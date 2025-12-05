@@ -22,8 +22,8 @@ serve(async (req) => {
     console.log(`Broker sync action: ${action}`);
 
     // MetaApi base URLs
-    const METAAPI_BASE = 'https://mt-provisioning-api-v1.agiliumtrade.ai';
-    const METAAPI_RPC = 'https://mt-client-api-v1.agiliumtrade.ai';
+    const METAAPI_BASE = 'https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai';
+    const METAAPI_RPC = 'https://mt-client-api-v1.agiliumtrade.agiliumtrade.ai';
 
     if (action === 'create-account') {
       // Create a MetaApi account to connect to the broker
