@@ -118,8 +118,8 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
     ctx.lineTo(xFor(0), dimensions.height - padding.bottom);
     ctx.closePath();
     const fillGrad = ctx.createLinearGradient(0, padding.top, 0, dimensions.height - padding.bottom);
-    fillGrad.addColorStop(0, "rgba(52, 211, 153, 0.2)");
-    fillGrad.addColorStop(1, "rgba(15, 23, 42, 0)");
+    fillGrad.addColorStop(0, "rgba(52, 211, 153, 0.25)");
+    fillGrad.addColorStop(1, "transparent");
     ctx.fillStyle = fillGrad;
     ctx.fill();
 
@@ -191,14 +191,7 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
 
       <div
         ref={containerRef}
-        className="w-full h-56 rounded-xl overflow-hidden border border-secondary/30 bg-gradient-to-br from-card via-card to-muted/20"
-        style={{
-          background: `
-            radial-gradient(circle at 0% 0%, rgba(52, 211, 153, 0.15), transparent 50%),
-            radial-gradient(circle at 100% 100%, rgba(6, 182, 212, 0.15), transparent 50%),
-            hsl(222 47% 6%)
-          `,
-        }}
+        className="w-full h-56 rounded-xl overflow-hidden border border-secondary/30 bg-card"
       >
         <canvas ref={canvasRef} className="w-full h-full" />
       </div>

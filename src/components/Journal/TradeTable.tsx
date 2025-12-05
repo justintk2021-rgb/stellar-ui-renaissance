@@ -24,12 +24,7 @@ export function TradeTable({ trades, onEdit, onDelete, onSelectForNotebook }: Tr
         </Badge>
       </div>
 
-      <div className="rounded-xl border border-secondary/30 overflow-hidden" style={{
-        background: `
-          radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.1), transparent 50%),
-          hsl(222 47% 7%)
-        `,
-      }}>
+      <div className="rounded-xl border border-secondary/30 overflow-hidden bg-card">
         {/* Header */}
         <div className="hidden md:grid grid-cols-[80px_100px_70px_90px_1fr_80px] gap-2 px-4 py-3 bg-muted/30 border-b border-secondary/30">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Date</div>

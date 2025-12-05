@@ -62,12 +62,7 @@ export function NotebookView({ trades, selectedTradeId, onSelectTrade, onSaveNot
 
       <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.4fr] gap-4">
         {/* Trade list */}
-        <div className="rounded-xl border border-secondary/30 overflow-hidden h-[300px]" style={{
-          background: `
-            radial-gradient(circle at 0% 0%, rgba(6, 182, 212, 0.08), transparent 50%),
-            hsl(222 47% 7%)
-          `,
-        }}>
+        <div className="rounded-xl border border-secondary/30 overflow-hidden h-[300px] bg-card">
           <div className="px-3 py-2.5 border-b border-secondary/30 bg-muted/30 flex justify-between items-center">
             <span className="text-xs font-medium">Trades</span>
             <span className="text-[10px] text-muted-foreground">Select one →</span>
@@ -116,12 +111,7 @@ export function NotebookView({ trades, selectedTradeId, onSelectTrade, onSaveNot
         </div>
 
         {/* Editor */}
-        <div className="rounded-xl border border-secondary/30 p-4 flex flex-col h-[300px]" style={{
-          background: `
-            radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.12), transparent 50%),
-            hsl(222 47% 7%)
-          `,
-        }}>
+        <div className="rounded-xl border border-secondary/30 p-4 flex flex-col h-[300px] bg-card">
           {selectedTrade ? (
             <>
               <div className="flex items-start justify-between mb-3">
