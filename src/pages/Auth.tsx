@@ -1,20 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserProfile } from "@/types/user";
 import { toast } from "sonner";
 import { TrendingUp, Mail, Lock, User } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
-interface AuthPageProps {
-  onSignUp: (profile: UserProfile) => void;
-  existingUser: UserProfile | null;
-}
-
-export function AuthPage({ onSignUp, existingUser }: AuthPageProps) {
+export function AuthPage() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -22,38 +18,97 @@ export function AuthPage({ onSignUp, existingUser }: AuthPageProps) {
     password: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    // Check if already logged in
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate("/");
+      }
+    };
+    checkSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        navigate("/");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
     if (!formData.email || !formData.password) {
       toast.error("Please fill in all required fields");
+      setIsLoading(false);
       return;
     }
 
     if (!isLogin && (!formData.firstName || !formData.lastName)) {
       toast.error("Please enter your name");
+      setIsLoading(false);
       return;
     }
 
-    if (isLogin) {
-      // Check if user exists
-      if (existingUser && existingUser.email === formData.email) {
-        toast.success("Welcome back!");
-        navigate("/");
+    try {
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+        
+        if (error) {
+          toast.error(error.message);
+        } else {
+          toast.success("Welcome back!");
+        }
       } else {
-        toast.error("No account found with this email");
+        const { error } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+            },
+          },
+        });
+        
+        if (error) {
+          toast.error(error.message);
+        } else {
+          toast.success("Account created successfully!");
+        }
       }
-    } else {
-      // Sign up
-      const newProfile: UserProfile = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        createdAt: new Date().toISOString(),
-      };
-      onSignUp(newProfile);
-      toast.success("Account created successfully!");
-      navigate("/");
+    } catch (error: any) {
+      toast.error(error.message || "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        },
+      });
+      
+      if (error) {
+        toast.error(error.message);
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to sign in with Google");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -103,6 +158,7 @@ export function AuthPage({ onSignUp, existingUser }: AuthPageProps) {
                         setFormData({ ...formData, firstName: e.target.value })
                       }
                       className="pl-10 bg-background/50 border-border/50 focus:border-primary/50"
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -117,6 +173,7 @@ export function AuthPage({ onSignUp, existingUser }: AuthPageProps) {
                         setFormData({ ...formData, lastName: e.target.value })
                       }
                       className="pl-10 bg-background/50 border-border/50 focus:border-primary/50"
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -135,6 +192,7 @@ export function AuthPage({ onSignUp, existingUser }: AuthPageProps) {
                     setFormData({ ...formData, email: e.target.value })
                   }
                   className="pl-10 bg-background/50 border-border/50 focus:border-primary/50"
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -151,15 +209,17 @@ export function AuthPage({ onSignUp, existingUser }: AuthPageProps) {
                     setFormData({ ...formData, password: e.target.value })
                   }
                   className="pl-10 bg-background/50 border-border/50 focus:border-primary/50"
+                  disabled={isLoading}
                 />
               </div>
             </div>
 
             <Button
               type="submit"
+              disabled={isLoading}
               className="w-full mt-6 bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 shadow-glow-sm font-semibold h-11"
             >
-              {isLogin ? "Sign In" : "Sign Up"}
+              {isLoading ? "Loading..." : isLogin ? "Sign In" : "Sign Up"}
             </Button>
           </form>
 
@@ -179,7 +239,8 @@ export function AuthPage({ onSignUp, existingUser }: AuthPageProps) {
               type="button"
               variant="outline"
               className="border-border/50 hover:bg-muted/50"
-              onClick={() => toast.info("Google sign-in coming soon!")}
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
             >
               <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
                 <path
@@ -206,6 +267,7 @@ export function AuthPage({ onSignUp, existingUser }: AuthPageProps) {
               variant="outline"
               className="border-border/50 hover:bg-muted/50"
               onClick={() => toast.info("Apple sign-in coming soon!")}
+              disabled={isLoading}
             >
               <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
@@ -221,6 +283,7 @@ export function AuthPage({ onSignUp, existingUser }: AuthPageProps) {
               type="button"
               onClick={() => setIsLogin(!isLogin)}
               className="text-primary hover:underline font-medium"
+              disabled={isLoading}
             >
               {isLogin ? "Sign Up" : "Login here"}
             </button>

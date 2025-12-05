@@ -1,8 +1,17 @@
 import { Moon, Sun, User, Mail, Key, Calendar, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { UserProfile } from "@/types/user";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+
+interface UserProfile {
+  id: string;
+  user_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  created_at: string;
+}
 
 interface SettingsViewProps {
   theme: 'dark' | 'light';
@@ -18,6 +27,23 @@ export function SettingsView({ theme, onThemeChange, userProfile, onLogout }: Se
       month: "long",
       day: "numeric",
     });
+  };
+
+  const getInitials = () => {
+    if (userProfile?.first_name && userProfile?.last_name) {
+      return `${userProfile.first_name.charAt(0)}${userProfile.last_name.charAt(0)}`;
+    }
+    if (userProfile?.email) {
+      return userProfile.email.charAt(0).toUpperCase();
+    }
+    return "U";
+  };
+
+  const getDisplayName = () => {
+    if (userProfile?.first_name || userProfile?.last_name) {
+      return `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim();
+    }
+    return userProfile?.email || "User";
   };
 
   return (
@@ -39,11 +65,19 @@ export function SettingsView({ theme, onThemeChange, userProfile, onLogout }: Se
             {/* User Info Card */}
             <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/20">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-primary-foreground text-xl font-bold">
-                  {userProfile.firstName.charAt(0)}{userProfile.lastName.charAt(0)}
-                </div>
+                {userProfile.avatar_url ? (
+                  <img 
+                    src={userProfile.avatar_url} 
+                    alt="Avatar" 
+                    className="w-16 h-16 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-primary-foreground text-xl font-bold">
+                    {getInitials()}
+                  </div>
+                )}
                 <div>
-                  <h3 className="text-lg font-semibold">{userProfile.firstName} {userProfile.lastName}</h3>
+                  <h3 className="text-lg font-semibold">{getDisplayName()}</h3>
                   <p className="text-sm text-muted-foreground">{userProfile.email}</p>
                 </div>
               </div>
@@ -65,7 +99,7 @@ export function SettingsView({ theme, onThemeChange, userProfile, onLogout }: Se
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium text-foreground">Member Since</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(userProfile.createdAt)}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(userProfile.created_at)}</p>
                 </div>
               </div>
             </div>
@@ -108,28 +142,9 @@ export function SettingsView({ theme, onThemeChange, userProfile, onLogout }: Se
                 <Mail className="w-4 h-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium text-foreground">Email</p>
-                  <p className="text-xs text-muted-foreground">Not signed in</p>
+                  <p className="text-xs text-muted-foreground">Loading...</p>
                 </div>
               </div>
-              <a
-                href="/auth"
-                className="px-4 py-2 text-xs font-medium rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
-              >
-                Sign In
-              </a>
-            </div>
-
-            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">
-              <div className="flex items-center gap-3">
-                <Key className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">Data Backup</p>
-                  <p className="text-xs text-muted-foreground">Local storage only</p>
-                </div>
-              </div>
-              <button className="px-4 py-2 text-xs font-medium rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors">
-                Export
-              </button>
             </div>
           </div>
         )}
