@@ -6,16 +6,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Trash2 } from "lucide-react";
+import { Plus, X } from "lucide-react";
 
 interface TradeFormProps {
   editingTrade: Trade | null;
   onSubmit: (trade: Omit<Trade, 'id'>) => void;
   onCancelEdit: () => void;
-  onClearAll: () => void;
 }
 
-export function TradeForm({ editingTrade, onSubmit, onCancelEdit, onClearAll }: TradeFormProps) {
+export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormProps) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().slice(0, 10),
     pair: '',
@@ -173,37 +172,25 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit, onClearAll }: 
           />
         </div>
 
-        <div className="flex items-center justify-between pt-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClearAll}
-            className="text-xs border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive/50"
-          >
-            <Trash2 className="w-3 h-3 mr-1" />
-            Clear All
-          </Button>
-
-          <div className="flex gap-2">
-            {editingTrade && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCancelEdit}
-                className="text-xs border-border/50"
-              >
-                <X className="w-3 h-3 mr-1" />
-                Cancel
-              </Button>
-            )}
+        <div className="flex justify-end gap-2 pt-2 border-t border-border/30">
+          {editingTrade && (
             <Button
-              type="submit"
-              className="bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 shadow-glow-sm text-xs font-semibold"
+              type="button"
+              variant="outline"
+              onClick={onCancelEdit}
+              className="text-xs border-border/50"
             >
-              <Plus className="w-3 h-3 mr-1" />
-              {editingTrade ? 'Update Trade' : 'Add Trade'}
+              <X className="w-3 h-3 mr-1" />
+              Cancel
             </Button>
-          </div>
+          )}
+          <Button
+            type="submit"
+            className="bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 shadow-glow-sm text-xs font-semibold"
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            {editingTrade ? 'Update Trade' : 'Add Trade'}
+          </Button>
         </div>
       </form>
     </div>

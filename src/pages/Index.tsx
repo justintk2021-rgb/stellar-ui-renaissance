@@ -109,11 +109,10 @@ const Index = () => {
   }, [selectedTradeId, trades, setTrades, setNotebookEntries]);
 
   const handleClearAll = useCallback(() => {
-    if (window.confirm('Delete ALL trades? This cannot be undone.')) {
-      setTrades([]);
-      setSelectedTradeId(null);
-    }
-  }, [setTrades]);
+    setTrades([]);
+    setNotebookEntries(prev => prev.filter(e => !e.tradeId));
+    setSelectedTradeId(null);
+  }, [setTrades, setNotebookEntries]);
 
   const handleSetBalance = useCallback((value: number) => {
     setStartBalance(value);
@@ -198,13 +197,13 @@ const Index = () => {
                   editingTrade={editingTrade}
                   onSubmit={handleAddTrade}
                   onCancelEdit={() => setEditingTrade(null)}
-                  onClearAll={handleClearAll}
                 />
                 <TradeTable
                   trades={trades}
                   onEdit={setEditingTrade}
                   onDelete={handleDeleteTrade}
                   onSelectForNotebook={handleSelectForNotebook}
+                  onClearAll={handleClearAll}
                 />
               </div>
             )}
