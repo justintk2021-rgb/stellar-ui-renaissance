@@ -161,50 +161,145 @@ export function NotebookView({
     losses: linkedTrade.result < 0 ? 1 : 0,
   } : null;
 
+  // Calculate overall trade stats
+  const overallStats = {
+    totalTrades: trades.length,
+    wins: trades.filter(t => t.result > 0).length,
+    losses: trades.filter(t => t.result < 0).length,
+    netPnL: trades.reduce((sum, t) => sum + t.result, 0),
+    winRate: trades.length > 0 ? (trades.filter(t => t.result > 0).length / trades.length) * 100 : 0,
+  };
+
   return (
     <div className="h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4">
-      {/* Left Sidebar - Categories */}
-      <div className="w-48 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
-        <div className="p-3 border-b border-border/30">
-          <Button
-            onClick={handleNewNote}
-            className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-xs font-medium"
-          >
-            <Plus className="w-3 h-3 mr-1" />
-            Add Note
-          </Button>
-        </div>
-        
-        <ScrollArea className="flex-1">
-          <div className="p-2 space-y-1">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1">
-              Folders
-            </div>
-            {CATEGORIES.map((cat) => {
-              const Icon = cat.icon;
-              const count = cat.id === "all" 
-                ? notebookEntries.length 
-                : notebookEntries.filter((e) => e.category === cat.id).length;
-              
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={cn(
-                    "w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
-                    selectedCategory === cat.id
-                      ? "bg-primary/20 text-primary border border-primary/30"
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                  )}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span className="flex-1 text-left truncate">{cat.label}</span>
-                  <span className="text-[10px] opacity-60">({count})</span>
-                </button>
-              );
-            })}
+      {/* Left Sidebar - Categories & Trade Stats */}
+      <div className="w-52 flex-shrink-0 flex flex-col gap-4">
+        {/* Categories */}
+        <div className="glass rounded-xl border border-border/40 overflow-hidden flex flex-col flex-1">
+          <div className="p-3 border-b border-border/30">
+            <Button
+              onClick={handleNewNote}
+              className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-xs font-medium"
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add Note
+            </Button>
           </div>
-        </ScrollArea>
+          
+          <ScrollArea className="flex-1">
+            <div className="p-2 space-y-1">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1">
+                Folders
+              </div>
+              {CATEGORIES.map((cat) => {
+                const Icon = cat.icon;
+                const count = cat.id === "all" 
+                  ? notebookEntries.length 
+                  : notebookEntries.filter((e) => e.category === cat.id).length;
+                
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
+                      selectedCategory === cat.id
+                        ? "bg-primary/20 text-primary border border-primary/30"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span className="flex-1 text-left truncate">{cat.label}</span>
+                    <span className="text-[10px] opacity-60">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* Trade Stats Summary */}
+        <div className="glass rounded-xl border border-border/40 p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            <span className="text-xs font-medium">Trade Summary</span>
+          </div>
+          
+          <div className={cn(
+            "p-3 rounded-lg border text-center",
+            overallStats.netPnL >= 0 
+              ? "bg-primary/10 border-primary/30" 
+              : "bg-destructive/10 border-destructive/30"
+          )}>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Net P&L</div>
+            <div className={cn(
+              "text-xl font-bold font-mono",
+              overallStats.netPnL >= 0 ? "text-primary" : "text-destructive"
+            )}>
+              {overallStats.netPnL >= 0 ? "+" : ""}${overallStats.netPnL.toFixed(2)}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-2 rounded-lg bg-muted/30 text-center">
+              <div className="text-[10px] text-muted-foreground">Total</div>
+              <div className="text-sm font-bold">{overallStats.totalTrades}</div>
+            </div>
+            <div className="p-2 rounded-lg bg-muted/30 text-center">
+              <div className="text-[10px] text-muted-foreground">Win Rate</div>
+              <div className={cn(
+                "text-sm font-bold",
+                overallStats.winRate >= 50 ? "text-primary" : "text-destructive"
+              )}>
+                {overallStats.winRate.toFixed(1)}%
+              </div>
+            </div>
+            <div className="p-2 rounded-lg bg-primary/10 text-center">
+              <div className="text-[10px] text-muted-foreground">Winners</div>
+              <div className="text-sm font-bold text-primary">{overallStats.wins}</div>
+            </div>
+            <div className="p-2 rounded-lg bg-destructive/10 text-center">
+              <div className="text-[10px] text-muted-foreground">Losers</div>
+              <div className="text-sm font-bold text-destructive">{overallStats.losses}</div>
+            </div>
+          </div>
+
+          {/* Recent Trades */}
+          {trades.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Recent Trades</div>
+              <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+                {trades.slice(0, 5).map((trade) => (
+                  <div 
+                    key={trade.id}
+                    className="flex items-center justify-between p-2 rounded-lg bg-muted/20 text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          "text-[9px] px-1.5 py-0",
+                          trade.direction === 'Long' 
+                            ? "border-primary/50 text-primary" 
+                            : "border-destructive/50 text-destructive"
+                        )}
+                      >
+                        {trade.direction.charAt(0)}
+                      </Badge>
+                      <span className="font-medium">{trade.pair}</span>
+                    </div>
+                    <span className={cn(
+                      "font-bold font-mono",
+                      trade.result >= 0 ? "text-primary" : "text-destructive"
+                    )}>
+                      {trade.result >= 0 ? "+" : ""}{trade.result.toFixed(0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Middle - Entries List */}
