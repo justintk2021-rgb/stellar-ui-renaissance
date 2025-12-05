@@ -8,6 +8,7 @@ import { TopBar } from "@/components/Layout/TopBar";
 import { StatsGrid } from "@/components/Dashboard/StatsGrid";
 import { EquityChart } from "@/components/Dashboard/EquityChart";
 import { PnLCalendar } from "@/components/Dashboard/PnLCalendar";
+import { BrokerConnection } from "@/components/Dashboard/BrokerConnection";
 import { TradeForm } from "@/components/Journal/TradeForm";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { NotebookView } from "@/components/Notebook/NotebookView";
@@ -266,6 +267,27 @@ const Index = () => {
             {/* Dashboard Page */}
             {currentPage === 'dashboard' && (
               <div className="space-y-6 animate-fade-in">
+                <BrokerConnection 
+                  onTradesImported={(importedTrades) => {
+                    // Convert MetaApi trades to our format
+                    const formattedTrades = importedTrades
+                      .filter((t: any) => t.type === 'DEAL_TYPE_BUY' || t.type === 'DEAL_TYPE_SELL')
+                      .map((t: any) => ({
+                        id: t.id || Date.now().toString(),
+                        date: new Date(t.time).toISOString().slice(0, 10),
+                        pair: t.symbol || 'Unknown',
+                        direction: t.type === 'DEAL_TYPE_BUY' ? 'Long' : 'Short' as 'Long' | 'Short',
+                        result: t.profit || 0,
+                        session: '',
+                        strategy: '',
+                        notes: `Imported from broker. Volume: ${t.volume}`,
+                      }));
+                    
+                    if (formattedTrades.length > 0) {
+                      setTrades(prev => [...formattedTrades, ...prev]);
+                    }
+                  }}
+                />
                 <EquityChart
                   trades={trades}
                   startBalance={startBalance}
