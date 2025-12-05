@@ -214,12 +214,16 @@
 
   .hover-lift:hover {
     @apply -translate-y-1;
-    box-shadow: 0 20px 40px hsl(222 47% 4% / 0.5);
+    box-shadow: 0 20px 40px hsl(var(--foreground) / 0.1);
+  }
+
+  .light .hover-lift:hover {
+    box-shadow: 0 20px 40px hsl(var(--foreground) / 0.08);
   }
 
   /* Stat card gradient backgrounds */
   .stat-gradient {
-    background: 
+    background:
       radial-gradient(circle at 0% 0%, hsl(158 64% 52% / 0.12), transparent 50%),
       hsl(var(--card));
   }
