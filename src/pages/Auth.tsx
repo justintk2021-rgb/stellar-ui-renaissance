@@ -114,15 +114,74 @@ export function AuthPage() {
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-      {/* TradingView Chart Background */}
-      <div className="absolute inset-0 z-0">
-        <iframe
-          src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=BINANCE%3ABTCUSDT&interval=5&hidesidetoolbar=0&symboledit=0&saveimage=0&toolbarbg=1a1a2e&studies=[]&theme=dark&style=1&timezone=exchange&withdateranges=0&showpopupbutton=0&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&showpopupbutton=0&locale=en&utm_source=&utm_medium=widget&utm_campaign=chart"
-          className="w-full h-full border-0"
-          style={{ filter: "brightness(0.4) saturate(1.2)" }}
-          allowTransparency
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/20" />
+      {/* Blurred Line Graph Background */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        <svg
+          className="absolute inset-0 w-full h-full"
+          viewBox="0 0 1200 800"
+          preserveAspectRatio="xMidYMid slice"
+          style={{ filter: "blur(3px)" }}
+        >
+          <defs>
+            <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
+              <stop offset="50%" stopColor="hsl(var(--secondary))" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
+            </linearGradient>
+            <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          
+          {/* Area fill under the line */}
+          <path
+            d="M0 600 L0 450 Q100 400, 200 420 T400 380 T600 350 T800 300 T1000 320 T1200 280 L1200 600 Z"
+            fill="url(#areaGradient)"
+          />
+          
+          {/* Main line */}
+          <path
+            d="M0 450 Q100 400, 200 420 T400 380 T600 350 T800 300 T1000 320 T1200 280"
+            fill="none"
+            stroke="url(#lineGradient)"
+            strokeWidth="3"
+            strokeLinecap="round"
+          />
+          
+          {/* Secondary line (lower) */}
+          <path
+            d="M0 520 Q150 480, 300 500 T500 460 T700 440 T900 400 T1100 420 T1200 380"
+            fill="none"
+            stroke="hsl(var(--muted-foreground))"
+            strokeWidth="1.5"
+            strokeOpacity="0.3"
+            strokeLinecap="round"
+          />
+          
+          {/* Grid lines */}
+          <g stroke="hsl(var(--border))" strokeOpacity="0.1" strokeWidth="1">
+            <line x1="0" y1="200" x2="1200" y2="200" />
+            <line x1="0" y1="400" x2="1200" y2="400" />
+            <line x1="0" y1="600" x2="1200" y2="600" />
+            <line x1="300" y1="0" x2="300" y2="800" />
+            <line x1="600" y1="0" x2="600" y2="800" />
+            <line x1="900" y1="0" x2="900" y2="800" />
+          </g>
+          
+          {/* Glow dots on the line */}
+          <circle cx="200" cy="420" r="6" fill="hsl(var(--primary))" opacity="0.8">
+            <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="600" cy="350" r="6" fill="hsl(var(--primary))" opacity="0.8">
+            <animate attributeName="opacity" values="0.6;1;0.6" dur="2.5s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="1000" cy="320" r="6" fill="hsl(var(--primary))" opacity="0.8">
+            <animate attributeName="opacity" values="0.5;1;0.5" dur="3s" repeatCount="indefinite" />
+          </circle>
+        </svg>
+        <div className="absolute inset-0 bg-gradient-to-br from-background/80 via-background/60 to-background/80" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10" />
       </div>
 
       {/* Auth Card */}
