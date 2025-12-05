@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,102 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Plus, X } from "lucide-react";
+
+// Common trading pairs and assets
+const TRADING_PAIRS = [
+  // Forex Majors
+  "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD",
+  // Forex Crosses
+  "EURGBP", "EURJPY", "GBPJPY", "AUDJPY", "CADJPY", "CHFJPY", "NZDJPY",
+  "EURAUD", "EURCHF", "EURCAD", "EURNZD", "GBPAUD", "GBPCAD", "GBPCHF", "GBPNZD",
+  "AUDCAD", "AUDCHF", "AUDNZD", "CADCHF", "NZDCAD", "NZDCHF",
+  // Commodities
+  "XAUUSD", "XAGUSD", "XAUEUR", "XAGEUR", "USOIL", "UKOIL", "NATGAS",
+  // Indices
+  "US30", "US100", "US500", "GER40", "UK100", "FRA40", "JPN225", "AUS200",
+  "NAS100", "SPX500", "DJ30",
+  // Crypto
+  "BTCUSD", "ETHUSD", "XRPUSD", "LTCUSD", "BCHUSD", "ADAUSD", "DOTUSD", "SOLUSD",
+  "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "AVAXUSDT",
+  // Stocks (popular)
+  "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "AMD", "NFLX", "DIS",
+];
+
+interface PairAutocompleteProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function PairAutocomplete({ value, onChange }: PairAutocompleteProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [filteredPairs, setFilteredPairs] = useState<string[]>([]);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (value.length > 0) {
+      const filtered = TRADING_PAIRS.filter(pair =>
+        pair.toLowerCase().includes(value.toLowerCase())
+      ).slice(0, 8);
+      setFilteredPairs(filtered);
+      setIsOpen(filtered.length > 0);
+    } else {
+      setFilteredPairs([]);
+      setIsOpen(false);
+    }
+  }, [value]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelect = (pair: string) => {
+    onChange(pair);
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="space-y-2 relative" ref={wrapperRef}>
+      <Label htmlFor="pair" className="text-xs text-muted-foreground">Pair / Asset</Label>
+      <Input
+        id="pair"
+        type="text"
+        placeholder="XAUUSD, EURUSD..."
+        value={value}
+        onChange={(e) => onChange(e.target.value.toUpperCase())}
+        onFocus={() => value.length > 0 && filteredPairs.length > 0 && setIsOpen(true)}
+        className="bg-muted/50 border-border/50 focus:border-primary/50"
+        autoComplete="off"
+        required
+      />
+      {isOpen && filteredPairs.length > 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
+          {filteredPairs.map((pair) => (
+            <button
+              key={pair}
+              type="button"
+              onClick={() => handleSelect(pair)}
+              className="w-full px-3 py-2 text-left text-sm hover:bg-muted/80 transition-colors flex items-center justify-between"
+            >
+              <span className="font-medium">{pair}</span>
+              <span className="text-xs text-muted-foreground">
+                {pair.includes("USD") && !pair.includes("USDT") ? "Forex" : 
+                 pair.includes("USDT") ? "Crypto" :
+                 pair.includes("XAU") || pair.includes("XAG") || pair.includes("OIL") || pair.includes("GAS") ? "Commodity" :
+                 pair.match(/^US\d|^GER|^UK|^FRA|^JPN|^AUS|^NAS|^SPX|^DJ/) ? "Index" : "Stock"}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface TradeFormProps {
   editingTrade: Trade | null;
@@ -93,18 +189,10 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="pair" className="text-xs text-muted-foreground">Pair / Asset</Label>
-            <Input
-              id="pair"
-              type="text"
-              placeholder="XAUUSD, EURUSD..."
-              value={formData.pair}
-              onChange={(e) => setFormData(prev => ({ ...prev, pair: e.target.value }))}
-              className="bg-muted/50 border-border/50 focus:border-primary/50"
-              required
-            />
-          </div>
+          <PairAutocomplete
+            value={formData.pair}
+            onChange={(value) => setFormData(prev => ({ ...prev, pair: value }))}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="direction" className="text-xs text-muted-foreground">Direction</Label>
