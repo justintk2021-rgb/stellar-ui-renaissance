@@ -234,8 +234,8 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>ATP Trades - Trading Journal & Notebook</title>
-        <meta name="description" content="Track your trades, analyze performance, and keep detailed notes with ATP Trades - your personal trading journal." />
+        <title>NSYNC Journal - Trading Journal & Notebook</title>
+        <meta name="description" content="Track your trades, analyze performance, and keep detailed notes with NSYNC Journal - your personal trading journal." />
       </Helmet>
 
       <div className="min-h-screen flex flex-col lg:flex-row gap-4 p-4 lg:p-5 max-w-[1400px] mx-auto pb-24 lg:pb-5">
@@ -253,7 +253,7 @@ const Index = () => {
             </svg>
           </div>
           <div>
-            <h1 className="text-base font-bold gradient-text">ATP TRADES</h1>
+            <h1 className="text-base font-bold gradient-text">NSYNC JOURNAL</h1>
             <p className="text-[10px] text-muted-foreground">Personal Journal</p>
           </div>
         </div>

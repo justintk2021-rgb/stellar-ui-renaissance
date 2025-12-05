@@ -234,7 +234,7 @@ export function SettingsView({ theme, onThemeChange, userProfile, onLogout }: Se
       {/* About */}
       <section className="glass rounded-xl p-6">
         <div className="text-center space-y-2">
-          <p className="text-xs text-muted-foreground">ATP Trades v1.0</p>
+          <p className="text-xs text-muted-foreground">NSYNC Journal v1.0</p>
           <p className="text-xs text-muted-foreground">All data is stored locally in your browser</p>
         </div>
       </section>
