@@ -42,8 +42,6 @@ serve(async (req) => {
           server: server,
           platform: platform || 'mt5',
           magic: 0,
-          application: 'MetaApi',
-          connectionStatus: 'connected',
         }),
       });
 
