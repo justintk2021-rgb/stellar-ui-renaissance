@@ -1,9 +1,32 @@
-import { Trade } from "@/types/trade";
+import { useState, useRef, useEffect } from "react";
+import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useRef, useEffect } from "react";
-import { Bold, List, Heading1, Save } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Bold,
+  Italic,
+  List,
+  Heading1,
+  Save,
+  Plus,
+  FolderOpen,
+  FileText,
+  BookOpen,
+  Target,
+  TrendingUp,
+  AlertTriangle,
+  Lightbulb,
+  Calendar,
+  Search,
+  Trash2,
+  ChevronRight,
+  ListOrdered,
+  Link,
+  Quote,
+} from "lucide-react";
 import { toast } from "sonner";
 
 interface NotebookViewProps {
@@ -11,28 +34,66 @@ interface NotebookViewProps {
   selectedTradeId: string | null;
   onSelectTrade: (id: string) => void;
   onSaveNotes: (id: string, notes: string) => void;
+  notebookEntries: NotebookEntry[];
+  onSaveEntry: (entry: NotebookEntry) => void;
+  onDeleteEntry: (id: string) => void;
 }
 
-export function NotebookView({ trades, selectedTradeId, onSelectTrade, onSaveNotes }: NotebookViewProps) {
-  const editorRef = useRef<HTMLDivElement>(null);
-  const selectedTrade = trades.find((t) => t.id === selectedTradeId);
+const CATEGORIES = [
+  { id: "all", label: "All Notes", icon: FileText },
+  { id: "trade-notes", label: "Trade Notes", icon: TrendingUp },
+  { id: "daily-journal", label: "Daily Journal", icon: Calendar },
+  { id: "trading-plan", label: "Trading Plan", icon: Target },
+  { id: "goals", label: "Goals", icon: Lightbulb },
+  { id: "mistakes", label: "Mistakes & Lessons", icon: AlertTriangle },
+  { id: "general", label: "General Notes", icon: BookOpen },
+];
 
+export function NotebookView({
+  trades,
+  selectedTradeId,
+  onSelectTrade,
+  onSaveNotes,
+  notebookEntries,
+  onSaveEntry,
+  onDeleteEntry,
+}: NotebookViewProps) {
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  // Find selected entry
+  const selectedEntry = notebookEntries.find((e) => e.id === selectedEntryId);
+
+  // Filter entries by category and search
+  const filteredEntries = notebookEntries.filter((entry) => {
+    const matchesCategory = selectedCategory === "all" || entry.category === selectedCategory;
+    const matchesSearch = entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      entry.content.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  // Group entries by date
+  const groupedEntries = filteredEntries.reduce((acc, entry) => {
+    const date = entry.date;
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(entry);
+    return acc;
+  }, {} as Record<string, NotebookEntry[]>);
+
+  const sortedDates = Object.keys(groupedEntries).sort((a, b) => b.localeCompare(a));
+
+  // Load entry content into editor
   useEffect(() => {
-    if (editorRef.current && selectedTrade) {
-      if (selectedTrade.notebook?.trim()) {
-        editorRef.current.innerHTML = selectedTrade.notebook;
-      } else {
-        editorRef.current.innerHTML = `
-          <h3>📋 Plan</h3>
-          <ul><li>Why did I take this trade?</li></ul>
-          <h3>⚙ Execution</h3>
-          <ul><li>Entry, management, exit.</li></ul>
-          <h3>🧠 Review</h3>
-          <ul><li>What did I learn?</li></ul>
-        `;
-      }
+    if (editorRef.current && selectedEntry) {
+      editorRef.current.innerHTML = selectedEntry.content || "";
+    } else if (editorRef.current && isCreatingNew) {
+      editorRef.current.innerHTML = "";
     }
-  }, [selectedTrade]);
+  }, [selectedEntry, isCreatingNew]);
 
   const execCommand = (cmd: string, value?: string) => {
     editorRef.current?.focus();
@@ -40,157 +101,308 @@ export function NotebookView({ trades, selectedTradeId, onSelectTrade, onSaveNot
   };
 
   const handleSave = () => {
-    if (!selectedTradeId || !editorRef.current) return;
-    onSaveNotes(selectedTradeId, editorRef.current.innerHTML);
-    toast.success("Notes saved!");
+    if (!editorRef.current) return;
+    
+    const content = editorRef.current.innerHTML;
+    const title = titleRef.current?.value || "Untitled Note";
+    
+    if (isCreatingNew) {
+      const newEntry: NotebookEntry = {
+        id: Date.now().toString(),
+        title,
+        content,
+        category: selectedCategory === "all" ? "general" : selectedCategory,
+        date: new Date().toISOString().slice(0, 10),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      onSaveEntry(newEntry);
+      setSelectedEntryId(newEntry.id);
+      setIsCreatingNew(false);
+      toast.success("Note created!");
+    } else if (selectedEntry) {
+      onSaveEntry({
+        ...selectedEntry,
+        title,
+        content,
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success("Note saved!");
+    }
   };
 
-  const pl = selectedTrade?.result || 0;
-  const isProfit = pl >= 0;
+  const handleNewNote = () => {
+    setIsCreatingNew(true);
+    setSelectedEntryId(null);
+    if (titleRef.current) titleRef.current.value = "";
+    if (editorRef.current) editorRef.current.innerHTML = "";
+  };
+
+  const handleDeleteEntry = () => {
+    if (selectedEntry && window.confirm("Delete this note?")) {
+      onDeleteEntry(selectedEntry.id);
+      setSelectedEntryId(null);
+      toast.success("Note deleted!");
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  };
+
+  // Find linked trade for entry
+  const linkedTrade = selectedEntry?.tradeId ? trades.find((t) => t.id === selectedEntry.tradeId) : null;
+
+  // Calculate stats for linked trade
+  const tradeStats = linkedTrade ? {
+    pnl: linkedTrade.result,
+    wins: linkedTrade.result > 0 ? 1 : 0,
+    losses: linkedTrade.result < 0 ? 1 : 0,
+  } : null;
 
   return (
-    <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-base font-semibold">Notebook</h3>
-          <p className="text-xs text-muted-foreground mt-1">Detailed notes per trade</p>
+    <div className="h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4">
+      {/* Left Sidebar - Categories */}
+      <div className="w-48 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
+        <div className="p-3 border-b border-border/30">
+          <Button
+            onClick={handleNewNote}
+            className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-xs font-medium"
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            Add Note
+          </Button>
         </div>
-        <Badge variant="outline" className="border-primary/40 text-muted-foreground text-xs">
-          Notes
-        </Badge>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.4fr] gap-4">
-        {/* Trade list */}
-        <div className="rounded-xl border border-secondary/30 overflow-hidden h-[300px] bg-card">
-          <div className="px-3 py-2.5 border-b border-secondary/30 bg-muted/30 flex justify-between items-center">
-            <span className="text-xs font-medium">Trades</span>
-            <span className="text-[10px] text-muted-foreground">Select one →</span>
-          </div>
-          <div className="overflow-y-auto h-[calc(100%-40px)] custom-scrollbar p-2">
-            {trades.length === 0 ? (
-              <div className="text-center text-xs text-muted-foreground py-4">
-                No trades yet. Add one in Journal.
-              </div>
-            ) : (
-              trades.map((trade) => {
-                const tpl = trade.result || 0;
-                const tIsProfit = tpl >= 0;
-                const isActive = trade.id === selectedTradeId;
-
-                return (
-                  <div
-                    key={trade.id}
-                    onClick={() => onSelectTrade(trade.id)}
-                    className={cn(
-                      "rounded-lg p-3 mb-2 cursor-pointer border transition-all duration-200",
-                      isActive
-                        ? "bg-gradient-to-r from-primary/20 to-secondary/10 border-primary/50"
-                        : "border-transparent hover:bg-primary/10 hover:border-primary/30"
-                    )}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="text-sm font-medium">{trade.date || '-'}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                          {trade.pair || '-'} • {trade.direction}
-                        </div>
-                      </div>
-                      <span className={cn(
-                        "text-sm font-bold font-mono",
-                        tIsProfit ? "text-primary" : "text-destructive"
-                      )}>
-                        {tIsProfit ? '+' : ''}{tpl.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Editor */}
-        <div className="rounded-xl border border-secondary/30 p-4 flex flex-col h-[300px] bg-card">
-          {selectedTrade ? (
-            <>
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h4 className="text-sm font-semibold">
-                    {selectedTrade.pair} • {selectedTrade.date}
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Direction: {selectedTrade.direction} • Session: {selectedTrade.session || 'n/a'}
-                  </p>
-                </div>
-                <Badge
-                  variant="outline"
+        
+        <ScrollArea className="flex-1">
+          <div className="p-2 space-y-1">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1">
+              Folders
+            </div>
+            {CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              const count = cat.id === "all" 
+                ? notebookEntries.length 
+                : notebookEntries.filter((e) => e.category === cat.id).length;
+              
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
                   className={cn(
-                    "font-mono text-xs",
-                    isProfit
-                      ? "border-primary/50 text-primary bg-primary/10"
-                      : "border-destructive/50 text-destructive bg-destructive/10"
+                    "w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
+                    selectedCategory === cat.id
+                      ? "bg-primary/20 text-primary border border-primary/30"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                   )}
                 >
-                  P/L {isProfit ? '+' : ''}{pl.toFixed(2)}
-                </Badge>
-              </div>
+                  <Icon className="w-4 h-4" />
+                  <span className="flex-1 text-left truncate">{cat.label}</span>
+                  <span className="text-[10px] opacity-60">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        </ScrollArea>
+      </div>
 
-              <div className="flex items-center gap-2 mb-3">
-                <Badge variant="outline" className="text-[10px] border-border/50">
-                  Setup: {selectedTrade.strategy || 'n/a'}
-                </Badge>
-              </div>
+      {/* Middle - Entries List */}
+      <div className="w-64 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
+        <div className="p-3 border-b border-border/30 space-y-2">
+          <div className="flex items-center gap-2">
+            <FolderOpen className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-medium">
+              {CATEGORIES.find((c) => c.id === selectedCategory)?.label}
+            </span>
+          </div>
+          <div className="relative">
+            <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-7 text-xs pl-7 bg-muted/30 border-border/50"
+            />
+          </div>
+        </div>
 
-              <div className="flex gap-1 mb-3">
+        <ScrollArea className="flex-1">
+          <div className="p-2">
+            {sortedDates.length === 0 && !isCreatingNew ? (
+              <div className="text-center text-xs text-muted-foreground py-8">
+                No notes yet. Create one!
+              </div>
+            ) : (
+              sortedDates.map((date) => (
+                <div key={date} className="mb-3">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1 sticky top-0 bg-card/80 backdrop-blur-sm">
+                    {formatDate(date)}
+                  </div>
+                  {groupedEntries[date].map((entry) => (
+                    <button
+                      key={entry.id}
+                      onClick={() => {
+                        setSelectedEntryId(entry.id);
+                        setIsCreatingNew(false);
+                      }}
+                      className={cn(
+                        "w-full text-left p-2 rounded-lg transition-all mb-1",
+                        selectedEntryId === entry.id
+                          ? "bg-primary/20 border border-primary/40"
+                          : "hover:bg-muted/50 border border-transparent"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <ChevronRight className={cn(
+                          "w-3 h-3 transition-transform",
+                          selectedEntryId === entry.id && "rotate-90"
+                        )} />
+                        <span className="text-xs font-medium truncate flex-1">{entry.title}</span>
+                      </div>
+                      {entry.tradeId && (
+                        <Badge variant="outline" className="mt-1 text-[9px] border-secondary/50">
+                          Trade linked
+                        </Badge>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Right - Editor */}
+      <div className="flex-1 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
+        {selectedEntry || isCreatingNew ? (
+          <>
+            {/* Header */}
+            <div className="p-4 border-b border-border/30 space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <Input
+                    ref={titleRef}
+                    defaultValue={selectedEntry?.title || ""}
+                    placeholder="Note title..."
+                    className="text-lg font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/50"
+                  />
+                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    <Calendar className="w-3 h-3" />
+                    <span>{selectedEntry ? formatDate(selectedEntry.date) : formatDate(new Date().toISOString().slice(0, 10))}</span>
+                    {selectedEntry && (
+                      <>
+                        <span>•</span>
+                        <span>Last updated: {new Date(selectedEntry.updatedAt).toLocaleTimeString()}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Trade Stats (if linked) */}
+                {tradeStats && linkedTrade && (
+                  <div className={cn(
+                    "px-4 py-2 rounded-lg border text-right",
+                    tradeStats.pnl >= 0 
+                      ? "bg-primary/10 border-primary/30" 
+                      : "bg-destructive/10 border-destructive/30"
+                  )}>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Net P&L</div>
+                    <div className={cn(
+                      "text-xl font-bold font-mono",
+                      tradeStats.pnl >= 0 ? "text-primary" : "text-destructive"
+                    )}>
+                      {tradeStats.pnl >= 0 ? "+" : ""}${tradeStats.pnl.toFixed(2)}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-[10px]">
+                      <span>{linkedTrade.pair}</span>
+                      <span>•</span>
+                      <span>{linkedTrade.direction}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Toolbar */}
+            <div className="px-4 py-2 border-b border-border/30 flex items-center gap-1 flex-wrap">
+              <Button variant="outline" size="sm" onClick={() => execCommand("bold")} className="w-7 h-7 p-0">
+                <Bold className="w-3 h-3" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => execCommand("italic")} className="w-7 h-7 p-0">
+                <Italic className="w-3 h-3" />
+              </Button>
+              <div className="w-px h-5 bg-border/50 mx-1" />
+              <Button variant="outline" size="sm" onClick={() => execCommand("formatBlock", "h2")} className="w-7 h-7 p-0">
+                <Heading1 className="w-3 h-3" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => execCommand("insertUnorderedList")} className="w-7 h-7 p-0">
+                <List className="w-3 h-3" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => execCommand("insertOrderedList")} className="w-7 h-7 p-0">
+                <ListOrdered className="w-3 h-3" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => execCommand("formatBlock", "blockquote")} className="w-7 h-7 p-0">
+                <Quote className="w-3 h-3" />
+              </Button>
+              
+              <div className="flex-1" />
+              
+              {selectedEntry && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => execCommand('bold')}
-                  className="w-7 h-7 p-0 border-secondary/50 hover:border-primary/50 hover:bg-primary/10"
+                  onClick={handleDeleteEntry}
+                  className="text-xs text-destructive hover:bg-destructive/10 hover:border-destructive/50"
                 >
-                  <Bold className="w-3 h-3" />
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  Delete
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => execCommand('insertUnorderedList')}
-                  className="w-7 h-7 p-0 border-secondary/50 hover:border-primary/50 hover:bg-primary/10"
-                >
-                  <List className="w-3 h-3" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => execCommand('formatBlock', 'h3')}
-                  className="w-7 h-7 p-0 border-secondary/50 hover:border-primary/50 hover:bg-primary/10"
-                >
-                  <Heading1 className="w-3 h-3" />
-                </Button>
-              </div>
+              )}
+              <Button
+                onClick={handleSave}
+                className="bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-xs font-medium"
+              >
+                <Save className="w-3 h-3 mr-1" />
+                Save
+              </Button>
+            </div>
 
+            {/* Editor */}
+            <ScrollArea className="flex-1">
               <div
                 ref={editorRef}
                 contentEditable
-                className="flex-1 rounded-lg border border-dashed border-border/50 p-3 text-sm overflow-y-auto custom-scrollbar bg-muted/20 focus:outline-none focus:border-primary/50 focus:border-solid [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_ul]:list-disc [&_ul]:ml-4 [&_li]:text-muted-foreground"
+                className="min-h-full p-4 text-sm focus:outline-none
+                  [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2
+                  [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2
+                  [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1
+                  [&_p]:mb-2
+                  [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:mb-2
+                  [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:mb-2
+                  [&_li]:text-foreground [&_li]:mb-1
+                  [&_blockquote]:border-l-4 [&_blockquote]:border-primary/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2
+                  [&_strong]:font-semibold
+                  [&_em]:italic"
+                data-placeholder="Start writing your notes..."
               />
-
-              <div className="flex justify-end mt-3">
-                <Button
-                  onClick={handleSave}
-                  className="bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 shadow-glow-sm text-xs font-semibold"
-                >
-                  <Save className="w-3 h-3 mr-1" />
-                  Save Notes
-                </Button>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-              Select a trade from the left to view notes
-            </div>
-          )}
-        </div>
+            </ScrollArea>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+            <BookOpen className="w-12 h-12 mb-4 opacity-30" />
+            <p className="text-sm">Select a note or create a new one</p>
+            <Button
+              onClick={handleNewNote}
+              variant="outline"
+              className="mt-4 text-xs"
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Create Note
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

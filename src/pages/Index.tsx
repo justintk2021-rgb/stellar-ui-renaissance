@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Trade } from "@/types/trade";
+import { Trade, NotebookEntry } from "@/types/trade";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { MobileNav } from "@/components/Layout/MobileNav";
@@ -16,13 +16,14 @@ import { Helmet } from "react-helmet";
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
   journal: { title: 'Journal', subtitle: 'Log and manage your trades' },
-  notebook: { title: 'Notebook', subtitle: 'Detailed notes for each trade' },
+  notebook: { title: 'Notebook', subtitle: 'Your personal trading notes and journal' },
   settings: { title: 'Settings', subtitle: 'Customize your preferences' },
 };
 
 const Index = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [trades, setTrades] = useLocalStorage<Trade[]>('atp_trades_v1', []);
+  const [notebookEntries, setNotebookEntries] = useLocalStorage<NotebookEntry[]>('atp_notebook_v1', []);
   const [startBalance, setStartBalance] = useLocalStorage<number>('atp_start_balance', 10000);
   const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('atp_theme', 'dark');
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
@@ -82,6 +83,20 @@ const Index = () => {
       t.id === id ? { ...t, notebook: notes } : t
     ));
   }, [setTrades]);
+
+  const handleSaveEntry = useCallback((entry: NotebookEntry) => {
+    setNotebookEntries(prev => {
+      const existing = prev.find(e => e.id === entry.id);
+      if (existing) {
+        return prev.map(e => e.id === entry.id ? entry : e);
+      }
+      return [entry, ...prev];
+    });
+  }, [setNotebookEntries]);
+
+  const handleDeleteEntry = useCallback((id: string) => {
+    setNotebookEntries(prev => prev.filter(e => e.id !== id));
+  }, [setNotebookEntries]);
 
   const handleSelectForNotebook = useCallback((id: string) => {
     setSelectedTradeId(id);
@@ -161,6 +176,9 @@ const Index = () => {
                   selectedTradeId={selectedTradeId}
                   onSelectTrade={setSelectedTradeId}
                   onSaveNotes={handleSaveNotes}
+                  notebookEntries={notebookEntries}
+                  onSaveEntry={handleSaveEntry}
+                  onDeleteEntry={handleDeleteEntry}
                 />
               </div>
             )}

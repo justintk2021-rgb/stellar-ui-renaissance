@@ -14,3 +14,14 @@ export interface DailyStats {
   pnl: number;
   trades: number;
 }
+
+export interface NotebookEntry {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  date: string;
+  tradeId?: string; // Optional link to a trade
+  createdAt: string;
+  updatedAt: string;
+}
