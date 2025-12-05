@@ -23,7 +23,7 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
           <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent" />
         </div>
         <div>
-          <h1 className="text-lg font-bold tracking-wider gradient-text">ATP TRADES</h1>
+          <h1 className="text-lg font-bold tracking-wider gradient-text">NSYNC JOURNAL</h1>
           <p className="text-xs text-muted-foreground">Personal Journal</p>
         </div>
       </div>
