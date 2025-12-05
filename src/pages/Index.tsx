@@ -115,14 +115,9 @@ const Index = () => {
     }
   }, [setTrades]);
 
-  const handleSetBalance = useCallback(() => {
-    const input = window.prompt('Enter starting balance:', startBalance.toString());
-    if (input === null) return;
-    const value = parseFloat(input);
-    if (!isNaN(value)) {
-      setStartBalance(value);
-    }
-  }, [startBalance, setStartBalance]);
+  const handleSetBalance = useCallback((value: number) => {
+    setStartBalance(value);
+  }, [setStartBalance]);
 
   const handleSaveNotes = useCallback((id: string, notes: string) => {
     setTrades(prev => prev.map(t => 

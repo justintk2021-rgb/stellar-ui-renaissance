@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
-import { Settings2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Settings2, Check, X } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -15,10 +16,44 @@ import {
 interface EquityChartProps {
   trades: Trade[];
   startBalance: number;
-  onSetBalance: () => void;
+  onSetBalance: (balance: number) => void;
 }
 
 export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(startBalance.toString());
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleStartEdit = () => {
+    setEditValue(startBalance.toString());
+    setIsEditing(true);
+  };
+
+  const handleConfirm = () => {
+    const value = parseFloat(editValue);
+    if (!isNaN(value) && value >= 0) {
+      onSetBalance(value);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(startBalance.toString());
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleConfirm();
+    if (e.key === "Escape") handleCancel();
+  };
+
   const { chartData, currentBalance, change } = useMemo(() => {
     const sortedTrades = [...trades].sort((a, b) => {
       if (a.date === b.date) return parseInt(a.id) - parseInt(b.id);
@@ -79,9 +114,46 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
         </div>
         <div className="flex items-center gap-4">
           <div className="flex gap-4 text-right">
+            {/* Start Balance - Editable */}
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Start</div>
-              <div className="text-sm font-bold font-mono">${startBalance.toFixed(2)}</div>
+              {isEditing ? (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-sm font-bold font-mono">$</span>
+                  <Input
+                    ref={inputRef}
+                    type="number"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="w-24 h-6 text-sm font-bold font-mono px-1 py-0 bg-background/50 border-primary/50"
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-primary hover:bg-primary/20"
+                    onClick={handleConfirm}
+                  >
+                    <Check className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
+                    onClick={handleCancel}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleStartEdit}
+                  className="text-sm font-bold font-mono hover:text-primary transition-colors cursor-pointer flex items-center gap-1 group"
+                >
+                  ${startBalance.toFixed(2)}
+                  <Settings2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              )}
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Balance</div>
@@ -94,15 +166,6 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
               </div>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onSetBalance}
-            className="text-xs border-border/50 hover:border-primary/50 hover:bg-primary/10"
-          >
-            <Settings2 className="w-3 h-3 mr-1" />
-            Set Balance
-          </Button>
         </div>
       </div>
 
