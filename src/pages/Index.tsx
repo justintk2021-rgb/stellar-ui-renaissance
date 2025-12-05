@@ -1,13 +1,165 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useCallback } from "react";
+import { Trade } from "@/types/trade";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { Sidebar } from "@/components/Layout/Sidebar";
+import { MobileNav } from "@/components/Layout/MobileNav";
+import { TopBar } from "@/components/Layout/TopBar";
+import { StatsGrid } from "@/components/Dashboard/StatsGrid";
+import { EquityChart } from "@/components/Dashboard/EquityChart";
+import { PnLCalendar } from "@/components/Dashboard/PnLCalendar";
+import { TradeForm } from "@/components/Journal/TradeForm";
+import { TradeTable } from "@/components/Journal/TradeTable";
+import { NotebookView } from "@/components/Notebook/NotebookView";
+import { Helmet } from "react-helmet";
+
+const pageInfo: Record<string, { title: string; subtitle: string }> = {
+  dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
+  journal: { title: 'Journal', subtitle: 'Log and manage your trades' },
+  notebook: { title: 'Notebook', subtitle: 'Detailed notes for each trade' },
+};
 
 const Index = () => {
+  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [trades, setTrades] = useLocalStorage<Trade[]>('atp_trades_v1', []);
+  const [startBalance, setStartBalance] = useLocalStorage<number>('atp_start_balance', 10000);
+  const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
+  const [selectedTradeId, setSelectedTradeId] = useState<string | null>(
+    trades.length > 0 ? trades[0].id : null
+  );
+
+  const handleAddTrade = useCallback((tradeData: Omit<Trade, 'id'>) => {
+    if (editingTrade) {
+      setTrades(prev => prev.map(t => 
+        t.id === editingTrade.id ? { ...t, ...tradeData } : t
+      ));
+      setEditingTrade(null);
+    } else {
+      const newTrade: Trade = {
+        ...tradeData,
+        id: Date.now().toString(),
+      };
+      setTrades(prev => [newTrade, ...prev]);
+      setSelectedTradeId(newTrade.id);
+    }
+  }, [editingTrade, setTrades]);
+
+  const handleDeleteTrade = useCallback((id: string) => {
+    setTrades(prev => prev.filter(t => t.id !== id));
+    if (selectedTradeId === id) {
+      setSelectedTradeId(trades.length > 1 ? trades.find(t => t.id !== id)?.id || null : null);
+    }
+  }, [selectedTradeId, trades, setTrades]);
+
+  const handleClearAll = useCallback(() => {
+    if (window.confirm('Delete ALL trades? This cannot be undone.')) {
+      setTrades([]);
+      setSelectedTradeId(null);
+    }
+  }, [setTrades]);
+
+  const handleSetBalance = useCallback(() => {
+    const input = window.prompt('Enter starting balance:', startBalance.toString());
+    if (input === null) return;
+    const value = parseFloat(input);
+    if (!isNaN(value)) {
+      setStartBalance(value);
+    }
+  }, [startBalance, setStartBalance]);
+
+  const handleSaveNotes = useCallback((id: string, notes: string) => {
+    setTrades(prev => prev.map(t => 
+      t.id === id ? { ...t, notebook: notes } : t
+    ));
+  }, [setTrades]);
+
+  const handleSelectForNotebook = useCallback((id: string) => {
+    setSelectedTradeId(id);
+    setCurrentPage('notebook');
+  }, []);
+
+  const { title, subtitle } = pageInfo[currentPage];
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <>
+      <Helmet>
+        <title>ATP Trades - Trading Journal & Notebook</title>
+        <meta name="description" content="Track your trades, analyze performance, and keep detailed notes with ATP Trades - your personal trading journal." />
+      </Helmet>
+
+      <div className="min-h-screen flex flex-col lg:flex-row gap-4 p-4 lg:p-5 max-w-[1400px] mx-auto pb-24 lg:pb-5">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block">
+          <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
+        </div>
+
+        {/* Mobile Header */}
+        <div className="lg:hidden glass-strong rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center glow-primary">
+            <svg className="w-5 h-5 text-primary-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="22,7 13.5,15.5 8.5,10.5 2,17" />
+              <polyline points="16,7 22,7 22,13" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-base font-bold gradient-text">ATP TRADES</h1>
+            <p className="text-[10px] text-muted-foreground">Personal Journal</p>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <main className="flex-1">
+          <div className="glass-strong rounded-2xl p-5 lg:p-6 min-h-[calc(100vh-120px)] lg:min-h-[calc(100vh-60px)]">
+            <TopBar title={title} subtitle={subtitle} />
+
+            {/* Dashboard Page */}
+            {currentPage === 'dashboard' && (
+              <div className="space-y-6 animate-fade-in">
+                <EquityChart
+                  trades={trades}
+                  startBalance={startBalance}
+                  onSetBalance={handleSetBalance}
+                />
+                <StatsGrid trades={trades} />
+                <PnLCalendar trades={trades} />
+              </div>
+            )}
+
+            {/* Journal Page */}
+            {currentPage === 'journal' && (
+              <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.4fr] gap-6 animate-fade-in">
+                <TradeForm
+                  editingTrade={editingTrade}
+                  onSubmit={handleAddTrade}
+                  onCancelEdit={() => setEditingTrade(null)}
+                  onClearAll={handleClearAll}
+                />
+                <TradeTable
+                  trades={trades}
+                  onEdit={setEditingTrade}
+                  onDelete={handleDeleteTrade}
+                  onSelectForNotebook={handleSelectForNotebook}
+                />
+              </div>
+            )}
+
+            {/* Notebook Page */}
+            {currentPage === 'notebook' && (
+              <div className="animate-fade-in">
+                <NotebookView
+                  trades={trades}
+                  selectedTradeId={selectedTradeId}
+                  onSelectTrade={setSelectedTradeId}
+                  onSaveNotes={handleSaveNotes}
+                />
+              </div>
+            )}
+          </div>
+        </main>
+
+        {/* Mobile Navigation */}
+        <MobileNav currentPage={currentPage} onPageChange={setCurrentPage} />
       </div>
-    </div>
+    </>
   );
 };
 
