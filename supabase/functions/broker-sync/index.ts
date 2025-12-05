@@ -21,8 +21,9 @@ serve(async (req) => {
     const { action, accountId, login, password, server, platform } = await req.json();
     console.log(`Broker sync action: ${action}`);
 
-    // MetaApi base URL
-    const METAAPI_BASE = 'https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai';
+    // MetaApi base URLs
+    const METAAPI_BASE = 'https://mt-provisioning-api-v1.agiliumtrade.ai';
+    const METAAPI_RPC = 'https://mt-client-api-v1.agiliumtrade.ai';
 
     if (action === 'create-account') {
       // Create a MetaApi account to connect to the broker
@@ -88,8 +89,6 @@ serve(async (req) => {
     if (action === 'get-trades') {
       // Fetch trades from the connected account
       console.log(`Fetching trades for account: ${accountId}`);
-      
-      const METAAPI_RPC = `https://mt-client-api-v1.agiliumtrade.agiliumtrade.ai`;
       
       // Get account info first
       const accountResponse = await fetch(`${METAAPI_BASE}/users/current/accounts/${accountId}`, {
