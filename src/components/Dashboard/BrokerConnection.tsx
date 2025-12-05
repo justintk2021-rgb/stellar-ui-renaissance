@@ -15,13 +15,24 @@ interface BrokerConnectionProps {
 
 // Popular MT5 broker servers
 const POPULAR_BROKERS = [
+  { name: "ClassicGlobal", servers: ["ClassicGlobal-Server", "ClassicGlobal-Demo", "ClassicGlobal-Live"] },
   { name: "ICMarkets", servers: ["ICMarketsSC-Demo", "ICMarketsSC-Live01", "ICMarketsSC-Live02", "ICMarketsSC-Live03"] },
-  { name: "Exness", servers: ["Exness-MT5Real", "Exness-MT5Real2", "Exness-MT5Demo"] },
-  { name: "XM", servers: ["XMGlobal-MT5", "XMGlobal-MT5 2", "XMGlobal-MT5 3"] },
-  { name: "FXCM", servers: ["FXCM-MT5Live01", "FXCM-MT5Demo01"] },
-  { name: "Pepperstone", servers: ["Pepperstone-MT5-Live01", "Pepperstone-MT5-Demo01"] },
-  { name: "OANDA", servers: ["OANDA-MT5 Live-1", "OANDA-MT5 Practice-1"] },
-  { name: "FxPro", servers: ["FxPro.com-MT5", "FxPro.com-Demo MT5"] },
+  { name: "Exness", servers: ["Exness-MT5Real", "Exness-MT5Real2", "Exness-MT5Real3", "Exness-MT5Demo"] },
+  { name: "XM", servers: ["XMGlobal-MT5", "XMGlobal-MT5 2", "XMGlobal-MT5 3", "XMGlobal-MT5 4"] },
+  { name: "FXCM", servers: ["FXCM-MT5Live01", "FXCM-MT5Live02", "FXCM-MT5Demo01"] },
+  { name: "Pepperstone", servers: ["Pepperstone-MT5-Live01", "Pepperstone-MT5-Live02", "Pepperstone-MT5-Demo01"] },
+  { name: "OANDA", servers: ["OANDA-MT5 Live-1", "OANDA-MT5 Live-2", "OANDA-MT5 Practice-1"] },
+  { name: "FxPro", servers: ["FxPro.com-MT5", "FxPro.com-MT5 2", "FxPro.com-Demo MT5"] },
+  { name: "Tickmill", servers: ["Tickmill-Live", "Tickmill-Demo"] },
+  { name: "FBS", servers: ["FBS-Real", "FBS-Real-2", "FBS-Demo"] },
+  { name: "RoboForex", servers: ["RoboForex-MT5Live", "RoboForex-MT5Demo"] },
+  { name: "HFMarkets", servers: ["HFMarketsKE-Live Server", "HFMarketsKE-Demo Server", "HFMarketsSV-Live Server"] },
+  { name: "Deriv", servers: ["Deriv-Server", "Deriv-Demo"] },
+  { name: "OctaFX", servers: ["OctaFX-Real", "OctaFX-Demo"] },
+  { name: "Axi", servers: ["AxiTrader-MT5-Live", "AxiTrader-MT5-Demo"] },
+  { name: "FP Markets", servers: ["FPMarkets-MT5 Live", "FPMarkets-MT5 Demo"] },
+  { name: "Admiral Markets", servers: ["AdmiralMarkets-MT5", "AdmiralMarkets-MT5-Demo"] },
+  { name: "Vantage", servers: ["VantageInternational-Live", "VantageInternational-Demo"] },
 ];
 
 export function BrokerConnection({ onTradesImported }: BrokerConnectionProps) {
