@@ -1,12 +1,25 @@
-import { Moon, Sun, User, Mail, Key } from "lucide-react";
+import { Moon, Sun, User, Mail, Key, Calendar, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UserProfile } from "@/types/user";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface SettingsViewProps {
   theme: 'dark' | 'light';
   onThemeChange: (theme: 'dark' | 'light') => void;
+  userProfile: UserProfile | null;
+  onLogout: () => void;
 }
 
-export function SettingsView({ theme, onThemeChange }: SettingsViewProps) {
+export function SettingsView({ theme, onThemeChange, userProfile, onLogout }: SettingsViewProps) {
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
   return (
     <div className="space-y-8 animate-fade-in max-w-2xl">
       {/* Account Settings */}
@@ -21,33 +34,105 @@ export function SettingsView({ theme, onThemeChange }: SettingsViewProps) {
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">
-            <div className="flex items-center gap-3">
-              <Mail className="w-4 h-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Email</p>
-                <p className="text-xs text-muted-foreground">Not connected</p>
+        {userProfile ? (
+          <div className="space-y-4">
+            {/* User Info Card */}
+            <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/20">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-primary-foreground text-xl font-bold">
+                  {userProfile.firstName.charAt(0)}{userProfile.lastName.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">{userProfile.firstName} {userProfile.lastName}</h3>
+                  <p className="text-sm text-muted-foreground">{userProfile.email}</p>
+                </div>
               </div>
             </div>
-            <button className="px-4 py-2 text-xs font-medium rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors">
-              Connect
-            </button>
-          </div>
 
-          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">
-            <div className="flex items-center gap-3">
-              <Key className="w-4 h-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Data Backup</p>
-                <p className="text-xs text-muted-foreground">Local storage only</p>
+            {/* Account Details */}
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">
+              <div className="flex items-center gap-3">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Email Address</p>
+                  <p className="text-xs text-muted-foreground">{userProfile.email}</p>
+                </div>
               </div>
             </div>
-            <button className="px-4 py-2 text-xs font-medium rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors">
-              Export
-            </button>
+
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">
+              <div className="flex items-center gap-3">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Member Since</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(userProfile.createdAt)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">
+              <div className="flex items-center gap-3">
+                <Key className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Data Backup</p>
+                  <p className="text-xs text-muted-foreground">Local storage only</p>
+                </div>
+              </div>
+              <button className="px-4 py-2 text-xs font-medium rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors">
+                Export
+              </button>
+            </div>
+
+            {/* Logout Button */}
+            <ConfirmDialog
+              trigger={
+                <Button
+                  variant="outline"
+                  className="w-full border-destructive/30 text-destructive hover:bg-destructive/10"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              }
+              title="Sign Out"
+              description="Are you sure you want to sign out? Your data will remain saved locally."
+              confirmLabel="Sign Out"
+              variant="destructive"
+              onConfirm={onLogout}
+            />
           </div>
-        </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">
+              <div className="flex items-center gap-3">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Email</p>
+                  <p className="text-xs text-muted-foreground">Not signed in</p>
+                </div>
+              </div>
+              <a
+                href="/auth"
+                className="px-4 py-2 text-xs font-medium rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+              >
+                Sign In
+              </a>
+            </div>
+
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">
+              <div className="flex items-center gap-3">
+                <Key className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Data Backup</p>
+                  <p className="text-xs text-muted-foreground">Local storage only</p>
+                </div>
+              </div>
+              <button className="px-4 py-2 text-xs font-medium rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors">
+                Export
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Theme Settings */}
