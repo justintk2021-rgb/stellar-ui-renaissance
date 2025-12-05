@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Trade } from "@/types/trade";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { Sidebar } from "@/components/Layout/Sidebar";
@@ -10,22 +10,33 @@ import { PnLCalendar } from "@/components/Dashboard/PnLCalendar";
 import { TradeForm } from "@/components/Journal/TradeForm";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { NotebookView } from "@/components/Notebook/NotebookView";
+import { SettingsView } from "@/components/Settings/SettingsView";
 import { Helmet } from "react-helmet";
 
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
   journal: { title: 'Journal', subtitle: 'Log and manage your trades' },
   notebook: { title: 'Notebook', subtitle: 'Detailed notes for each trade' },
+  settings: { title: 'Settings', subtitle: 'Customize your preferences' },
 };
 
 const Index = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [trades, setTrades] = useLocalStorage<Trade[]>('atp_trades_v1', []);
   const [startBalance, setStartBalance] = useLocalStorage<number>('atp_start_balance', 10000);
+  const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('atp_theme', 'dark');
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(
     trades.length > 0 ? trades[0].id : null
   );
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.classList.remove('light', 'dark');
+    if (theme === 'light') {
+      document.documentElement.classList.add('light');
+    }
+  }, [theme]);
 
   const handleAddTrade = useCallback((tradeData: Omit<Trade, 'id'>) => {
     if (editingTrade) {
@@ -152,6 +163,11 @@ const Index = () => {
                   onSaveNotes={handleSaveNotes}
                 />
               </div>
+            )}
+
+            {/* Settings Page */}
+            {currentPage === 'settings' && (
+              <SettingsView theme={theme} onThemeChange={setTheme} />
             )}
           </div>
         </main>
