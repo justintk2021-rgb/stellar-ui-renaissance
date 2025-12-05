@@ -44,23 +44,69 @@ const Index = () => {
       setTrades(prev => prev.map(t => 
         t.id === editingTrade.id ? { ...t, ...tradeData } : t
       ));
+      // Update linked notebook entry if exists
+      setNotebookEntries(prev => prev.map(entry => {
+        if (entry.tradeId === editingTrade.id) {
+          return {
+            ...entry,
+            title: `${tradeData.pair} - ${tradeData.direction} Trade`,
+            date: tradeData.date,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return entry;
+      }));
       setEditingTrade(null);
     } else {
+      const tradeId = Date.now().toString();
       const newTrade: Trade = {
         ...tradeData,
-        id: Date.now().toString(),
+        id: tradeId,
       };
       setTrades(prev => [newTrade, ...prev]);
       setSelectedTradeId(newTrade.id);
+      
+      // Auto-create notebook entry for this trade
+      const newEntry: NotebookEntry = {
+        id: `trade-note-${tradeId}`,
+        title: `${tradeData.pair} - ${tradeData.direction} Trade`,
+        content: `<h2>📋 Trade Plan</h2>
+<ul>
+  <li>Why did I take this trade?</li>
+  <li>What was my setup/strategy?</li>
+</ul>
+
+<h2>⚙️ Execution</h2>
+<ul>
+  <li>Entry point and reasoning</li>
+  <li>Trade management</li>
+  <li>Exit point</li>
+</ul>
+
+<h2>🧠 Post-Trade Review</h2>
+<ul>
+  <li>What went well?</li>
+  <li>What could be improved?</li>
+  <li>Key lessons learned</li>
+</ul>`,
+        category: "trade-notes",
+        date: tradeData.date,
+        tradeId: tradeId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setNotebookEntries(prev => [newEntry, ...prev]);
     }
-  }, [editingTrade, setTrades]);
+  }, [editingTrade, setTrades, setNotebookEntries]);
 
   const handleDeleteTrade = useCallback((id: string) => {
     setTrades(prev => prev.filter(t => t.id !== id));
+    // Also delete linked notebook entry
+    setNotebookEntries(prev => prev.filter(e => e.tradeId !== id));
     if (selectedTradeId === id) {
       setSelectedTradeId(trades.length > 1 ? trades.find(t => t.id !== id)?.id || null : null);
     }
-  }, [selectedTradeId, trades, setTrades]);
+  }, [selectedTradeId, trades, setTrades, setNotebookEntries]);
 
   const handleClearAll = useCallback(() => {
     if (window.confirm('Delete ALL trades? This cannot be undone.')) {
