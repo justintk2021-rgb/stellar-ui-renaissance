@@ -106,9 +106,7 @@ const Index = () => {
   // Apply theme to document
   useEffect(() => {
     document.documentElement.classList.remove('light', 'dark');
-    if (theme === 'light') {
-      document.documentElement.classList.add('light');
-    }
+    document.documentElement.classList.add(theme);
   }, [theme]);
 
   const handleLogout = async () => {
