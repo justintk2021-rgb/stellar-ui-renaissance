@@ -11,14 +11,21 @@ export function StatsGrid({ trades }: StatsGridProps) {
     (acc, trade) => {
       const pl = trade.result || 0;
       acc.net += pl;
-      if (pl > 0) acc.wins++;
-      else if (pl < 0) acc.losses++;
+      if (pl > 0) {
+        acc.wins++;
+        acc.totalWinAmount += pl;
+      } else if (pl < 0) {
+        acc.losses++;
+        acc.totalLossAmount += Math.abs(pl);
+      }
       return acc;
     },
-    { wins: 0, losses: 0, net: 0 }
+    { wins: 0, losses: 0, net: 0, totalWinAmount: 0, totalLossAmount: 0 }
   );
 
   const winRate = trades.length > 0 ? Math.round((stats.wins / trades.length) * 100) : 0;
+  const avgWin = stats.wins > 0 ? stats.totalWinAmount / stats.wins : 0;
+  const avgLoss = stats.losses > 0 ? stats.totalLossAmount / stats.losses : 0;
 
   const statCards = [
     {
@@ -43,10 +50,26 @@ export function StatsGrid({ trades }: StatsGridProps) {
       gradient: stats.net >= 0 ? 'stat-gradient' : 'stat-gradient-loss',
       isProfit: stats.net >= 0,
     },
+    {
+      label: 'Avg Win',
+      value: `$${avgWin.toFixed(2)}`,
+      note: `From ${stats.wins} winning trades`,
+      icon: TrendingUp,
+      gradient: 'stat-gradient',
+      isProfit: true,
+    },
+    {
+      label: 'Avg Loss',
+      value: `$${avgLoss.toFixed(2)}`,
+      note: `From ${stats.losses} losing trades`,
+      icon: TrendingDown,
+      gradient: 'stat-gradient-loss',
+      isProfit: false,
+    },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
       {statCards.map((stat, index) => {
         const Icon = stat.icon;
         return (
