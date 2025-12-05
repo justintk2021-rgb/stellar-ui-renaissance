@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Trade, NotebookEntry } from "@/types/trade";
+import { UserProfile } from "@/types/user";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { MobileNav } from "@/components/Layout/MobileNav";
@@ -20,7 +22,12 @@ const pageInfo: Record<string, { title: string; subtitle: string }> = {
   settings: { title: 'Settings', subtitle: 'Customize your preferences' },
 };
 
-const Index = () => {
+interface IndexProps {
+  userProfile: UserProfile | null;
+  onLogout: () => void;
+}
+
+const Index = ({ userProfile, onLogout }: IndexProps) => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [trades, setTrades] = useLocalStorage<Trade[]>('atp_trades_v1', []);
   const [notebookEntries, setNotebookEntries] = useLocalStorage<NotebookEntry[]>('atp_notebook_v1', []);
@@ -223,9 +230,13 @@ const Index = () => {
               </div>
             )}
 
-            {/* Settings Page */}
             {currentPage === 'settings' && (
-              <SettingsView theme={theme} onThemeChange={setTheme} />
+              <SettingsView 
+                theme={theme} 
+                onThemeChange={setTheme}
+                userProfile={userProfile}
+                onLogout={onLogout}
+              />
             )}
           </div>
         </main>
