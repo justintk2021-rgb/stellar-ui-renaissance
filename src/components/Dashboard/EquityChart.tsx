@@ -160,7 +160,7 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
               <div className="text-sm font-bold font-mono">${currentBalance.toFixed(2)}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Change</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">PnL</div>
               <div className={`text-sm font-bold font-mono ${isPositive ? 'text-primary' : 'text-destructive'}`}>
                 {isPositive ? '+' : ''}{change.toFixed(2)}
               </div>
