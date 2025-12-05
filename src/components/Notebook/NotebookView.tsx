@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Bold,
   Italic,
@@ -24,7 +25,6 @@ import {
   Trash2,
   ChevronRight,
   ListOrdered,
-  Link,
   Quote,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -139,7 +139,7 @@ export function NotebookView({
   };
 
   const handleDeleteEntry = () => {
-    if (selectedEntry && window.confirm("Delete this note?")) {
+    if (selectedEntry) {
       onDeleteEntry(selectedEntry.id);
       setSelectedEntryId(null);
       toast.success("Note deleted!");
@@ -498,15 +498,23 @@ export function NotebookView({
               <div className="flex-1" />
               
               {selectedEntry && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDeleteEntry}
-                  className="text-xs text-destructive hover:bg-destructive/10 hover:border-destructive/50"
-                >
-                  <Trash2 className="w-3 h-3 mr-1" />
-                  Delete
-                </Button>
+                <ConfirmDialog
+                  trigger={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs text-destructive hover:bg-destructive/10 hover:border-destructive/50"
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" />
+                      Delete
+                    </Button>
+                  }
+                  title="Delete Note"
+                  description="Are you sure you want to delete this note? This action cannot be undone."
+                  confirmLabel="Delete"
+                  variant="destructive"
+                  onConfirm={handleDeleteEntry}
+                />
               )}
               <Button
                 onClick={handleSave}

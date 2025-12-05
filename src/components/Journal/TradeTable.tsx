@@ -2,16 +2,18 @@ import { Trade } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, ExternalLink } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface TradeTableProps {
   trades: Trade[];
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
   onSelectForNotebook: (id: string) => void;
+  onClearAll?: () => void;
 }
 
-export function TradeTable({ trades, onEdit, onDelete, onSelectForNotebook }: TradeTableProps) {
+export function TradeTable({ trades, onEdit, onDelete, onSelectForNotebook, onClearAll }: TradeTableProps) {
   return (
     <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
       <div className="flex items-center justify-between mb-4">
@@ -19,9 +21,25 @@ export function TradeTable({ trades, onEdit, onDelete, onSelectForNotebook }: Tr
           <h3 className="text-base font-semibold">Trade Log</h3>
           <p className="text-xs text-muted-foreground mt-1">Click a row to view notes</p>
         </div>
-        <Badge variant="outline" className="border-secondary/40 text-muted-foreground text-xs">
-          History
-        </Badge>
+        <div className="flex items-center gap-2">
+          {trades.length > 0 && onClearAll && (
+            <ConfirmDialog
+              trigger={
+                <Button variant="outline" size="sm" className="text-xs border-destructive/30 text-destructive hover:bg-destructive/10">
+                  Clear All
+                </Button>
+              }
+              title="Delete All Trades"
+              description="This will permanently delete all your trades. This action cannot be undone."
+              confirmLabel="Delete All"
+              variant="destructive"
+              onConfirm={onClearAll}
+            />
+          )}
+          <Badge variant="outline" className="border-secondary/40 text-muted-foreground text-xs">
+            History
+          </Badge>
+        </div>
       </div>
 
       <div className="rounded-xl border border-secondary/30 overflow-hidden bg-card">
@@ -98,14 +116,23 @@ export function TradeTable({ trades, onEdit, onDelete, onSelectForNotebook }: Tr
                     >
                       <Pencil className="w-3 h-3" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={(e) => { e.stopPropagation(); onDelete(trade.id); }}
-                      className="w-7 h-7 rounded-full border-border/50 hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
+                    <ConfirmDialog
+                      trigger={
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-7 h-7 rounded-full border-border/50 hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      }
+                      title="Delete Trade"
+                      description="Are you sure you want to delete this trade? This action cannot be undone."
+                      confirmLabel="Delete"
+                      variant="destructive"
+                      onConfirm={() => onDelete(trade.id)}
+                    />
                   </div>
                 </div>
               );
