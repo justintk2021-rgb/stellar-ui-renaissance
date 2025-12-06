@@ -81,9 +81,6 @@ function CircularProgress({ value, color, size = 40 }: { value: number; color: s
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
           className="transition-all duration-1000 ease-out"
-          style={{
-            filter: `drop-shadow(0 0 6px ${color})`
-          }}
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
