@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -17,23 +17,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-interface ChecklistItem {
-  id: string;
-  text: string;
-  checked: boolean;
-}
-
-interface Checklist {
-  id: string;
-  name: string;
-  items: ChecklistItem[];
-  createdAt: string;
-  isExpanded: boolean;
-}
+import { useChecklists } from "@/hooks/useChecklists";
 
 export function PlaybookView() {
-  const [checklists, setChecklists] = useState<Checklist[]>([]);
+  const { checklists, loading, isAuthenticated, createChecklist, updateChecklist, deleteChecklist } = useChecklists();
   const [newChecklistName, setNewChecklistName] = useState("");
   const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
   const [editingChecklistName, setEditingChecklistName] = useState("");
@@ -41,122 +28,127 @@ export function PlaybookView() {
   const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-  // Load checklists from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('atp_playbook_checklists');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setChecklists(parsed);
-        // Auto-select first checklist if exists
-        if (parsed.length > 0 && !selectedChecklistId) {
-          setSelectedChecklistId(parsed[0].id);
-        }
-      } catch (e) {
-        console.error('Failed to parse checklists:', e);
-      }
-    }
-  }, []);
+  const selectedChecklist = checklists.find(c => c.id === selectedChecklistId) || null;
 
-  // Save checklists to localStorage
-  useEffect(() => {
-    localStorage.setItem('atp_playbook_checklists', JSON.stringify(checklists));
-  }, [checklists]);
-
-  // Get the currently selected checklist
-  const selectedChecklist = useMemo(() => {
-    return checklists.find(c => c.id === selectedChecklistId) || null;
-  }, [checklists, selectedChecklistId]);
-
-  const createChecklist = () => {
+  const handleCreateChecklist = async () => {
     if (!newChecklistName.trim()) return;
-    
-    const newChecklist: Checklist = {
-      id: Date.now().toString(),
-      name: newChecklistName.trim(),
-      items: [],
-      createdAt: new Date().toISOString(),
-      isExpanded: true,
-    };
-    
-    setChecklists([newChecklist, ...checklists]);
+    const newChecklist = await createChecklist(newChecklistName);
+    if (newChecklist) {
+      setSelectedChecklistId(newChecklist.id);
+    }
     setNewChecklistName("");
-    setSelectedChecklistId(newChecklist.id);
     setIsCreateDialogOpen(false);
   };
 
-  const deleteChecklist = (id: string) => {
-    const updated = checklists.filter(c => c.id !== id);
-    setChecklists(updated);
+  const handleDeleteChecklist = async (id: string) => {
+    await deleteChecklist(id);
     if (selectedChecklistId === id) {
-      setSelectedChecklistId(updated.length > 0 ? updated[0].id : null);
+      setSelectedChecklistId(checklists.length > 1 ? checklists.find(c => c.id !== id)?.id || null : null);
     }
   };
 
-  const startEditingChecklist = (checklist: Checklist) => {
-    setEditingChecklistId(checklist.id);
-    setEditingChecklistName(checklist.name);
+  const startEditingChecklist = (id: string, name: string) => {
+    setEditingChecklistId(id);
+    setEditingChecklistName(name);
   };
 
-  const saveChecklistName = (id: string) => {
+  const saveChecklistName = async (id: string) => {
     if (!editingChecklistName.trim()) return;
-    setChecklists(checklists.map(c => 
-      c.id === id ? { ...c, name: editingChecklistName.trim() } : c
-    ));
+    await updateChecklist(id, { name: editingChecklistName.trim() });
     setEditingChecklistId(null);
     setEditingChecklistName("");
   };
 
-  const addItem = (checklistId: string) => {
+  const addItem = async (checklistId: string) => {
     const text = newItemTexts[checklistId]?.trim();
     if (!text) return;
 
-    const newItem: ChecklistItem = {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const newItem = {
       id: Date.now().toString(),
       text,
       checked: false,
     };
 
-    setChecklists(checklists.map(c => 
-      c.id === checklistId ? { ...c, items: [...c.items, newItem] } : c
-    ));
+    await updateChecklist(checklistId, { items: [...checklist.items, newItem] });
     setNewItemTexts({ ...newItemTexts, [checklistId]: "" });
   };
 
-  const toggleItem = (checklistId: string, itemId: string) => {
-    setChecklists(checklists.map(c => 
-      c.id === checklistId 
-        ? { 
-            ...c, 
-            items: c.items.map(item => 
-              item.id === itemId ? { ...item, checked: !item.checked } : item
-            ) 
-          } 
-        : c
-    ));
+  const toggleItem = async (checklistId: string, itemId: string) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const updatedItems = checklist.items.map(item =>
+      item.id === itemId ? { ...item, checked: !item.checked } : item
+    );
+    await updateChecklist(checklistId, { items: updatedItems });
   };
 
-  const deleteItem = (checklistId: string, itemId: string) => {
-    setChecklists(checklists.map(c => 
-      c.id === checklistId 
-        ? { ...c, items: c.items.filter(item => item.id !== itemId) } 
-        : c
-    ));
+  const deleteItem = async (checklistId: string, itemId: string) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const updatedItems = checklist.items.filter(item => item.id !== itemId);
+    await updateChecklist(checklistId, { items: updatedItems });
   };
 
-  const getCompletionPercentage = (checklist: Checklist) => {
-    if (checklist.items.length === 0) return 0;
-    const checked = checklist.items.filter(item => item.checked).length;
-    return Math.round((checked / checklist.items.length) * 100);
+  const getCompletionPercentage = (items: { checked: boolean }[]) => {
+    if (items.length === 0) return 0;
+    const checked = items.filter(item => item.checked).length;
+    return Math.round((checked / items.length) * 100);
   };
 
-  const resetChecklist = (checklistId: string) => {
-    setChecklists(checklists.map(c => 
-      c.id === checklistId 
-        ? { ...c, items: c.items.map(item => ({ ...item, checked: false })) } 
-        : c
-    ));
+  const resetChecklist = async (checklistId: string) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const resetItems = checklist.items.map(item => ({ ...item, checked: false }));
+    await updateChecklist(checklistId, { items: resetItems });
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+            <ClipboardList className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold">Trading Playbook</h2>
+            <p className="text-xs text-muted-foreground">Create and manage your trading checklists</p>
+          </div>
+        </div>
+        <div className="glass rounded-xl p-12 text-center">
+          <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Sign In Required</h3>
+          <p className="text-sm text-muted-foreground">
+            Please sign in to access your trading checklists
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+            <ClipboardList className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold">Trading Playbook</h2>
+            <p className="text-xs text-muted-foreground">Create and manage your trading checklists</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -188,7 +180,7 @@ export function PlaybookView() {
               placeholder="Enter checklist name (e.g., Pre-Trade Checklist)"
               value={newChecklistName}
               onChange={(e) => setNewChecklistName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && createChecklist()}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateChecklist()}
               className="bg-background/50 border-border/50"
               autoFocus
             />
@@ -197,7 +189,7 @@ export function PlaybookView() {
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={createChecklist} disabled={!newChecklistName.trim()}>
+            <Button onClick={handleCreateChecklist} disabled={!newChecklistName.trim()}>
               Create
             </Button>
           </DialogFooter>
@@ -216,34 +208,28 @@ export function PlaybookView() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-[200px] max-h-[300px] overflow-y-auto bg-popover">
-            {checklists.length === 0 ? (
-              <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                No checklists found
-              </div>
-            ) : (
-              checklists.map((checklist) => (
-                <DropdownMenuItem
-                  key={checklist.id}
-                  onClick={() => setSelectedChecklistId(checklist.id)}
-                  className={cn(
-                    "cursor-pointer",
-                    selectedChecklistId === checklist.id && "bg-primary/10"
-                  )}
-                >
-                  <span className="truncate">{checklist.name}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {getCompletionPercentage(checklist)}%
-                  </span>
-                </DropdownMenuItem>
-              ))
-            )}
+            {checklists.map((checklist) => (
+              <DropdownMenuItem
+                key={checklist.id}
+                onClick={() => setSelectedChecklistId(checklist.id)}
+                className={cn(
+                  "cursor-pointer",
+                  selectedChecklistId === checklist.id && "bg-primary/10"
+                )}
+              >
+                <span className="truncate">{checklist.name}</span>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {getCompletionPercentage(checklist.items)}%
+                </span>
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
 
       {/* Selected Checklist Display */}
       {checklists.length === 0 ? (
-        <div className="glass rounded-xl p-12 border border-border/40 text-center">
+        <div className="glass rounded-xl p-12 text-center">
           <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No Checklists Yet</h3>
           <p className="text-sm text-muted-foreground">
@@ -251,7 +237,7 @@ export function PlaybookView() {
           </p>
         </div>
       ) : !selectedChecklist ? (
-        <div className="glass rounded-xl p-12 border border-border/40 text-center">
+        <div className="glass rounded-xl p-12 text-center">
           <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">Select a Checklist</h3>
           <p className="text-sm text-muted-foreground">
@@ -262,7 +248,7 @@ export function PlaybookView() {
         <div 
           className={cn(
             "glass rounded-xl transition-all duration-300",
-            getCompletionPercentage(selectedChecklist) === 100 && selectedChecklist.items.length > 0
+            getCompletionPercentage(selectedChecklist.items) === 100 && selectedChecklist.items.length > 0
               && "bg-primary/5"
           )}
         >
@@ -289,7 +275,7 @@ export function PlaybookView() {
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold text-lg">{selectedChecklist.name}</h3>
                   <button 
-                    onClick={() => startEditingChecklist(selectedChecklist)}
+                    onClick={() => startEditingChecklist(selectedChecklist.id, selectedChecklist.name)}
                     className="p-1 rounded hover:bg-muted/50 transition-colors"
                   >
                     <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
@@ -305,20 +291,20 @@ export function PlaybookView() {
                   <div 
                     className={cn(
                       "h-full transition-all duration-500",
-                      getCompletionPercentage(selectedChecklist) === 100 && selectedChecklist.items.length > 0
+                      getCompletionPercentage(selectedChecklist.items) === 100 && selectedChecklist.items.length > 0
                         ? "bg-primary" 
                         : "bg-primary/70"
                     )}
-                    style={{ width: `${getCompletionPercentage(selectedChecklist)}%` }}
+                    style={{ width: `${getCompletionPercentage(selectedChecklist.items)}%` }}
                   />
                 </div>
                 <span className={cn(
                   "text-sm font-bold min-w-[3rem] text-right",
-                  getCompletionPercentage(selectedChecklist) === 100 && selectedChecklist.items.length > 0
+                  getCompletionPercentage(selectedChecklist.items) === 100 && selectedChecklist.items.length > 0
                     ? "text-primary" 
                     : "text-muted-foreground"
                 )}>
-                  {getCompletionPercentage(selectedChecklist)}%
+                  {getCompletionPercentage(selectedChecklist.items)}%
                 </span>
               </div>
 
@@ -341,7 +327,7 @@ export function PlaybookView() {
                 description={`Are you sure you want to delete "${selectedChecklist.name}"? This action cannot be undone.`}
                 confirmLabel="Delete"
                 variant="destructive"
-                onConfirm={() => deleteChecklist(selectedChecklist.id)}
+                onConfirm={() => handleDeleteChecklist(selectedChecklist.id)}
               />
             </div>
           </div>
