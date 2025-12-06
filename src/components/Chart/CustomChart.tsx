@@ -54,9 +54,9 @@ export function CustomChart() {
   };
 
   return (
-    <div className="flex flex-col h-full animate-fade-in -mt-4">
+    <div className="flex flex-col animate-fade-in -mt-2" style={{ height: "calc(100vh - 180px)" }}>
       {/* Search Bar */}
-      <div className="flex items-center gap-3 mb-3">
+      <div className="flex items-center gap-3 mb-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -74,20 +74,15 @@ export function CustomChart() {
 
       {/* TradingView Chart Container */}
       <div 
-        className="flex-1 relative rounded-lg overflow-hidden border border-border/50 bg-card"
-        style={{ minHeight: "500px", height: "calc(100vh - 220px)" }}
+        className="flex-1 relative rounded-lg overflow-hidden border border-border/50"
+        style={{ minHeight: "600px" }}
       >
         <div 
           ref={containerRef}
-          className="tradingview-widget-container w-full h-full"
+          className="tradingview-widget-container"
           style={{ height: "100%", width: "100%" }}
         />
       </div>
-
-      {/* Attribution */}
-      <p className="text-xs text-muted-foreground/60 mt-2 text-center">
-        Chart powered by TradingView
-      </p>
     </div>
   );
 }
