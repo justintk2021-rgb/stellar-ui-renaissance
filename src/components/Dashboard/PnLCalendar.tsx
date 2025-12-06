@@ -595,21 +595,27 @@ function DayCumulativeChart({ trades }: { trades: Trade[] }) {
   const chartData = useMemo(() => {
     if (trades.length === 0) return [];
     
+    // Add starting point at 0
+    const data = [{ trade: 0, value: 0, pair: 'Start', result: 0 }];
+    
     let cumulative = 0;
-    return trades.map((trade, index) => {
+    trades.forEach((trade, index) => {
       cumulative += trade.result || 0;
-      return {
+      data.push({
         trade: index + 1,
         value: cumulative,
         pair: trade.pair,
         result: trade.result,
-      };
+      });
     });
+    
+    return data;
   }, [trades]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      if (data.trade === 0) return null;
       return (
         <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
           <p className="text-xs text-muted-foreground">Trade #{data.trade}: {data.pair}</p>
@@ -631,22 +637,26 @@ function DayCumulativeChart({ trades }: { trades: Trade[] }) {
     return null;
   };
 
-  if (chartData.length === 0) {
+  if (trades.length === 0) {
     return (
-      <div className="h-[120px] flex items-center justify-center text-muted-foreground text-sm">
+      <div className="h-[140px] flex items-center justify-center text-muted-foreground text-sm">
         No trades to display
       </div>
     );
   }
 
+  const minValue = Math.min(...chartData.map(d => d.value));
+  const maxValue = Math.max(...chartData.map(d => d.value));
+  const padding = Math.max(Math.abs(maxValue - minValue) * 0.1, 10);
+
   return (
-    <div className="h-[120px]">
+    <div className="h-[140px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={chartData}>
+        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           <defs>
-            <linearGradient id="colorDayCumulative" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+            <linearGradient id="dayCumulativeGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/>
+              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05}/>
             </linearGradient>
           </defs>
           <XAxis 
@@ -654,14 +664,15 @@ function DayCumulativeChart({ trades }: { trades: Trade[] }) {
             tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(value) => `#${value}`}
+            tickFormatter={(value) => value === 0 ? '' : `#${value}`}
           />
           <YAxis 
             tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
             tickFormatter={(value) => `$${value}`}
             tickLine={false}
             axisLine={false}
-            width={45}
+            width={50}
+            domain={[minValue - padding, maxValue + padding]}
           />
           <Tooltip content={<CustomTooltip />} />
           <Area 
@@ -669,9 +680,11 @@ function DayCumulativeChart({ trades }: { trades: Trade[] }) {
             dataKey="value" 
             stroke="hsl(var(--primary))" 
             strokeWidth={2.5}
-            fill="url(#colorDayCumulative)" 
-            dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+            fill="url(#dayCumulativeGradient)" 
+            dot={{ r: 4, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+            activeDot={{ r: 6, fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+            isAnimationActive={true}
+            animationDuration={800}
           />
         </AreaChart>
       </ResponsiveContainer>
