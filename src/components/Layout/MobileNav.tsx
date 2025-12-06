@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, NotebookPen, Settings, Calculator } from "lucide-react";
+import { LayoutDashboard, BookOpen, NotebookPen, Settings, Calculator, BarChart3 } from "lucide-react";
 
 interface MobileNavProps {
   currentPage: string;
@@ -7,10 +7,10 @@ interface MobileNavProps {
 }
 
 const navItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
   { id: 'journal', label: 'Journal', icon: BookOpen },
-  { id: 'notebook', label: 'Notebook', icon: NotebookPen },
-  { id: 'calculator', label: 'Calc', icon: Calculator },
+  { id: 'chart', label: 'Chart', icon: BarChart3 },
+  { id: 'notebook', label: 'Notes', icon: NotebookPen },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
