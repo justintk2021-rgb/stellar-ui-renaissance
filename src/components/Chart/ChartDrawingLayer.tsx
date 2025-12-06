@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Canvas as FabricCanvas, PencilBrush, Line, Rect, Circle, Textbox, FabricObject } from "fabric";
+import { Canvas as FabricCanvas, PencilBrush, Line, Rect, Circle, Textbox } from "fabric";
 import { 
   MousePointer2, 
   Pencil, 
@@ -8,8 +8,6 @@ import {
   CircleIcon, 
   Type, 
   Trash2, 
-  Undo2,
-  Redo2,
   Download,
   Eye,
   EyeOff
@@ -36,14 +34,8 @@ const tools = [
 ];
 
 const colors = [
-  "#ef4444", // red
-  "#f97316", // orange
-  "#eab308", // yellow
-  "#22c55e", // green
-  "#3b82f6", // blue
-  "#8b5cf6", // purple
-  "#ec4899", // pink
-  "#ffffff", // white
+  "#ef4444", "#f97316", "#eab308", "#22c55e", 
+  "#3b82f6", "#8b5cf6", "#ec4899", "#ffffff",
 ];
 
 export function ChartDrawingLayer({ width, height, symbol, onSave, savedData }: ChartDrawingLayerProps) {
@@ -51,71 +43,79 @@ export function ChartDrawingLayer({ width, height, symbol, onSave, savedData }: 
   const fabricRef = useRef<FabricCanvas | null>(null);
   const [activeTool, setActiveTool] = useState("select");
   const [activeColor, setActiveColor] = useState("#3b82f6");
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [isVisible, setIsVisible] = useState(true);
-  const [history, setHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [isReady, setIsReady] = useState(false);
+  const drawingRef = useRef<{ startX: number; startY: number } | null>(null);
 
-  // Initialize Fabric.js canvas
+  // Initialize canvas
   useEffect(() => {
-    if (!canvasRef.current || width === 0 || height === 0) return;
+    if (!canvasRef.current || width <= 0 || height <= 0) return;
 
-    const canvas = new FabricCanvas(canvasRef.current, {
-      width,
-      height,
-      backgroundColor: "transparent",
-      selection: activeTool === "select",
-    });
-
-    fabricRef.current = canvas;
-
-    // Load saved data if available
-    if (savedData) {
-      try {
-        canvas.loadFromJSON(JSON.parse(savedData), () => {
-          canvas.renderAll();
-          saveToHistory();
-        });
-      } catch (e) {
-        console.error("Error loading saved drawing:", e);
-      }
-    }
-
-    // Save on object modified
-    canvas.on("object:modified", saveDrawing);
-    canvas.on("object:added", () => {
-      saveDrawing();
-      saveToHistory();
-    });
-    canvas.on("object:removed", () => {
-      saveDrawing();
-      saveToHistory();
-    });
-
-    return () => {
-      canvas.dispose();
+    // Dispose previous canvas if exists
+    if (fabricRef.current) {
+      fabricRef.current.dispose();
       fabricRef.current = null;
-    };
-  }, [width, height]);
-
-  // Update canvas size when dimensions change
-  useEffect(() => {
-    if (fabricRef.current && width > 0 && height > 0) {
-      fabricRef.current.setDimensions({ width, height });
-      fabricRef.current.renderAll();
     }
-  }, [width, height]);
 
-  // Update drawing mode when tool changes
+    try {
+      const canvas = new FabricCanvas(canvasRef.current, {
+        width,
+        height,
+        backgroundColor: "transparent",
+        selection: true,
+      });
+
+      fabricRef.current = canvas;
+      setIsReady(true);
+
+      // Load saved drawings
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData);
+          canvas.loadFromJSON(parsed, () => {
+            canvas.renderAll();
+          });
+        } catch (e) {
+          console.log("No valid saved data");
+        }
+      }
+
+      // Auto-save on changes
+      const saveHandler = () => {
+        if (fabricRef.current) {
+          const json = JSON.stringify(fabricRef.current.toJSON());
+          onSave(json);
+        }
+      };
+
+      canvas.on("object:added", saveHandler);
+      canvas.on("object:modified", saveHandler);
+      canvas.on("object:removed", saveHandler);
+
+      return () => {
+        canvas.off("object:added", saveHandler);
+        canvas.off("object:modified", saveHandler);
+        canvas.off("object:removed", saveHandler);
+        canvas.dispose();
+        fabricRef.current = null;
+        setIsReady(false);
+      };
+    } catch (error) {
+      console.error("Failed to initialize canvas:", error);
+    }
+  }, [width, height, symbol]);
+
+  // Handle tool changes
   useEffect(() => {
-    if (!fabricRef.current) return;
+    if (!fabricRef.current || !isReady) return;
 
     const canvas = fabricRef.current;
     
     if (activeTool === "draw") {
       canvas.isDrawingMode = true;
-      canvas.freeDrawingBrush = new PencilBrush(canvas);
+      if (!canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush = new PencilBrush(canvas);
+      }
       canvas.freeDrawingBrush.color = activeColor;
       canvas.freeDrawingBrush.width = 2;
     } else {
@@ -123,100 +123,79 @@ export function ChartDrawingLayer({ width, height, symbol, onSave, savedData }: 
     }
 
     canvas.selection = activeTool === "select";
-    canvas.forEachObject((obj: FabricObject) => {
+    canvas.getObjects().forEach((obj) => {
       obj.selectable = activeTool === "select";
       obj.evented = activeTool === "select";
     });
     canvas.renderAll();
-  }, [activeTool, activeColor]);
+  }, [activeTool, activeColor, isReady]);
 
-  // Update brush color
-  useEffect(() => {
-    if (fabricRef.current?.freeDrawingBrush) {
-      fabricRef.current.freeDrawingBrush.color = activeColor;
-    }
-  }, [activeColor]);
-
-  const saveDrawing = useCallback(() => {
-    if (!fabricRef.current) return;
-    const json = JSON.stringify(fabricRef.current.toJSON());
-    onSave(json);
-  }, [onSave]);
-
-  const saveToHistory = useCallback(() => {
-    if (!fabricRef.current) return;
-    const json = JSON.stringify(fabricRef.current.toJSON());
-    setHistory(prev => {
-      const newHistory = prev.slice(0, historyIndex + 1);
-      newHistory.push(json);
-      return newHistory.slice(-20); // Keep last 20 states
-    });
-    setHistoryIndex(prev => Math.min(prev + 1, 19));
-  }, [historyIndex]);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
     if (!fabricRef.current || activeTool === "select" || activeTool === "draw") return;
-
-    const canvas = fabricRef.current;
+    
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setStartPoint({ x, y });
-    setIsDrawing(true);
+    
+    drawingRef.current = {
+      startX: e.clientX - rect.left,
+      startY: e.clientY - rect.top,
+    };
   }, [activeTool]);
 
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    if (!fabricRef.current || !isDrawing || !startPoint) return;
+  const handleCanvasMouseUp = useCallback((e: React.MouseEvent) => {
+    if (!fabricRef.current || !drawingRef.current) return;
 
     const canvas = fabricRef.current;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
 
+    const { startX, startY } = drawingRef.current;
     const endX = e.clientX - rect.left;
     const endY = e.clientY - rect.top;
 
-    let shape: FabricObject | null = null;
+    let shape = null;
 
     switch (activeTool) {
       case "line":
-        shape = new Line([startPoint.x, startPoint.y, endX, endY], {
+        shape = new Line([startX, startY, endX, endY], {
           stroke: activeColor,
           strokeWidth: 2,
+          selectable: true,
         });
         break;
       case "rect":
         shape = new Rect({
-          left: Math.min(startPoint.x, endX),
-          top: Math.min(startPoint.y, endY),
-          width: Math.abs(endX - startPoint.x),
-          height: Math.abs(endY - startPoint.y),
+          left: Math.min(startX, endX),
+          top: Math.min(startY, endY),
+          width: Math.abs(endX - startX),
+          height: Math.abs(endY - startY),
           stroke: activeColor,
           strokeWidth: 2,
           fill: "transparent",
+          selectable: true,
         });
         break;
       case "circle":
-        const radius = Math.sqrt(
-          Math.pow(endX - startPoint.x, 2) + Math.pow(endY - startPoint.y, 2)
-        ) / 2;
+        const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2)) / 2;
         shape = new Circle({
-          left: Math.min(startPoint.x, endX),
-          top: Math.min(startPoint.y, endY),
-          radius,
+          left: (startX + endX) / 2 - radius,
+          top: (startY + endY) / 2 - radius,
+          radius: Math.max(radius, 5),
           stroke: activeColor,
           strokeWidth: 2,
           fill: "transparent",
+          selectable: true,
         });
         break;
       case "text":
         shape = new Textbox("Text", {
-          left: startPoint.x,
-          top: startPoint.y,
-          fontSize: 16,
+          left: startX,
+          top: startY,
+          fontSize: 18,
           fill: activeColor,
-          fontFamily: "sans-serif",
+          fontFamily: "Arial",
+          selectable: true,
+          editable: true,
         });
         break;
     }
@@ -227,46 +206,24 @@ export function ChartDrawingLayer({ width, height, symbol, onSave, savedData }: 
       canvas.renderAll();
     }
 
-    setIsDrawing(false);
-    setStartPoint(null);
-  }, [isDrawing, startPoint, activeTool, activeColor]);
+    drawingRef.current = null;
+  }, [activeTool, activeColor]);
 
   const handleClear = () => {
     if (!fabricRef.current) return;
     fabricRef.current.clear();
-    fabricRef.current.backgroundColor = "transparent";
     fabricRef.current.renderAll();
-    saveDrawing();
-    saveToHistory();
+    onSave("");
   };
 
   const handleDeleteSelected = () => {
     if (!fabricRef.current) return;
-    const activeObjects = fabricRef.current.getActiveObjects();
-    activeObjects.forEach(obj => fabricRef.current?.remove(obj));
-    fabricRef.current.discardActiveObject();
-    fabricRef.current.renderAll();
-    saveDrawing();
-  };
-
-  const handleUndo = () => {
-    if (historyIndex <= 0 || !fabricRef.current) return;
-    const newIndex = historyIndex - 1;
-    fabricRef.current.loadFromJSON(JSON.parse(history[newIndex]), () => {
-      fabricRef.current?.renderAll();
-      saveDrawing();
-    });
-    setHistoryIndex(newIndex);
-  };
-
-  const handleRedo = () => {
-    if (historyIndex >= history.length - 1 || !fabricRef.current) return;
-    const newIndex = historyIndex + 1;
-    fabricRef.current.loadFromJSON(JSON.parse(history[newIndex]), () => {
-      fabricRef.current?.renderAll();
-      saveDrawing();
-    });
-    setHistoryIndex(newIndex);
+    const active = fabricRef.current.getActiveObjects();
+    if (active.length > 0) {
+      active.forEach(obj => fabricRef.current?.remove(obj));
+      fabricRef.current.discardActiveObject();
+      fabricRef.current.renderAll();
+    }
   };
 
   const handleExport = () => {
@@ -284,19 +241,18 @@ export function ChartDrawingLayer({ width, height, symbol, onSave, savedData }: 
         size="sm"
         variant="outline"
         onClick={() => setIsVisible(true)}
-        className="absolute top-2 left-2 z-30 bg-background/80 hover:bg-background gap-1.5"
+        className="absolute top-2 left-2 z-30 bg-background/90 hover:bg-background gap-1.5"
       >
         <Eye className="w-4 h-4" />
-        Show Drawing
+        Show Drawings
       </Button>
     );
   }
 
   return (
     <>
-      {/* Drawing Toolbar */}
+      {/* Toolbar */}
       <div className="absolute top-2 left-2 z-30 flex flex-col gap-1 bg-background/95 backdrop-blur-sm rounded-lg border border-border/50 p-1.5 shadow-lg">
-        {/* Tools */}
         {tools.map((tool) => {
           const Icon = tool.icon;
           return (
@@ -305,10 +261,7 @@ export function ChartDrawingLayer({ width, height, symbol, onSave, savedData }: 
               size="icon"
               variant={activeTool === tool.id ? "default" : "ghost"}
               onClick={() => setActiveTool(tool.id)}
-              className={cn(
-                "h-8 w-8",
-                activeTool === tool.id && "bg-primary text-primary-foreground"
-              )}
+              className={cn("h-8 w-8", activeTool === tool.id && "bg-primary")}
               title={tool.label}
             >
               <Icon className="w-4 h-4" />
@@ -318,25 +271,21 @@ export function ChartDrawingLayer({ width, height, symbol, onSave, savedData }: 
 
         <div className="h-px bg-border my-1" />
 
-        {/* Color Picker */}
         <Popover>
           <PopoverTrigger asChild>
             <Button size="icon" variant="ghost" className="h-8 w-8" title="Color">
-              <div
-                className="w-5 h-5 rounded-full border-2 border-border"
-                style={{ backgroundColor: activeColor }}
-              />
+              <div className="w-5 h-5 rounded-full border-2 border-border" style={{ backgroundColor: activeColor }} />
             </Button>
           </PopoverTrigger>
           <PopoverContent side="right" className="w-auto p-2">
-            <div className="grid grid-cols-4 gap-1">
+            <div className="grid grid-cols-4 gap-1.5">
               {colors.map((color) => (
                 <button
                   key={color}
                   onClick={() => setActiveColor(color)}
                   className={cn(
-                    "w-6 h-6 rounded-full border-2 transition-transform hover:scale-110",
-                    activeColor === color ? "border-primary" : "border-transparent"
+                    "w-7 h-7 rounded-full border-2 transition-transform hover:scale-110",
+                    activeColor === color ? "border-white ring-2 ring-primary" : "border-transparent"
                   )}
                   style={{ backgroundColor: color }}
                 />
@@ -347,67 +296,26 @@ export function ChartDrawingLayer({ width, height, symbol, onSave, savedData }: 
 
         <div className="h-px bg-border my-1" />
 
-        {/* Actions */}
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={handleUndo}
-          disabled={historyIndex <= 0}
-          className="h-8 w-8"
-          title="Undo"
-        >
-          <Undo2 className="w-4 h-4" />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={handleRedo}
-          disabled={historyIndex >= history.length - 1}
-          className="h-8 w-8"
-          title="Redo"
-        >
-          <Redo2 className="w-4 h-4" />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={handleDeleteSelected}
-          className="h-8 w-8"
-          title="Delete Selected"
-        >
+        <Button size="icon" variant="ghost" onClick={handleDeleteSelected} className="h-8 w-8" title="Delete">
           <Trash2 className="w-4 h-4" />
         </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={handleExport}
-          className="h-8 w-8"
-          title="Export"
-        >
+        <Button size="icon" variant="ghost" onClick={handleExport} className="h-8 w-8" title="Export">
           <Download className="w-4 h-4" />
         </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => setIsVisible(false)}
-          className="h-8 w-8"
-          title="Hide Drawing Layer"
-        >
+        <Button size="icon" variant="ghost" onClick={() => setIsVisible(false)} className="h-8 w-8" title="Hide">
           <EyeOff className="w-4 h-4" />
         </Button>
       </div>
 
-      {/* Canvas */}
-      <canvas
-        ref={canvasRef}
+      {/* Drawing Canvas */}
+      <div 
         className="absolute inset-0 z-20"
-        style={{ 
-          pointerEvents: activeTool === "select" && !fabricRef.current?.getActiveObject() ? "none" : "auto",
-          cursor: activeTool === "draw" ? "crosshair" : activeTool === "select" ? "default" : "crosshair"
-        }}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-      />
+        style={{ pointerEvents: activeTool === "select" ? "none" : "auto" }}
+        onMouseDown={handleCanvasMouseDown}
+        onMouseUp={handleCanvasMouseUp}
+      >
+        <canvas ref={canvasRef} />
+      </div>
     </>
   );
 }
