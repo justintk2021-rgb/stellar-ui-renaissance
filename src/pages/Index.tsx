@@ -464,7 +464,7 @@ const Index = () => {
 
             {/* Chart Page */}
             {currentPage === 'chart' && (
-              <CustomChart />
+              <CustomChart theme={theme} />
             )}
           </div>
         </main>

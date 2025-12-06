@@ -4,18 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Search, Sun, Moon, Calculator, ChevronLeft, ChevronRight } from "lucide-react";
 import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
 
-type ChartTheme = "light" | "dark";
+interface LightweightChartProps {
+  theme?: 'dark' | 'light';
+}
 
-export function LightweightChart() {
+export function LightweightChart({ theme: appTheme = 'dark' }: LightweightChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [symbol, setSymbol] = useState(() => {
     return localStorage.getItem("chart-symbol") || "BTCUSD";
   });
   const [searchValue, setSearchValue] = useState("");
-  const [theme, setTheme] = useState<ChartTheme>(() => {
-    const stored = localStorage.getItem("theme");
-    return stored === "light" ? "light" : "dark";
-  });
   const [showCalculator, setShowCalculator] = useState(() => {
     return localStorage.getItem("chart-show-calculator") === "true";
   });
@@ -46,7 +44,7 @@ export function LightweightChart() {
       symbol: symbol,
       interval: "15",
       timezone: "Etc/UTC",
-      theme: theme,
+      theme: appTheme,
       style: "1",
       locale: "en",
       allow_symbol_change: true,
@@ -71,7 +69,7 @@ export function LightweightChart() {
         containerRef.current.innerHTML = "";
       }
     };
-  }, [symbol, theme]);
+  }, [symbol, appTheme]);
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchValue.trim()) {
@@ -79,9 +77,6 @@ export function LightweightChart() {
     }
   };
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-  };
 
   return (
     <div className="flex gap-4 animate-fade-in" style={{ height: "calc(100vh - 140px)" }}>
