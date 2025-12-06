@@ -1,9 +1,15 @@
-import { useState, useEffect } from "react";
-import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ChecklistItem {
   id: string;
@@ -25,13 +31,20 @@ export function PlaybookView() {
   const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
   const [editingChecklistName, setEditingChecklistName] = useState("");
   const [newItemTexts, setNewItemTexts] = useState<Record<string, string>>({});
+  const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Load checklists from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('atp_playbook_checklists');
     if (saved) {
       try {
-        setChecklists(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setChecklists(parsed);
+        // Auto-select first checklist if exists
+        if (parsed.length > 0 && !selectedChecklistId) {
+          setSelectedChecklistId(parsed[0].id);
+        }
       } catch (e) {
         console.error('Failed to parse checklists:', e);
       }
@@ -42,6 +55,19 @@ export function PlaybookView() {
   useEffect(() => {
     localStorage.setItem('atp_playbook_checklists', JSON.stringify(checklists));
   }, [checklists]);
+
+  // Filter checklists based on search query
+  const filteredChecklists = useMemo(() => {
+    if (!searchQuery.trim()) return checklists;
+    return checklists.filter(c => 
+      c.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [checklists, searchQuery]);
+
+  // Get the currently selected checklist
+  const selectedChecklist = useMemo(() => {
+    return checklists.find(c => c.id === selectedChecklistId) || null;
+  }, [checklists, selectedChecklistId]);
 
   const createChecklist = () => {
     if (!newChecklistName.trim()) return;
@@ -56,16 +82,15 @@ export function PlaybookView() {
     
     setChecklists([newChecklist, ...checklists]);
     setNewChecklistName("");
+    setSelectedChecklistId(newChecklist.id);
   };
 
   const deleteChecklist = (id: string) => {
-    setChecklists(checklists.filter(c => c.id !== id));
-  };
-
-  const toggleExpanded = (id: string) => {
-    setChecklists(checklists.map(c => 
-      c.id === id ? { ...c, isExpanded: !c.isExpanded } : c
-    ));
+    const updated = checklists.filter(c => c.id !== id);
+    setChecklists(updated);
+    if (selectedChecklistId === id) {
+      setSelectedChecklistId(updated.length > 0 ? updated[0].id : null);
+    }
   };
 
   const startEditingChecklist = (checklist: Checklist) => {
@@ -168,7 +193,63 @@ export function PlaybookView() {
         </div>
       </div>
 
-      {/* Checklists */}
+      {/* Checklist Selector */}
+      {checklists.length > 0 && (
+        <div className="glass rounded-xl p-5 border border-border/40">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+            Select Checklist
+          </h3>
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search checklists..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-background/50 border-border/50 pl-10"
+              />
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="min-w-[200px] justify-between bg-background/50">
+                  <span className="truncate">
+                    {selectedChecklist ? selectedChecklist.name : "Select a checklist"}
+                  </span>
+                  <ChevronDown className="w-4 h-4 ml-2 shrink-0" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[200px] max-h-[300px] overflow-y-auto bg-popover">
+                {filteredChecklists.length === 0 ? (
+                  <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                    No checklists found
+                  </div>
+                ) : (
+                  filteredChecklists.map((checklist) => (
+                    <DropdownMenuItem
+                      key={checklist.id}
+                      onClick={() => {
+                        setSelectedChecklistId(checklist.id);
+                        setSearchQuery("");
+                      }}
+                      className={cn(
+                        "cursor-pointer",
+                        selectedChecklistId === checklist.id && "bg-primary/10"
+                      )}
+                    >
+                      <span className="truncate">{checklist.name}</span>
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {getCompletionPercentage(checklist)}%
+                      </span>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      )}
+
+      {/* Selected Checklist Display */}
       {checklists.length === 0 ? (
         <div className="glass rounded-xl p-12 border border-border/40 text-center">
           <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -177,169 +258,166 @@ export function PlaybookView() {
             Create your first trading checklist to get started
           </p>
         </div>
+      ) : !selectedChecklist ? (
+        <div className="glass rounded-xl p-12 border border-border/40 text-center">
+          <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Select a Checklist</h3>
+          <p className="text-sm text-muted-foreground">
+            Choose a checklist from the dropdown above
+          </p>
+        </div>
       ) : (
-        <div className="space-y-4">
-          {checklists.map((checklist) => {
-            const percentage = getCompletionPercentage(checklist);
-            const isComplete = percentage === 100 && checklist.items.length > 0;
-            
-            return (
-              <div 
-                key={checklist.id} 
-                className={cn(
-                  "glass rounded-xl border transition-all duration-300",
-                  isComplete ? "border-primary/50 bg-primary/5" : "border-border/40"
-                )}
-              >
-                {/* Checklist Header */}
-                <div className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-1">
-                    <button
-                      onClick={() => toggleExpanded(checklist.id)}
-                      className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center hover:bg-muted transition-colors"
-                    >
-                      {checklist.isExpanded ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )}
-                    </button>
-                    
-                    {editingChecklistId === checklist.id ? (
-                      <div className="flex items-center gap-2 flex-1">
-                        <Input
-                          value={editingChecklistName}
-                          onChange={(e) => setEditingChecklistName(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && saveChecklistName(checklist.id)}
-                          className="h-8 bg-background/50"
-                          autoFocus
-                        />
-                        <Button size="sm" variant="ghost" onClick={() => saveChecklistName(checklist.id)}>
-                          <Check className="w-4 h-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingChecklistId(null)}>
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">{checklist.name}</h3>
-                        <button 
-                          onClick={() => startEditingChecklist(checklist)}
-                          className="p-1 rounded hover:bg-muted/50 transition-colors"
-                        >
-                          <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Percentage Badge */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className={cn(
-                            "h-full transition-all duration-500",
-                            isComplete ? "bg-primary" : "bg-primary/70"
-                          )}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                      <span className={cn(
-                        "text-sm font-bold min-w-[3rem] text-right",
-                        isComplete ? "text-primary" : "text-muted-foreground"
-                      )}>
-                        {percentage}%
-                      </span>
-                    </div>
-
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => resetChecklist(checklist.id)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      Reset
-                    </Button>
-
-                    <ConfirmDialog
-                      trigger={
-                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      }
-                      title="Delete Checklist"
-                      description={`Are you sure you want to delete "${checklist.name}"? This action cannot be undone.`}
-                      confirmLabel="Delete"
-                      variant="destructive"
-                      onConfirm={() => deleteChecklist(checklist.id)}
-                    />
-                  </div>
+        <div 
+          className={cn(
+            "glass rounded-xl border transition-all duration-300",
+            getCompletionPercentage(selectedChecklist) === 100 && selectedChecklist.items.length > 0
+              ? "border-primary/50 bg-primary/5" 
+              : "border-border/40"
+          )}
+        >
+          {/* Checklist Header */}
+          <div className="p-4 flex items-center justify-between border-b border-border/40">
+            <div className="flex items-center gap-3 flex-1">
+              {editingChecklistId === selectedChecklist.id ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <Input
+                    value={editingChecklistName}
+                    onChange={(e) => setEditingChecklistName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && saveChecklistName(selectedChecklist.id)}
+                    className="h-8 bg-background/50"
+                    autoFocus
+                  />
+                  <Button size="sm" variant="ghost" onClick={() => saveChecklistName(selectedChecklist.id)}>
+                    <Check className="w-4 h-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingChecklistId(null)}>
+                    <X className="w-4 h-4" />
+                  </Button>
                 </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-lg">{selectedChecklist.name}</h3>
+                  <button 
+                    onClick={() => startEditingChecklist(selectedChecklist)}
+                    className="p-1 rounded hover:bg-muted/50 transition-colors"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                </div>
+              )}
+            </div>
 
-                {/* Checklist Items */}
-                {checklist.isExpanded && (
-                  <div className="px-4 pb-4 space-y-2">
-                    {checklist.items.map((item) => (
-                      <div 
-                        key={item.id}
-                        className={cn(
-                          "flex items-center gap-3 p-3 rounded-lg transition-all duration-200",
-                          item.checked 
-                            ? "bg-primary/10 border border-primary/30" 
-                            : "bg-muted/30 border border-transparent hover:bg-muted/50"
-                        )}
-                      >
-                        <button
-                          onClick={() => toggleItem(checklist.id, item.id)}
-                          className={cn(
-                            "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
-                            item.checked
-                              ? "bg-primary border-primary text-primary-foreground"
-                              : "border-muted-foreground/50 hover:border-primary"
-                          )}
-                        >
-                          {item.checked && <Check className="w-3 h-3" />}
-                        </button>
-                        <span className={cn(
-                          "flex-1 text-sm transition-all",
-                          item.checked && "line-through text-muted-foreground"
-                        )}>
-                          {item.text}
-                        </span>
-                        <button
-                          onClick={() => deleteItem(checklist.id, item.id)}
-                          className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-
-                    {/* Add New Item */}
-                    <div className="flex gap-2 pt-2">
-                      <Input
-                        placeholder="Add new item..."
-                        value={newItemTexts[checklist.id] || ""}
-                        onChange={(e) => setNewItemTexts({ ...newItemTexts, [checklist.id]: e.target.value })}
-                        onKeyDown={(e) => e.key === 'Enter' && addItem(checklist.id)}
-                        className="bg-background/50 border-border/50 h-9 text-sm"
-                      />
-                      <Button 
-                        size="sm" 
-                        variant="secondary"
-                        onClick={() => addItem(checklist.id)}
-                        className="shrink-0"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
+            {/* Percentage Badge & Actions */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className={cn(
+                      "h-full transition-all duration-500",
+                      getCompletionPercentage(selectedChecklist) === 100 && selectedChecklist.items.length > 0
+                        ? "bg-primary" 
+                        : "bg-primary/70"
+                    )}
+                    style={{ width: `${getCompletionPercentage(selectedChecklist)}%` }}
+                  />
+                </div>
+                <span className={cn(
+                  "text-sm font-bold min-w-[3rem] text-right",
+                  getCompletionPercentage(selectedChecklist) === 100 && selectedChecklist.items.length > 0
+                    ? "text-primary" 
+                    : "text-muted-foreground"
+                )}>
+                  {getCompletionPercentage(selectedChecklist)}%
+                </span>
               </div>
-            );
-          })}
+
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => resetChecklist(selectedChecklist.id)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Reset
+              </Button>
+
+              <ConfirmDialog
+                trigger={
+                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                }
+                title="Delete Checklist"
+                description={`Are you sure you want to delete "${selectedChecklist.name}"? This action cannot be undone.`}
+                confirmLabel="Delete"
+                variant="destructive"
+                onConfirm={() => deleteChecklist(selectedChecklist.id)}
+              />
+            </div>
+          </div>
+
+          {/* Checklist Items */}
+          <div className="p-4 space-y-2">
+            {selectedChecklist.items.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                No items yet. Add your first item below.
+              </div>
+            ) : (
+              selectedChecklist.items.map((item) => (
+                <div 
+                  key={item.id}
+                  className={cn(
+                    "flex items-center gap-3 p-3 rounded-lg transition-all duration-200",
+                    item.checked 
+                      ? "bg-primary/10 border border-primary/30" 
+                      : "bg-muted/30 border border-transparent hover:bg-muted/50"
+                  )}
+                >
+                  <button
+                    onClick={() => toggleItem(selectedChecklist.id, item.id)}
+                    className={cn(
+                      "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
+                      item.checked
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : "border-muted-foreground/50 hover:border-primary"
+                    )}
+                  >
+                    {item.checked && <Check className="w-3 h-3" />}
+                  </button>
+                  <span className={cn(
+                    "flex-1 text-sm transition-all",
+                    item.checked && "line-through text-muted-foreground"
+                  )}>
+                    {item.text}
+                  </span>
+                  <button
+                    onClick={() => deleteItem(selectedChecklist.id, item.id)}
+                    className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))
+            )}
+
+            {/* Add New Item */}
+            <div className="flex gap-2 pt-2">
+              <Input
+                placeholder="Add new item..."
+                value={newItemTexts[selectedChecklist.id] || ""}
+                onChange={(e) => setNewItemTexts({ ...newItemTexts, [selectedChecklist.id]: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && addItem(selectedChecklist.id)}
+                className="bg-background/50 border-border/50 h-9 text-sm"
+              />
+              <Button 
+                size="sm" 
+                variant="secondary"
+                onClick={() => addItem(selectedChecklist.id)}
+                className="shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
