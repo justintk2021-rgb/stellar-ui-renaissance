@@ -307,17 +307,13 @@ const Index = () => {
 
         {/* Mobile Header - or Hamburger menu on chart page */}
         {isChartPage ? (
-          <div className="glass-strong rounded-2xl p-3 flex items-center gap-3">
+          <div className="absolute top-4 left-4 z-10">
             <button 
               onClick={() => setSidebarOpen(true)}
-              className="w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors"
+              className="w-10 h-10 rounded-xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="flex-1">
-              <h1 className="text-base font-bold gradient-text">Chart</h1>
-              <p className="text-[10px] text-muted-foreground">Interactive chart with drawing tools</p>
-            </div>
           </div>
         ) : (
           <div className="lg:hidden glass-strong rounded-2xl p-4 flex items-center gap-3">
