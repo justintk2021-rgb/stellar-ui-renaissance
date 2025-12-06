@@ -98,13 +98,56 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [localCustomColor, setLocalCustomColor] = useState(customColor || '#10b981');
-  const [selectedGradient, setSelectedGradient] = useState<{ from: string; to: string } | null>(null);
-  const [customGradientFrom, setCustomGradientFrom] = useState('#10b981');
-  const [customGradientTo, setCustomGradientTo] = useState('#06b6d4');
+  const [selectedGradient, setSelectedGradient] = useState<{ from: string; to: string } | null>(() => {
+    const saved = localStorage.getItem('atp_custom_gradient');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+  const [customGradientFrom, setCustomGradientFrom] = useState(() => {
+    const saved = localStorage.getItem('atp_custom_gradient');
+    if (saved) {
+      try {
+        return JSON.parse(saved).from || '#10b981';
+      } catch {
+        return '#10b981';
+      }
+    }
+    return '#10b981';
+  });
+  const [customGradientTo, setCustomGradientTo] = useState(() => {
+    const saved = localStorage.getItem('atp_custom_gradient');
+    if (saved) {
+      try {
+        return JSON.parse(saved).to || '#06b6d4';
+      } catch {
+        return '#06b6d4';
+      }
+    }
+    return '#06b6d4';
+  });
+
+  // Load and apply saved gradient on mount
+  useEffect(() => {
+    const savedGradient = localStorage.getItem('atp_custom_gradient');
+    if (savedGradient && accentColor === 'custom') {
+      try {
+        const gradient = JSON.parse(savedGradient);
+        setSelectedGradient(gradient);
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
 
   // Apply custom color to CSS variables
   useEffect(() => {
-    if (accentColor === 'custom' && localCustomColor) {
+    if (accentColor === 'custom' && localCustomColor && !selectedGradient) {
       const hsl = hexToHsl(localCustomColor);
       document.documentElement.style.setProperty('--primary', hsl);
       document.documentElement.style.setProperty('--primary-glow', adjustLightness(hsl, 5));
@@ -112,9 +155,9 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
       document.documentElement.style.setProperty('--sidebar-primary', hsl);
       document.documentElement.style.setProperty('--sidebar-ring', hsl);
     }
-  }, [accentColor, localCustomColor]);
+  }, [accentColor, localCustomColor, selectedGradient]);
 
-  // Apply gradient colors
+  // Apply gradient colors and save to localStorage
   useEffect(() => {
     if (selectedGradient) {
       const fromHsl = hexToHsl(selectedGradient.from);
@@ -124,6 +167,8 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
       document.documentElement.style.setProperty('--ring', fromHsl);
       document.documentElement.style.setProperty('--sidebar-primary', fromHsl);
       document.documentElement.style.setProperty('--sidebar-ring', fromHsl);
+      // Save to localStorage
+      localStorage.setItem('atp_custom_gradient', JSON.stringify(selectedGradient));
     }
   }, [selectedGradient]);
 
