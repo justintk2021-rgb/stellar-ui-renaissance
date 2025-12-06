@@ -359,8 +359,8 @@ export function PlaybookView() {
                   className={cn(
                     "flex items-center gap-3 p-3 rounded-lg transition-all duration-200",
                     item.checked 
-                      ? "bg-primary/10 border border-primary/30" 
-                      : "bg-muted/30 border border-transparent hover:bg-muted/50"
+                      ? "bg-primary/10" 
+                      : "bg-muted/30 hover:bg-muted/50"
                   )}
                 >
                   <button
