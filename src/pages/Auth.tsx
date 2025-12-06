@@ -31,6 +31,23 @@ export function AuthPage() {
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+  // Apply theme on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('atp_theme');
+    const savedAccent = localStorage.getItem('atp_accent_color');
+    
+    // Parse and apply theme
+    const theme = savedTheme ? JSON.parse(savedTheme) : 'dark';
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(theme);
+    
+    // Parse and apply accent color
+    const accent = savedAccent ? JSON.parse(savedAccent) : 'emerald';
+    const accentClasses = ['accent-emerald', 'accent-blue', 'accent-purple', 'accent-pink', 'accent-red', 'accent-orange', 'accent-yellow', 'accent-cyan'];
+    accentClasses.forEach(cls => document.documentElement.classList.remove(cls));
+    document.documentElement.classList.add(`accent-${accent}`);
+  }, []);
+
   useEffect(() => {
     // Check if already logged in
     const checkSession = async () => {
@@ -152,9 +169,9 @@ export function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4 bg-background">
       {/* Blurred Line Graph Background */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
+      <div className="absolute inset-0 z-0 overflow-hidden bg-background">
         <svg
           className="absolute inset-0 w-full h-full"
           viewBox="0 0 1200 800"
@@ -199,7 +216,7 @@ export function AuthPage() {
           />
           
           {/* Grid lines */}
-          <g stroke="hsl(var(--border))" strokeOpacity="0.1" strokeWidth="1">
+          <g stroke="hsl(var(--border))" strokeOpacity="0.2" strokeWidth="1">
             <line x1="0" y1="200" x2="1200" y2="200" />
             <line x1="0" y1="400" x2="1200" y2="400" />
             <line x1="0" y1="600" x2="1200" y2="600" />
@@ -219,13 +236,13 @@ export function AuthPage() {
             <animate attributeName="opacity" values="0.5;1;0.5" dur="3s" repeatCount="indefinite" />
           </circle>
         </svg>
-        <div className="absolute inset-0 bg-gradient-to-br from-background/80 via-background/60 to-background/80" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-background/70 to-background/90" />
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10" />
       </div>
 
       {/* Auth Card */}
       <div className="relative z-10 w-full max-w-md">
-        <div className="glass-strong rounded-3xl p-8 border border-border/40 backdrop-blur-xl shadow-2xl">
+        <div className="glass-strong rounded-3xl p-8 border border-border/40 backdrop-blur-xl shadow-2xl bg-card/95">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center glow-primary">
