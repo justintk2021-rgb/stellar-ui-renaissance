@@ -138,8 +138,15 @@ const Index = () => {
     accentClasses.forEach(cls => document.documentElement.classList.remove(cls));
     document.documentElement.classList.add(`accent-${accentColor}`);
 
-    // Apply saved custom gradient on page load
-    if (accentColor === 'custom') {
+    // Clear any inline custom styles when switching to a preset accent color
+    if (accentColor !== 'custom') {
+      document.documentElement.style.removeProperty('--primary');
+      document.documentElement.style.removeProperty('--primary-glow');
+      document.documentElement.style.removeProperty('--ring');
+      document.documentElement.style.removeProperty('--sidebar-primary');
+      document.documentElement.style.removeProperty('--sidebar-ring');
+    } else {
+      // Apply saved custom gradient on page load
       const savedGradient = localStorage.getItem('atp_custom_gradient');
       if (savedGradient) {
         try {

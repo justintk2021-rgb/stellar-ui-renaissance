@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Moon, Sun, User, Mail, Key, Calendar, LogOut, Palette, Save, Check, Trash2, Download, Link2, Pipette } from "lucide-react";
+import { Moon, Sun, User, Mail, Key, Calendar, LogOut, Palette, Save, Check, Trash2, Download, Link2, Pipette, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -182,6 +182,26 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
   const handleGradientSelect = (gradient: { from: string; to: string }) => {
     setSelectedGradient(gradient);
     onAccentColorChange('custom');
+  };
+
+  const handleResetColors = () => {
+    // Clear custom styles
+    document.documentElement.style.removeProperty('--primary');
+    document.documentElement.style.removeProperty('--primary-glow');
+    document.documentElement.style.removeProperty('--ring');
+    document.documentElement.style.removeProperty('--sidebar-primary');
+    document.documentElement.style.removeProperty('--sidebar-ring');
+    
+    // Clear stored gradient
+    localStorage.removeItem('atp_custom_gradient');
+    setSelectedGradient(null);
+    setLocalCustomColor('#10b981');
+    setCustomGradientFrom('#10b981');
+    setCustomGradientTo('#06b6d4');
+    
+    // Reset to default emerald
+    onAccentColorChange('emerald');
+    toast.success("Colors reset to default");
   };
 
   const handleCustomGradientApply = () => {
@@ -456,14 +476,25 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
 
       {/* Accent Color Settings */}
       <section className="glass rounded-xl p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-            <Palette className="w-5 h-5 text-primary" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+              <Palette className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Accent Color</h2>
+              <p className="text-sm text-muted-foreground">Personalize your theme color</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Accent Color</h2>
-            <p className="text-sm text-muted-foreground">Personalize your theme color</p>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResetColors}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Reset
+          </Button>
         </div>
 
         <div className="grid grid-cols-4 gap-3">
