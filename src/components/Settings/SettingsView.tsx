@@ -99,6 +99,8 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
   const [isSaved, setIsSaved] = useState(false);
   const [localCustomColor, setLocalCustomColor] = useState(customColor || '#10b981');
   const [selectedGradient, setSelectedGradient] = useState<{ from: string; to: string } | null>(null);
+  const [customGradientFrom, setCustomGradientFrom] = useState('#10b981');
+  const [customGradientTo, setCustomGradientTo] = useState('#06b6d4');
 
   // Apply custom color to CSS variables
   useEffect(() => {
@@ -133,6 +135,12 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
   };
 
   const handleGradientSelect = (gradient: { from: string; to: string }) => {
+    setSelectedGradient(gradient);
+    onAccentColorChange('custom');
+  };
+
+  const handleCustomGradientApply = () => {
+    const gradient = { from: customGradientFrom, to: customGradientTo };
     setSelectedGradient(gradient);
     onAccentColorChange('custom');
   };
@@ -517,6 +525,72 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
                 )}
               </button>
             ))}
+          </div>
+
+          {/* Custom Gradient Creator */}
+          <div className="mt-4 p-4 rounded-xl bg-muted/30 border border-border/50 space-y-4">
+            <span className="text-xs font-medium text-muted-foreground">Create Custom Gradient</span>
+            
+            <div className="flex items-center gap-4">
+              {/* From Color */}
+              <div className="flex-1 space-y-2">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground">From</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={customGradientFrom}
+                    onChange={(e) => setCustomGradientFrom(e.target.value)}
+                    className="w-10 h-10 rounded-lg cursor-pointer border border-border/50"
+                    style={{ padding: 0 }}
+                  />
+                  <Input
+                    type="text"
+                    value={customGradientFrom}
+                    onChange={(e) => setCustomGradientFrom(e.target.value)}
+                    className="font-mono text-xs bg-background/50 h-8"
+                  />
+                </div>
+              </div>
+
+              {/* Arrow */}
+              <div className="text-muted-foreground pt-5">→</div>
+
+              {/* To Color */}
+              <div className="flex-1 space-y-2">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground">To</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={customGradientTo}
+                    onChange={(e) => setCustomGradientTo(e.target.value)}
+                    className="w-10 h-10 rounded-lg cursor-pointer border border-border/50"
+                    style={{ padding: 0 }}
+                  />
+                  <Input
+                    type="text"
+                    value={customGradientTo}
+                    onChange={(e) => setCustomGradientTo(e.target.value)}
+                    className="font-mono text-xs bg-background/50 h-8"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Preview & Apply */}
+            <div className="flex items-center gap-3">
+              <div 
+                className="flex-1 h-10 rounded-lg border border-border/50"
+                style={{ background: `linear-gradient(135deg, ${customGradientFrom}, ${customGradientTo})` }}
+              />
+              <Button 
+                size="sm" 
+                onClick={handleCustomGradientApply}
+                className="shrink-0"
+              >
+                <Check className="w-4 h-4 mr-1" />
+                Apply
+              </Button>
+            </div>
           </div>
         </div>
       </section>
