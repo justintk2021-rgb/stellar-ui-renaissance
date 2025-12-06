@@ -2,10 +2,34 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, LineData, AreaData } from "lightweight-charts";
 import { Canvas as FabricCanvas, Line, Rect, Circle, IText } from "fabric";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, Sun, Moon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ChartToolbar, DrawingTool, ChartType, Timeframe } from "./ChartToolbar";
 import { ChartInfoPanel } from "./ChartInfoPanel";
 import { useBinanceWebSocket } from "@/hooks/useBinanceWebSocket";
+
+type ChartTheme = "light" | "dark";
+
+const chartThemes = {
+  dark: {
+    background: "transparent",
+    textColor: "#a3a3a3",
+    gridColor: "rgba(39, 39, 42, 0.5)",
+    borderColor: "rgba(39, 39, 42, 0.5)",
+    crosshairColor: "rgba(255, 255, 255, 0.3)",
+    crosshairLabelBg: "#27272a",
+    containerBg: "#0a0a0a",
+  },
+  light: {
+    background: "transparent",
+    textColor: "#374151",
+    gridColor: "rgba(209, 213, 219, 0.5)",
+    borderColor: "rgba(209, 213, 219, 0.8)",
+    crosshairColor: "rgba(0, 0, 0, 0.3)",
+    crosshairLabelBg: "#f3f4f6",
+    containerBg: "#ffffff",
+  },
+};
 
 export function LightweightChart() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -23,9 +47,18 @@ export function LightweightChart() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [tempShape, setTempShape] = useState<any>(null);
+  const [chartTheme, setChartTheme] = useState<ChartTheme>(() => {
+    const stored = localStorage.getItem("theme");
+    return stored === "light" ? "light" : "dark";
+  });
 
-  const binanceInterval = timeframe === "D" ? "1d" : timeframe === "240" ? "4h" : timeframe === "60" ? "1h" : `${timeframe}m`;
   const { data, status, currentCandle } = useBinanceWebSocket(symbol, timeframe);
+  const theme = chartThemes[chartTheme];
+
+  // Toggle chart theme
+  const toggleTheme = () => {
+    setChartTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
 
   // Initialize lightweight-charts
   useEffect(() => {
@@ -33,29 +66,29 @@ export function LightweightChart() {
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { color: "transparent" },
-        textColor: "#a3a3a3",
+        background: { color: theme.background },
+        textColor: theme.textColor,
       },
       grid: {
-        vertLines: { color: "rgba(39, 39, 42, 0.5)" },
-        horzLines: { color: "rgba(39, 39, 42, 0.5)" },
+        vertLines: { color: theme.gridColor },
+        horzLines: { color: theme.gridColor },
       },
       crosshair: {
         mode: 1,
         vertLine: {
-          color: "rgba(255, 255, 255, 0.3)",
-          labelBackgroundColor: "#27272a",
+          color: theme.crosshairColor,
+          labelBackgroundColor: theme.crosshairLabelBg,
         },
         horzLine: {
-          color: "rgba(255, 255, 255, 0.3)",
-          labelBackgroundColor: "#27272a",
+          color: theme.crosshairColor,
+          labelBackgroundColor: theme.crosshairLabelBg,
         },
       },
       rightPriceScale: {
-        borderColor: "rgba(39, 39, 42, 0.5)",
+        borderColor: theme.borderColor,
       },
       timeScale: {
-        borderColor: "rgba(39, 39, 42, 0.5)",
+        borderColor: theme.borderColor,
         timeVisible: true,
         secondsVisible: false,
       },
@@ -80,7 +113,39 @@ export function LightweightChart() {
       chart.remove();
       chartRef.current = null;
     };
-  }, []);
+  }, [chartTheme]);
+
+  // Update chart theme without recreating
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    chartRef.current.applyOptions({
+      layout: {
+        background: { color: theme.background },
+        textColor: theme.textColor,
+      },
+      grid: {
+        vertLines: { color: theme.gridColor },
+        horzLines: { color: theme.gridColor },
+      },
+      crosshair: {
+        vertLine: {
+          color: theme.crosshairColor,
+          labelBackgroundColor: theme.crosshairLabelBg,
+        },
+        horzLine: {
+          color: theme.crosshairColor,
+          labelBackgroundColor: theme.crosshairLabelBg,
+        },
+      },
+      rightPriceScale: {
+        borderColor: theme.borderColor,
+      },
+      timeScale: {
+        borderColor: theme.borderColor,
+      },
+    });
+  }, [theme]);
 
   // Update series when chart type or data changes
   useEffect(() => {
@@ -129,7 +194,7 @@ export function LightweightChart() {
 
     seriesRef.current = series;
     chartRef.current.timeScale().fitContent();
-  }, [data, chartType]);
+  }, [data, chartType, chartTheme]);
 
   // Update current candle in real-time
   useEffect(() => {
@@ -185,7 +250,7 @@ export function LightweightChart() {
       window.removeEventListener("resize", handleResize);
       fabric.dispose();
     };
-  }, []);
+  }, [chartTheme]);
 
   // Update fabric canvas mode based on tool
   useEffect(() => {
@@ -358,6 +423,21 @@ export function LightweightChart() {
                 className="pl-10 bg-background/50 border-border/50 w-48"
               />
             </div>
+            
+            {/* Theme Toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleTheme}
+              className="h-8 w-8 p-0"
+              title={chartTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {chartTheme === "dark" ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+            </Button>
           </div>
 
           <ChartToolbar
@@ -380,8 +460,8 @@ export function LightweightChart() {
 
       {/* Chart Container */}
       <div
-        className="flex-1 relative rounded-lg overflow-hidden border border-border/50 bg-[#0a0a0a]"
-        style={{ minHeight: "600px" }}
+        className="flex-1 relative rounded-lg overflow-hidden border border-border/50 transition-colors duration-200"
+        style={{ minHeight: "600px", backgroundColor: theme.containerBg }}
       >
         <div ref={chartContainerRef} className="absolute inset-0" />
         <div
