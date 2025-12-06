@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, NotebookPen, TrendingUp, Settings, Calculator } from "lucide-react";
+import { LayoutDashboard, BookOpen, NotebookPen, TrendingUp, Settings, Calculator, BarChart3 } from "lucide-react";
 
 interface SidebarProps {
   currentPage: string;
@@ -9,6 +9,7 @@ interface SidebarProps {
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'journal', label: 'Journal', icon: BookOpen },
+  { id: 'chart', label: 'Chart', icon: BarChart3 },
   { id: 'notebook', label: 'Notebook', icon: NotebookPen },
   { id: 'calculator', label: 'Calculator', icon: Calculator },
   { id: 'settings', label: 'Settings', icon: Settings },

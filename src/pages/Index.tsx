@@ -15,6 +15,7 @@ import { TradeTable } from "@/components/Journal/TradeTable";
 import { NotebookView } from "@/components/Notebook/NotebookView";
 import { SettingsView } from "@/components/Settings/SettingsView";
 import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
+import { ChartPage } from "@/components/Chart/ChartPage";
 import { TradingAssistant } from "@/components/AI/TradingAssistant";
 import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +25,7 @@ import { toast } from "sonner";
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
   journal: { title: 'Journal', subtitle: 'Log and manage your trades' },
+  chart: { title: 'Chart', subtitle: 'Full TradingView chart with your account' },
   notebook: { title: 'Notebook', subtitle: 'Your personal trading notes and journal' },
   calculator: { title: 'Calculator', subtitle: 'Calculate lot size and risk management' },
   settings: { title: 'Settings', subtitle: 'Customize your preferences' },
@@ -358,6 +360,11 @@ const Index = () => {
             {/* Calculator Page */}
             {currentPage === 'calculator' && (
               <LotSizeCalculator />
+            )}
+
+            {/* Chart Page */}
+            {currentPage === 'chart' && (
+              <ChartPage />
             )}
           </div>
         </main>
