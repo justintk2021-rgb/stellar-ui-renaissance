@@ -48,7 +48,7 @@ export function CustomChart() {
   const [activeColor, setActiveColor] = useState("#f59e0b");
 
   // Get live data from Binance
-  const { data, isConnected, isLoading, isLive } = useBinanceData(symbol, interval);
+  const { data, isConnected, isLoading, isLive, connectionError } = useBinanceData(symbol, interval);
 
   // Initialize chart
   useEffect(() => {
@@ -197,9 +197,11 @@ export function CustomChart() {
       >
         {/* Status Badges */}
         <div className="absolute top-2 left-2 z-20 flex items-center gap-2">
-          {isLive && (
+          {isLoading ? (
+            <Badge variant="secondary">Loading...</Badge>
+          ) : isLive ? (
             <Badge 
-              variant={isConnected ? "default" : "secondary"} 
+              variant={isConnected ? "default" : connectionError ? "destructive" : "secondary"} 
               className={`gap-1.5 ${isConnected ? "bg-green-600 hover:bg-green-600" : ""}`}
             >
               {isConnected ? (
@@ -207,21 +209,22 @@ export function CustomChart() {
                   <Wifi className="w-3 h-3" />
                   Live
                 </>
-              ) : (
+              ) : connectionError ? (
                 <>
                   <WifiOff className="w-3 h-3" />
+                  Offline
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-3 h-3 animate-pulse" />
                   Connecting...
                 </>
               )}
             </Badge>
-          )}
-          {!isLive && (
+          ) : (
             <Badge variant="outline" className="text-muted-foreground">
               Mock Data
             </Badge>
-          )}
-          {isLoading && (
-            <Badge variant="secondary">Loading...</Badge>
           )}
         </div>
 

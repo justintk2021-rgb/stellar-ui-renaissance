@@ -59,8 +59,11 @@ export function useBinanceData(symbol: string, interval: string) {
   const [data, setData] = useState<CandlestickData<Time>[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 3;
 
   const binanceSymbol = symbolMap[symbol];
   const binanceInterval = intervalMap[interval] || "15m";
@@ -75,10 +78,17 @@ export function useBinanceData(symbol: string, interval: string) {
     }
 
     try {
+      console.log("Fetching historical data for:", binanceSymbol.toUpperCase());
       const response = await fetch(
         `https://api.binance.com/api/v3/klines?symbol=${binanceSymbol.toUpperCase()}&interval=${binanceInterval}&limit=500`
       );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const klines = await response.json();
+      console.log("Received", klines.length, "candles");
 
       const formattedData: CandlestickData<Time>[] = klines.map((k: number[]) => ({
         time: (k[0] / 1000) as Time,
@@ -90,10 +100,12 @@ export function useBinanceData(symbol: string, interval: string) {
 
       setData(formattedData);
       setIsLoading(false);
+      setConnectionError(null);
     } catch (error) {
       console.error("Error fetching historical data:", error);
       setData(generateMockData(symbol, interval));
       setIsLoading(false);
+      setConnectionError("Failed to fetch live data, using mock data");
     }
   }, [binanceSymbol, binanceInterval, symbol, interval]);
 
@@ -101,79 +113,103 @@ export function useBinanceData(symbol: string, interval: string) {
   const connect = useCallback(() => {
     if (!binanceSymbol) return;
 
+    // Close existing connection if any
+    if (wsRef.current) {
+      wsRef.current.close(1000, "Reconnecting");
+      wsRef.current = null;
+    }
+
     const wsUrl = `wss://stream.binance.com:9443/ws/${binanceSymbol}@kline_${binanceInterval}`;
     console.log("Connecting to Binance WebSocket:", wsUrl);
 
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    try {
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      console.log("Binance WebSocket connected");
-      setIsConnected(true);
-    };
+      ws.onopen = () => {
+        console.log("Binance WebSocket connected successfully");
+        setIsConnected(true);
+        setConnectionError(null);
+        reconnectAttemptsRef.current = 0;
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const message: BinanceMessage = JSON.parse(event.data);
-        
-        if (message.e === "kline") {
-          const kline = message.k;
-          const newCandle: CandlestickData<Time> = {
-            time: (kline.t / 1000) as Time,
-            open: parseFloat(kline.o),
-            high: parseFloat(kline.h),
-            low: parseFloat(kline.l),
-            close: parseFloat(kline.c),
-          };
+      ws.onmessage = (event) => {
+        try {
+          const message: BinanceMessage = JSON.parse(event.data);
+          
+          if (message.e === "kline") {
+            const kline = message.k;
+            const newCandle: CandlestickData<Time> = {
+              time: (kline.t / 1000) as Time,
+              open: parseFloat(kline.o),
+              high: parseFloat(kline.h),
+              low: parseFloat(kline.l),
+              close: parseFloat(kline.c),
+            };
 
-          setData((prevData) => {
-            const newData = [...prevData];
-            const lastIndex = newData.length - 1;
+            setData((prevData) => {
+              const newData = [...prevData];
+              const lastIndex = newData.length - 1;
 
-            // Check if this is an update to the current candle or a new one
-            if (lastIndex >= 0 && newData[lastIndex].time === newCandle.time) {
-              newData[lastIndex] = newCandle;
-            } else if (kline.x) {
-              // Kline closed, add new candle
-              newData.push(newCandle);
-              // Keep only last 500 candles
-              if (newData.length > 500) {
-                newData.shift();
+              // Check if this is an update to the current candle or a new one
+              if (lastIndex >= 0 && newData[lastIndex].time === newCandle.time) {
+                newData[lastIndex] = newCandle;
+              } else if (kline.x) {
+                // Kline closed, add new candle
+                newData.push(newCandle);
+                // Keep only last 500 candles
+                if (newData.length > 500) {
+                  newData.shift();
+                }
+              } else if (lastIndex >= 0) {
+                // Update current candle
+                newData[lastIndex] = newCandle;
               }
-            } else if (lastIndex >= 0) {
-              // Update current candle
-              newData[lastIndex] = newCandle;
-            }
 
-            return newData;
-          });
+              return newData;
+            });
+          }
+        } catch (error) {
+          console.error("Error parsing WebSocket message:", error);
         }
-      } catch (error) {
-        console.error("Error parsing WebSocket message:", error);
-      }
-    };
+      };
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        setIsConnected(false);
+        setConnectionError("WebSocket connection error");
+      };
+
+      ws.onclose = (event) => {
+        console.log("WebSocket closed:", event.code, event.reason);
+        setIsConnected(false);
+
+        // Reconnect after delay if not a normal closure and within retry limit
+        if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
+          reconnectAttemptsRef.current++;
+          console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/${maxReconnectAttempts})...`);
+          reconnectTimeoutRef.current = window.setTimeout(() => {
+            connect();
+          }, 3000);
+        } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+          setConnectionError("Connection failed after multiple attempts");
+          console.log("Max reconnection attempts reached, using historical data only");
+        }
+      };
+    } catch (error) {
+      console.error("Failed to create WebSocket:", error);
+      setConnectionError("Failed to establish WebSocket connection");
       setIsConnected(false);
-    };
-
-    ws.onclose = (event) => {
-      console.log("WebSocket closed:", event.code, event.reason);
-      setIsConnected(false);
-
-      // Reconnect after 5 seconds if not a normal closure
-      if (event.code !== 1000) {
-        reconnectTimeoutRef.current = window.setTimeout(() => {
-          console.log("Attempting to reconnect...");
-          connect();
-        }, 5000);
-      }
-    };
+    }
   }, [binanceSymbol, binanceInterval]);
 
   // Cleanup WebSocket on unmount or when symbol/interval changes
   useEffect(() => {
+    setIsLoading(true);
+    setIsConnected(false);
+    setConnectionError(null);
+    reconnectAttemptsRef.current = 0;
+    
     fetchHistoricalData();
 
     return () => {
@@ -189,8 +225,13 @@ export function useBinanceData(symbol: string, interval: string) {
 
   // Connect WebSocket after fetching historical data
   useEffect(() => {
-    if (!isLoading && binanceSymbol) {
-      connect();
+    if (!isLoading && binanceSymbol && data.length > 0) {
+      // Small delay to ensure historical data is rendered first
+      const timer = setTimeout(() => {
+        connect();
+      }, 500);
+      
+      return () => clearTimeout(timer);
     }
 
     return () => {
@@ -199,9 +240,9 @@ export function useBinanceData(symbol: string, interval: string) {
         wsRef.current = null;
       }
     };
-  }, [isLoading, connect, binanceSymbol]);
+  }, [isLoading, connect, binanceSymbol, data.length]);
 
-  return { data, isConnected, isLoading, isLive: !!binanceSymbol };
+  return { data, isConnected, isLoading, isLive: !!binanceSymbol, connectionError };
 }
 
 // Generate mock data for non-crypto symbols
