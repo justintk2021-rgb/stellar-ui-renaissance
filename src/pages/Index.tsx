@@ -292,7 +292,12 @@ const Index = () => {
                   onSetBalance={handleSetBalance}
                 />
                 <StatsGrid trades={trades} />
-                <PnLCalendar trades={trades} />
+                <PnLCalendar 
+                  trades={trades} 
+                  onUpdateTrade={(id, updates) => {
+                    setTrades(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+                  }}
+                />
               </div>
             )}
 

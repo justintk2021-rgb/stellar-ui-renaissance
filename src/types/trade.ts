@@ -8,6 +8,7 @@ export interface Trade {
   strategy?: string;
   notes?: string;
   notebook?: string;
+  chartImage?: string; // Base64 image of trade chart with entry/TP/SL
 }
 
 export interface DailyStats {
