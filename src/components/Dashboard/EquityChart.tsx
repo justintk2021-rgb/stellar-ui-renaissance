@@ -24,6 +24,13 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
   const [editValue, setEditValue] = useState(startBalance.toString());
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Keep editValue in sync with startBalance when not editing
+  useEffect(() => {
+    if (!isEditing) {
+      setEditValue(startBalance.toString());
+    }
+  }, [startBalance, isEditing]);
+
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
