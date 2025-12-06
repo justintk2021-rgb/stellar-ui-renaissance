@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Search } from "lucide-react";
+import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -39,7 +39,6 @@ export function PlaybookView() {
   const [editingChecklistName, setEditingChecklistName] = useState("");
   const [newItemTexts, setNewItemTexts] = useState<Record<string, string>>({});
   const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // Load checklists from localStorage
@@ -63,14 +62,6 @@ export function PlaybookView() {
   useEffect(() => {
     localStorage.setItem('atp_playbook_checklists', JSON.stringify(checklists));
   }, [checklists]);
-
-  // Filter checklists based on search query
-  const filteredChecklists = useMemo(() => {
-    if (!searchQuery.trim()) return checklists;
-    return checklists.filter(c => 
-      c.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [checklists, searchQuery]);
 
   // Get the currently selected checklist
   const selectedChecklist = useMemo(() => {
@@ -215,58 +206,39 @@ export function PlaybookView() {
 
       {/* Checklist Selector */}
       {checklists.length > 0 && (
-        <div className="glass rounded-xl p-5 border border-border/40">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-            Select Checklist
-          </h3>
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search checklists..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-background/50 border-border/50 pl-10"
-              />
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="min-w-[200px] justify-between bg-background/50">
-                  <span className="truncate">
-                    {selectedChecklist ? selectedChecklist.name : "Select a checklist"}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="w-full justify-between bg-background/50">
+              <span className="truncate">
+                {selectedChecklist ? selectedChecklist.name : "Select a checklist"}
+              </span>
+              <ChevronDown className="w-4 h-4 ml-2 shrink-0" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-[300px] overflow-y-auto bg-popover">
+            {checklists.length === 0 ? (
+              <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                No checklists found
+              </div>
+            ) : (
+              checklists.map((checklist) => (
+                <DropdownMenuItem
+                  key={checklist.id}
+                  onClick={() => setSelectedChecklistId(checklist.id)}
+                  className={cn(
+                    "cursor-pointer",
+                    selectedChecklistId === checklist.id && "bg-primary/10"
+                  )}
+                >
+                  <span className="truncate">{checklist.name}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {getCompletionPercentage(checklist)}%
                   </span>
-                  <ChevronDown className="w-4 h-4 ml-2 shrink-0" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[200px] max-h-[300px] overflow-y-auto bg-popover">
-                {filteredChecklists.length === 0 ? (
-                  <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                    No checklists found
-                  </div>
-                ) : (
-                  filteredChecklists.map((checklist) => (
-                    <DropdownMenuItem
-                      key={checklist.id}
-                      onClick={() => {
-                        setSelectedChecklistId(checklist.id);
-                        setSearchQuery("");
-                      }}
-                      className={cn(
-                        "cursor-pointer",
-                        selectedChecklistId === checklist.id && "bg-primary/10"
-                      )}
-                    >
-                      <span className="truncate">{checklist.name}</span>
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        {getCompletionPercentage(checklist)}%
-                      </span>
-                    </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
+                </DropdownMenuItem>
+              ))
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
 
       {/* Selected Checklist Display */}
