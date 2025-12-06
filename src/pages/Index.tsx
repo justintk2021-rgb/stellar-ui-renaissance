@@ -15,7 +15,6 @@ import { TradeTable } from "@/components/Journal/TradeTable";
 import { NotebookView } from "@/components/Notebook/NotebookView";
 import { SettingsView } from "@/components/Settings/SettingsView";
 import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
-import { TradingAssistant } from "@/components/AI/TradingAssistant";
 import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
@@ -364,9 +363,6 @@ const Index = () => {
 
         {/* Mobile Navigation */}
         <MobileNav currentPage={currentPage} onPageChange={setCurrentPage} />
-        
-        {/* AI Trading Assistant */}
-        <TradingAssistant trades={trades} />
       </div>
     </>
   );
