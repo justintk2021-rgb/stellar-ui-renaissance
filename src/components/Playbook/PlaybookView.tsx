@@ -208,14 +208,14 @@ export function PlaybookView() {
       {checklists.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="w-full justify-between bg-background/50">
+            <Button variant="outline" className="w-fit justify-between bg-background/50">
               <span className="truncate">
                 {selectedChecklist ? selectedChecklist.name : "Select a checklist"}
               </span>
               <ChevronDown className="w-4 h-4 ml-2 shrink-0" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-[300px] overflow-y-auto bg-popover">
+          <DropdownMenuContent align="start" className="min-w-[200px] max-h-[300px] overflow-y-auto bg-popover">
             {checklists.length === 0 ? (
               <div className="px-2 py-4 text-center text-sm text-muted-foreground">
                 No checklists found
