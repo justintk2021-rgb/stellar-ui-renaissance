@@ -1,4 +1,4 @@
-import { Moon, Sun, User, Mail, Key, Calendar, LogOut } from "lucide-react";
+import { Moon, Sun, User, Mail, Key, Calendar, LogOut, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -13,14 +13,29 @@ interface UserProfile {
   created_at: string;
 }
 
+export type AccentColor = 'emerald' | 'red' | 'pink' | 'purple' | 'blue' | 'orange' | 'yellow' | 'cyan';
+
 interface SettingsViewProps {
   theme: 'dark' | 'light';
   onThemeChange: (theme: 'dark' | 'light') => void;
+  accentColor: AccentColor;
+  onAccentColorChange: (color: AccentColor) => void;
   userProfile: UserProfile | null;
   onLogout: () => void;
 }
 
-export function SettingsView({ theme, onThemeChange, userProfile, onLogout }: SettingsViewProps) {
+const accentColors: { name: AccentColor; label: string; color: string; darkColor: string }[] = [
+  { name: 'emerald', label: 'Emerald', color: 'bg-emerald-500', darkColor: 'bg-emerald-400' },
+  { name: 'blue', label: 'Blue', color: 'bg-blue-500', darkColor: 'bg-blue-400' },
+  { name: 'purple', label: 'Purple', color: 'bg-purple-500', darkColor: 'bg-purple-400' },
+  { name: 'pink', label: 'Pink', color: 'bg-pink-500', darkColor: 'bg-pink-400' },
+  { name: 'red', label: 'Red', color: 'bg-red-500', darkColor: 'bg-red-400' },
+  { name: 'orange', label: 'Orange', color: 'bg-orange-500', darkColor: 'bg-orange-400' },
+  { name: 'yellow', label: 'Yellow', color: 'bg-yellow-500', darkColor: 'bg-yellow-400' },
+  { name: 'cyan', label: 'Cyan', color: 'bg-cyan-500', darkColor: 'bg-cyan-400' },
+];
+
+export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorChange, userProfile, onLogout }: SettingsViewProps) {
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-US", {
       year: "numeric",
@@ -161,8 +176,8 @@ export function SettingsView({ theme, onThemeChange, userProfile, onLogout }: Se
             )}
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Theme</h2>
-            <p className="text-sm text-muted-foreground">Customize your appearance</p>
+            <h2 className="text-lg font-semibold text-foreground">Appearance</h2>
+            <p className="text-sm text-muted-foreground">Choose light or dark mode</p>
           </div>
         </div>
 
@@ -228,6 +243,49 @@ export function SettingsView({ theme, onThemeChange, userProfile, onLogout }: Se
               <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary animate-pulse" />
             )}
           </button>
+        </div>
+      </section>
+
+      {/* Accent Color Settings */}
+      <section className="glass rounded-xl p-6 space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+            <Palette className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Accent Color</h2>
+            <p className="text-sm text-muted-foreground">Personalize your theme color</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-3">
+          {accentColors.map((color) => (
+            <button
+              key={color.name}
+              onClick={() => onAccentColorChange(color.name)}
+              className={cn(
+                "relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-300",
+                accentColor === color.name
+                  ? "border-primary bg-primary/10"
+                  : "border-border/50 bg-muted/30 hover:border-border"
+              )}
+            >
+              <div className={cn(
+                "w-8 h-8 rounded-full transition-transform",
+                theme === 'dark' ? color.darkColor : color.color,
+                accentColor === color.name && "ring-2 ring-offset-2 ring-offset-background ring-primary scale-110"
+              )} />
+              <span className={cn(
+                "text-xs font-medium transition-colors",
+                accentColor === color.name ? "text-foreground" : "text-muted-foreground"
+              )}>
+                {color.label}
+              </span>
+              {accentColor === color.name && (
+                <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              )}
+            </button>
+          ))}
         </div>
       </section>
 
