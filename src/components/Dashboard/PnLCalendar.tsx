@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Trade, DailyStats } from "@/types/trade";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, BarChart3, Clock, Crosshair, LineChart } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, BarChart3, Clock, Crosshair, LineChart, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { TradingViewChart } from "./TradingViewChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 interface PnLCalendarProps {
   trades: Trade[];
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void;
@@ -215,41 +216,158 @@ export function PnLCalendar({ trades, onUpdateTrade }: PnLCalendarProps) {
               </TabsList>
 
               <TabsContent value="metrics" className="space-y-5">
-                {/* NET P&L Header */}
-                <div className={cn(
-                  "p-4 rounded-xl border",
-                  dayMetrics.netPnL >= 0 
-                    ? "bg-primary/10 border-primary/30" 
-                    : "bg-destructive/10 border-destructive/30"
-                )}>
-                  <div className="flex items-center justify-between">
+                {/* Top Metrics Row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {/* NET P&L */}
+                  <div className={cn(
+                    "p-4 rounded-xl border",
+                    dayMetrics.netPnL >= 0 
+                      ? "bg-primary/10 border-primary/30" 
+                      : "bg-destructive/10 border-destructive/30"
+                  )}>
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-xs text-muted-foreground">Net P&L</span>
+                      <TooltipProvider>
+                        <UITooltip>
+                          <TooltipTrigger>
+                            <Info className="w-3 h-3 text-muted-foreground/50" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Total profit/loss for the day</p>
+                          </TooltipContent>
+                        </UITooltip>
+                      </TooltipProvider>
+                    </div>
                     <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-xl font-bold font-mono",
+                        dayMetrics.netPnL >= 0 ? "text-primary" : "text-destructive"
+                      )}>
+                        {dayMetrics.netPnL >= 0 ? '+' : ''}${dayMetrics.netPnL.toFixed(2)}
+                      </span>
                       {dayMetrics.netPnL >= 0 ? (
-                        <TrendingUp className="w-5 h-5 text-primary" />
+                        <TrendingUp className="w-4 h-4 text-primary" />
                       ) : (
-                        <TrendingDown className="w-5 h-5 text-destructive" />
+                        <TrendingDown className="w-4 h-4 text-destructive" />
                       )}
-                      <span className="text-sm font-medium text-muted-foreground">NET P&L</span>
+                    </div>
+                  </div>
+
+                  {/* Win Rate */}
+                  <div className="p-4 rounded-xl border border-border/30 bg-muted/20">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-xs text-muted-foreground">Win Rate</span>
+                      <TooltipProvider>
+                        <UITooltip>
+                          <TooltipTrigger>
+                            <Info className="w-3 h-3 text-muted-foreground/50" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Percentage of winning trades</p>
+                          </TooltipContent>
+                        </UITooltip>
+                      </TooltipProvider>
                     </div>
                     <span className={cn(
-                      "text-2xl font-bold font-mono",
-                      dayMetrics.netPnL >= 0 ? "text-primary" : "text-destructive"
+                      "text-xl font-bold font-mono",
+                      dayMetrics.winRate >= 50 ? "text-primary" : "text-destructive"
                     )}>
-                      {dayMetrics.netPnL >= 0 ? '+' : ''}${dayMetrics.netPnL.toFixed(2)}
+                      {dayMetrics.winRate.toFixed(1)}%
+                    </span>
+                  </div>
+
+                  {/* Avg Win */}
+                  <div className="p-4 rounded-xl border-2 border-primary/40 bg-primary/5">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-xs text-muted-foreground">Avg Win</span>
+                      <TooltipProvider>
+                        <UITooltip>
+                          <TooltipTrigger>
+                            <Info className="w-3 h-3 text-muted-foreground/50" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Average winning trade amount</p>
+                          </TooltipContent>
+                        </UITooltip>
+                      </TooltipProvider>
+                    </div>
+                    <span className="text-xl font-bold font-mono text-primary">
+                      ${dayMetrics.avgWin.toFixed(2)}
+                    </span>
+                  </div>
+
+                  {/* Avg Loss */}
+                  <div className="p-4 rounded-xl border-2 border-destructive/40 bg-destructive/5">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-xs text-muted-foreground">Avg Loss</span>
+                      <TooltipProvider>
+                        <UITooltip>
+                          <TooltipTrigger>
+                            <Info className="w-3 h-3 text-muted-foreground/50" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Average losing trade amount</p>
+                          </TooltipContent>
+                        </UITooltip>
+                      </TooltipProvider>
+                    </div>
+                    <span className="text-xl font-bold font-mono text-destructive">
+                      -${Math.abs(dayMetrics.avgLoss).toFixed(2)}
                     </span>
                   </div>
                 </div>
 
+                {/* Main Content - Win Rate Circle + Chart */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Win Rate Circular Display */}
+                  <div className="p-4 rounded-xl border border-border/30 bg-muted/10">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium">Win/Loss Breakdown</span>
+                      <TooltipProvider>
+                        <UITooltip>
+                          <TooltipTrigger>
+                            <Info className="w-4 h-4 text-muted-foreground/50" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Distribution of wins vs losses</p>
+                          </TooltipContent>
+                        </UITooltip>
+                      </TooltipProvider>
+                    </div>
+                    <DayCircularProgress 
+                      value={dayMetrics.winRate}
+                      winners={dayMetrics.wins}
+                      losers={dayMetrics.losses}
+                    />
+                  </div>
+
+                  {/* Cumulative P&L Chart */}
+                  <div className="p-4 rounded-xl border border-border/30 bg-muted/10">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium">Cumulative P&L</span>
+                      <TooltipProvider>
+                        <UITooltip>
+                          <TooltipTrigger>
+                            <Info className="w-4 h-4 text-muted-foreground/50" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Running total P&L throughout the day</p>
+                          </TooltipContent>
+                        </UITooltip>
+                      </TooltipProvider>
+                    </div>
+                    <DayCumulativeChart trades={selectedTrades} />
+                  </div>
+                </div>
+
                 {/* Metrics Grid */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <MetricRow icon={BarChart3} label="Total Trades" value={dayMetrics.totalTrades.toString()} />
-                  <MetricRow icon={Target} label="Win Rate" value={`${dayMetrics.winRate.toFixed(1)}%`} isPositive={dayMetrics.winRate >= 50} />
                   <MetricRow label="Wins" value={dayMetrics.wins.toString()} isPositive />
                   <MetricRow label="Losses" value={dayMetrics.losses.toString()} isNegative />
+                  <MetricRow label="Breakeven" value={dayMetrics.breakeven.toString()} />
                   <MetricRow label="Gross Profit" value={`$${dayMetrics.grossProfit.toFixed(2)}`} isPositive />
                   <MetricRow label="Gross Loss" value={`$${Math.abs(dayMetrics.grossLoss).toFixed(2)}`} isNegative />
-                  <MetricRow label="Avg Win" value={`$${dayMetrics.avgWin.toFixed(2)}`} isPositive />
-                  <MetricRow label="Avg Loss" value={`$${Math.abs(dayMetrics.avgLoss).toFixed(2)}`} isNegative />
                 </div>
 
                 {/* Tags Section */}
@@ -397,6 +515,164 @@ function MetricRow({ icon: Icon, label, value, isPositive, isNegative }: MetricR
       )}>
         {value}
       </span>
+    </div>
+  );
+}
+
+// Circular progress for day metrics
+function DayCircularProgress({ 
+  value, 
+  winners,
+  losers,
+}: { 
+  value: number; 
+  winners: number;
+  losers: number;
+}) {
+  const size = 120;
+  const strokeWidth = 8;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = Math.min(Math.max(value, 0), 100);
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+  return (
+    <div className="flex items-center justify-center gap-6">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg className="transform -rotate-90" width={size} height={size}>
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="hsl(var(--destructive) / 0.3)"
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="hsl(var(--primary))"
+            strokeWidth={strokeWidth}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            className="transition-all duration-700 ease-out"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="flex items-baseline">
+            <span className="text-2xl font-bold">{value.toFixed(0)}</span>
+            <span className="text-sm font-bold text-muted-foreground">%</span>
+          </div>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Winrate</span>
+        </div>
+      </div>
+      
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm bg-primary" />
+          <div className="flex flex-col">
+            <span className="text-lg font-bold">{winners}</span>
+            <span className="text-[10px] text-muted-foreground">winners</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm bg-destructive" />
+          <div className="flex flex-col">
+            <span className="text-lg font-bold">{losers}</span>
+            <span className="text-[10px] text-muted-foreground">losers</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Cumulative P&L chart for the day
+function DayCumulativeChart({ trades }: { trades: Trade[] }) {
+  const chartData = useMemo(() => {
+    if (trades.length === 0) return [];
+    
+    let cumulative = 0;
+    return trades.map((trade, index) => {
+      cumulative += trade.result || 0;
+      return {
+        trade: index + 1,
+        value: cumulative,
+        pair: trade.pair,
+        result: trade.result,
+      };
+    });
+  }, [trades]);
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
+          <p className="text-xs text-muted-foreground">Trade #{data.trade}: {data.pair}</p>
+          <p className={cn(
+            "text-xs font-medium",
+            data.result >= 0 ? "text-primary" : "text-destructive"
+          )}>
+            {data.result >= 0 ? '+' : ''}${data.result.toFixed(2)}
+          </p>
+          <p className={cn(
+            "text-sm font-bold",
+            data.value >= 0 ? "text-primary" : "text-destructive"
+          )}>
+            Total: ${data.value.toFixed(2)}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  if (chartData.length === 0) {
+    return (
+      <div className="h-[120px] flex items-center justify-center text-muted-foreground text-sm">
+        No trades to display
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[120px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={chartData}>
+          <defs>
+            <linearGradient id="colorDayCumulative" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          <XAxis 
+            dataKey="trade" 
+            tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value) => `#${value}`}
+          />
+          <YAxis 
+            tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
+            tickFormatter={(value) => `$${value}`}
+            tickLine={false}
+            axisLine={false}
+            width={45}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Area 
+            type="monotone" 
+            dataKey="value" 
+            stroke="hsl(var(--primary))" 
+            strokeWidth={2}
+            fill="url(#colorDayCumulative)" 
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }
