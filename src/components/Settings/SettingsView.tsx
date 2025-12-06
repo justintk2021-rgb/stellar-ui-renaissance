@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 // Helper function to convert hex to HSL string
@@ -98,6 +99,14 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [localCustomColor, setLocalCustomColor] = useState(customColor || '#10b981');
+  const [accentEnabled, setAccentEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('atp_accent_enabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [gradientEnabled, setGradientEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('atp_gradient_enabled');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [selectedGradient, setSelectedGradient] = useState<{ from: string; to: string } | null>(() => {
     const saved = localStorage.getItem('atp_custom_gradient');
     if (saved) {
@@ -145,9 +154,18 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
     }
   }, []);
 
+  // Save toggle states to localStorage
+  useEffect(() => {
+    localStorage.setItem('atp_accent_enabled', JSON.stringify(accentEnabled));
+  }, [accentEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem('atp_gradient_enabled', JSON.stringify(gradientEnabled));
+  }, [gradientEnabled]);
+
   // Apply custom color to CSS variables
   useEffect(() => {
-    if (accentColor === 'custom' && localCustomColor && !selectedGradient) {
+    if (accentEnabled && !gradientEnabled && localCustomColor && accentColor === 'custom') {
       const hsl = hexToHsl(localCustomColor);
       document.documentElement.style.setProperty('--primary', hsl);
       document.documentElement.style.setProperty('--primary-glow', adjustLightness(hsl, 5));
@@ -155,11 +173,11 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
       document.documentElement.style.setProperty('--sidebar-primary', hsl);
       document.documentElement.style.setProperty('--sidebar-ring', hsl);
     }
-  }, [accentColor, localCustomColor, selectedGradient]);
+  }, [accentEnabled, gradientEnabled, accentColor, localCustomColor]);
 
   // Apply gradient colors and save to localStorage
   useEffect(() => {
-    if (selectedGradient) {
+    if (gradientEnabled && selectedGradient) {
       const fromHsl = hexToHsl(selectedGradient.from);
       const toHsl = hexToHsl(selectedGradient.to);
       document.documentElement.style.setProperty('--primary', fromHsl);
@@ -167,20 +185,66 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
       document.documentElement.style.setProperty('--ring', fromHsl);
       document.documentElement.style.setProperty('--sidebar-primary', fromHsl);
       document.documentElement.style.setProperty('--sidebar-ring', fromHsl);
-      // Save to localStorage
       localStorage.setItem('atp_custom_gradient', JSON.stringify(selectedGradient));
+    } else if (!gradientEnabled && !accentEnabled) {
+      // Both off - clear inline styles and use CSS class defaults
+      document.documentElement.style.removeProperty('--primary');
+      document.documentElement.style.removeProperty('--primary-glow');
+      document.documentElement.style.removeProperty('--ring');
+      document.documentElement.style.removeProperty('--sidebar-primary');
+      document.documentElement.style.removeProperty('--sidebar-ring');
     }
-  }, [selectedGradient]);
+  }, [gradientEnabled, accentEnabled, selectedGradient]);
+
+  const handleAccentToggle = (enabled: boolean) => {
+    setAccentEnabled(enabled);
+    if (enabled && !gradientEnabled) {
+      // Apply selected accent color
+      onAccentColorChange(accentColor);
+    } else if (!enabled && !gradientEnabled) {
+      // Clear all custom styles
+      document.documentElement.style.removeProperty('--primary');
+      document.documentElement.style.removeProperty('--primary-glow');
+      document.documentElement.style.removeProperty('--ring');
+      document.documentElement.style.removeProperty('--sidebar-primary');
+      document.documentElement.style.removeProperty('--sidebar-ring');
+    }
+  };
+
+  const handleGradientToggle = (enabled: boolean) => {
+    setGradientEnabled(enabled);
+    if (enabled && selectedGradient) {
+      // Apply gradient
+      const fromHsl = hexToHsl(selectedGradient.from);
+      const toHsl = hexToHsl(selectedGradient.to);
+      document.documentElement.style.setProperty('--primary', fromHsl);
+      document.documentElement.style.setProperty('--primary-glow', toHsl);
+      document.documentElement.style.setProperty('--ring', fromHsl);
+      document.documentElement.style.setProperty('--sidebar-primary', fromHsl);
+      document.documentElement.style.setProperty('--sidebar-ring', fromHsl);
+    } else if (!enabled) {
+      // Clear gradient and reapply accent if enabled
+      if (accentEnabled && accentColor !== 'custom') {
+        document.documentElement.style.removeProperty('--primary');
+        document.documentElement.style.removeProperty('--primary-glow');
+        document.documentElement.style.removeProperty('--ring');
+        document.documentElement.style.removeProperty('--sidebar-primary');
+        document.documentElement.style.removeProperty('--sidebar-ring');
+      }
+    }
+  };
 
   const handleCustomColorChange = (color: string) => {
     setLocalCustomColor(color);
-    setSelectedGradient(null);
+    setGradientEnabled(false);
+    setAccentEnabled(true);
     onAccentColorChange('custom');
     onCustomColorChange?.(color);
   };
 
   const handleGradientSelect = (gradient: { from: string; to: string }) => {
     setSelectedGradient(gradient);
+    setGradientEnabled(true);
     onAccentColorChange('custom');
   };
 
@@ -192,12 +256,16 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
     document.documentElement.style.removeProperty('--sidebar-primary');
     document.documentElement.style.removeProperty('--sidebar-ring');
     
-    // Clear stored gradient
+    // Clear stored gradient and settings
     localStorage.removeItem('atp_custom_gradient');
+    localStorage.setItem('atp_accent_enabled', 'true');
+    localStorage.setItem('atp_gradient_enabled', 'false');
     setSelectedGradient(null);
     setLocalCustomColor('#10b981');
     setCustomGradientFrom('#10b981');
     setCustomGradientTo('#06b6d4');
+    setAccentEnabled(true);
+    setGradientEnabled(false);
     
     // Reset to default emerald
     onAccentColorChange('emerald');
@@ -497,14 +565,36 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
           </Button>
         </div>
 
-        <div className="grid grid-cols-4 gap-3">
+        {/* Accent Color Toggle */}
+        <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50">
+          <div className="flex items-center gap-3">
+            <Palette className="w-4 h-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Use Accent Color</p>
+              <p className="text-xs text-muted-foreground">Apply selected accent color to theme</p>
+            </div>
+          </div>
+          <Switch
+            checked={accentEnabled}
+            onCheckedChange={handleAccentToggle}
+          />
+        </div>
+
+        <div className={cn(
+          "grid grid-cols-4 gap-3 transition-opacity duration-300",
+          !accentEnabled && "opacity-50 pointer-events-none"
+        )}>
           {accentColors.map((color) => (
             <button
               key={color.name}
-              onClick={() => onAccentColorChange(color.name)}
+              onClick={() => {
+                setAccentEnabled(true);
+                setGradientEnabled(false);
+                onAccentColorChange(color.name);
+              }}
               className={cn(
                 "relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-300",
-                accentColor === color.name
+                accentColor === color.name && accentEnabled && !gradientEnabled
                   ? "border-primary bg-primary/10"
                   : "border-border/50 bg-muted/30 hover:border-border"
               )}
@@ -512,15 +602,15 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
               <div className={cn(
                 "w-8 h-8 rounded-full transition-transform",
                 theme === 'dark' ? color.darkColor : color.color,
-                accentColor === color.name && "ring-2 ring-offset-2 ring-offset-background ring-primary scale-110"
+                accentColor === color.name && accentEnabled && !gradientEnabled && "ring-2 ring-offset-2 ring-offset-background ring-primary scale-110"
               )} />
               <span className={cn(
                 "text-xs font-medium transition-colors",
-                accentColor === color.name ? "text-foreground" : "text-muted-foreground"
+                accentColor === color.name && accentEnabled && !gradientEnabled ? "text-foreground" : "text-muted-foreground"
               )}>
                 {color.label}
               </span>
-              {accentColor === color.name && (
+              {accentColor === color.name && accentEnabled && !gradientEnabled && (
                 <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
               )}
             </button>
@@ -572,8 +662,26 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
           </div>
         </div>
 
+        {/* Gradient Toggle */}
+        <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50">
+          <div className="flex items-center gap-3">
+            <Palette className="w-4 h-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Use Gradient</p>
+              <p className="text-xs text-muted-foreground">Apply gradient colors to theme</p>
+            </div>
+          </div>
+          <Switch
+            checked={gradientEnabled}
+            onCheckedChange={handleGradientToggle}
+          />
+        </div>
+
         {/* Gradient Presets */}
-        <div className="space-y-4 pt-4 border-t border-border/50">
+        <div className={cn(
+          "space-y-4 transition-opacity duration-300",
+          !gradientEnabled && "opacity-50 pointer-events-none"
+        )}>
           <div className="flex items-center gap-3">
             <Palette className="w-4 h-4 text-muted-foreground" />
             <span className="text-sm font-medium text-foreground">Gradient Presets</span>
@@ -586,7 +694,7 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
                 onClick={() => handleGradientSelect(gradient)}
                 className={cn(
                   "relative p-3 rounded-xl border-2 transition-all duration-300",
-                  selectedGradient?.from === gradient.from && selectedGradient?.to === gradient.to
+                  selectedGradient?.from === gradient.from && selectedGradient?.to === gradient.to && gradientEnabled
                     ? "border-primary"
                     : "border-border/50 hover:border-border"
                 )}
@@ -596,77 +704,80 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
                   style={{ background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})` }}
                 />
                 <span className="text-xs font-medium text-muted-foreground">{gradient.name}</span>
-                {selectedGradient?.from === gradient.from && selectedGradient?.to === gradient.to && (
+                {selectedGradient?.from === gradient.from && selectedGradient?.to === gradient.to && gradientEnabled && (
                   <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                 )}
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Custom Gradient Creator */}
-          <div className="mt-4 p-4 rounded-xl bg-muted/30 border border-border/50 space-y-4">
-            <span className="text-xs font-medium text-muted-foreground">Create Custom Gradient</span>
-            
-            <div className="flex items-center gap-4">
-              {/* From Color */}
-              <div className="flex-1 space-y-2">
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground">From</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={customGradientFrom}
-                    onChange={(e) => setCustomGradientFrom(e.target.value)}
-                    className="w-10 h-10 rounded-lg cursor-pointer border border-border/50"
-                    style={{ padding: 0 }}
-                  />
-                  <Input
-                    type="text"
-                    value={customGradientFrom}
-                    onChange={(e) => setCustomGradientFrom(e.target.value)}
-                    className="font-mono text-xs bg-background/50 h-8"
-                  />
-                </div>
-              </div>
-
-              {/* Arrow */}
-              <div className="text-muted-foreground pt-5">→</div>
-
-              {/* To Color */}
-              <div className="flex-1 space-y-2">
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground">To</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={customGradientTo}
-                    onChange={(e) => setCustomGradientTo(e.target.value)}
-                    className="w-10 h-10 rounded-lg cursor-pointer border border-border/50"
-                    style={{ padding: 0 }}
-                  />
-                  <Input
-                    type="text"
-                    value={customGradientTo}
-                    onChange={(e) => setCustomGradientTo(e.target.value)}
-                    className="font-mono text-xs bg-background/50 h-8"
-                  />
-                </div>
+        {/* Custom Gradient Creator */}
+        <div className={cn(
+          "mt-4 p-4 rounded-xl bg-muted/30 border border-border/50 space-y-4 transition-opacity duration-300",
+          !gradientEnabled && "opacity-50 pointer-events-none"
+        )}>
+          <span className="text-xs font-medium text-muted-foreground">Create Custom Gradient</span>
+          
+          <div className="flex items-center gap-4">
+            {/* From Color */}
+            <div className="flex-1 space-y-2">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground">From</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={customGradientFrom}
+                  onChange={(e) => setCustomGradientFrom(e.target.value)}
+                  className="w-10 h-10 rounded-lg cursor-pointer border border-border/50"
+                  style={{ padding: 0 }}
+                />
+                <Input
+                  type="text"
+                  value={customGradientFrom}
+                  onChange={(e) => setCustomGradientFrom(e.target.value)}
+                  className="font-mono text-xs bg-background/50 h-8"
+                />
               </div>
             </div>
 
-            {/* Preview & Apply */}
-            <div className="flex items-center gap-3">
-              <div 
-                className="flex-1 h-10 rounded-lg border border-border/50"
-                style={{ background: `linear-gradient(135deg, ${customGradientFrom}, ${customGradientTo})` }}
-              />
-              <Button 
-                size="sm" 
-                onClick={handleCustomGradientApply}
-                className="shrink-0"
-              >
-                <Check className="w-4 h-4 mr-1" />
-                Apply
-              </Button>
+            {/* Arrow */}
+            <div className="text-muted-foreground pt-5">→</div>
+
+            {/* To Color */}
+            <div className="flex-1 space-y-2">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground">To</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={customGradientTo}
+                  onChange={(e) => setCustomGradientTo(e.target.value)}
+                  className="w-10 h-10 rounded-lg cursor-pointer border border-border/50"
+                  style={{ padding: 0 }}
+                />
+                <Input
+                  type="text"
+                  value={customGradientTo}
+                  onChange={(e) => setCustomGradientTo(e.target.value)}
+                  className="font-mono text-xs bg-background/50 h-8"
+                />
+              </div>
             </div>
+          </div>
+
+          {/* Preview & Apply */}
+          <div className="flex items-center gap-3">
+            <div 
+              className="flex-1 h-10 rounded-lg border border-border/50"
+              style={{ background: `linear-gradient(135deg, ${customGradientFrom}, ${customGradientTo})` }}
+            />
+            <Button 
+              size="sm" 
+              onClick={handleCustomGradientApply}
+              className="shrink-0"
+            >
+              <Check className="w-4 h-4 mr-1" />
+              Apply
+            </Button>
           </div>
         </div>
       </section>
