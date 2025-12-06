@@ -124,9 +124,9 @@ export function ChartPage({ defaultSymbol = "FX:EURUSD" }: ChartPageProps) {
   }, []);
 
   return (
-    <div className="space-y-4 animate-fade-in h-full flex flex-col">
+    <div className="space-y-3 animate-fade-in h-full flex flex-col -mt-2">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         {/* Symbol Search */}
         <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-md">
           <div className="relative flex-1">
@@ -186,42 +186,36 @@ export function ChartPage({ defaultSymbol = "FX:EURUSD" }: ChartPageProps) {
         </Button>
       </div>
 
-      {/* TradingView Login Info */}
-      <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-primary/5 to-secondary/5 border border-border/30">
-        <div className="flex items-center gap-3">
-          <BarChart3 className="w-5 h-5 text-primary" />
-          <div>
-            <p className="text-sm font-medium">TradingView Account</p>
-            <p className="text-xs text-muted-foreground">
-              Sign in to TradingView within the chart to access your saved layouts, watchlists, and drawings
-            </p>
-          </div>
+      {/* TradingView Login - Compact */}
+      <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-gradient-to-r from-primary/5 to-secondary/5 border border-border/30">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-primary" />
+          <p className="text-xs text-muted-foreground">
+            Sign in to TradingView to access saved layouts & drawings
+          </p>
         </div>
         <Button
           size="sm"
-          variant="outline"
+          variant="ghost"
           onClick={() => window.open('https://www.tradingview.com/accounts/signin/', '_blank')}
-          className="shrink-0"
+          className="text-xs h-7"
         >
-          Sign in to TradingView
+          Sign in
         </Button>
       </div>
 
       {/* Chart Container */}
       <div 
-        className="flex-1 min-h-[600px] rounded-xl overflow-hidden border border-border/50 bg-background relative"
-        style={{ height: 'calc(100vh - 320px)' }}
+        className="flex-1 rounded-xl overflow-hidden border border-border/50 bg-background relative"
+        style={{ minHeight: 'calc(100vh - 280px)', height: 'calc(100vh - 280px)' }}
       >
         <div ref={containerRef} className="h-full w-full" />
       </div>
 
-      {/* Tips */}
-      <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
-        <p className="text-xs text-muted-foreground">
-          <strong>Tip:</strong> Click the person icon in the chart's top-right corner to sign in to your TradingView account. 
-          Your saved chart layouts, indicators, and drawings will sync automatically.
-        </p>
-      </div>
+      {/* Tips - Compact */}
+      <p className="text-[11px] text-muted-foreground px-1">
+        <strong>Tip:</strong> Click the person icon in the chart to sign in to TradingView and sync your saved layouts.
+      </p>
     </div>
   );
 }
