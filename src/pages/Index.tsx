@@ -276,16 +276,16 @@ const Index = () => {
         />
       )}
 
-      {/* Slide-out sidebar for chart page */}
+      {/* Slide-out sidebar for chart page - from bottom left */}
       {isChartPage && (
         <div className={cn(
-          "fixed top-0 left-0 h-full z-50 transition-transform duration-300 ease-in-out p-4",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed bottom-4 left-4 z-50 transition-all duration-300 ease-in-out",
+          sidebarOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
         )}>
           <div className="relative">
             <button 
               onClick={() => setSidebarOpen(false)}
-              className="absolute -right-3 top-4 w-8 h-8 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted transition-colors z-10"
+              className="absolute -right-3 -top-3 w-8 h-8 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted transition-colors z-10"
             >
               <X className="w-4 h-4" />
             </button>
