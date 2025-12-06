@@ -170,21 +170,19 @@ export function TradingAssistant({ trades }: TradingAssistantProps) {
   return (
     <>
       {/* Floating Button */}
-      <Button
-        onClick={() => setIsOpen(true)}
-        className={cn(
-          "fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg",
-          "bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70",
-          "transition-all duration-300 hover:scale-110",
-          isOpen && "hidden"
-        )}
-      >
-        <Bot className="w-6 h-6" />
-      </Button>
+      {!isOpen && (
+        <Button
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-6 right-6 z-[9999] w-14 h-14 rounded-full shadow-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-300 hover:scale-110 border-2 border-primary-foreground/20"
+          style={{ position: 'fixed' }}
+        >
+          <Bot className="w-6 h-6" />
+        </Button>
+      )}
 
       {/* Chat Panel */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[400px] h-[600px] max-h-[80vh] flex flex-col glass rounded-2xl border border-border/50 shadow-2xl overflow-hidden animate-scale-in">
+        <div className="fixed bottom-6 right-6 z-[9999] w-[400px] h-[600px] max-h-[80vh] flex flex-col glass rounded-2xl border border-border/50 shadow-2xl overflow-hidden animate-scale-in">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border/30 bg-gradient-to-r from-primary/10 to-transparent">
             <div className="flex items-center gap-3">
