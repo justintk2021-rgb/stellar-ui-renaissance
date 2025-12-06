@@ -6,6 +6,18 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { TrendingUp, Mail, Lock, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { z } from "zod";
+
+// Zod schemas for form validation
+const loginSchema = z.object({
+  email: z.string().trim().email("Please enter a valid email address").max(255, "Email is too long"),
+  password: z.string().min(8, "Password must be at least 8 characters").max(128, "Password is too long"),
+});
+
+const signupSchema = loginSchema.extend({
+  firstName: z.string().trim().min(1, "First name is required").max(50, "First name is too long"),
+  lastName: z.string().trim().min(1, "Last name is required").max(50, "Last name is too long"),
+});
 
 export function AuthPage() {
   const navigate = useNavigate();
@@ -17,6 +29,7 @@ export function AuthPage() {
     email: "",
     password: "",
   });
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
     // Check if already logged in
@@ -41,15 +54,21 @@ export function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    if (!formData.email || !formData.password) {
-      toast.error("Please fill in all required fields");
-      setIsLoading(false);
-      return;
-    }
+    setErrors({});
 
-    if (!isLogin && (!formData.firstName || !formData.lastName)) {
-      toast.error("Please enter your name");
+    // Validate form data with Zod
+    const schema = isLogin ? loginSchema : signupSchema;
+    const result = schema.safeParse(formData);
+
+    if (!result.success) {
+      const fieldErrors: { [key: string]: string } = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          fieldErrors[err.path[0] as string] = err.message;
+        }
+      });
+      setErrors(fieldErrors);
+      toast.error(result.error.errors[0]?.message || "Please fix the form errors");
       setIsLoading(false);
       return;
     }
@@ -233,13 +252,16 @@ export function AuthPage() {
                     <Input
                       placeholder="John"
                       value={formData.firstName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, firstName: e.target.value })
-                      }
-                      className="pl-10 bg-background/50 border-border/50 focus:border-primary/50"
+                      onChange={(e) => {
+                        setFormData({ ...formData, firstName: e.target.value });
+                        if (errors.firstName) setErrors({ ...errors, firstName: '' });
+                      }}
+                      className={`pl-10 bg-background/50 border-border/50 focus:border-primary/50 ${errors.firstName ? 'border-destructive' : ''}`}
                       disabled={isLoading}
+                      maxLength={50}
                     />
                   </div>
+                  {errors.firstName && <p className="text-xs text-destructive">{errors.firstName}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Last Name</Label>
@@ -248,13 +270,16 @@ export function AuthPage() {
                     <Input
                       placeholder="Doe"
                       value={formData.lastName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, lastName: e.target.value })
-                      }
-                      className="pl-10 bg-background/50 border-border/50 focus:border-primary/50"
+                      onChange={(e) => {
+                        setFormData({ ...formData, lastName: e.target.value });
+                        if (errors.lastName) setErrors({ ...errors, lastName: '' });
+                      }}
+                      className={`pl-10 bg-background/50 border-border/50 focus:border-primary/50 ${errors.lastName ? 'border-destructive' : ''}`}
                       disabled={isLoading}
+                      maxLength={50}
                     />
                   </div>
+                  {errors.lastName && <p className="text-xs text-destructive">{errors.lastName}</p>}
                 </div>
               </div>
             )}
@@ -267,13 +292,16 @@ export function AuthPage() {
                   type="email"
                   placeholder="you@example.com"
                   value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  className="pl-10 bg-background/50 border-border/50 focus:border-primary/50"
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value });
+                    if (errors.email) setErrors({ ...errors, email: '' });
+                  }}
+                  className={`pl-10 bg-background/50 border-border/50 focus:border-primary/50 ${errors.email ? 'border-destructive' : ''}`}
                   disabled={isLoading}
+                  maxLength={255}
                 />
               </div>
+              {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
             </div>
 
             <div className="space-y-2">
@@ -284,13 +312,17 @@ export function AuthPage() {
                   type="password"
                   placeholder="••••••••"
                   value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  className="pl-10 bg-background/50 border-border/50 focus:border-primary/50"
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value });
+                    if (errors.password) setErrors({ ...errors, password: '' });
+                  }}
+                  className={`pl-10 bg-background/50 border-border/50 focus:border-primary/50 ${errors.password ? 'border-destructive' : ''}`}
                   disabled={isLoading}
+                  maxLength={128}
                 />
               </div>
+              {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+              {!isLogin && <p className="text-xs text-muted-foreground">Minimum 8 characters</p>}
             </div>
 
             <Button
