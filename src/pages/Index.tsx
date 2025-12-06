@@ -353,18 +353,18 @@ const Index = () => {
 
         {/* Mobile Header - or Hamburger menu on chart page */}
         {isChartPage ? (
-          <div className="fixed bottom-4 left-4 z-10 flex items-center gap-2">
+          <div className="fixed top-4 left-4 z-10 flex items-center gap-2">
             <button 
               onClick={() => setSidebarOpen(true)}
-              className="w-12 h-12 rounded-xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg"
+              className="w-10 h-10 rounded-xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-4 h-4" />
             </button>
             <button 
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-12 h-12 rounded-xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg"
+              className="w-10 h-10 rounded-xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg"
             >
-              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
         ) : (
