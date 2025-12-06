@@ -62,6 +62,7 @@ const Index = () => {
   const [startBalance, setStartBalance] = useLocalStorage<number>('atp_start_balance', 10000);
   const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('atp_theme', 'dark');
   const [accentColor, setAccentColor] = useLocalStorage<AccentColor>('atp_accent_color', 'emerald');
+  const [customColor, setCustomColor] = useLocalStorage<string>('atp_custom_color', '#10b981');
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -398,6 +399,8 @@ const Index = () => {
                 onAccentColorChange={setAccentColor}
                 userProfile={userProfile}
                 onLogout={handleLogout}
+                customColor={customColor}
+                onCustomColorChange={setCustomColor}
               />
             )}
 
