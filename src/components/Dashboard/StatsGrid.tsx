@@ -1,8 +1,12 @@
 import { Trade } from "@/types/trade";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, BarChart3, Target, Percent, Calendar, Zap, Scale } from "lucide-react";
+import { TrendingUp, TrendingDown, Info } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { format, parseISO } from "date-fns";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface StatsGridProps {
   trades: Trade[];
@@ -43,10 +47,23 @@ function AnimatedNumber({
   );
 }
 
-// Circular progress component with animation
-function CircularProgress({ value, color, size = 40 }: { value: number; color: string; size?: number }) {
+// Large Circular progress component for winrate display
+function LargeCircularProgress({ 
+  value, 
+  size = 160,
+  winners,
+  losers,
+  label
+}: { 
+  value: number; 
+  size?: number;
+  winners: number;
+  losers: number;
+  label: string;
+}) {
   const [animatedValue, setAnimatedValue] = useState(0);
-  const radius = (size - 4) / 2;
+  const strokeWidth = 10;
+  const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.min(Math.max(animatedValue, 0), 100);
   const strokeDashoffset = circumference - (progress / 100) * circumference;
@@ -59,34 +76,79 @@ function CircularProgress({ value, color, size = 40 }: { value: number; color: s
   }, [value]);
 
   return (
-    <div className="relative group" style={{ width: size, height: size }}>
-      <svg className="transform -rotate-90 transition-transform duration-300 group-hover:scale-110" width={size} height={size}>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="currentColor"
-          strokeWidth="3"
-          fill="none"
-          className="text-muted/30"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={color}
-          strokeWidth="3"
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          className="transition-all duration-1000 ease-out"
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <AnimatedNumber value={animatedValue} decimals={0} suffix="%" className="text-[10px] font-bold" duration={1000} />
+    <div className="flex items-center gap-4">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg className="transform -rotate-90" width={size} height={size}>
+          {/* Background circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="hsl(var(--destructive) / 0.3)"
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+          {/* Progress circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="hsl(var(--primary))"
+            strokeWidth={strokeWidth}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            className="transition-all duration-1000 ease-out"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="flex items-baseline">
+            <AnimatedNumber 
+              value={animatedValue} 
+              decimals={0} 
+              className="text-4xl font-bold" 
+              duration={1000} 
+            />
+            <span className="text-xl font-bold text-muted-foreground">%</span>
+          </div>
+          <span className="text-xs text-muted-foreground uppercase tracking-wider">{label}</span>
+        </div>
+      </div>
+      
+      {/* Legend */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm bg-primary" />
+          <div className="flex flex-col">
+            <span className="text-xl font-bold">{winners}</span>
+            <span className="text-xs text-muted-foreground">winners</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm bg-destructive" />
+          <div className="flex flex-col">
+            <span className="text-xl font-bold">{losers}</span>
+            <span className="text-xs text-muted-foreground">losers</span>
+          </div>
+        </div>
       </div>
     </div>
+  );
+}
+
+function InfoTooltip({ content }: { content: string }) {
+  return (
+    <TooltipProvider>
+      <UITooltip>
+        <TooltipTrigger>
+          <Info className="w-4 h-4 text-muted-foreground/50 hover:text-muted-foreground transition-colors" />
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="text-xs max-w-[200px]">{content}</p>
+        </TooltipContent>
+      </UITooltip>
+    </TooltipProvider>
   );
 }
 
@@ -116,6 +178,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
   });
 
   const profitableDays = Array.from(tradingDays.values()).filter((pnl) => pnl > 0).length;
+  const losingDays = Array.from(tradingDays.values()).filter((pnl) => pnl < 0).length;
   const totalDays = tradingDays.size;
   const dayWinRate = totalDays > 0 ? (profitableDays / totalDays) * 100 : 0;
 
@@ -125,157 +188,271 @@ export function StatsGrid({ trades }: StatsGridProps) {
   
   // Profit Factor = Total Wins / Total Losses
   const profitFactor = stats.totalLossAmount > 0 ? stats.totalWinAmount / stats.totalLossAmount : stats.totalWinAmount > 0 ? Infinity : 0;
-  
-  // Trade Expectancy = (Win Rate × Avg Win) - (Loss Rate × Avg Loss)
-  const lossRate = trades.length > 0 ? stats.losses / trades.length : 0;
-  const tradeExpectancy = trades.length > 0 
-    ? ((winRate / 100) * avgWin) - (lossRate * avgLoss)
-    : 0;
+
+  // Chart data
+  const chartData = useMemo(() => {
+    if (trades.length === 0) return { cumulative: [], daily: [] };
+    
+    const sortedTrades = [...trades].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    
+    // Group by date for daily P&L
+    const dailyMap = new Map<string, number>();
+    sortedTrades.forEach(trade => {
+      const current = dailyMap.get(trade.date) || 0;
+      dailyMap.set(trade.date, current + (trade.result || 0));
+    });
+    
+    // Cumulative data
+    let cumulative = 0;
+    const cumulativeData = Array.from(dailyMap.entries()).map(([date, pnl]) => {
+      cumulative += pnl;
+      return {
+        date,
+        value: cumulative,
+        formattedDate: format(parseISO(date), 'MM/dd/yyyy')
+      };
+    });
+    
+    // Daily data
+    const dailyData = Array.from(dailyMap.entries()).map(([date, pnl]) => ({
+      date,
+      value: pnl,
+      formattedDate: format(parseISO(date), 'MM/dd/yyyy')
+    }));
+    
+    return { cumulative: cumulativeData, daily: dailyData };
+  }, [trades]);
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+          <p className="text-xs text-muted-foreground">{data.formattedDate}</p>
+          <p className={cn(
+            "text-sm font-bold",
+            data.value >= 0 ? "text-primary" : "text-destructive"
+          )}>
+            ${data.value.toFixed(2)}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-4">
-      {/* Top Row - Key Metrics with Circular Progress */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {/* Net P/L */}
-        <div className="glass rounded-xl p-4 hover-lift border border-border/40 stat-gradient">
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
-              Net P/L <Percent className="w-3 h-3" />
-            </span>
-            {stats.net >= 0 ? (
-              <TrendingUp className="w-4 h-4 text-primary" />
-            ) : (
-              <TrendingDown className="w-4 h-4 text-destructive" />
-            )}
+      {/* Top Row - Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Total Net P&L - Large Card */}
+        <div className="glass rounded-xl p-5 border border-border/40">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm text-muted-foreground">Total Net P&L</span>
+            <InfoTooltip content="Total profit and loss across all trades" />
           </div>
-          <AnimatedNumber 
-            value={stats.net} 
-            decimals={2} 
-            prefix="$" 
-            className={cn(
-              "text-xl font-bold font-mono",
-              stats.net >= 0 ? "text-primary" : "text-destructive"
-            )}
-          />
-          <p className="text-[10px] text-muted-foreground mt-1">Total across {trades.length} trades</p>
-        </div>
-
-        {/* Trade Win % with Circular */}
-        <div className="glass rounded-xl p-4 hover-lift border border-border/40">
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Trade Win %</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <CircularProgress 
-              value={winRate} 
-              color={winRate >= 50 ? "hsl(var(--primary))" : "hsl(var(--destructive))"} 
+          <div className="flex items-center gap-2">
+            <AnimatedNumber 
+              value={stats.net} 
+              decimals={2} 
+              prefix="$" 
+              className={cn(
+                "text-3xl font-bold font-mono",
+                stats.net >= 0 ? "text-primary" : "text-destructive"
+              )}
             />
-            <div>
-              <AnimatedNumber value={winRate} decimals={1} suffix="%" className="text-lg font-bold" />
-              <p className="text-[10px] text-muted-foreground">{stats.wins}W / {stats.losses}L</p>
-            </div>
+            {stats.net >= 0 ? (
+              <TrendingUp className="w-5 h-5 text-primary" />
+            ) : (
+              <TrendingDown className="w-5 h-5 text-destructive" />
+            )}
           </div>
+          <p className="text-sm text-muted-foreground mt-1">Trades in total: {trades.length}</p>
         </div>
 
         {/* Profit Factor */}
-        <div className="glass rounded-xl p-4 hover-lift border border-border/40">
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Profit Factor</span>
-            <Scale className="w-4 h-4 text-muted-foreground" />
+        <div className="glass rounded-xl p-5 border border-border/40">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm text-muted-foreground">Profit Factor</span>
+            <InfoTooltip content="Ratio of gross profit to gross loss. Above 1.5 is considered good." />
           </div>
           {profitFactor === Infinity ? (
-            <span className="text-xl font-bold font-mono text-primary">∞</span>
+            <span className="text-3xl font-bold font-mono text-primary">∞</span>
           ) : (
             <AnimatedNumber 
               value={profitFactor} 
               decimals={2}
               className={cn(
-                "text-xl font-bold font-mono",
+                "text-3xl font-bold font-mono",
                 profitFactor >= 1 ? "text-primary" : "text-destructive"
               )}
             />
           )}
-          <p className="text-[10px] text-muted-foreground mt-1">
-            {profitFactor >= 1.5 ? "Excellent" : profitFactor >= 1 ? "Good" : "Needs work"}
-          </p>
         </div>
 
-        {/* Trade Expectancy */}
-        <div className="glass rounded-xl p-4 hover-lift border border-border/40">
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Expectancy</span>
-            <Zap className="w-4 h-4 text-muted-foreground" />
+        {/* Average Winning Trade */}
+        <div className="glass rounded-xl p-5 border-2 border-primary/50 bg-primary/5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm text-muted-foreground">Average Winning Trade</span>
+            <InfoTooltip content="Average profit per winning trade" />
           </div>
           <AnimatedNumber 
-            value={tradeExpectancy} 
+            value={avgWin} 
             decimals={2} 
-            prefix="$"
-            className={cn(
-              "text-xl font-bold font-mono",
-              tradeExpectancy >= 0 ? "text-primary" : "text-destructive"
-            )}
+            prefix="$" 
+            className="text-3xl font-bold font-mono text-primary"
           />
-          <p className="text-[10px] text-muted-foreground mt-1">Avg $ per trade</p>
         </div>
 
-        {/* Day Win % with Circular */}
-        <div className="glass rounded-xl p-4 hover-lift border border-border/40">
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Day Win %</span>
+        {/* Average Losing Trade */}
+        <div className="glass rounded-xl p-5 border-2 border-destructive/50 bg-destructive/5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm text-muted-foreground">Average Losing Trade</span>
+            <InfoTooltip content="Average loss per losing trade" />
           </div>
-          <div className="flex items-center gap-3">
-            <CircularProgress 
-              value={dayWinRate} 
-              color={dayWinRate >= 50 ? "hsl(var(--primary))" : "hsl(var(--destructive))"} 
-            />
-            <div>
-              <AnimatedNumber value={dayWinRate} decimals={1} suffix="%" className="text-lg font-bold" />
-              <p className="text-[10px] text-muted-foreground">{profitableDays}/{totalDays} days</p>
-            </div>
-          </div>
+          <AnimatedNumber 
+            value={avgLoss} 
+            decimals={2} 
+            prefix="-$" 
+            className="text-3xl font-bold font-mono text-destructive"
+          />
         </div>
       </div>
 
-      {/* Bottom Row - Averages */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {/* Total Trades */}
-        <div className="glass rounded-xl p-4 hover-lift border border-border/40">
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Total Trades</span>
-            <BarChart3 className="w-4 h-4 text-muted-foreground" />
+      {/* Main Content Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Left Column - Win Rate Cards */}
+        <div className="space-y-4">
+          {/* Winning % By Trades */}
+          <div className="glass rounded-xl p-5 border border-border/40">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-medium">Winning % By Trades</span>
+              <InfoTooltip content="Percentage of winning trades out of total trades" />
+            </div>
+            <LargeCircularProgress 
+              value={winRate}
+              winners={stats.wins}
+              losers={stats.losses}
+              label="WINRATE"
+            />
           </div>
-          <AnimatedNumber value={trades.length} decimals={0} className="text-xl font-bold font-mono" />
-          <p className="text-[10px] text-muted-foreground mt-1">Logged trades</p>
+
+          {/* Winning % By Days */}
+          <div className="glass rounded-xl p-5 border border-border/40">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-medium">Winning % By Days</span>
+              <InfoTooltip content="Percentage of profitable trading days" />
+            </div>
+            <LargeCircularProgress 
+              value={dayWinRate}
+              winners={profitableDays}
+              losers={losingDays}
+              label="WINRATE"
+            />
+          </div>
         </div>
 
-        {/* Trading Days */}
-        <div className="glass rounded-xl p-4 hover-lift border border-border/40">
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Trading Days</span>
-            <Calendar className="w-4 h-4 text-muted-foreground" />
-          </div>
-          <AnimatedNumber value={totalDays} decimals={0} className="text-xl font-bold font-mono" />
-          <p className="text-[10px] text-muted-foreground mt-1">{profitableDays} profitable</p>
-        </div>
-
-        {/* Avg Win */}
-        <div className="glass rounded-xl p-4 hover-lift border border-border/40 stat-gradient">
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Avg Win</span>
-            <TrendingUp className="w-4 h-4 text-primary" />
-          </div>
-          <AnimatedNumber value={avgWin} decimals={2} prefix="$" className="text-xl font-bold font-mono text-primary" />
-          <p className="text-[10px] text-muted-foreground mt-1">From {stats.wins} wins</p>
-        </div>
-
-        {/* Avg Loss */}
-        <div className="glass rounded-xl p-4 hover-lift border border-border/40 stat-gradient-loss">
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Avg Loss</span>
-            <TrendingDown className="w-4 h-4 text-destructive" />
-          </div>
-          <AnimatedNumber value={avgLoss} decimals={2} prefix="$" className="text-xl font-bold font-mono text-destructive" />
-          <p className="text-[10px] text-muted-foreground mt-1">From {stats.losses} losses</p>
+        {/* Right Column - P&L Chart */}
+        <div className="lg:col-span-2 glass rounded-xl p-5 border border-border/40">
+          <Tabs defaultValue="cumulative" className="w-full">
+            <div className="flex items-center justify-between mb-4">
+              <TabsList className="bg-muted/50">
+                <TabsTrigger value="cumulative" className="text-xs">
+                  Daily Net Cumulative P&L
+                </TabsTrigger>
+                <TabsTrigger value="daily" className="text-xs">
+                  Net Daily P&L
+                </TabsTrigger>
+              </TabsList>
+              <InfoTooltip content="Track your profit and loss over time" />
+            </div>
+            
+            <TabsContent value="cumulative" className="mt-0">
+              <div className="h-[280px]">
+                {chartData.cumulative.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData.cumulative}>
+                      <defs>
+                        <linearGradient id="colorCumulative" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis 
+                        dataKey="formattedDate" 
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tickFormatter={(value) => `$${value.toLocaleString()}`}
+                        tickLine={false}
+                        axisLine={false}
+                        width={70}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Area 
+                        type="monotone" 
+                        dataKey="value" 
+                        stroke="hsl(var(--primary))" 
+                        strokeWidth={2}
+                        fill="url(#colorCumulative)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    No trade data to display
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="daily" className="mt-0">
+              <div className="h-[280px]">
+                {chartData.daily.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData.daily}>
+                      <defs>
+                        <linearGradient id="colorDaily" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis 
+                        dataKey="formattedDate" 
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tickFormatter={(value) => `$${value.toLocaleString()}`}
+                        tickLine={false}
+                        axisLine={false}
+                        width={70}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Area 
+                        type="monotone" 
+                        dataKey="value" 
+                        stroke="hsl(var(--primary))" 
+                        strokeWidth={2}
+                        fill="url(#colorDaily)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    No trade data to display
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
