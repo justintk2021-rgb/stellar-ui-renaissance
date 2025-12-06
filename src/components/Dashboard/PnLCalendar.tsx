@@ -665,11 +665,13 @@ function DayCumulativeChart({ trades }: { trades: Trade[] }) {
           />
           <Tooltip content={<CustomTooltip />} />
           <Area 
-            type="monotone" 
+            type="natural" 
             dataKey="value" 
             stroke="hsl(var(--primary))" 
-            strokeWidth={2}
+            strokeWidth={2.5}
             fill="url(#colorDayCumulative)" 
+            dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+            activeDot={{ r: 5, fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
           />
         </AreaChart>
       </ResponsiveContainer>
