@@ -6,12 +6,21 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Link2, Link2Off, RefreshCw, Shield, Eye, EyeOff, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Link2, Link2Off, RefreshCw, Shield, Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { z } from "zod";
 
 interface BrokerConnectionProps {
   onTradesImported?: (trades: any[]) => void;
 }
+
+// Validation schema for broker connection form
+const brokerFormSchema = z.object({
+  login: z.string().regex(/^[0-9]+$/, "Login must contain only numbers").min(1, "Login is required").max(20, "Login is too long"),
+  server: z.string().min(1, "Server is required").max(100, "Server name is too long"),
+  investorPassword: z.string().min(1, "Password is required").max(128, "Password is too long"),
+  platform: z.enum(['mt4', 'mt5']),
+});
 
 // Popular MT5 broker servers
 const POPULAR_BROKERS = [
@@ -41,6 +50,7 @@ export function BrokerConnection({ onTradesImported }: BrokerConnectionProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'syncing'>('disconnected');
+  const [isLoading, setIsLoading] = useState(true);
   
   const [formData, setFormData] = useState({
     broker: '',
@@ -51,25 +61,68 @@ export function BrokerConnection({ onTradesImported }: BrokerConnectionProps) {
     platform: 'mt5' as 'mt4' | 'mt5',
   });
 
-  // Load saved connection from localStorage
+  // Store broker connection from database instead of localStorage
   const [savedConnection, setSavedConnection] = useState<{
     accountId: string;
     broker: string;
     login: string;
   } | null>(null);
 
+  // Load saved connection from database
   useEffect(() => {
-    const saved = localStorage.getItem('broker_connection');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setSavedConnection(parsed);
-      setConnectionStatus('connected');
-    }
+    const loadConnection = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setIsLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('broker_connections')
+          .select('account_id, broker, login')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error loading broker connection:', error);
+        } else if (data) {
+          setSavedConnection({
+            accountId: data.account_id,
+            broker: data.broker,
+            login: data.login,
+          });
+          setConnectionStatus('connected');
+        }
+      } catch (error) {
+        console.error('Error loading broker connection:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadConnection();
   }, []);
 
   const handleConnect = async () => {
-    if (!formData.login || !formData.investorPassword || (!formData.server && !formData.customServer)) {
-      toast.error("Please fill in all required fields");
+    const server = formData.customServer || formData.server;
+    
+    // Validate form data
+    const validationResult = brokerFormSchema.safeParse({
+      login: formData.login,
+      server: server,
+      investorPassword: formData.investorPassword,
+      platform: formData.platform,
+    });
+
+    if (!validationResult.success) {
+      toast.error(validationResult.error.errors[0]?.message || "Please fix the form errors");
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Please log in to connect your broker");
       return;
     }
 
@@ -77,8 +130,6 @@ export function BrokerConnection({ onTradesImported }: BrokerConnectionProps) {
     setConnectionStatus('connecting');
 
     try {
-      const server = formData.customServer || formData.server;
-      
       // Create account via edge function
       const { data, error } = await supabase.functions.invoke('broker-sync', {
         body: {
@@ -103,13 +154,25 @@ export function BrokerConnection({ onTradesImported }: BrokerConnectionProps) {
 
       if (deployResult.error) throw deployResult.error;
 
-      // Save connection info
+      // Save connection to database instead of localStorage
+      const { error: saveError } = await supabase
+        .from('broker_connections')
+        .upsert({
+          user_id: user.id,
+          account_id: data.accountId,
+          broker: formData.broker || 'Custom',
+          login: formData.login,
+        }, {
+          onConflict: 'user_id',
+        });
+
+      if (saveError) throw saveError;
+
       const connection = {
         accountId: data.accountId,
         broker: formData.broker || 'Custom',
         login: formData.login,
       };
-      localStorage.setItem('broker_connection', JSON.stringify(connection));
       setSavedConnection(connection);
       setConnectionStatus('connected');
       
@@ -192,6 +255,12 @@ export function BrokerConnection({ onTradesImported }: BrokerConnectionProps) {
     if (!savedConnection?.accountId) return;
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Please log in to disconnect");
+        return;
+      }
+
       await supabase.functions.invoke('broker-sync', {
         body: {
           action: 'disconnect',
@@ -199,7 +268,12 @@ export function BrokerConnection({ onTradesImported }: BrokerConnectionProps) {
         },
       });
 
-      localStorage.removeItem('broker_connection');
+      // Remove from database instead of localStorage
+      await supabase
+        .from('broker_connections')
+        .delete()
+        .eq('user_id', user.id);
+
       setSavedConnection(null);
       setConnectionStatus('disconnected');
       toast.success("Broker disconnected");
@@ -210,6 +284,16 @@ export function BrokerConnection({ onTradesImported }: BrokerConnectionProps) {
   };
 
   const selectedBroker = POPULAR_BROKERS.find(b => b.name === formData.broker);
+
+  if (isLoading) {
+    return (
+      <div className="glass rounded-2xl p-4 border border-border/40 shadow-card">
+        <div className="flex items-center justify-center py-2">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="glass rounded-2xl p-4 border border-border/40 shadow-card">
@@ -352,6 +436,7 @@ export function BrokerConnection({ onTradesImported }: BrokerConnectionProps) {
                         value={formData.customServer}
                         onChange={(e) => setFormData(prev => ({ ...prev, customServer: e.target.value }))}
                         className="bg-muted/50"
+                        maxLength={100}
                       />
                       <p className="text-xs text-muted-foreground">
                         Find this in MT5: File → Open an Account
@@ -364,8 +449,13 @@ export function BrokerConnection({ onTradesImported }: BrokerConnectionProps) {
                     <Input
                       placeholder="12345678"
                       value={formData.login}
-                      onChange={(e) => setFormData(prev => ({ ...prev, login: e.target.value }))}
+                      onChange={(e) => {
+                        // Only allow numbers
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        setFormData(prev => ({ ...prev, login: value }));
+                      }}
                       className="bg-muted/50"
+                      maxLength={20}
                     />
                   </div>
 
@@ -381,6 +471,7 @@ export function BrokerConnection({ onTradesImported }: BrokerConnectionProps) {
                         value={formData.investorPassword}
                         onChange={(e) => setFormData(prev => ({ ...prev, investorPassword: e.target.value }))}
                         className="bg-muted/50 pr-10"
+                        maxLength={128}
                       />
                       <button
                         type="button"
