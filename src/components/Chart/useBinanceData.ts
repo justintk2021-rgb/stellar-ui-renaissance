@@ -245,22 +245,32 @@ export function useBinanceData(symbol: string, interval: string) {
   return { data, isConnected, isLoading, isLive: !!binanceSymbol, connectionError };
 }
 
-// Generate mock data for non-crypto symbols
+// Generate mock data for non-crypto symbols or when API fails
 function generateMockData(symbol: string, interval: string): CandlestickData<Time>[] {
   const data: CandlestickData<Time>[] = [];
   
   const basePrices: Record<string, number> = {
+    // Crypto
+    BTCUSDT: 97500,
+    ETHUSDT: 3850,
+    BNBUSDT: 710,
+    SOLUSDT: 225,
+    XRPUSDT: 2.35,
+    ADAUSDT: 1.05,
+    DOGEUSDT: 0.42,
+    // Forex
     EURUSD: 1.0850,
     GBPUSD: 1.2650,
     USDJPY: 149.50,
     XAUUSD: 2035.00,
+    // Indices
     NAS100: 17850,
     US30: 38200,
     SPX: 4780,
   };
 
   const basePrice = basePrices[symbol] || 100;
-  const volatility = basePrice * 0.002;
+  const volatility = basePrice * 0.003; // Slightly higher volatility for more realistic charts
 
   const intervalMinutes: Record<string, number> = {
     "1": 1,
@@ -276,11 +286,14 @@ function generateMockData(symbol: string, interval: string): CandlestickData<Tim
   const now = new Date();
   let currentPrice = basePrice;
 
-  for (let i = 199; i >= 0; i--) {
+  // Generate 300 candles for a better-looking chart
+  for (let i = 299; i >= 0; i--) {
     const date = new Date(now.getTime() - i * minutes * 60 * 1000);
     
-    const change = (Math.random() - 0.5) * volatility * 2;
-    const meanReversion = (basePrice - currentPrice) * 0.01;
+    // Add some trend and randomness
+    const trend = Math.sin(i / 30) * volatility * 0.5;
+    const change = (Math.random() - 0.5) * volatility * 2 + trend;
+    const meanReversion = (basePrice - currentPrice) * 0.005;
     currentPrice += change + meanReversion;
 
     const open = currentPrice;
@@ -290,12 +303,15 @@ function generateMockData(symbol: string, interval: string): CandlestickData<Tim
 
     currentPrice = close;
 
+    // Determine decimal places based on price magnitude
+    const decimals = currentPrice < 1 ? 6 : currentPrice < 10 ? 4 : currentPrice < 100 ? 3 : 2;
+
     data.push({
       time: (Math.floor(date.getTime() / 1000)) as Time,
-      open: Number(open.toFixed(symbol.includes("JPY") ? 3 : 5)),
-      high: Number(high.toFixed(symbol.includes("JPY") ? 3 : 5)),
-      low: Number(low.toFixed(symbol.includes("JPY") ? 3 : 5)),
-      close: Number(close.toFixed(symbol.includes("JPY") ? 3 : 5)),
+      open: Number(open.toFixed(decimals)),
+      high: Number(high.toFixed(decimals)),
+      low: Number(low.toFixed(decimals)),
+      close: Number(close.toFixed(decimals)),
     });
   }
 
