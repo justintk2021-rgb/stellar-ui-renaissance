@@ -14,6 +14,7 @@ import { TradeForm } from "@/components/Journal/TradeForm";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { NotebookView } from "@/components/Notebook/NotebookView";
 import { SettingsView } from "@/components/Settings/SettingsView";
+import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
 import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
@@ -23,6 +24,7 @@ const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
   journal: { title: 'Journal', subtitle: 'Log and manage your trades' },
   notebook: { title: 'Notebook', subtitle: 'Your personal trading notes and journal' },
+  calculator: { title: 'Calculator', subtitle: 'Calculate lot size and risk management' },
   settings: { title: 'Settings', subtitle: 'Customize your preferences' },
 };
 
@@ -350,6 +352,11 @@ const Index = () => {
                 userProfile={userProfile}
                 onLogout={handleLogout}
               />
+            )}
+
+            {/* Calculator Page */}
+            {currentPage === 'calculator' && (
+              <LotSizeCalculator />
             )}
           </div>
         </main>
