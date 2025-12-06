@@ -20,6 +20,8 @@ import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
+import { Menu, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
@@ -64,6 +66,13 @@ const Index = () => {
   const [accentColor, setAccentColor] = useLocalStorage<AccentColor>('atp_accent_color', 'emerald');
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close sidebar when clicking outside or changing page
+  const handlePageChange = useCallback((page: string) => {
+    setCurrentPage(page);
+    setSidebarOpen(false);
+  }, []);
 
   // Fetch user profile
   const fetchProfile = useCallback(async (userId: string) => {
@@ -249,6 +258,9 @@ const Index = () => {
     return null;
   }
 
+  // Chart page uses full-width layout with hamburger menu
+  const isChartPage = currentPage === 'chart';
+
   return (
     <>
       <Helmet>
@@ -256,30 +268,79 @@ const Index = () => {
         <meta name="description" content="Track your trades, analyze performance, and keep detailed notes with NSYNC Journal - your personal trading journal." />
       </Helmet>
 
-      <div className="min-h-screen flex flex-col lg:flex-row gap-4 p-4 lg:p-5 max-w-[1400px] mx-auto pb-24 lg:pb-5">
-        {/* Desktop Sidebar */}
-        <div className="hidden lg:block">
-          <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
-        </div>
+      {/* Overlay for sidebar on chart page */}
+      {isChartPage && sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 animate-fade-in"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-        {/* Mobile Header */}
-        <div className="lg:hidden glass-strong rounded-2xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center glow-primary">
-            <svg className="w-5 h-5 text-primary-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="22,7 13.5,15.5 8.5,10.5 2,17" />
-              <polyline points="16,7 22,7 22,13" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-base font-bold gradient-text">NSYNC JOURNAL</h1>
-            <p className="text-[10px] text-muted-foreground">Personal Journal</p>
+      {/* Slide-out sidebar for chart page */}
+      {isChartPage && (
+        <div className={cn(
+          "fixed top-0 left-0 h-full z-50 transition-transform duration-300 ease-in-out p-4",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
+          <div className="relative">
+            <button 
+              onClick={() => setSidebarOpen(false)}
+              className="absolute -right-3 top-4 w-8 h-8 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted transition-colors z-10"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <Sidebar currentPage={currentPage} onPageChange={handlePageChange} />
           </div>
         </div>
+      )}
+
+      <div className={cn(
+        "min-h-screen flex flex-col gap-4 p-4 mx-auto pb-24",
+        isChartPage ? "lg:p-4 max-w-full" : "lg:flex-row lg:p-5 max-w-[1400px] lg:pb-5"
+      )}>
+        {/* Desktop Sidebar - hidden on chart page */}
+        {!isChartPage && (
+          <div className="hidden lg:block">
+            <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
+          </div>
+        )}
+
+        {/* Mobile Header - or Hamburger menu on chart page */}
+        {isChartPage ? (
+          <div className="glass-strong rounded-2xl p-3 flex items-center gap-3">
+            <button 
+              onClick={() => setSidebarOpen(true)}
+              className="w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex-1">
+              <h1 className="text-base font-bold gradient-text">Chart</h1>
+              <p className="text-[10px] text-muted-foreground">Interactive chart with drawing tools</p>
+            </div>
+          </div>
+        ) : (
+          <div className="lg:hidden glass-strong rounded-2xl p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center glow-primary">
+              <svg className="w-5 h-5 text-primary-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="22,7 13.5,15.5 8.5,10.5 2,17" />
+                <polyline points="16,7 22,7 22,13" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-base font-bold gradient-text">NSYNC JOURNAL</h1>
+              <p className="text-[10px] text-muted-foreground">Personal Journal</p>
+            </div>
+          </div>
+        )}
 
         {/* Main Content */}
         <main className="flex-1">
-          <div className="glass-strong rounded-2xl p-5 lg:p-6 min-h-[calc(100vh-120px)] lg:min-h-[calc(100vh-60px)]">
-            <TopBar title={title} subtitle={subtitle} />
+          <div className={cn(
+            "glass-strong rounded-2xl min-h-[calc(100vh-120px)]",
+            isChartPage ? "p-4 lg:min-h-[calc(100vh-100px)]" : "p-5 lg:p-6 lg:min-h-[calc(100vh-60px)]"
+          )}>
+            {!isChartPage && <TopBar title={title} subtitle={subtitle} />}
 
             {/* Dashboard Page */}
             {currentPage === 'dashboard' && (
@@ -358,8 +419,10 @@ const Index = () => {
           </div>
         </main>
 
-        {/* Mobile Navigation */}
-        <MobileNav currentPage={currentPage} onPageChange={setCurrentPage} />
+        {/* Mobile Navigation - hidden on chart page */}
+        {!isChartPage && (
+          <MobileNav currentPage={currentPage} onPageChange={setCurrentPage} />
+        )}
 
         {/* AI Trading Assistant */}
         <TradingAssistant trades={trades} onAddTrade={handleAddTrade} />

@@ -84,7 +84,7 @@ export function LightweightChart() {
   };
 
   return (
-    <div className="flex gap-4 animate-fade-in -mt-2" style={{ height: "calc(100vh - 180px)" }}>
+    <div className="flex gap-4 animate-fade-in" style={{ height: "calc(100vh - 140px)" }}>
       {/* Main Chart Section */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Header */}
