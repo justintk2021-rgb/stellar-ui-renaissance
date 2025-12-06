@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Trade, DailyStats } from "@/types/trade";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, X, TrendingUp, TrendingDown, Target, BarChart3, Clock, Crosshair } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, BarChart3, Clock, Crosshair, LineChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,9 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { TradeChartEditor } from "./TradeChartEditor";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface PnLCalendarProps {
   trades: Trade[];
+  onUpdateTrade?: (id: string, updates: Partial<Trade>) => void;
 }
 
 const MONTH_NAMES = [
@@ -22,12 +25,13 @@ const MONTH_NAMES = [
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function PnLCalendar({ trades }: PnLCalendarProps) {
+export function PnLCalendar({ trades, onUpdateTrade }: PnLCalendarProps) {
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedTradeForChart, setSelectedTradeForChart] = useState<Trade | null>(null);
 
   const dailyStats: Record<string, DailyStats> = {};
   const dailyTrades: Record<string, Trade[]> = {};
@@ -184,8 +188,8 @@ export function PnLCalendar({ trades }: PnLCalendarProps) {
       </div>
 
       {/* Trade Details Modal */}
-      <Dialog open={!!selectedDate} onOpenChange={() => setSelectedDate(null)}>
-        <DialogContent className="sm:max-w-lg glass border-border/50 bg-card/95 backdrop-blur-xl">
+      <Dialog open={!!selectedDate} onOpenChange={() => { setSelectedDate(null); setSelectedTradeForChart(null); }}>
+        <DialogContent className="sm:max-w-2xl glass border-border/50 bg-card/95 backdrop-blur-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="pb-4 border-b border-border/30">
             <div className="flex items-center justify-between">
               <div>
@@ -198,117 +202,185 @@ export function PnLCalendar({ trades }: PnLCalendarProps) {
           </DialogHeader>
 
           {dayMetrics && (
-            <div className="space-y-5 py-2">
-              {/* NET P&L Header */}
-              <div className={cn(
-                "p-4 rounded-xl border",
-                dayMetrics.netPnL >= 0 
-                  ? "bg-primary/10 border-primary/30" 
-                  : "bg-destructive/10 border-destructive/30"
-              )}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {dayMetrics.netPnL >= 0 ? (
-                      <TrendingUp className="w-5 h-5 text-primary" />
-                    ) : (
-                      <TrendingDown className="w-5 h-5 text-destructive" />
-                    )}
-                    <span className="text-sm font-medium text-muted-foreground">NET P&L</span>
-                  </div>
-                  <span className={cn(
-                    "text-2xl font-bold font-mono",
-                    dayMetrics.netPnL >= 0 ? "text-primary" : "text-destructive"
-                  )}>
-                    {dayMetrics.netPnL >= 0 ? '+' : ''}${dayMetrics.netPnL.toFixed(2)}
-                  </span>
-                </div>
-              </div>
+            <Tabs defaultValue="metrics" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="metrics" className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  Metrics
+                </TabsTrigger>
+                <TabsTrigger value="chart" className="flex items-center gap-2">
+                  <LineChart className="w-4 h-4" />
+                  Chart Editor
+                </TabsTrigger>
+              </TabsList>
 
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <MetricRow icon={BarChart3} label="Total Trades" value={dayMetrics.totalTrades.toString()} />
-                <MetricRow icon={Target} label="Win Rate" value={`${dayMetrics.winRate.toFixed(1)}%`} isPositive={dayMetrics.winRate >= 50} />
-                <MetricRow label="Wins" value={dayMetrics.wins.toString()} isPositive />
-                <MetricRow label="Losses" value={dayMetrics.losses.toString()} isNegative />
-                <MetricRow label="Gross Profit" value={`$${dayMetrics.grossProfit.toFixed(2)}`} isPositive />
-                <MetricRow label="Gross Loss" value={`$${Math.abs(dayMetrics.grossLoss).toFixed(2)}`} isNegative />
-                <MetricRow label="Avg Win" value={`$${dayMetrics.avgWin.toFixed(2)}`} isPositive />
-                <MetricRow label="Avg Loss" value={`$${Math.abs(dayMetrics.avgLoss).toFixed(2)}`} isNegative />
-              </div>
-
-              {/* Tags Section */}
-              <div className="space-y-3">
-                {dayMetrics.pairs.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-muted-foreground">Pairs:</span>
-                    {dayMetrics.pairs.map((pair) => (
-                      <Badge key={pair} variant="outline" className="text-xs border-secondary/50 bg-secondary/10">
-                        {pair}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {dayMetrics.sessions.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Clock className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Sessions:</span>
-                    {dayMetrics.sessions.map((session) => (
-                      <Badge key={session} variant="outline" className="text-xs border-border/50">
-                        {session}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {dayMetrics.strategies.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Crosshair className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Setups:</span>
-                    {dayMetrics.strategies.map((strategy) => (
-                      <Badge key={strategy} variant="outline" className="text-xs border-primary/50 bg-primary/10 text-primary">
-                        {strategy}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Individual Trades */}
-              <div className="space-y-2">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Trade Details</span>
-                <div className="space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar">
-                  {selectedTrades.map((trade) => (
-                    <div 
-                      key={trade.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Badge 
-                          variant="outline" 
-                          className={cn(
-                            "text-[10px]",
-                            trade.direction === 'Long' 
-                              ? "border-primary/50 text-primary" 
-                              : "border-destructive/50 text-destructive"
-                          )}
-                        >
-                          {trade.direction}
-                        </Badge>
-                        <span className="text-sm font-medium">{trade.pair}</span>
-                        {trade.strategy && (
-                          <span className="text-xs text-muted-foreground">• {trade.strategy}</span>
-                        )}
-                      </div>
-                      <span className={cn(
-                        "text-sm font-bold font-mono",
-                        trade.result >= 0 ? "text-primary" : "text-destructive"
-                      )}>
-                        {trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}
-                      </span>
+              <TabsContent value="metrics" className="space-y-5">
+                {/* NET P&L Header */}
+                <div className={cn(
+                  "p-4 rounded-xl border",
+                  dayMetrics.netPnL >= 0 
+                    ? "bg-primary/10 border-primary/30" 
+                    : "bg-destructive/10 border-destructive/30"
+                )}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {dayMetrics.netPnL >= 0 ? (
+                        <TrendingUp className="w-5 h-5 text-primary" />
+                      ) : (
+                        <TrendingDown className="w-5 h-5 text-destructive" />
+                      )}
+                      <span className="text-sm font-medium text-muted-foreground">NET P&L</span>
                     </div>
-                  ))}
+                    <span className={cn(
+                      "text-2xl font-bold font-mono",
+                      dayMetrics.netPnL >= 0 ? "text-primary" : "text-destructive"
+                    )}>
+                      {dayMetrics.netPnL >= 0 ? '+' : ''}${dayMetrics.netPnL.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </div>
+
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <MetricRow icon={BarChart3} label="Total Trades" value={dayMetrics.totalTrades.toString()} />
+                  <MetricRow icon={Target} label="Win Rate" value={`${dayMetrics.winRate.toFixed(1)}%`} isPositive={dayMetrics.winRate >= 50} />
+                  <MetricRow label="Wins" value={dayMetrics.wins.toString()} isPositive />
+                  <MetricRow label="Losses" value={dayMetrics.losses.toString()} isNegative />
+                  <MetricRow label="Gross Profit" value={`$${dayMetrics.grossProfit.toFixed(2)}`} isPositive />
+                  <MetricRow label="Gross Loss" value={`$${Math.abs(dayMetrics.grossLoss).toFixed(2)}`} isNegative />
+                  <MetricRow label="Avg Win" value={`$${dayMetrics.avgWin.toFixed(2)}`} isPositive />
+                  <MetricRow label="Avg Loss" value={`$${Math.abs(dayMetrics.avgLoss).toFixed(2)}`} isNegative />
+                </div>
+
+                {/* Tags Section */}
+                <div className="space-y-3">
+                  {dayMetrics.pairs.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-muted-foreground">Pairs:</span>
+                      {dayMetrics.pairs.map((pair) => (
+                        <Badge key={pair} variant="outline" className="text-xs border-secondary/50 bg-secondary/10">
+                          {pair}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  {dayMetrics.sessions.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Clock className="w-3 h-3 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Sessions:</span>
+                      {dayMetrics.sessions.map((session) => (
+                        <Badge key={session} variant="outline" className="text-xs border-border/50">
+                          {session}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  {dayMetrics.strategies.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Crosshair className="w-3 h-3 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Setups:</span>
+                      {dayMetrics.strategies.map((strategy) => (
+                        <Badge key={strategy} variant="outline" className="text-xs border-primary/50 bg-primary/10 text-primary">
+                          {strategy}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Individual Trades */}
+                <div className="space-y-2">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Trade Details</span>
+                  <div className="space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar">
+                    {selectedTrades.map((trade) => (
+                      <div 
+                        key={trade.id}
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "text-[10px]",
+                              trade.direction === 'Long' 
+                                ? "border-primary/50 text-primary" 
+                                : "border-destructive/50 text-destructive"
+                            )}
+                          >
+                            {trade.direction}
+                          </Badge>
+                          <span className="text-sm font-medium">{trade.pair}</span>
+                          {trade.strategy && (
+                            <span className="text-xs text-muted-foreground">• {trade.strategy}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={cn(
+                            "text-sm font-bold font-mono",
+                            trade.result >= 0 ? "text-primary" : "text-destructive"
+                          )}>
+                            {trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedTradeForChart(trade)}
+                            className="h-7 px-2 text-xs"
+                          >
+                            <LineChart className="w-3 h-3 mr-1" />
+                            Chart
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="chart" className="space-y-4">
+                {selectedTradeForChart ? (
+                  <>
+                    <TradeChartEditor
+                      pair={selectedTradeForChart.pair}
+                      direction={selectedTradeForChart.direction}
+                      existingImage={selectedTradeForChart.chartImage}
+                      onSaveImage={(imageDataUrl) => {
+                        if (onUpdateTrade) {
+                          onUpdateTrade(selectedTradeForChart.id, { chartImage: imageDataUrl });
+                        }
+                      }}
+                    />
+                    {selectedTradeForChart.chartImage && (
+                      <div className="space-y-2">
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Saved Chart</span>
+                        <div className="rounded-xl overflow-hidden border border-border/50">
+                          <img 
+                            src={selectedTradeForChart.chartImage} 
+                            alt="Trade chart" 
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <LineChart className="w-12 h-12 text-muted-foreground/50 mb-4" />
+                    <p className="text-sm text-muted-foreground">
+                      Select a trade from the Metrics tab to add entry, TP & SL levels
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => selectedTrades.length > 0 && setSelectedTradeForChart(selectedTrades[0])}
+                    >
+                      Select First Trade
+                    </Button>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>
