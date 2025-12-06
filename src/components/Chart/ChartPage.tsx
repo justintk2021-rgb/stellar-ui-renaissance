@@ -124,29 +124,29 @@ export function ChartPage({ defaultSymbol = "FX:EURUSD" }: ChartPageProps) {
   }, []);
 
   return (
-    <div className="space-y-3 animate-fade-in h-full flex flex-col -mt-2">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="animate-fade-in h-full flex flex-col -mt-4">
+      {/* Compact Toolbar */}
+      <div className="flex flex-wrap items-center gap-2 mb-2">
         {/* Symbol Search */}
-        <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-md">
+        <div className="flex items-center gap-1.5 flex-1 min-w-[180px] max-w-sm">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <Input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Search symbol (e.g., EURUSD, BTCUSD)"
-              className="pl-9 bg-background/50"
+              placeholder="Search symbol..."
+              className="pl-8 h-8 text-sm bg-background/50"
             />
           </div>
-          <Button size="sm" onClick={handleSearch} variant="secondary">
+          <Button size="sm" onClick={handleSearch} variant="secondary" className="h-8 px-3">
             Go
           </Button>
         </div>
 
         {/* Quick Symbols */}
         <Select value={symbol} onValueChange={setSymbol}>
-          <SelectTrigger className="w-[140px] bg-background/50">
+          <SelectTrigger className="w-[120px] h-8 bg-background/50 text-sm">
             <SelectValue placeholder="Symbol" />
           </SelectTrigger>
           <SelectContent>
@@ -159,12 +159,12 @@ export function ChartPage({ defaultSymbol = "FX:EURUSD" }: ChartPageProps) {
         </Select>
 
         {/* Timeframe */}
-        <div className="flex items-center gap-1 bg-background/50 rounded-lg p-1 border border-border/50">
+        <div className="flex items-center gap-0.5 bg-background/50 rounded-md p-0.5 border border-border/50">
           {timeframes.map((tf) => (
             <button
               key={tf.value}
               onClick={() => setInterval(tf.value)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
                 interval === tf.value
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -175,47 +175,35 @@ export function ChartPage({ defaultSymbol = "FX:EURUSD" }: ChartPageProps) {
           ))}
         </div>
 
-        {/* Fullscreen */}
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={toggleFullscreen}
-          className="shrink-0"
-        >
-          <Maximize2 className="w-4 h-4" />
-        </Button>
-      </div>
-
-      {/* TradingView Login - Compact */}
-      <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-gradient-to-r from-primary/5 to-secondary/5 border border-border/30">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-primary" />
-          <p className="text-xs text-muted-foreground">
-            Sign in to TradingView to access saved layouts & drawings
-          </p>
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 ml-auto">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => window.open('https://www.tradingview.com/accounts/signin/', '_blank')}
+            className="text-xs h-8 gap-1.5"
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            TradingView Login
+          </Button>
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={toggleFullscreen}
+            className="h-8 w-8"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </Button>
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => window.open('https://www.tradingview.com/accounts/signin/', '_blank')}
-          className="text-xs h-7"
-        >
-          Sign in
-        </Button>
       </div>
 
-      {/* Chart Container */}
+      {/* Chart Container - Maximum Height */}
       <div 
-        className="flex-1 rounded-xl overflow-hidden border border-border/50 bg-background relative"
-        style={{ minHeight: 'calc(100vh - 280px)', height: 'calc(100vh - 280px)' }}
+        className="flex-1 rounded-lg overflow-hidden border border-border/50 bg-background"
+        style={{ height: 'calc(100vh - 140px)', minHeight: '500px' }}
       >
         <div ref={containerRef} className="h-full w-full" />
       </div>
-
-      {/* Tips - Compact */}
-      <p className="text-[11px] text-muted-foreground px-1">
-        <strong>Tip:</strong> Click the person icon in the chart to sign in to TradingView and sync your saved layouts.
-      </p>
     </div>
   );
 }
