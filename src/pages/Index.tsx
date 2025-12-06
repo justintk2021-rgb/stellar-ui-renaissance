@@ -295,6 +295,8 @@ const Index = () => {
                   onUpdateTrade={async (id, updates) => {
                     await updateTrade(id, updates);
                   }}
+                  notebookEntries={notebookEntries}
+                  onSaveEntry={handleSaveEntry}
                 />
               </div>
             )}

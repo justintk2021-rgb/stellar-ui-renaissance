@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
-import { Trade, DailyStats } from "@/types/trade";
+import { Trade, DailyStats, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, BarChart3, Clock, Crosshair, LineChart, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, BarChart3, Clock, Crosshair, LineChart, Info, MoreVertical, FileText, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,13 +10,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { TradingViewChart } from "./TradingViewChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
+
 interface PnLCalendarProps {
   trades: Trade[];
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void;
+  notebookEntries?: NotebookEntry[];
+  onSaveEntry?: (entry: NotebookEntry) => void;
 }
 
 const MONTH_NAMES = [
@@ -26,13 +38,27 @@ const MONTH_NAMES = [
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function PnLCalendar({ trades, onUpdateTrade }: PnLCalendarProps) {
+export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSaveEntry }: PnLCalendarProps) {
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTradeForChart, setSelectedTradeForChart] = useState<Trade | null>(null);
+  const [noteDialogDate, setNoteDialogDate] = useState<string | null>(null);
+  const [noteTitle, setNoteTitle] = useState("");
+  const [noteContent, setNoteContent] = useState("");
+
+  // Get daily notes (non-trade linked entries by date)
+  const dailyNotes: Record<string, NotebookEntry[]> = {};
+  notebookEntries.forEach((entry) => {
+    if (!entry.tradeId && entry.date) {
+      if (!dailyNotes[entry.date]) {
+        dailyNotes[entry.date] = [];
+      }
+      dailyNotes[entry.date].push(entry);
+    }
+  });
 
   const dailyStats: Record<string, DailyStats> = {};
   const dailyTrades: Record<string, Trade[]> = {};
@@ -96,6 +122,43 @@ export function PnLCalendar({ trades, onUpdateTrade }: PnLCalendarProps) {
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   };
 
+  const openNoteDialog = (dateStr: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Check if there's an existing note for this date
+    const existingNote = dailyNotes[dateStr]?.[0];
+    if (existingNote) {
+      setNoteTitle(existingNote.title);
+      setNoteContent(existingNote.content);
+    } else {
+      setNoteTitle(`Daily Note - ${formatDate(dateStr)}`);
+      setNoteContent("");
+    }
+    setNoteDialogDate(dateStr);
+  };
+
+  const saveNote = () => {
+    if (!noteDialogDate || !onSaveEntry) return;
+    
+    const existingNote = dailyNotes[noteDialogDate]?.[0];
+    const now = new Date().toISOString();
+    
+    const entry: NotebookEntry = {
+      id: existingNote?.id || `daily-note-${noteDialogDate}-${Date.now()}`,
+      title: noteTitle || `Daily Note - ${formatDate(noteDialogDate)}`,
+      content: noteContent,
+      category: "daily-journal",
+      date: noteDialogDate,
+      createdAt: existingNote?.createdAt || now,
+      updatedAt: now,
+    };
+    
+    onSaveEntry(entry);
+    setNoteDialogDate(null);
+    setNoteTitle("");
+    setNoteContent("");
+    toast.success("Note saved!");
+  };
+
   return (
     <>
       <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
@@ -152,23 +215,50 @@ export function PnLCalendar({ trades, onUpdateTrade }: PnLCalendarProps) {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const stat = dailyStats[dateStr];
             const hasTrades = !!stat;
+            const hasNote = !!dailyNotes[dateStr]?.length;
 
             return (
               <div
                 key={day}
                 onClick={() => handleDayClick(dateStr, hasTrades)}
                 className={cn(
-                  "min-h-[72px] rounded-xl border p-2 flex flex-col gap-1 transition-all duration-200",
+                  "relative min-h-[72px] rounded-xl border p-2 flex flex-col gap-1 transition-all duration-200 group",
                   stat
                     ? stat.pnl > 0
                       ? "calendar-cell-positive cursor-pointer hover:scale-105 hover:shadow-lg"
                       : stat.pnl < 0
                       ? "calendar-cell-negative cursor-pointer hover:scale-105 hover:shadow-lg"
                       : "calendar-cell-flat cursor-pointer hover:scale-105 hover:shadow-lg"
-                    : "border-border/30 bg-muted/20"
+                    : "border-border/30 bg-muted/20 hover:border-border/50"
                 )}
               >
-                <span className="text-xs text-muted-foreground">{day}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{day}</span>
+                  <div className="flex items-center gap-0.5">
+                    {hasNote && (
+                      <StickyNote className="w-3 h-3 text-secondary" />
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <button className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-background/50 transition-all">
+                          <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem onClick={(e) => openNoteDialog(dateStr, e)}>
+                          <FileText className="w-4 h-4 mr-2" />
+                          {hasNote ? "Edit Note" : "Add Note"}
+                        </DropdownMenuItem>
+                        {hasTrades && (
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedDate(dateStr); }}>
+                            <BarChart3 className="w-4 h-4 mr-2" />
+                            View Trades
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
                 {stat && (
                   <>
                     <span className={cn(
@@ -187,6 +277,57 @@ export function PnLCalendar({ trades, onUpdateTrade }: PnLCalendarProps) {
           })}
         </div>
       </div>
+
+      {/* Note Dialog */}
+      <Dialog open={!!noteDialogDate} onOpenChange={() => { setNoteDialogDate(null); setNoteTitle(""); setNoteContent(""); }}>
+        <DialogContent className="sm:max-w-md glass border-border/50 bg-card/95 backdrop-blur-xl">
+          <DialogHeader className="pb-4 border-b border-border/30">
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              {noteDialogDate && formatDate(noteDialogDate)}
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground mt-1">Add a note for this day</p>
+          </DialogHeader>
+          
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Title</label>
+              <Input
+                value={noteTitle}
+                onChange={(e) => setNoteTitle(e.target.value)}
+                placeholder="Note title..."
+                className="bg-background/50 border-border/50"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Content</label>
+              <Textarea
+                value={noteContent}
+                onChange={(e) => setNoteContent(e.target.value)}
+                placeholder="Write your thoughts, observations, market analysis..."
+                className="min-h-[150px] bg-background/50 border-border/50 resize-none"
+              />
+            </div>
+            
+            <div className="flex gap-2 pt-2">
+              <Button 
+                onClick={saveNote}
+                className="flex-1"
+                disabled={!noteContent.trim()}
+              >
+                Save Note
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => { setNoteDialogDate(null); setNoteTitle(""); setNoteContent(""); }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Trade Details Modal */}
       <Dialog open={!!selectedDate} onOpenChange={() => { setSelectedDate(null); setSelectedTradeForChart(null); }}>
