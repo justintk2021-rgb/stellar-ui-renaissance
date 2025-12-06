@@ -261,14 +261,13 @@ export function PlaybookView() {
       ) : (
         <div 
           className={cn(
-            "glass rounded-xl border transition-all duration-300",
+            "glass rounded-xl transition-all duration-300",
             getCompletionPercentage(selectedChecklist) === 100 && selectedChecklist.items.length > 0
-              ? "border-primary/50 bg-primary/5" 
-              : "border-border/40"
+              && "bg-primary/5"
           )}
         >
           {/* Checklist Header */}
-          <div className="p-4 flex items-center justify-between border-b border-border/40">
+          <div className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1">
               {editingChecklistId === selectedChecklist.id ? (
                 <div className="flex items-center gap-2 flex-1">
