@@ -1,17 +1,34 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { ChartDrawingLayer } from "./ChartDrawingLayer";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 export function CustomChart() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [symbol, setSymbol] = useState("BTCUSD");
   const [searchValue, setSearchValue] = useState("");
+  const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
+  const [chartDrawings, setChartDrawings] = useLocalStorage<Record<string, string>>("chart_drawings", {});
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     // Clear previous widget
-    containerRef.current.innerHTML = "";
+    const container = containerRef.current;
+    container.innerHTML = "";
+
+    // Create widget container
+    const widgetContainer = document.createElement("div");
+    widgetContainer.className = "tradingview-widget-container";
+    widgetContainer.style.height = "100%";
+    widgetContainer.style.width = "100%";
+    
+    const widgetDiv = document.createElement("div");
+    widgetDiv.className = "tradingview-widget-container__widget";
+    widgetDiv.style.height = "100%";
+    widgetDiv.style.width = "100%";
+    widgetContainer.appendChild(widgetDiv);
 
     // Create TradingView widget script
     const script = document.createElement("script");
@@ -38,20 +55,49 @@ export function CustomChart() {
       gridColor: "rgba(39, 39, 42, 0.5)",
     });
 
-    containerRef.current.appendChild(script);
+    widgetContainer.appendChild(script);
+    container.appendChild(widgetContainer);
 
     return () => {
-      if (containerRef.current) {
-        containerRef.current.innerHTML = "";
-      }
+      container.innerHTML = "";
     };
   }, [symbol]);
+
+  // Track container size for drawing layer
+  useEffect(() => {
+    const updateSize = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setChartSize({ width: rect.width, height: rect.height });
+      }
+    };
+
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    
+    const observer = new ResizeObserver(updateSize);
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener("resize", updateSize);
+      observer.disconnect();
+    };
+  }, []);
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchValue.trim()) {
       setSymbol(searchValue.trim().toUpperCase());
     }
   };
+
+  const handleSaveDrawing = useCallback((data: string) => {
+    setChartDrawings(prev => ({
+      ...prev,
+      [symbol]: data
+    }));
+  }, [symbol, setChartDrawings]);
 
   return (
     <div className="flex flex-col animate-fade-in -mt-2" style={{ height: "calc(100vh - 180px)" }}>
@@ -72,16 +118,28 @@ export function CustomChart() {
         </span>
       </div>
 
-      {/* TradingView Chart Container */}
+      {/* Chart Container with Drawing Layer */}
       <div 
         className="flex-1 relative rounded-lg overflow-hidden border border-border/50"
         style={{ minHeight: "600px" }}
       >
+        {/* TradingView Chart */}
         <div 
           ref={containerRef}
-          className="tradingview-widget-container"
+          className="w-full h-full"
           style={{ height: "100%", width: "100%" }}
         />
+
+        {/* Drawing Layer */}
+        {chartSize.width > 0 && chartSize.height > 0 && (
+          <ChartDrawingLayer
+            width={chartSize.width}
+            height={chartSize.height}
+            symbol={symbol}
+            onSave={handleSaveDrawing}
+            savedData={chartDrawings[symbol] || null}
+          />
+        )}
       </div>
     </div>
   );
