@@ -1,0 +1,208 @@
+import { useEffect, useRef, useState, useCallback } from "react";
+import { createChart, IChartApi, ISeriesApi, ColorType } from "lightweight-charts";
+import { ChartToolbar } from "./ChartToolbar";
+import { ChartDrawingLayer } from "./ChartDrawingLayer";
+import { generateMockData } from "./chartUtils";
+import { Button } from "@/components/ui/button";
+import { Maximize2, Minimize2 } from "lucide-react";
+
+export interface ChartSymbol {
+  label: string;
+  value: string;
+}
+
+const popularSymbols: ChartSymbol[] = [
+  { label: "EUR/USD", value: "EURUSD" },
+  { label: "GBP/USD", value: "GBPUSD" },
+  { label: "USD/JPY", value: "USDJPY" },
+  { label: "XAU/USD", value: "XAUUSD" },
+  { label: "BTC/USD", value: "BTCUSD" },
+  { label: "ETH/USD", value: "ETHUSDT" },
+  { label: "NAS100", value: "NAS100" },
+  { label: "US30", value: "US30" },
+  { label: "S&P 500", value: "SPX" },
+];
+
+const timeframes = [
+  { label: "1m", value: "1" },
+  { label: "5m", value: "5" },
+  { label: "15m", value: "15" },
+  { label: "1H", value: "60" },
+  { label: "4H", value: "240" },
+  { label: "1D", value: "D" },
+  { label: "1W", value: "W" },
+];
+
+export function CustomChart() {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const [symbol, setSymbol] = useState("EURUSD");
+  const [interval, setInterval] = useState("15");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
+  const [activeTool, setActiveTool] = useState<string>("select");
+  const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
+
+  // Initialize chart
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
+
+    const container = chartContainerRef.current;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    const chart = createChart(container, {
+      width,
+      height,
+      layout: {
+        background: { type: ColorType.Solid, color: "transparent" },
+        textColor: "hsl(var(--foreground))",
+      },
+      grid: {
+        vertLines: { color: "hsl(var(--border) / 0.3)" },
+        horzLines: { color: "hsl(var(--border) / 0.3)" },
+      },
+      crosshair: {
+        mode: 1,
+        vertLine: {
+          color: "hsl(var(--primary) / 0.5)",
+          width: 1,
+          style: 2,
+        },
+        horzLine: {
+          color: "hsl(var(--primary) / 0.5)",
+          width: 1,
+          style: 2,
+        },
+      },
+      rightPriceScale: {
+        borderColor: "hsl(var(--border) / 0.5)",
+      },
+      timeScale: {
+        borderColor: "hsl(var(--border) / 0.5)",
+        timeVisible: true,
+        secondsVisible: false,
+      },
+    });
+
+    chartRef.current = chart;
+    setChartSize({ width, height });
+
+    // Add candlestick series
+    const candlestickSeries = chart.addCandlestickSeries({
+      upColor: "#22c55e",
+      downColor: "#ef4444",
+      borderVisible: false,
+      wickUpColor: "#22c55e",
+      wickDownColor: "#ef4444",
+    });
+    seriesRef.current = candlestickSeries;
+
+    // Load mock data for now
+    const data = generateMockData(symbol, interval);
+    candlestickSeries.setData(data);
+    chart.timeScale().fitContent();
+
+    // Handle resize
+    const handleResize = () => {
+      if (chartContainerRef.current && chartRef.current) {
+        const newWidth = chartContainerRef.current.clientWidth;
+        const newHeight = chartContainerRef.current.clientHeight;
+        chartRef.current.applyOptions({ width: newWidth, height: newHeight });
+        setChartSize({ width: newWidth, height: newHeight });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(container);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
+      chart.remove();
+    };
+  }, []);
+
+  // Update data when symbol or interval changes
+  useEffect(() => {
+    if (!chartRef.current || !seriesRef.current) return;
+
+    const data = generateMockData(symbol, interval);
+    seriesRef.current.setData(data);
+    chartRef.current.timeScale().fitContent();
+  }, [symbol, interval]);
+
+  const toggleFullscreen = useCallback(() => {
+    const container = chartContainerRef.current?.parentElement?.parentElement;
+    if (!document.fullscreenElement) {
+      container?.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const handleToolChange = (tool: string) => {
+    setActiveTool(tool);
+    setIsDrawingMode(tool !== "select");
+  };
+
+  return (
+    <div className="flex flex-col h-full animate-fade-in -mt-4">
+      {/* Toolbar */}
+      <ChartToolbar
+        symbol={symbol}
+        onSymbolChange={setSymbol}
+        interval={interval}
+        onIntervalChange={setInterval}
+        activeTool={activeTool}
+        onToolChange={handleToolChange}
+        symbols={popularSymbols}
+        timeframes={timeframes}
+      />
+
+      {/* Chart Container */}
+      <div className="flex-1 relative rounded-lg overflow-hidden border border-border/50 bg-card mt-2">
+        {/* Fullscreen Button */}
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={toggleFullscreen}
+          className="absolute top-2 right-2 z-20 h-8 w-8 bg-background/80 hover:bg-background"
+        >
+          {isFullscreen ? (
+            <Minimize2 className="w-4 h-4" />
+          ) : (
+            <Maximize2 className="w-4 h-4" />
+          )}
+        </Button>
+
+        {/* Lightweight Charts Container */}
+        <div
+          ref={chartContainerRef}
+          className="absolute inset-0"
+          style={{ minHeight: "calc(100vh - 180px)" }}
+        />
+
+        {/* Drawing Layer (Fabric.js Canvas) */}
+        <ChartDrawingLayer
+          width={chartSize.width}
+          height={chartSize.height}
+          isActive={isDrawingMode}
+          activeTool={activeTool}
+        />
+      </div>
+    </div>
+  );
+}
