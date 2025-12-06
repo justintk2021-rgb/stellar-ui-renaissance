@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, NotebookPen, TrendingUp, Settings, Calculator, BarChart3 } from "lucide-react";
+import { LayoutDashboard, BookOpen, NotebookPen, Settings, Calculator, BarChart3 } from "lucide-react";
+import logo3d from "@/assets/logo-3d.png";
 
 interface SidebarProps {
   currentPage: string;
@@ -20,9 +21,12 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
     <aside className="w-64 lg:w-72 glass-strong rounded-2xl p-5 flex flex-col gap-6 shadow-card">
       {/* Logo */}
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-secondary to-primary flex items-center justify-center glow-primary relative overflow-hidden">
-          <TrendingUp className="w-6 h-6 text-primary-foreground relative z-10" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent" />
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden">
+          <img 
+            src={logo3d} 
+            alt="NSYNC Journal Logo" 
+            className="w-12 h-12 object-contain animate-spin-slow"
+          />
         </div>
         <div>
           <h1 className="text-lg font-bold tracking-wider gradient-text">NSYNC JOURNAL</h1>
