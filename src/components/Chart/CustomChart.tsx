@@ -49,68 +49,84 @@ export function CustomChart() {
     if (!chartContainerRef.current) return;
 
     const container = chartContainerRef.current;
-    const width = container.clientWidth;
-    const height = container.clientHeight;
+    
+    // Wait for container to have proper dimensions
+    const initChart = () => {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      
+      if (width === 0 || height === 0) {
+        requestAnimationFrame(initChart);
+        return;
+      }
 
-    const chart = createChart(container, {
-      width,
-      height,
-      layout: {
-        background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "hsl(var(--foreground))",
-      },
-      grid: {
-        vertLines: { color: "hsl(var(--border) / 0.3)" },
-        horzLines: { color: "hsl(var(--border) / 0.3)" },
-      },
-      crosshair: {
-        mode: 1,
-        vertLine: {
-          color: "hsl(var(--primary) / 0.5)",
-          width: 1,
-          style: 2,
+      // If chart already exists, don't recreate
+      if (chartRef.current) return;
+
+      const chart = createChart(container, {
+        width,
+        height,
+        layout: {
+          background: { type: ColorType.Solid, color: "#0a0a0a" },
+          textColor: "#a1a1aa",
         },
-        horzLine: {
-          color: "hsl(var(--primary) / 0.5)",
-          width: 1,
-          style: 2,
+        grid: {
+          vertLines: { color: "#27272a" },
+          horzLines: { color: "#27272a" },
         },
-      },
-      rightPriceScale: {
-        borderColor: "hsl(var(--border) / 0.5)",
-      },
-      timeScale: {
-        borderColor: "hsl(var(--border) / 0.5)",
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    });
+        crosshair: {
+          mode: 1,
+          vertLine: {
+            color: "#6366f1",
+            width: 1,
+            style: 2,
+          },
+          horzLine: {
+            color: "#6366f1",
+            width: 1,
+            style: 2,
+          },
+        },
+        rightPriceScale: {
+          borderColor: "#27272a",
+        },
+        timeScale: {
+          borderColor: "#27272a",
+          timeVisible: true,
+          secondsVisible: false,
+        },
+      });
 
-    chartRef.current = chart;
-    setChartSize({ width, height });
+      chartRef.current = chart;
+      setChartSize({ width, height });
 
-    // Add candlestick series
-    const candlestickSeries = chart.addCandlestickSeries({
-      upColor: "#22c55e",
-      downColor: "#ef4444",
-      borderVisible: false,
-      wickUpColor: "#22c55e",
-      wickDownColor: "#ef4444",
-    });
-    seriesRef.current = candlestickSeries;
+      // Add candlestick series
+      const candlestickSeries = chart.addCandlestickSeries({
+        upColor: "#22c55e",
+        downColor: "#ef4444",
+        borderVisible: false,
+        wickUpColor: "#22c55e",
+        wickDownColor: "#ef4444",
+      });
+      seriesRef.current = candlestickSeries;
 
-    // Load mock data for now
-    const data = generateMockData(symbol, interval);
-    candlestickSeries.setData(data);
-    chart.timeScale().fitContent();
+      // Load initial data
+      const data = generateMockData("EURUSD", "15");
+      candlestickSeries.setData(data);
+      chart.timeScale().fitContent();
+    };
+
+    initChart();
 
     // Handle resize
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
         const newWidth = chartContainerRef.current.clientWidth;
         const newHeight = chartContainerRef.current.clientHeight;
-        chartRef.current.applyOptions({ width: newWidth, height: newHeight });
-        setChartSize({ width: newWidth, height: newHeight });
+        if (newWidth > 0 && newHeight > 0) {
+          chartRef.current.applyOptions({ width: newWidth, height: newHeight });
+          setChartSize({ width: newWidth, height: newHeight });
+        }
       }
     };
 
@@ -121,7 +137,11 @@ export function CustomChart() {
     return () => {
       window.removeEventListener("resize", handleResize);
       resizeObserver.disconnect();
-      chart.remove();
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+        seriesRef.current = null;
+      }
     };
   }, []);
 
@@ -173,7 +193,10 @@ export function CustomChart() {
       />
 
       {/* Chart Container */}
-      <div className="flex-1 relative rounded-lg overflow-hidden border border-border/50 bg-card mt-2">
+      <div 
+        className="flex-1 relative rounded-lg overflow-hidden border border-border/50 bg-card mt-2"
+        style={{ minHeight: "500px", height: "calc(100vh - 180px)" }}
+      >
         {/* Fullscreen Button */}
         <Button
           size="icon"
@@ -191,8 +214,7 @@ export function CustomChart() {
         {/* Lightweight Charts Container */}
         <div
           ref={chartContainerRef}
-          className="absolute inset-0"
-          style={{ minHeight: "calc(100vh - 180px)" }}
+          className="w-full h-full"
         />
 
         {/* Drawing Layer (Fabric.js Canvas) */}
