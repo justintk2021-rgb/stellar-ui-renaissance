@@ -20,7 +20,7 @@ import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
@@ -353,12 +353,18 @@ const Index = () => {
 
         {/* Mobile Header - or Hamburger menu on chart page */}
         {isChartPage ? (
-          <div className="fixed bottom-4 left-4 z-10">
+          <div className="fixed bottom-4 left-4 z-10 flex items-center gap-2">
             <button 
               onClick={() => setSidebarOpen(true)}
               className="w-12 h-12 rounded-xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg"
             >
               <Menu className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="w-12 h-12 rounded-xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg"
+            >
+              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
           </div>
         ) : (
