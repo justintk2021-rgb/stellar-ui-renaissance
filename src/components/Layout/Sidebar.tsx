@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList } from "lucide-react";
-import logo3d from "@/assets/logo-3d.png";
+import bookLogo from "@/assets/book-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 
 interface SidebarProps {
@@ -55,9 +55,10 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       <div className="flex items-center gap-3">
         <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden">
           <img 
-            src={logo3d} 
+            src={bookLogo} 
             alt="NSYNC Journal Logo" 
-            className="w-12 h-12 object-contain animate-spin-slow"
+            className="w-12 h-12 object-contain"
+            style={{ filter: 'drop-shadow(0 0 8px hsl(var(--primary) / 0.5))' }}
           />
         </div>
         <div>
