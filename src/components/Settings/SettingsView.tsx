@@ -1,10 +1,43 @@
 import { useState, useEffect } from "react";
-import { Moon, Sun, User, Mail, Key, Calendar, LogOut, Palette, Save, Check, Trash2, Download, Link2 } from "lucide-react";
+import { Moon, Sun, User, Mail, Key, Calendar, LogOut, Palette, Save, Check, Trash2, Download, Link2, Pipette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+
+// Helper function to convert hex to HSL string
+function hexToHsl(hex: string): string {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return '158 64% 51%';
+  
+  let r = parseInt(result[1], 16) / 255;
+  let g = parseInt(result[2], 16) / 255;
+  let b = parseInt(result[3], 16) / 255;
+  
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
+// Helper function to adjust lightness of HSL string
+function adjustLightness(hsl: string, amount: number): string {
+  const parts = hsl.split(' ');
+  if (parts.length !== 3) return hsl;
+  const l = parseInt(parts[2]);
+  return `${parts[0]} ${parts[1]} ${Math.min(100, l + amount)}%`;
+}
 
 interface UserProfile {
   id: string;
@@ -16,13 +49,14 @@ interface UserProfile {
   created_at: string;
 }
 
-export type AccentColor = 'emerald' | 'red' | 'pink' | 'purple' | 'blue' | 'orange' | 'yellow' | 'cyan';
+export type AccentColor = 'emerald' | 'red' | 'pink' | 'purple' | 'blue' | 'orange' | 'yellow' | 'cyan' | 'custom';
 
 interface SettingsPreset {
   id: string;
   name: string;
   theme: 'dark' | 'light';
   accentColor: AccentColor;
+  customColor?: string;
   createdAt: string;
 }
 
@@ -33,6 +67,8 @@ interface SettingsViewProps {
   onAccentColorChange: (color: AccentColor) => void;
   userProfile: UserProfile | null;
   onLogout: () => void;
+  customColor?: string;
+  onCustomColorChange?: (color: string) => void;
 }
 
 const accentColors: { name: AccentColor; label: string; color: string; darkColor: string }[] = [
@@ -46,11 +82,60 @@ const accentColors: { name: AccentColor; label: string; color: string; darkColor
   { name: 'cyan', label: 'Cyan', color: 'bg-cyan-500', darkColor: 'bg-cyan-400' },
 ];
 
-export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorChange, userProfile, onLogout }: SettingsViewProps) {
+// Gradient presets
+const gradientPresets = [
+  { name: 'Sunset', from: '#ff6b6b', to: '#feca57' },
+  { name: 'Ocean', from: '#0abde3', to: '#10ac84' },
+  { name: 'Purple Haze', from: '#a55eea', to: '#5f27cd' },
+  { name: 'Flamingo', from: '#ff6b81', to: '#a55eea' },
+  { name: 'Northern Lights', from: '#0be881', to: '#00d2d3' },
+  { name: 'Fire', from: '#ff4757', to: '#ff6348' },
+];
+
+export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorChange, userProfile, onLogout, customColor, onCustomColorChange }: SettingsViewProps) {
   const [presets, setPresets] = useState<SettingsPreset[]>([]);
   const [presetName, setPresetName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [localCustomColor, setLocalCustomColor] = useState(customColor || '#10b981');
+  const [selectedGradient, setSelectedGradient] = useState<{ from: string; to: string } | null>(null);
+
+  // Apply custom color to CSS variables
+  useEffect(() => {
+    if (accentColor === 'custom' && localCustomColor) {
+      const hsl = hexToHsl(localCustomColor);
+      document.documentElement.style.setProperty('--primary', hsl);
+      document.documentElement.style.setProperty('--primary-glow', adjustLightness(hsl, 5));
+      document.documentElement.style.setProperty('--ring', hsl);
+      document.documentElement.style.setProperty('--sidebar-primary', hsl);
+      document.documentElement.style.setProperty('--sidebar-ring', hsl);
+    }
+  }, [accentColor, localCustomColor]);
+
+  // Apply gradient colors
+  useEffect(() => {
+    if (selectedGradient) {
+      const fromHsl = hexToHsl(selectedGradient.from);
+      const toHsl = hexToHsl(selectedGradient.to);
+      document.documentElement.style.setProperty('--primary', fromHsl);
+      document.documentElement.style.setProperty('--primary-glow', toHsl);
+      document.documentElement.style.setProperty('--ring', fromHsl);
+      document.documentElement.style.setProperty('--sidebar-primary', fromHsl);
+      document.documentElement.style.setProperty('--sidebar-ring', fromHsl);
+    }
+  }, [selectedGradient]);
+
+  const handleCustomColorChange = (color: string) => {
+    setLocalCustomColor(color);
+    setSelectedGradient(null);
+    onAccentColorChange('custom');
+    onCustomColorChange?.(color);
+  };
+
+  const handleGradientSelect = (gradient: { from: string; to: string }) => {
+    setSelectedGradient(gradient);
+    onAccentColorChange('custom');
+  };
 
   // Load presets from localStorage
   useEffect(() => {
@@ -356,6 +441,83 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
               )}
             </button>
           ))}
+        </div>
+
+        {/* Custom Color Picker */}
+        <div className="space-y-4 pt-4 border-t border-border/50">
+          <div className="flex items-center gap-3">
+            <Pipette className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">Custom Color</span>
+          </div>
+          
+          {/* Color Wheel Input */}
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <input
+                type="color"
+                value={localCustomColor}
+                onChange={(e) => handleCustomColorChange(e.target.value)}
+                className="w-12 h-12 rounded-full cursor-pointer border-2 border-border/50 hover:border-primary transition-colors"
+                style={{ 
+                  WebkitAppearance: 'none',
+                  padding: 0,
+                  background: 'transparent'
+                }}
+              />
+              <div 
+                className="absolute inset-0 rounded-full pointer-events-none"
+                style={{ 
+                  background: `conic-gradient(red, yellow, lime, aqua, blue, magenta, red)`,
+                  opacity: 0.1
+                }}
+              />
+            </div>
+            <div className="flex-1">
+              <Input
+                type="text"
+                value={localCustomColor}
+                onChange={(e) => handleCustomColorChange(e.target.value)}
+                placeholder="#10b981"
+                className="font-mono text-sm bg-background/50"
+              />
+            </div>
+            <div 
+              className="w-10 h-10 rounded-lg border border-border/50"
+              style={{ backgroundColor: localCustomColor }}
+            />
+          </div>
+        </div>
+
+        {/* Gradient Presets */}
+        <div className="space-y-4 pt-4 border-t border-border/50">
+          <div className="flex items-center gap-3">
+            <Palette className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">Gradient Presets</span>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-3">
+            {gradientPresets.map((gradient) => (
+              <button
+                key={gradient.name}
+                onClick={() => handleGradientSelect(gradient)}
+                className={cn(
+                  "relative p-3 rounded-xl border-2 transition-all duration-300",
+                  selectedGradient?.from === gradient.from && selectedGradient?.to === gradient.to
+                    ? "border-primary"
+                    : "border-border/50 hover:border-border"
+                )}
+              >
+                <div 
+                  className="w-full h-8 rounded-lg mb-2"
+                  style={{ background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})` }}
+                />
+                <span className="text-xs font-medium text-muted-foreground">{gradient.name}</span>
+                {selectedGradient?.from === gradient.from && selectedGradient?.to === gradient.to && (
+                  <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
