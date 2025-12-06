@@ -211,6 +211,143 @@
     --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.3), 0 8px 10px -1px hsl(0 0% 0% / 0.2);
     --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.5);
   }
+
+  /* Accent color themes */
+  .accent-emerald {
+    --primary: 158 64% 51%;
+    --primary-foreground: 165 91% 9%;
+    --primary-glow: 158 64% 52%;
+    --ring: 158 64% 51%;
+    --sidebar-primary: 158 64% 51%;
+    --sidebar-ring: 158 64% 51%;
+  }
+  .light.accent-emerald {
+    --primary: 158 64% 42%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 158 64% 42%;
+    --ring: 158 64% 42%;
+    --sidebar-primary: 158 64% 42%;
+    --sidebar-ring: 158 64% 42%;
+  }
+
+  .accent-blue {
+    --primary: 217 91% 60%;
+    --primary-foreground: 217 91% 9%;
+    --primary-glow: 217 91% 65%;
+    --ring: 217 91% 60%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-ring: 217 91% 60%;
+  }
+  .light.accent-blue {
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 217 91% 50%;
+    --ring: 217 91% 50%;
+    --sidebar-primary: 217 91% 50%;
+    --sidebar-ring: 217 91% 50%;
+  }
+
+  .accent-purple {
+    --primary: 271 81% 56%;
+    --primary-foreground: 271 81% 9%;
+    --primary-glow: 271 81% 60%;
+    --ring: 271 81% 56%;
+    --sidebar-primary: 271 81% 56%;
+    --sidebar-ring: 271 81% 56%;
+  }
+  .light.accent-purple {
+    --primary: 271 81% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 271 81% 50%;
+    --ring: 271 81% 50%;
+    --sidebar-primary: 271 81% 50%;
+    --sidebar-ring: 271 81% 50%;
+  }
+
+  .accent-pink {
+    --primary: 330 81% 60%;
+    --primary-foreground: 330 81% 9%;
+    --primary-glow: 330 81% 65%;
+    --ring: 330 81% 60%;
+    --sidebar-primary: 330 81% 60%;
+    --sidebar-ring: 330 81% 60%;
+  }
+  .light.accent-pink {
+    --primary: 330 81% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 330 81% 50%;
+    --ring: 330 81% 50%;
+    --sidebar-primary: 330 81% 50%;
+    --sidebar-ring: 330 81% 50%;
+  }
+
+  .accent-red {
+    --primary: 0 84% 60%;
+    --primary-foreground: 0 84% 9%;
+    --primary-glow: 0 84% 65%;
+    --ring: 0 84% 60%;
+    --sidebar-primary: 0 84% 60%;
+    --sidebar-ring: 0 84% 60%;
+  }
+  .light.accent-red {
+    --primary: 0 84% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 0 84% 50%;
+    --ring: 0 84% 50%;
+    --sidebar-primary: 0 84% 50%;
+    --sidebar-ring: 0 84% 50%;
+  }
+
+  .accent-orange {
+    --primary: 25 95% 53%;
+    --primary-foreground: 25 95% 9%;
+    --primary-glow: 25 95% 58%;
+    --ring: 25 95% 53%;
+    --sidebar-primary: 25 95% 53%;
+    --sidebar-ring: 25 95% 53%;
+  }
+  .light.accent-orange {
+    --primary: 25 95% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 25 95% 50%;
+    --ring: 25 95% 50%;
+    --sidebar-primary: 25 95% 50%;
+    --sidebar-ring: 25 95% 50%;
+  }
+
+  .accent-yellow {
+    --primary: 48 96% 53%;
+    --primary-foreground: 48 96% 9%;
+    --primary-glow: 48 96% 58%;
+    --ring: 48 96% 53%;
+    --sidebar-primary: 48 96% 53%;
+    --sidebar-ring: 48 96% 53%;
+  }
+  .light.accent-yellow {
+    --primary: 48 96% 45%;
+    --primary-foreground: 0 0% 0%;
+    --primary-glow: 48 96% 45%;
+    --ring: 48 96% 45%;
+    --sidebar-primary: 48 96% 45%;
+    --sidebar-ring: 48 96% 45%;
+  }
+
+  .accent-cyan {
+    --primary: 189 94% 43%;
+    --primary-foreground: 189 94% 9%;
+    --primary-glow: 189 94% 48%;
+    --ring: 189 94% 43%;
+    --sidebar-primary: 189 94% 43%;
+    --sidebar-ring: 189 94% 43%;
+  }
+  .light.accent-cyan {
+    --primary: 189 94% 40%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 189 94% 40%;
+    --ring: 189 94% 40%;
+    --sidebar-primary: 189 94% 40%;
+    --sidebar-ring: 189 94% 40%;
+  }
 }
 
 @layer base {

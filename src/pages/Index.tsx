@@ -13,7 +13,7 @@ import { BrokerConnection } from "@/components/Dashboard/BrokerConnection";
 import { TradeForm } from "@/components/Journal/TradeForm";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { NotebookView } from "@/components/Notebook/NotebookView";
-import { SettingsView } from "@/components/Settings/SettingsView";
+import { SettingsView, AccentColor } from "@/components/Settings/SettingsView";
 import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
 import { CustomChart } from "@/components/Chart/CustomChart";
 import { TradingAssistant } from "@/components/AI/TradingAssistant";
@@ -62,6 +62,7 @@ const Index = () => {
   const [notebookEntries, setNotebookEntries] = useLocalStorage<NotebookEntry[]>('atp_notebook_v1', []);
   const [startBalance, setStartBalance] = useLocalStorage<number>('atp_start_balance', 10000);
   const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('atp_theme', 'dark');
+  const [accentColor, setAccentColor] = useLocalStorage<AccentColor>('atp_accent_color', 'emerald');
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
 
@@ -118,11 +119,16 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, [navigate, fetchProfile]);
 
-  // Apply theme to document
+  // Apply theme and accent color to document
   useEffect(() => {
     document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(theme);
-  }, [theme]);
+    
+    // Remove all accent classes and add the current one
+    const accentClasses = ['accent-emerald', 'accent-blue', 'accent-purple', 'accent-pink', 'accent-red', 'accent-orange', 'accent-yellow', 'accent-cyan'];
+    accentClasses.forEach(cls => document.documentElement.classList.remove(cls));
+    document.documentElement.classList.add(`accent-${accentColor}`);
+  }, [theme, accentColor]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -352,6 +358,8 @@ const Index = () => {
               <SettingsView 
                 theme={theme} 
                 onThemeChange={setTheme}
+                accentColor={accentColor}
+                onAccentColorChange={setAccentColor}
                 userProfile={userProfile}
                 onLogout={handleLogout}
               />
