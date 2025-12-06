@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, NotebookPen, Settings, Calculator, BarChart3 } from "lucide-react";
+import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3 } from "lucide-react";
 import logo3d from "@/assets/logo-3d.png";
 
 interface SidebarProps {
@@ -12,7 +12,6 @@ const navItems = [
   { id: 'journal', label: 'Journal', icon: BookOpen },
   { id: 'chart', label: 'Chart', icon: BarChart3 },
   { id: 'notebook', label: 'Notebook', icon: NotebookPen },
-  { id: 'calculator', label: 'Calculator', icon: Calculator },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 

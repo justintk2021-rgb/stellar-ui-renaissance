@@ -13,7 +13,6 @@ import { TradeForm } from "@/components/Journal/TradeForm";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { NotebookView } from "@/components/Notebook/NotebookView";
 import { SettingsView, AccentColor } from "@/components/Settings/SettingsView";
-import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
 import { CustomChart } from "@/components/Chart/CustomChart";
 import { TradingAssistant } from "@/components/AI/TradingAssistant";
 import { Helmet } from "react-helmet";
@@ -28,7 +27,6 @@ const pageInfo: Record<string, { title: string; subtitle: string }> = {
   journal: { title: 'Journal', subtitle: 'Log and manage your trades' },
   chart: { title: 'Chart', subtitle: 'Interactive chart with drawing tools' },
   notebook: { title: 'Notebook', subtitle: 'Your personal trading notes and journal' },
-  calculator: { title: 'Calculator', subtitle: 'Calculate lot size and risk management' },
   settings: { title: 'Settings', subtitle: 'Customize your preferences' },
 };
 
@@ -401,11 +399,6 @@ const Index = () => {
                 userProfile={userProfile}
                 onLogout={handleLogout}
               />
-            )}
-
-            {/* Calculator Page */}
-            {currentPage === 'calculator' && (
-              <LotSizeCalculator />
             )}
 
             {/* Chart Page */}
