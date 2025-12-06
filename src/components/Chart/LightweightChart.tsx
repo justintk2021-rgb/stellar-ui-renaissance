@@ -7,12 +7,19 @@ type ChartTheme = "light" | "dark";
 
 export function LightweightChart() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [symbol, setSymbol] = useState("BTCUSD");
+  const [symbol, setSymbol] = useState(() => {
+    return localStorage.getItem("chart-symbol") || "BTCUSD";
+  });
   const [searchValue, setSearchValue] = useState("");
   const [theme, setTheme] = useState<ChartTheme>(() => {
     const stored = localStorage.getItem("theme");
     return stored === "light" ? "light" : "dark";
   });
+
+  // Save symbol to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem("chart-symbol", symbol);
+  }, [symbol]);
 
   // Load TradingView widget
   useEffect(() => {
