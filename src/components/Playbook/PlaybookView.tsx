@@ -5,6 +5,13 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -33,6 +40,7 @@ export function PlaybookView() {
   const [newItemTexts, setNewItemTexts] = useState<Record<string, string>>({});
   const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // Load checklists from localStorage
   useEffect(() => {
@@ -83,6 +91,7 @@ export function PlaybookView() {
     setChecklists([newChecklist, ...checklists]);
     setNewChecklistName("");
     setSelectedChecklistId(newChecklist.id);
+    setIsCreateDialogOpen(false);
   };
 
   const deleteChecklist = (id: string) => {
@@ -171,27 +180,38 @@ export function PlaybookView() {
             <p className="text-xs text-muted-foreground">Create and manage your trading checklists</p>
           </div>
         </div>
+        <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          New Checklist
+        </Button>
       </div>
 
-      {/* Create New Checklist */}
-      <div className="glass rounded-xl p-5 border border-border/40">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-          Create New Checklist
-        </h3>
-        <div className="flex gap-3">
-          <Input
-            placeholder="Enter checklist name (e.g., Pre-Trade Checklist)"
-            value={newChecklistName}
-            onChange={(e) => setNewChecklistName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && createChecklist()}
-            className="bg-background/50 border-border/50"
-          />
-          <Button onClick={createChecklist} className="shrink-0">
-            <Plus className="w-4 h-4 mr-2" />
-            Create
-          </Button>
-        </div>
-      </div>
+      {/* Create Checklist Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Checklist</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              placeholder="Enter checklist name (e.g., Pre-Trade Checklist)"
+              value={newChecklistName}
+              onChange={(e) => setNewChecklistName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && createChecklist()}
+              className="bg-background/50 border-border/50"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={createChecklist} disabled={!newChecklistName.trim()}>
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Checklist Selector */}
       {checklists.length > 0 && (
