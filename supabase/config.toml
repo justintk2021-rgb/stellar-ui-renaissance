@@ -1,7 +1,4 @@
 project_id = "kjyzpptyiogpobwkqmpc"
 
-[functions.broker-sync]
-verify_jwt = false
-
 [functions.trading-assistant]
 verify_jwt = false
