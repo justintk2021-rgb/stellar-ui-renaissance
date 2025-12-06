@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Trade } from "@/types/trade";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: "user" | "assistant";
@@ -82,13 +83,26 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
     setIsLoading(true);
 
     try {
+      // Get the current session for authenticated requests
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error("Please log in to use the trading assistant");
+        setMessages(prev => [...prev, {
+          role: "assistant",
+          content: "You need to be logged in to use the trading assistant. Please sign in first."
+        }]);
+        setIsLoading(false);
+        return;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trading-assistant`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             messages: [...messages, userMessage].map(m => ({
