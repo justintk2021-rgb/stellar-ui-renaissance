@@ -139,7 +139,7 @@ function TradingViewChartComponent({ pair, direction, existingImage }: TradingVi
 
       <div 
         className="rounded-xl overflow-hidden border border-border/50 bg-background"
-        style={{ height: '400px' }}
+        style={{ height: '600px' }}
       >
         <div ref={widgetRef} style={{ height: '100%', width: '100%' }} />
       </div>
