@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Sun, Moon } from "lucide-react";
+import { Search, Sun, Moon, Calculator, ChevronLeft, ChevronRight } from "lucide-react";
+import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
 
 type ChartTheme = "light" | "dark";
 
@@ -15,6 +16,14 @@ export function LightweightChart() {
     const stored = localStorage.getItem("theme");
     return stored === "light" ? "light" : "dark";
   });
+  const [showCalculator, setShowCalculator] = useState(() => {
+    return localStorage.getItem("chart-show-calculator") === "true";
+  });
+
+  // Save calculator visibility to localStorage
+  useEffect(() => {
+    localStorage.setItem("chart-show-calculator", String(showCalculator));
+  }, [showCalculator]);
 
   // Save symbol to localStorage when it changes
   useEffect(() => {
@@ -75,38 +84,67 @@ export function LightweightChart() {
   };
 
   return (
-    <div className="flex flex-col animate-fade-in -mt-2" style={{ height: "calc(100vh - 180px)" }}>
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-2">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search symbol (e.g., BTCUSD)"
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            onKeyDown={handleSearch}
-            className="pl-10 bg-background/50 border-border/50"
-          />
+    <div className="flex gap-4 animate-fade-in -mt-2" style={{ height: "calc(100vh - 180px)" }}>
+      {/* Main Chart Section */}
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-2">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search symbol (e.g., BTCUSD)"
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              onKeyDown={handleSearch}
+              className="pl-10 bg-background/50 border-border/50"
+            />
+          </div>
+          <span className="text-sm text-muted-foreground">
+            <span className="text-foreground font-medium">{symbol}</span>
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Light mode" : "Dark mode"}
+          >
+            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </Button>
+          <Button
+            variant={showCalculator ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setShowCalculator(!showCalculator)}
+            title={showCalculator ? "Hide calculator" : "Show calculator"}
+          >
+            <Calculator className="w-4 h-4" />
+          </Button>
         </div>
-        <span className="text-sm text-muted-foreground">
-          <span className="text-foreground font-medium">{symbol}</span>
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleTheme}
-          title={theme === "dark" ? "Light mode" : "Dark mode"}
-        >
-          {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </Button>
+
+        {/* TradingView Widget */}
+        <div
+          ref={containerRef}
+          className="tradingview-widget-container flex-1 rounded-lg overflow-hidden border border-border/50"
+          style={{ minHeight: "400px" }}
+        />
       </div>
 
-      {/* TradingView Widget */}
-      <div
-        ref={containerRef}
-        className="tradingview-widget-container flex-1 rounded-lg overflow-hidden border border-border/50"
-        style={{ minHeight: "600px" }}
-      />
+      {/* Calculator Panel */}
+      {showCalculator && (
+        <div className="w-[420px] flex-shrink-0 overflow-y-auto border-l border-border/50 pl-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-muted-foreground">Lot Size Calculator</h3>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setShowCalculator(false)}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+          <LotSizeCalculator compact />
+        </div>
+      )}
     </div>
   );
 }
