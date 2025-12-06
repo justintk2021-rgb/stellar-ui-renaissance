@@ -36,6 +36,8 @@ export function LightweightChart() {
       allow_symbol_change: true,
       calendar: false,
       hide_side_toolbar: false,
+      details: true,
+      withdateranges: true,
       studies: [],
       support_host: "https://www.tradingview.com",
     });
