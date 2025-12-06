@@ -1,52 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { createChart, IChartApi, ISeriesApi, CandlestickData, Time } from "lightweight-charts";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Sun, Moon } from "lucide-react";
 
 type ChartTheme = "light" | "dark";
 
-const themes = {
-  dark: {
-    background: "#0a0a0a",
-    textColor: "#d1d5db",
-    gridColor: "rgba(42, 46, 57, 0.5)",
-    borderColor: "#2a2e39",
-  },
-  light: {
-    background: "#ffffff",
-    textColor: "#131722",
-    gridColor: "rgba(42, 46, 57, 0.1)",
-    borderColor: "#e0e3eb",
-  },
-};
-
-// Generate sample data
-function generateData(symbol: string): CandlestickData<Time>[] {
-  const data: CandlestickData<Time>[] = [];
-  const now = Date.now();
-  let price = symbol.includes("BTC") ? 95000 : symbol.includes("ETH") ? 3500 : 150;
-
-  for (let i = 300; i >= 0; i--) {
-    const time = Math.floor((now - i * 15 * 60 * 1000) / 1000) as Time;
-    const volatility = price * 0.003;
-    const open = price;
-    const close = open + (Math.random() - 0.5) * volatility * 2;
-    const high = Math.max(open, close) + Math.random() * volatility;
-    const low = Math.min(open, close) - Math.random() * volatility;
-
-    data.push({ time, open, high, low, close });
-    price = close;
-  }
-
-  return data;
-}
-
 export function LightweightChart() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-
   const [symbol, setSymbol] = useState("BTCUSD");
   const [searchValue, setSearchValue] = useState("");
   const [theme, setTheme] = useState<ChartTheme>(() => {
@@ -54,74 +14,44 @@ export function LightweightChart() {
     return stored === "light" ? "light" : "dark";
   });
 
-  const colors = themes[theme];
-
-  // Create chart
+  // Load TradingView widget
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const chart = createChart(containerRef.current, {
-      layout: {
-        background: { color: colors.background },
-        textColor: colors.textColor,
-      },
-      grid: {
-        vertLines: { color: colors.gridColor },
-        horzLines: { color: colors.gridColor },
-      },
-      rightPriceScale: {
-        borderColor: colors.borderColor,
-      },
-      timeScale: {
-        borderColor: colors.borderColor,
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      crosshair: {
-        mode: 1,
-      },
+    // Clear previous widget
+    containerRef.current.innerHTML = "";
+
+    const script = document.createElement("script");
+    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+    script.type = "text/javascript";
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      autosize: true,
+      symbol: symbol,
+      interval: "15",
+      timezone: "Etc/UTC",
+      theme: theme,
+      style: "1",
+      locale: "en",
+      allow_symbol_change: true,
+      calendar: false,
+      support_host: "https://www.tradingview.com",
     });
 
-    chartRef.current = chart;
+    const widgetContainer = document.createElement("div");
+    widgetContainer.className = "tradingview-widget-container__widget";
+    widgetContainer.style.height = "100%";
+    widgetContainer.style.width = "100%";
 
-    const series = chart.addCandlestickSeries({
-      upColor: "#26a69a",
-      downColor: "#ef5350",
-      borderUpColor: "#26a69a",
-      borderDownColor: "#ef5350",
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
-    });
-
-    seriesRef.current = series;
-    series.setData(generateData(symbol));
-    chart.timeScale().fitContent();
-
-    const handleResize = () => {
-      if (containerRef.current) {
-        chart.applyOptions({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-    handleResize();
+    containerRef.current.appendChild(widgetContainer);
+    containerRef.current.appendChild(script);
 
     return () => {
-      window.removeEventListener("resize", handleResize);
-      chart.remove();
+      if (containerRef.current) {
+        containerRef.current.innerHTML = "";
+      }
     };
-  }, [theme]);
-
-  // Update data when symbol changes
-  useEffect(() => {
-    if (seriesRef.current && chartRef.current) {
-      seriesRef.current.setData(generateData(symbol));
-      chartRef.current.timeScale().fitContent();
-    }
-  }, [symbol]);
+  }, [symbol, theme]);
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchValue.trim()) {
@@ -160,10 +90,10 @@ export function LightweightChart() {
         </Button>
       </div>
 
-      {/* Chart */}
+      {/* TradingView Widget */}
       <div
         ref={containerRef}
-        className="flex-1 rounded-lg overflow-hidden border border-border/50"
+        className="tradingview-widget-container flex-1 rounded-lg overflow-hidden border border-border/50"
         style={{ minHeight: "600px" }}
       />
     </div>
