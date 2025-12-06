@@ -45,10 +45,13 @@ export function CustomChart() {
       support_host: "https://www.tradingview.com",
       hide_top_toolbar: false,
       hide_legend: false,
+      hide_side_toolbar: false,
       save_image: true,
       hide_volume: false,
       backgroundColor: "rgba(10, 10, 10, 1)",
       gridColor: "rgba(39, 39, 42, 0.5)",
+      withdateranges: true,
+      details: true,
     });
 
     widgetContainer.appendChild(script);
