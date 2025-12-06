@@ -2,25 +2,27 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createChart, IChartApi, ISeriesApi, ColorType } from "lightweight-charts";
 import { ChartToolbar } from "./ChartToolbar";
 import { ChartDrawingLayer } from "./ChartDrawingLayer";
-import { generateMockData } from "./chartUtils";
+import { useBinanceData } from "./useBinanceData";
 import { Button } from "@/components/ui/button";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, Wifi, WifiOff } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 export interface ChartSymbol {
   label: string;
   value: string;
+  isLive?: boolean;
 }
 
 const popularSymbols: ChartSymbol[] = [
+  { label: "BTC/USDT", value: "BTCUSDT", isLive: true },
+  { label: "ETH/USDT", value: "ETHUSDT", isLive: true },
+  { label: "BNB/USDT", value: "BNBUSDT", isLive: true },
+  { label: "SOL/USDT", value: "SOLUSDT", isLive: true },
+  { label: "XRP/USDT", value: "XRPUSDT", isLive: true },
+  { label: "DOGE/USDT", value: "DOGEUSDT", isLive: true },
   { label: "EUR/USD", value: "EURUSD" },
   { label: "GBP/USD", value: "GBPUSD" },
-  { label: "USD/JPY", value: "USDJPY" },
   { label: "XAU/USD", value: "XAUUSD" },
-  { label: "BTC/USD", value: "BTCUSD" },
-  { label: "ETH/USD", value: "ETHUSDT" },
-  { label: "NAS100", value: "NAS100" },
-  { label: "US30", value: "US30" },
-  { label: "S&P 500", value: "SPX" },
 ];
 
 const timeframes = [
@@ -37,12 +39,16 @@ export function CustomChart() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const [symbol, setSymbol] = useState("EURUSD");
+  const [symbol, setSymbol] = useState("BTCUSDT");
   const [interval, setInterval] = useState("15");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [activeTool, setActiveTool] = useState<string>("select");
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
+  const [activeColor, setActiveColor] = useState("#f59e0b");
+
+  // Get live data from Binance
+  const { data, isConnected, isLoading, isLive } = useBinanceData(symbol, interval);
 
   // Initialize chart
   useEffect(() => {
@@ -50,7 +56,6 @@ export function CustomChart() {
 
     const container = chartContainerRef.current;
     
-    // Wait for container to have proper dimensions
     const initChart = () => {
       const width = container.clientWidth;
       const height = container.clientHeight;
@@ -60,7 +65,6 @@ export function CustomChart() {
         return;
       }
 
-      // If chart already exists, don't recreate
       if (chartRef.current) return;
 
       const chart = createChart(container, {
@@ -100,7 +104,6 @@ export function CustomChart() {
       chartRef.current = chart;
       setChartSize({ width, height });
 
-      // Add candlestick series
       const candlestickSeries = chart.addCandlestickSeries({
         upColor: "#22c55e",
         downColor: "#ef4444",
@@ -109,16 +112,10 @@ export function CustomChart() {
         wickDownColor: "#ef4444",
       });
       seriesRef.current = candlestickSeries;
-
-      // Load initial data
-      const data = generateMockData("EURUSD", "15");
-      candlestickSeries.setData(data);
-      chart.timeScale().fitContent();
     };
 
     initChart();
 
-    // Handle resize
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
         const newWidth = chartContainerRef.current.clientWidth;
@@ -145,14 +142,13 @@ export function CustomChart() {
     };
   }, []);
 
-  // Update data when symbol or interval changes
+  // Update chart data when data changes
   useEffect(() => {
-    if (!chartRef.current || !seriesRef.current) return;
+    if (!seriesRef.current || data.length === 0) return;
 
-    const data = generateMockData(symbol, interval);
     seriesRef.current.setData(data);
-    chartRef.current.timeScale().fitContent();
-  }, [symbol, interval]);
+    chartRef.current?.timeScale().fitContent();
+  }, [data]);
 
   const toggleFullscreen = useCallback(() => {
     const container = chartContainerRef.current?.parentElement?.parentElement;
@@ -190,6 +186,8 @@ export function CustomChart() {
         onToolChange={handleToolChange}
         symbols={popularSymbols}
         timeframes={timeframes}
+        activeColor={activeColor}
+        onColorChange={setActiveColor}
       />
 
       {/* Chart Container */}
@@ -197,6 +195,36 @@ export function CustomChart() {
         className="flex-1 relative rounded-lg overflow-hidden border border-border/50 bg-card mt-2"
         style={{ minHeight: "500px", height: "calc(100vh - 180px)" }}
       >
+        {/* Status Badges */}
+        <div className="absolute top-2 left-2 z-20 flex items-center gap-2">
+          {isLive && (
+            <Badge 
+              variant={isConnected ? "default" : "secondary"} 
+              className={`gap-1.5 ${isConnected ? "bg-green-600 hover:bg-green-600" : ""}`}
+            >
+              {isConnected ? (
+                <>
+                  <Wifi className="w-3 h-3" />
+                  Live
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-3 h-3" />
+                  Connecting...
+                </>
+              )}
+            </Badge>
+          )}
+          {!isLive && (
+            <Badge variant="outline" className="text-muted-foreground">
+              Mock Data
+            </Badge>
+          )}
+          {isLoading && (
+            <Badge variant="secondary">Loading...</Badge>
+          )}
+        </div>
+
         {/* Fullscreen Button */}
         <Button
           size="icon"
@@ -223,6 +251,7 @@ export function CustomChart() {
           height={chartSize.height}
           isActive={isDrawingMode}
           activeTool={activeTool}
+          activeColor={activeColor}
         />
       </div>
     </div>

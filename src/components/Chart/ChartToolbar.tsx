@@ -14,6 +14,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Search,
   MousePointer2,
   Minus,
@@ -23,12 +28,18 @@ import {
   Pencil,
   Trash2,
   TrendingUp,
+  ArrowUpRight,
+  Target,
+  Palette,
+  Hash,
 } from "lucide-react";
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 
 interface ChartSymbol {
   label: string;
   value: string;
+  isLive?: boolean;
 }
 
 interface ChartToolbarProps {
@@ -40,16 +51,32 @@ interface ChartToolbarProps {
   onToolChange: (tool: string) => void;
   symbols: ChartSymbol[];
   timeframes: { label: string; value: string }[];
+  activeColor: string;
+  onColorChange: (color: string) => void;
 }
 
 const drawingTools = [
-  { id: "select", icon: MousePointer2, label: "Select" },
+  { id: "select", icon: MousePointer2, label: "Select (V)" },
   { id: "line", icon: Minus, label: "Line" },
   { id: "trendline", icon: TrendingUp, label: "Trend Line" },
+  { id: "arrow", icon: ArrowUpRight, label: "Arrow" },
   { id: "rectangle", icon: Square, label: "Rectangle" },
   { id: "circle", icon: Circle, label: "Circle" },
   { id: "text", icon: Type, label: "Text" },
   { id: "draw", icon: Pencil, label: "Free Draw" },
+  { id: "crosshair", icon: Target, label: "Price Level" },
+  { id: "fibonacci", icon: Hash, label: "Fibonacci" },
+];
+
+const colorPresets = [
+  "#ef4444", // Red
+  "#f59e0b", // Amber
+  "#22c55e", // Green
+  "#3b82f6", // Blue
+  "#8b5cf6", // Purple
+  "#ec4899", // Pink
+  "#ffffff", // White
+  "#6b7280", // Gray
 ];
 
 export function ChartToolbar({
@@ -61,6 +88,8 @@ export function ChartToolbar({
   onToolChange,
   symbols,
   timeframes,
+  activeColor,
+  onColorChange,
 }: ChartToolbarProps) {
   const [searchInput, setSearchInput] = useState("");
 
@@ -71,6 +100,8 @@ export function ChartToolbar({
       setSearchInput("");
     }
   };
+
+  const currentSymbol = symbols.find((s) => s.value === symbol);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -90,13 +121,25 @@ export function ChartToolbar({
 
       {/* Symbol Select */}
       <Select value={symbol} onValueChange={onSymbolChange}>
-        <SelectTrigger className="w-[100px] h-8 bg-background/50 text-sm">
-          <SelectValue />
+        <SelectTrigger className="w-[130px] h-8 bg-background/50 text-sm">
+          <div className="flex items-center gap-1.5">
+            <SelectValue />
+            {currentSymbol?.isLive && (
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            )}
+          </div>
         </SelectTrigger>
         <SelectContent>
           {symbols.map((s) => (
             <SelectItem key={s.value} value={s.value}>
-              {s.label}
+              <div className="flex items-center gap-2">
+                {s.label}
+                {s.isLive && (
+                  <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                    LIVE
+                  </Badge>
+                )}
+              </div>
             </SelectItem>
           ))}
         </SelectContent>
@@ -147,6 +190,45 @@ export function ChartToolbar({
         </div>
       </TooltipProvider>
 
+      {/* Color Picker */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+          >
+            <div 
+              className="w-5 h-5 rounded-full border-2 border-border"
+              style={{ backgroundColor: activeColor }}
+            />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-3" align="start">
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-muted-foreground font-medium">Drawing Color</p>
+            <div className="flex gap-1.5">
+              {colorPresets.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => onColorChange(color)}
+                  className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                    activeColor === color ? "border-foreground" : "border-transparent"
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+            <Input
+              type="color"
+              value={activeColor}
+              onChange={(e) => onColorChange(e.target.value)}
+              className="h-8 w-full cursor-pointer"
+            />
+          </div>
+        </PopoverContent>
+      </Popover>
+
       {/* Clear Drawings */}
       <TooltipProvider delayDuration={100}>
         <Tooltip>
@@ -156,7 +238,6 @@ export function ChartToolbar({
               variant="ghost"
               className="h-8 w-8 text-muted-foreground hover:text-destructive"
               onClick={() => {
-                // Will be handled by ChartDrawingLayer via event
                 window.dispatchEvent(new CustomEvent("chart:clear-drawings"));
               }}
             >
