@@ -47,6 +47,54 @@ export type Database = {
         }
         Relationships: []
       }
+      trades: {
+        Row: {
+          chart_image: string | null
+          created_at: string
+          date: string
+          direction: string
+          id: string
+          notebook: string | null
+          notes: string | null
+          pair: string
+          result: number
+          session: string | null
+          strategy: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chart_image?: string | null
+          created_at?: string
+          date: string
+          direction: string
+          id?: string
+          notebook?: string | null
+          notes?: string | null
+          pair: string
+          result: number
+          session?: string | null
+          strategy?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chart_image?: string | null
+          created_at?: string
+          date?: string
+          direction?: string
+          id?: string
+          notebook?: string | null
+          notes?: string | null
+          pair?: string
+          result?: number
+          session?: string | null
+          strategy?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

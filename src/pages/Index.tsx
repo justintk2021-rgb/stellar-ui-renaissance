@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useTrades } from "@/hooks/useTrades";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
@@ -41,14 +42,23 @@ const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [trades, setTrades] = useLocalStorage<Trade[]>('atp_trades_v1', []);
+  
+  // Use database-backed trades
+  const { 
+    trades, 
+    isLoading: tradesLoading, 
+    addTrade, 
+    updateTrade, 
+    deleteTrade, 
+    clearAllTrades, 
+    importTrades 
+  } = useTrades(user?.id);
+  
   const [notebookEntries, setNotebookEntries] = useLocalStorage<NotebookEntry[]>('atp_notebook_v1', []);
   const [startBalance, setStartBalance] = useLocalStorage<number>('atp_start_balance', 10000);
   const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('atp_theme', 'dark');
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
-  const [selectedTradeId, setSelectedTradeId] = useState<string | null>(
-    trades.length > 0 ? trades[0].id : null
-  );
+  const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
 
   // Fetch user profile
   const fetchProfile = useCallback(async (userId: string) => {
@@ -119,38 +129,34 @@ const Index = () => {
     }
   };
 
-  const handleAddTrade = useCallback((tradeData: Omit<Trade, 'id'>) => {
+  const handleAddTrade = useCallback(async (tradeData: Omit<Trade, 'id'>) => {
     if (editingTrade) {
-      setTrades(prev => prev.map(t => 
-        t.id === editingTrade.id ? { ...t, ...tradeData } : t
-      ));
-      // Update linked notebook entry if exists
-      setNotebookEntries(prev => prev.map(entry => {
-        if (entry.tradeId === editingTrade.id) {
-          return {
-            ...entry,
-            title: `${tradeData.pair} - ${tradeData.direction} Trade`,
-            date: tradeData.date,
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return entry;
-      }));
-      setEditingTrade(null);
+      const success = await updateTrade(editingTrade.id, tradeData);
+      if (success) {
+        // Update linked notebook entry if exists
+        setNotebookEntries(prev => prev.map(entry => {
+          if (entry.tradeId === editingTrade.id) {
+            return {
+              ...entry,
+              title: `${tradeData.pair} - ${tradeData.direction} Trade`,
+              date: tradeData.date,
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          return entry;
+        }));
+        setEditingTrade(null);
+      }
     } else {
-      const tradeId = Date.now().toString();
-      const newTrade: Trade = {
-        ...tradeData,
-        id: tradeId,
-      };
-      setTrades(prev => [newTrade, ...prev]);
-      setSelectedTradeId(newTrade.id);
-      
-      // Auto-create notebook entry for this trade
-      const newEntry: NotebookEntry = {
-        id: `trade-note-${tradeId}`,
-        title: `${tradeData.pair} - ${tradeData.direction} Trade`,
-        content: `<h2>📋 Trade Plan</h2>
+      const newTrade = await addTrade(tradeData);
+      if (newTrade) {
+        setSelectedTradeId(newTrade.id);
+        
+        // Auto-create notebook entry for this trade
+        const newEntry: NotebookEntry = {
+          id: `trade-note-${newTrade.id}`,
+          title: `${tradeData.pair} - ${tradeData.direction} Trade`,
+          content: `<h2>📋 Trade Plan</h2>
 <ul>
   <li>Why did I take this trade?</li>
   <li>What was my setup/strategy?</li>
@@ -169,40 +175,43 @@ const Index = () => {
   <li>What could be improved?</li>
   <li>Key lessons learned</li>
 </ul>`,
-        category: "trade-notes",
-        date: tradeData.date,
-        tradeId: tradeId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setNotebookEntries(prev => [newEntry, ...prev]);
+          category: "trade-notes",
+          date: tradeData.date,
+          tradeId: newTrade.id,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        setNotebookEntries(prev => [newEntry, ...prev]);
+      }
     }
-  }, [editingTrade, setTrades, setNotebookEntries]);
+  }, [editingTrade, addTrade, updateTrade, setNotebookEntries]);
 
-  const handleDeleteTrade = useCallback((id: string) => {
-    setTrades(prev => prev.filter(t => t.id !== id));
-    // Also delete linked notebook entry
-    setNotebookEntries(prev => prev.filter(e => e.tradeId !== id));
-    if (selectedTradeId === id) {
-      setSelectedTradeId(trades.length > 1 ? trades.find(t => t.id !== id)?.id || null : null);
+  const handleDeleteTrade = useCallback(async (id: string) => {
+    const success = await deleteTrade(id);
+    if (success) {
+      // Also delete linked notebook entry
+      setNotebookEntries(prev => prev.filter(e => e.tradeId !== id));
+      if (selectedTradeId === id) {
+        setSelectedTradeId(trades.length > 1 ? trades.find(t => t.id !== id)?.id || null : null);
+      }
     }
-  }, [selectedTradeId, trades, setTrades, setNotebookEntries]);
+  }, [selectedTradeId, trades, deleteTrade, setNotebookEntries]);
 
-  const handleClearAll = useCallback(() => {
-    setTrades([]);
-    setNotebookEntries(prev => prev.filter(e => !e.tradeId));
-    setSelectedTradeId(null);
-  }, [setTrades, setNotebookEntries]);
+  const handleClearAll = useCallback(async () => {
+    const success = await clearAllTrades();
+    if (success) {
+      setNotebookEntries(prev => prev.filter(e => !e.tradeId));
+      setSelectedTradeId(null);
+    }
+  }, [clearAllTrades, setNotebookEntries]);
 
   const handleSetBalance = useCallback((value: number) => {
     setStartBalance(value);
   }, [setStartBalance]);
 
-  const handleSaveNotes = useCallback((id: string, notes: string) => {
-    setTrades(prev => prev.map(t => 
-      t.id === id ? { ...t, notebook: notes } : t
-    ));
-  }, [setTrades]);
+  const handleSaveNotes = useCallback(async (id: string, notes: string) => {
+    await updateTrade(id, { notebook: notes });
+  }, [updateTrade]);
 
   const handleSaveEntry = useCallback((entry: NotebookEntry) => {
     setNotebookEntries(prev => {
@@ -266,12 +275,11 @@ const Index = () => {
             {currentPage === 'dashboard' && (
               <div className="space-y-6 animate-fade-in">
                 <BrokerConnection 
-                  onTradesImported={(importedTrades) => {
+                  onTradesImported={async (importedTrades) => {
                     // Convert MetaApi trades to our format
                     const formattedTrades = importedTrades
                       .filter((t: any) => t.type === 'DEAL_TYPE_BUY' || t.type === 'DEAL_TYPE_SELL')
                       .map((t: any) => ({
-                        id: t.id || Date.now().toString(),
                         date: new Date(t.time).toISOString().slice(0, 10),
                         pair: t.symbol || 'Unknown',
                         direction: t.type === 'DEAL_TYPE_BUY' ? 'Long' : 'Short' as 'Long' | 'Short',
@@ -282,7 +290,7 @@ const Index = () => {
                       }));
                     
                     if (formattedTrades.length > 0) {
-                      setTrades(prev => [...formattedTrades, ...prev]);
+                      await importTrades(formattedTrades);
                     }
                   }}
                 />
@@ -294,8 +302,8 @@ const Index = () => {
                 <StatsGrid trades={trades} />
                 <PnLCalendar 
                   trades={trades} 
-                  onUpdateTrade={(id, updates) => {
-                    setTrades(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+                  onUpdateTrade={async (id, updates) => {
+                    await updateTrade(id, updates);
                   }}
                 />
               </div>
