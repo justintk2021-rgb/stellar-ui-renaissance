@@ -298,9 +298,9 @@ const Index = () => {
         "min-h-screen flex flex-col gap-4 p-4 mx-auto pb-24",
         isChartPage ? "lg:p-4 max-w-full" : "lg:flex-row lg:p-5 max-w-[1400px] lg:pb-5"
       )}>
-        {/* Desktop Sidebar - hidden on chart page */}
+        {/* Desktop Sidebar - hidden on chart page, sticky on scroll */}
         {!isChartPage && (
-          <div className="hidden lg:block">
+          <div className="hidden lg:block sticky top-5 h-fit">
             <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
           </div>
         )}
