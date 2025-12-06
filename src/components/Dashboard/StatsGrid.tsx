@@ -1,21 +1,66 @@
 import { Trade } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, BarChart3, Target, Percent, Calendar, Zap, Scale } from "lucide-react";
+import { useCountUp } from "@/hooks/useCountUp";
+import { useEffect, useState } from "react";
 
 interface StatsGridProps {
   trades: Trade[];
 }
 
-// Circular progress component
-function CircularProgress({ value, color, size = 40 }: { value: number; color: string; size?: number }) {
-  const radius = (size - 4) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const progress = Math.min(Math.max(value, 0), 100);
-  const strokeDashoffset = circumference - (progress / 100) * circumference;
+// Animated number component
+function AnimatedNumber({ 
+  value, 
+  decimals = 2, 
+  prefix = '', 
+  suffix = '',
+  className = '',
+  duration = 1200
+}: { 
+  value: number; 
+  decimals?: number; 
+  prefix?: string; 
+  suffix?: string;
+  className?: string;
+  duration?: number;
+}) {
+  const { formattedValue, isAnimating } = useCountUp({
+    end: value,
+    duration,
+    decimals,
+    prefix,
+    suffix
+  });
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg className="transform -rotate-90" width={size} height={size}>
+    <span className={cn(
+      className,
+      "transition-all duration-200",
+      isAnimating && "scale-105"
+    )}>
+      {formattedValue}
+    </span>
+  );
+}
+
+// Circular progress component with animation
+function CircularProgress({ value, color, size = 40 }: { value: number; color: string; size?: number }) {
+  const [animatedValue, setAnimatedValue] = useState(0);
+  const radius = (size - 4) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = Math.min(Math.max(animatedValue, 0), 100);
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAnimatedValue(value);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [value]);
+
+  return (
+    <div className="relative group" style={{ width: size, height: size }}>
+      <svg className="transform -rotate-90 transition-transform duration-300 group-hover:scale-110" width={size} height={size}>
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -35,11 +80,14 @@ function CircularProgress({ value, color, size = 40 }: { value: number; color: s
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
-          className="transition-all duration-500"
+          className="transition-all duration-1000 ease-out"
+          style={{
+            filter: `drop-shadow(0 0 6px ${color})`
+          }}
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-[10px] font-bold">{Math.round(value)}%</span>
+        <AnimatedNumber value={animatedValue} decimals={0} suffix="%" className="text-[10px] font-bold" duration={1000} />
       </div>
     </div>
   );
@@ -103,12 +151,15 @@ export function StatsGrid({ trades }: StatsGridProps) {
               <TrendingDown className="w-4 h-4 text-destructive" />
             )}
           </div>
-          <div className={cn(
-            "text-xl font-bold font-mono",
-            stats.net >= 0 ? "text-primary" : "text-destructive"
-          )}>
-            ${stats.net.toFixed(2)}
-          </div>
+          <AnimatedNumber 
+            value={stats.net} 
+            decimals={2} 
+            prefix="$" 
+            className={cn(
+              "text-xl font-bold font-mono",
+              stats.net >= 0 ? "text-primary" : "text-destructive"
+            )}
+          />
           <p className="text-[10px] text-muted-foreground mt-1">Total across {trades.length} trades</p>
         </div>
 
@@ -123,7 +174,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
               color={winRate >= 50 ? "hsl(var(--primary))" : "hsl(var(--destructive))"} 
             />
             <div>
-              <div className="text-lg font-bold">{winRate.toFixed(1)}%</div>
+              <AnimatedNumber value={winRate} decimals={1} suffix="%" className="text-lg font-bold" />
               <p className="text-[10px] text-muted-foreground">{stats.wins}W / {stats.losses}L</p>
             </div>
           </div>
@@ -135,12 +186,18 @@ export function StatsGrid({ trades }: StatsGridProps) {
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Profit Factor</span>
             <Scale className="w-4 h-4 text-muted-foreground" />
           </div>
-          <div className={cn(
-            "text-xl font-bold font-mono",
-            profitFactor >= 1 ? "text-primary" : "text-destructive"
-          )}>
-            {profitFactor === Infinity ? "∞" : profitFactor.toFixed(2)}
-          </div>
+          {profitFactor === Infinity ? (
+            <span className="text-xl font-bold font-mono text-primary">∞</span>
+          ) : (
+            <AnimatedNumber 
+              value={profitFactor} 
+              decimals={2}
+              className={cn(
+                "text-xl font-bold font-mono",
+                profitFactor >= 1 ? "text-primary" : "text-destructive"
+              )}
+            />
+          )}
           <p className="text-[10px] text-muted-foreground mt-1">
             {profitFactor >= 1.5 ? "Excellent" : profitFactor >= 1 ? "Good" : "Needs work"}
           </p>
@@ -152,12 +209,15 @@ export function StatsGrid({ trades }: StatsGridProps) {
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Expectancy</span>
             <Zap className="w-4 h-4 text-muted-foreground" />
           </div>
-          <div className={cn(
-            "text-xl font-bold font-mono",
-            tradeExpectancy >= 0 ? "text-primary" : "text-destructive"
-          )}>
-            ${tradeExpectancy.toFixed(2)}
-          </div>
+          <AnimatedNumber 
+            value={tradeExpectancy} 
+            decimals={2} 
+            prefix="$"
+            className={cn(
+              "text-xl font-bold font-mono",
+              tradeExpectancy >= 0 ? "text-primary" : "text-destructive"
+            )}
+          />
           <p className="text-[10px] text-muted-foreground mt-1">Avg $ per trade</p>
         </div>
 
@@ -172,7 +232,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
               color={dayWinRate >= 50 ? "hsl(var(--primary))" : "hsl(var(--destructive))"} 
             />
             <div>
-              <div className="text-lg font-bold">{dayWinRate.toFixed(1)}%</div>
+              <AnimatedNumber value={dayWinRate} decimals={1} suffix="%" className="text-lg font-bold" />
               <p className="text-[10px] text-muted-foreground">{profitableDays}/{totalDays} days</p>
             </div>
           </div>
@@ -187,7 +247,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Total Trades</span>
             <BarChart3 className="w-4 h-4 text-muted-foreground" />
           </div>
-          <div className="text-xl font-bold font-mono">{trades.length}</div>
+          <AnimatedNumber value={trades.length} decimals={0} className="text-xl font-bold font-mono" />
           <p className="text-[10px] text-muted-foreground mt-1">Logged trades</p>
         </div>
 
@@ -197,7 +257,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Trading Days</span>
             <Calendar className="w-4 h-4 text-muted-foreground" />
           </div>
-          <div className="text-xl font-bold font-mono">{totalDays}</div>
+          <AnimatedNumber value={totalDays} decimals={0} className="text-xl font-bold font-mono" />
           <p className="text-[10px] text-muted-foreground mt-1">{profitableDays} profitable</p>
         </div>
 
@@ -207,7 +267,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Avg Win</span>
             <TrendingUp className="w-4 h-4 text-primary" />
           </div>
-          <div className="text-xl font-bold font-mono text-primary">${avgWin.toFixed(2)}</div>
+          <AnimatedNumber value={avgWin} decimals={2} prefix="$" className="text-xl font-bold font-mono text-primary" />
           <p className="text-[10px] text-muted-foreground mt-1">From {stats.wins} wins</p>
         </div>
 
@@ -217,7 +277,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Avg Loss</span>
             <TrendingDown className="w-4 h-4 text-destructive" />
           </div>
-          <div className="text-xl font-bold font-mono text-destructive">${avgLoss.toFixed(2)}</div>
+          <AnimatedNumber value={avgLoss} decimals={2} prefix="$" className="text-xl font-bold font-mono text-destructive" />
           <p className="text-[10px] text-muted-foreground mt-1">From {stats.losses} losses</p>
         </div>
       </div>
