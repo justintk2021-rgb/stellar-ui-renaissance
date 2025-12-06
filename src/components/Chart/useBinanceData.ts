@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { CandlestickData, Time } from "lightweight-charts";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BinanceKline {
   t: number; // Kline start time
@@ -23,16 +24,16 @@ interface BinanceMessage {
 }
 
 // Map our symbols to Binance symbols
-const symbolMap: Record<string, string> = {
-  BTCUSD: "btcusdt",
-  BTCUSDT: "btcusdt",
-  ETHUSDT: "ethusdt",
-  ETHUSD: "ethusdt",
-  BNBUSDT: "bnbusdt",
-  XRPUSDT: "xrpusdt",
-  SOLUSDT: "solusdt",
-  ADAUSDT: "adausdt",
-  DOGEUSDT: "dogeusdt",
+const symbolMap: Record<string, string | null> = {
+  BTCUSD: "BTCUSDT",
+  BTCUSDT: "BTCUSDT",
+  ETHUSDT: "ETHUSDT",
+  ETHUSD: "ETHUSDT",
+  BNBUSDT: "BNBUSDT",
+  XRPUSDT: "XRPUSDT",
+  SOLUSDT: "SOLUSDT",
+  ADAUSDT: "ADAUSDT",
+  DOGEUSDT: "DOGEUSDT",
   // Forex pairs - we'll use mock data for these
   EURUSD: null,
   GBPUSD: null,
@@ -55,6 +56,9 @@ const intervalMap: Record<string, string> = {
   "W": "1w",
 };
 
+// Get the Supabase project URL for edge functions
+const SUPABASE_URL = "https://kjyzpptyiogpobwkqmpc.supabase.co";
+
 export function useBinanceData(symbol: string, interval: string) {
   const [data, setData] = useState<CandlestickData<Time>[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -68,7 +72,7 @@ export function useBinanceData(symbol: string, interval: string) {
   const binanceSymbol = symbolMap[symbol];
   const binanceInterval = intervalMap[interval] || "15m";
 
-  // Fetch historical data
+  // Fetch historical data via edge function proxy
   const fetchHistoricalData = useCallback(async () => {
     if (!binanceSymbol) {
       // Use mock data for non-crypto symbols
@@ -78,24 +82,42 @@ export function useBinanceData(symbol: string, interval: string) {
     }
 
     try {
-      console.log("Fetching historical data for:", binanceSymbol.toUpperCase());
-      const response = await fetch(
-        `https://api.binance.com/api/v3/klines?symbol=${binanceSymbol.toUpperCase()}&interval=${binanceInterval}&limit=500`
-      );
+      console.log("Fetching historical data for:", binanceSymbol);
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // Use our edge function proxy to avoid CORS
+      const response = await supabase.functions.invoke('binance-proxy', {
+        body: null,
+        headers: {},
+      });
+
+      // Parse URL params manually since invoke doesn't support query params well
+      const proxyUrl = `${SUPABASE_URL}/functions/v1/binance-proxy?symbol=${binanceSymbol}&interval=${binanceInterval}&limit=500`;
+      
+      const fetchResponse = await fetch(proxyUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!fetchResponse.ok) {
+        throw new Error(`HTTP error! status: ${fetchResponse.status}`);
       }
       
-      const klines = await response.json();
+      const klines = await fetchResponse.json();
+      
+      if (klines.error) {
+        throw new Error(klines.error);
+      }
+      
       console.log("Received", klines.length, "candles");
 
-      const formattedData: CandlestickData<Time>[] = klines.map((k: number[]) => ({
-        time: (k[0] / 1000) as Time,
-        open: parseFloat(k[1] as unknown as string),
-        high: parseFloat(k[2] as unknown as string),
-        low: parseFloat(k[3] as unknown as string),
-        close: parseFloat(k[4] as unknown as string),
+      const formattedData: CandlestickData<Time>[] = klines.map((k: (string | number)[]) => ({
+        time: (Number(k[0]) / 1000) as Time,
+        open: parseFloat(String(k[1])),
+        high: parseFloat(String(k[2])),
+        low: parseFloat(String(k[3])),
+        close: parseFloat(String(k[4])),
       }));
 
       setData(formattedData);
@@ -105,11 +127,11 @@ export function useBinanceData(symbol: string, interval: string) {
       console.error("Error fetching historical data:", error);
       setData(generateMockData(symbol, interval));
       setIsLoading(false);
-      setConnectionError("Failed to fetch live data, using mock data");
+      setConnectionError("Failed to fetch live data, using sample data");
     }
   }, [binanceSymbol, binanceInterval, symbol, interval]);
 
-  // Connect to WebSocket for real-time updates
+  // Connect to WebSocket via edge function proxy
   const connect = useCallback(() => {
     if (!binanceSymbol) return;
 
@@ -119,26 +141,44 @@ export function useBinanceData(symbol: string, interval: string) {
       wsRef.current = null;
     }
 
-    const wsUrl = `wss://stream.binance.com:9443/ws/${binanceSymbol}@kline_${binanceInterval}`;
-    console.log("Connecting to Binance WebSocket:", wsUrl);
+    const wsUrl = `wss://kjyzpptyiogpobwkqmpc.supabase.co/functions/v1/binance-ws?symbol=${binanceSymbol}&interval=${binanceInterval}`;
+    console.log("Connecting to WebSocket proxy:", wsUrl);
 
     try {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log("Binance WebSocket connected successfully");
-        setIsConnected(true);
-        setConnectionError(null);
-        reconnectAttemptsRef.current = 0;
+        console.log("WebSocket proxy connected");
       };
 
       ws.onmessage = (event) => {
         try {
-          const message: BinanceMessage = JSON.parse(event.data);
+          const message = JSON.parse(event.data);
           
+          // Handle connection status messages
+          if (message.type === 'connected') {
+            console.log("Binance WebSocket connected via proxy");
+            setIsConnected(true);
+            setConnectionError(null);
+            reconnectAttemptsRef.current = 0;
+            return;
+          }
+          
+          if (message.type === 'disconnected') {
+            setIsConnected(false);
+            return;
+          }
+          
+          if (message.type === 'error') {
+            console.error("Proxy error:", message.message);
+            setConnectionError(message.message);
+            return;
+          }
+          
+          // Handle kline data
           if (message.e === "kline") {
-            const kline = message.k;
+            const kline = message.k as BinanceKline;
             const newCandle: CandlestickData<Time> = {
               time: (kline.t / 1000) as Time,
               open: parseFloat(kline.o),
@@ -270,7 +310,7 @@ function generateMockData(symbol: string, interval: string): CandlestickData<Tim
   };
 
   const basePrice = basePrices[symbol] || 100;
-  const volatility = basePrice * 0.003; // Slightly higher volatility for more realistic charts
+  const volatility = basePrice * 0.003;
 
   const intervalMinutes: Record<string, number> = {
     "1": 1,
@@ -286,11 +326,9 @@ function generateMockData(symbol: string, interval: string): CandlestickData<Tim
   const now = new Date();
   let currentPrice = basePrice;
 
-  // Generate 300 candles for a better-looking chart
   for (let i = 299; i >= 0; i--) {
     const date = new Date(now.getTime() - i * minutes * 60 * 1000);
     
-    // Add some trend and randomness
     const trend = Math.sin(i / 30) * volatility * 0.5;
     const change = (Math.random() - 0.5) * volatility * 2 + trend;
     const meanReversion = (basePrice - currentPrice) * 0.005;
@@ -303,7 +341,6 @@ function generateMockData(symbol: string, interval: string): CandlestickData<Tim
 
     currentPrice = close;
 
-    // Determine decimal places based on price magnitude
     const decimals = currentPrice < 1 ? 6 : currentPrice < 10 ? 4 : currentPrice < 100 ? 3 : 2;
 
     data.push({
