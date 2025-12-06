@@ -4,16 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Search, Sun, Moon, Calculator, ChevronLeft, ChevronRight } from "lucide-react";
 import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
 
-interface LightweightChartProps {
-  theme?: 'dark' | 'light';
-}
+type ChartTheme = "light" | "dark";
 
-export function LightweightChart({ theme: appTheme = 'dark' }: LightweightChartProps) {
+export function LightweightChart() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [symbol, setSymbol] = useState(() => {
     return localStorage.getItem("chart-symbol") || "BTCUSD";
   });
   const [searchValue, setSearchValue] = useState("");
+  const [chartTheme, setChartTheme] = useState<ChartTheme>(() => {
+    const stored = localStorage.getItem("chart-theme");
+    return stored === "light" ? "light" : "dark";
+  });
   const [showCalculator, setShowCalculator] = useState(() => {
     return localStorage.getItem("chart-show-calculator") === "true";
   });
@@ -22,6 +24,11 @@ export function LightweightChart({ theme: appTheme = 'dark' }: LightweightChartP
   useEffect(() => {
     localStorage.setItem("chart-show-calculator", String(showCalculator));
   }, [showCalculator]);
+
+  // Save chart theme to localStorage
+  useEffect(() => {
+    localStorage.setItem("chart-theme", chartTheme);
+  }, [chartTheme]);
 
   // Save symbol to localStorage when it changes
   useEffect(() => {
@@ -44,7 +51,7 @@ export function LightweightChart({ theme: appTheme = 'dark' }: LightweightChartP
       symbol: symbol,
       interval: "15",
       timezone: "Etc/UTC",
-      theme: appTheme,
+      theme: chartTheme,
       style: "1",
       locale: "en",
       allow_symbol_change: true,
@@ -69,7 +76,7 @@ export function LightweightChart({ theme: appTheme = 'dark' }: LightweightChartP
         containerRef.current.innerHTML = "";
       }
     };
-  }, [symbol, appTheme]);
+  }, [symbol, chartTheme]);
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchValue.trim()) {
@@ -77,6 +84,9 @@ export function LightweightChart({ theme: appTheme = 'dark' }: LightweightChartP
     }
   };
 
+  const toggleChartTheme = () => {
+    setChartTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
 
   return (
     <div className="flex gap-4 animate-fade-in" style={{ height: "calc(100vh - 140px)" }}>
@@ -97,6 +107,14 @@ export function LightweightChart({ theme: appTheme = 'dark' }: LightweightChartP
           <span className="text-sm text-muted-foreground whitespace-nowrap">
             <span className="text-foreground font-medium">{symbol}</span>
           </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleChartTheme}
+            title={chartTheme === "dark" ? "Light chart" : "Dark chart"}
+          >
+            {chartTheme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </Button>
           <Button
             variant={showCalculator ? "secondary" : "ghost"}
             size="icon"
