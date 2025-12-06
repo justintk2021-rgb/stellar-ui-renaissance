@@ -87,29 +87,21 @@ export function LightweightChart() {
     <div className="flex gap-4 animate-fade-in" style={{ height: "calc(100vh - 140px)" }}>
       {/* Main Chart Section */}
       <div className="flex flex-col flex-1 min-w-0">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-2">
-          <div className="relative flex-1 max-w-xs">
+        {/* Header - Centered Search */}
+        <div className="flex items-center justify-center gap-3 mb-2">
+          <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search symbol (e.g., BTCUSD)"
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
               onKeyDown={handleSearch}
-              className="pl-10 bg-background/50 border-border/50"
+              className="pl-10 bg-background/50 border-border/50 text-center"
             />
           </div>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
             <span className="text-foreground font-medium">{symbol}</span>
           </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            title={theme === "dark" ? "Light mode" : "Dark mode"}
-          >
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </Button>
           <Button
             variant={showCalculator ? "secondary" : "ghost"}
             size="icon"
