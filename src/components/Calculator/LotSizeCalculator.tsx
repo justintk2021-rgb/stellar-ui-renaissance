@@ -118,7 +118,11 @@ function AnimatedResult({ value, prefix = "", suffix = "", decimals = 2, classNa
   );
 }
 
-export function LotSizeCalculator() {
+interface LotSizeCalculatorProps {
+  compact?: boolean;
+}
+
+export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
   const [accountBalance, setAccountBalance] = useState<string>("10000");
   const [riskPercentage, setRiskPercentage] = useState<string>("1");
   const [riskUsd, setRiskUsd] = useState<string>("100");
@@ -230,6 +234,173 @@ export function LotSizeCalculator() {
     setSelectedSymbol(symbol);
     setUseCustom(false);
   };
+
+  // Compact mode for sidebar integration
+  if (compact) {
+    return (
+      <div className="space-y-4 animate-fade-in">
+        {/* Trade Parameters - Compact */}
+        <div className="space-y-4">
+          {/* Account Balance */}
+          <div className="space-y-1.5">
+            <Label htmlFor="balance-compact" className="text-xs text-muted-foreground">
+              Account Balance ($)
+            </Label>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="balance-compact"
+                type="number"
+                value={accountBalance}
+                onChange={(e) => setAccountBalance(e.target.value)}
+                className="pl-9 font-mono h-9 text-sm"
+                placeholder="10000"
+              />
+            </div>
+          </div>
+
+          {/* Risk Per Trade */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Risk Per Trade</Label>
+              <div className="flex rounded-md overflow-hidden border border-border/50">
+                <button
+                  onClick={() => setRiskMode('percent')}
+                  className={cn(
+                    "px-2 py-0.5 text-[10px] font-medium transition-all",
+                    riskMode === 'percent'
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                  )}
+                >
+                  %
+                </button>
+                <button
+                  onClick={() => setRiskMode('usd')}
+                  className={cn(
+                    "px-2 py-0.5 text-[10px] font-medium transition-all",
+                    riskMode === 'usd'
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                  )}
+                >
+                  $
+                </button>
+              </div>
+            </div>
+            <div className="relative">
+              {riskMode === 'percent' ? (
+                <Percent className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              ) : (
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              )}
+              <Input
+                type="number"
+                value={riskMode === 'percent' ? riskPercentage : riskUsd}
+                onChange={(e) => riskMode === 'percent' ? setRiskPercentage(e.target.value) : setRiskUsd(e.target.value)}
+                className="pl-9 font-mono h-9 text-sm"
+                placeholder={riskMode === 'percent' ? "1" : "100"}
+              />
+            </div>
+          </div>
+
+          {/* Stop Loss */}
+          <div className="space-y-1.5">
+            <Label htmlFor="sl-compact" className="text-xs text-muted-foreground">
+              Stop Loss (pips)
+            </Label>
+            <div className="relative">
+              <TrendingDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="sl-compact"
+                type="number"
+                value={stopLoss}
+                onChange={(e) => setStopLoss(e.target.value)}
+                className="pl-9 font-mono h-9 text-sm"
+                placeholder="50"
+              />
+            </div>
+          </div>
+
+          {/* Instrument Selection */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Instrument</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 text-sm"
+                placeholder="Search..."
+              />
+            </div>
+            <div className="flex gap-1 flex-wrap">
+              {(['forex', 'stocks', 'futures', 'indices'] as const).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={cn(
+                    "px-2 py-0.5 rounded text-[10px] font-medium capitalize transition-all",
+                    activeCategory === cat
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <div className="max-h-32 overflow-y-auto space-y-1 bg-muted/20 rounded-lg p-2">
+              {filteredInstruments.slice(0, 10).map((inst) => (
+                <button
+                  key={inst.symbol}
+                  onClick={() => handleSelectInstrument(inst.symbol)}
+                  className={cn(
+                    "w-full text-left px-2 py-1 rounded text-xs transition-all",
+                    selectedSymbol === inst.symbol
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted/50"
+                  )}
+                >
+                  <span className="font-medium">{inst.symbol}</span>
+                  <span className="text-muted-foreground ml-1 text-[10px]">{inst.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Results - Compact */}
+        <div className="glass rounded-lg p-4 border border-border/40 space-y-3">
+          <div className="text-center">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Recommended Size</p>
+            <AnimatedResult
+              value={calculations.lotSize}
+              suffix=" lots"
+              decimals={2}
+              className="text-2xl font-bold text-primary"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-muted/30 rounded p-2 text-center">
+              <p className="text-muted-foreground text-[10px]">Risk Amount</p>
+              <AnimatedResult value={calculations.riskAmount} prefix="$" decimals={2} className="font-semibold" />
+            </div>
+            <div className="bg-muted/30 rounded p-2 text-center">
+              <p className="text-muted-foreground text-[10px]">Position Units</p>
+              <AnimatedResult value={calculations.positionUnits} decimals={0} className="font-semibold" />
+            </div>
+          </div>
+        </div>
+
+        <Button variant="outline" size="sm" onClick={handleReset} className="w-full gap-2 h-8 text-xs">
+          <RefreshCw className="w-3 h-3" />
+          Reset
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
