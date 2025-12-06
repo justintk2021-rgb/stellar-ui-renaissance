@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList } from "lucide-react";
 import logo3d from "@/assets/logo-3d.png";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SidebarProps {
   currentPage: string;
@@ -17,6 +19,36 @@ const navItems = [
 ];
 
 export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
+  const [userName, setUserName] = useState<string>("NSYNC JOURNAL");
+
+  useEffect(() => {
+    const fetchUserName = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (profile) {
+          const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
+          if (fullName.trim()) {
+            setUserName(`${fullName}'s Journal`);
+          }
+        }
+      }
+    };
+
+    fetchUserName();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      fetchUserName();
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   return (
     <aside className="w-64 lg:w-72 glass-strong rounded-2xl p-5 flex flex-col gap-6 shadow-card">
       {/* Logo */}
@@ -29,7 +61,7 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
           />
         </div>
         <div>
-          <h1 className="text-lg font-bold tracking-wider gradient-text">NSYNC JOURNAL</h1>
+          <h1 className="text-lg font-bold tracking-wider gradient-text">{userName}</h1>
           <p className="text-xs text-muted-foreground">Personal Journal</p>
         </div>
       </div>
