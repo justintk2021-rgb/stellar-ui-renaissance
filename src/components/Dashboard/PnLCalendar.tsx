@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { TradeChartEditor } from "./TradeChartEditor";
+import { TradingViewChart } from "./TradingViewChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface PnLCalendarProps {
@@ -339,35 +339,21 @@ export function PnLCalendar({ trades, onUpdateTrade }: PnLCalendarProps) {
 
               <TabsContent value="chart" className="space-y-4">
                 {selectedTradeForChart ? (
-                  <>
-                    <TradeChartEditor
-                      pair={selectedTradeForChart.pair}
-                      direction={selectedTradeForChart.direction}
-                      existingImage={selectedTradeForChart.chartImage}
-                      onSaveImage={(imageDataUrl) => {
-                        if (onUpdateTrade) {
-                          onUpdateTrade(selectedTradeForChart.id, { chartImage: imageDataUrl });
-                        }
-                      }}
-                    />
-                    {selectedTradeForChart.chartImage && (
-                      <div className="space-y-2">
-                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Saved Chart</span>
-                        <div className="rounded-xl overflow-hidden border border-border/50">
-                          <img 
-                            src={selectedTradeForChart.chartImage} 
-                            alt="Trade chart" 
-                            className="w-full"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </>
+                  <TradingViewChart
+                    pair={selectedTradeForChart.pair}
+                    direction={selectedTradeForChart.direction}
+                    existingImage={selectedTradeForChart.chartImage}
+                    onSaveImage={(imageDataUrl) => {
+                      if (onUpdateTrade) {
+                        onUpdateTrade(selectedTradeForChart.id, { chartImage: imageDataUrl });
+                      }
+                    }}
+                  />
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <LineChart className="w-12 h-12 text-muted-foreground/50 mb-4" />
                     <p className="text-sm text-muted-foreground">
-                      Select a trade from the Metrics tab to add entry, TP & SL levels
+                      Select a trade from the Metrics tab to view chart
                     </p>
                     <Button
                       variant="outline"
