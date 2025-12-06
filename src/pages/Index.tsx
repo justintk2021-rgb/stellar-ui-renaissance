@@ -382,7 +382,7 @@ const Index = () => {
             "glass-strong rounded-2xl min-h-[calc(100vh-120px)]",
             isChartPage ? "p-4 lg:min-h-[calc(100vh-100px)]" : "p-5 lg:p-6 lg:min-h-[calc(100vh-60px)]"
           )}>
-            {!isChartPage && <TopBar title={title} subtitle={subtitle} />}
+            {!isChartPage && <TopBar title={title} subtitle={subtitle} theme={theme} onThemeChange={setTheme} />}
 
             {/* Dashboard Page */}
             {currentPage === 'dashboard' && (
