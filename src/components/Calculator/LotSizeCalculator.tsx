@@ -121,6 +121,8 @@ function AnimatedResult({ value, prefix = "", suffix = "", decimals = 2, classNa
 export function LotSizeCalculator() {
   const [accountBalance, setAccountBalance] = useState<string>("10000");
   const [riskPercentage, setRiskPercentage] = useState<string>("1");
+  const [riskUsd, setRiskUsd] = useState<string>("100");
+  const [riskMode, setRiskMode] = useState<'percent' | 'usd'>('percent');
   const [stopLoss, setStopLoss] = useState<string>("50");
   const [selectedSymbol, setSelectedSymbol] = useState<string>("EUR/USD");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -148,6 +150,7 @@ export function LotSizeCalculator() {
   const calculations = useMemo(() => {
     const balance = parseFloat(accountBalance) || 0;
     const riskPercent = parseFloat(riskPercentage) || 0;
+    const riskDollar = parseFloat(riskUsd) || 0;
     const sl = parseFloat(stopLoss) || 0;
     
     const pipValue = useCustom 
@@ -160,8 +163,10 @@ export function LotSizeCalculator() {
 
     const pipSize = selectedInstrument?.pipSize || 0.0001;
 
-    // Risk amount in dollars
-    const riskAmount = (balance * riskPercent) / 100;
+    // Risk amount in dollars - based on mode
+    const riskAmount = riskMode === 'percent' 
+      ? (balance * riskPercent) / 100 
+      : riskDollar;
 
     // Lot size calculation: Risk Amount / (Stop Loss × Pip Value)
     const lotSize = sl > 0 ? riskAmount / (sl * pipValue) : 0;
@@ -206,15 +211,18 @@ export function LotSizeCalculator() {
       unitLabel: getUnitLabel(),
       pipLabel: getPipLabel()
     };
-  }, [accountBalance, riskPercentage, stopLoss, selectedInstrument, useCustom, customPipValue, customContractSize]);
+  }, [accountBalance, riskPercentage, riskUsd, riskMode, stopLoss, selectedInstrument, useCustom, customPipValue, customContractSize]);
 
   const handleReset = () => {
     setAccountBalance("10000");
     setRiskPercentage("1");
+    setRiskUsd("100");
+    setRiskMode("percent");
     setStopLoss("50");
     setSelectedSymbol("EUR/USD");
     setSearchQuery("");
     setActiveCategory("forex");
+    setUseCustom(false);
     setUseCustom(false);
   };
 
@@ -270,41 +278,103 @@ export function LotSizeCalculator() {
               </div>
             </div>
 
-            {/* Risk Percentage */}
+            {/* Risk Per Trade */}
             <div className="space-y-2">
-              <Label htmlFor="risk" className="text-xs uppercase tracking-wider text-muted-foreground">
-                Risk Per Trade (%)
-              </Label>
-              <div className="relative">
-                <Percent className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="risk"
-                  type="number"
-                  value={riskPercentage}
-                  onChange={(e) => setRiskPercentage(e.target.value)}
-                  className="pl-9 font-mono"
-                  placeholder="1"
-                  step="0.1"
-                  min="0.1"
-                  max="100"
-                />
-              </div>
-              <div className="flex gap-2">
-                {[0.5, 1, 2, 3].map((r) => (
+              <div className="flex items-center justify-between">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Risk Per Trade
+                </Label>
+                <div className="flex rounded-lg overflow-hidden border border-border/50">
                   <button
-                    key={r}
-                    onClick={() => setRiskPercentage(r.toString())}
+                    onClick={() => setRiskMode('percent')}
                     className={cn(
-                      "px-3 py-1 rounded-lg text-xs font-medium transition-all",
-                      parseFloat(riskPercentage) === r
+                      "px-2 py-1 text-[10px] font-medium transition-all",
+                      riskMode === 'percent'
                         ? "bg-primary text-primary-foreground"
-                        : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                        : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
                     )}
                   >
-                    {r}%
+                    %
                   </button>
-                ))}
+                  <button
+                    onClick={() => setRiskMode('usd')}
+                    className={cn(
+                      "px-2 py-1 text-[10px] font-medium transition-all",
+                      riskMode === 'usd'
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    $
+                  </button>
+                </div>
               </div>
+              
+              {riskMode === 'percent' ? (
+                <>
+                  <div className="relative">
+                    <Percent className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="risk"
+                      type="number"
+                      value={riskPercentage}
+                      onChange={(e) => setRiskPercentage(e.target.value)}
+                      className="pl-9 font-mono"
+                      placeholder="1"
+                      step="0.1"
+                      min="0.1"
+                      max="100"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    {[0.5, 1, 2, 3].map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => setRiskPercentage(r.toString())}
+                        className={cn(
+                          "px-3 py-1 rounded-lg text-xs font-medium transition-all",
+                          parseFloat(riskPercentage) === r
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        {r}%
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="riskUsd"
+                      type="number"
+                      value={riskUsd}
+                      onChange={(e) => setRiskUsd(e.target.value)}
+                      className="pl-9 font-mono"
+                      placeholder="100"
+                      min="1"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    {[50, 100, 200, 500].map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => setRiskUsd(r.toString())}
+                        className={cn(
+                          "px-3 py-1 rounded-lg text-xs font-medium transition-all",
+                          parseFloat(riskUsd) === r
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        ${r}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Stop Loss */}
