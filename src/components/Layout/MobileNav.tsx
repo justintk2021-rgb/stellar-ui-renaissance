@@ -23,24 +23,28 @@ export function MobileNav({ currentPage, onPageChange }: MobileNavProps) {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
+          const isDisabled = item.id === 'calendar';
 
           return (
             <button
               key={item.id}
-              onClick={() => onPageChange(item.id)}
+              onClick={() => !isDisabled && onPageChange(item.id)}
+              disabled={isDisabled}
               className={cn(
                 "relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all duration-200 min-w-0 flex-1",
-                isActive
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
+                isDisabled
+                  ? "text-muted-foreground/40 cursor-not-allowed"
+                  : isActive
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
               )}
             >
               <Icon className={cn(
                 "w-5 h-5 shrink-0",
-                isActive && "drop-shadow-[0_0_8px_hsl(var(--primary)_/_0.5)]"
+                !isDisabled && isActive && "drop-shadow-[0_0_8px_hsl(var(--primary)_/_0.5)]"
               )} />
               <span className="text-[9px] font-medium truncate">{item.label}</span>
-              {isActive && (
+              {isActive && !isDisabled && (
                 <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
               )}
             </button>
