@@ -143,6 +143,11 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
+    const SESSION_KEY = 'nsync_active_session';
+    
+    // Check if this is a fresh browser session (no sessionStorage flag)
+    const isActiveSession = sessionStorage.getItem(SESSION_KEY);
+    
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -150,6 +155,8 @@ const Index = () => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          // Mark this as an active session
+          sessionStorage.setItem(SESSION_KEY, 'true');
           // Defer Supabase calls with setTimeout
           setTimeout(() => {
             fetchProfile(session.user.id);
@@ -162,11 +169,23 @@ const Index = () => {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      // If there's a stored session but no sessionStorage flag, 
+      // this is a new browser session - sign out for security
+      if (session && !isActiveSession) {
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setUserProfile(null);
+        navigate('/auth');
+        return;
+      }
+      
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
+        sessionStorage.setItem(SESSION_KEY, 'true');
         fetchProfile(session.user.id);
       } else {
         navigate('/auth');
