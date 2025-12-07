@@ -472,8 +472,8 @@ const Index = () => {
                 <Menu className="w-6 h-6" />
               </button>
             </div>
-            {/* Theme switch - top right */}
-            <div className="fixed top-4 right-4 z-10 flex items-center gap-2 glass-strong rounded-xl px-3 py-2 shadow-lg">
+            {/* Theme switch - bottom center */}
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 glass-strong rounded-xl px-3 py-2 shadow-lg">
               <Sun className="w-4 h-4 text-muted-foreground" />
               <Switch
                 checked={theme === 'dark'}
