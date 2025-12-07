@@ -418,17 +418,24 @@ const Index = () => {
                 left: menuPosition.x,
                 touchAction: 'none'
               }}
-              onMouseDown={handleMenuDragStart}
-              onTouchStart={handleMenuDragStart}
             >
               <button 
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  handleMenuDragStart(e);
+                }}
+                onTouchStart={(e) => {
+                  handleMenuDragStart(e);
+                }}
                 onClick={(e) => {
+                  e.stopPropagation();
                   if (!hasDragged) {
                     setShowMenuHint(true);
                     setTimeout(() => setShowMenuHint(false), 2000);
                   }
                 }}
                 onDoubleClick={(e) => {
+                  e.stopPropagation();
                   if (!hasDragged) setSidebarOpen(true);
                   setShowMenuHint(false);
                 }}
