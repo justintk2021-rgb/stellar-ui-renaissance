@@ -233,36 +233,42 @@ export const AccountSelector = ({
               />
             </div>
           </div>
-          <DialogFooter className="flex justify-between sm:justify-between">
-            <div className="flex gap-2">
-              {editingAccount && !editingAccount.is_default && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onSetDefault(editingAccount.id);
-                    setIsEditDialogOpen(false);
-                  }}
-                >
-                  <Star className="w-4 h-4 mr-1" />
-                  Set as Default
-                </Button>
-              )}
-              {editingAccount && accounts.length > 1 && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    onDeleteAccount(editingAccount.id);
-                    setIsEditDialogOpen(false);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4 mr-1" />
-                  Delete
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-2">
+          <DialogFooter className="flex-col gap-3 sm:flex-col">
+            {/* Action buttons row */}
+            {editingAccount && (!editingAccount.is_default || accounts.length > 1) && (
+              <div className="flex gap-2 w-full">
+                {!editingAccount.is_default && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      onSetDefault(editingAccount.id);
+                      setIsEditDialogOpen(false);
+                    }}
+                  >
+                    <Star className="w-4 h-4 mr-1" />
+                    Set Default
+                  </Button>
+                )}
+                {accounts.length > 1 && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      onDeleteAccount(editingAccount.id);
+                      setIsEditDialogOpen(false);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Delete
+                  </Button>
+                )}
+              </div>
+            )}
+            {/* Save/Cancel buttons row */}
+            <div className="flex gap-2 w-full justify-end">
               <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                 Cancel
               </Button>
