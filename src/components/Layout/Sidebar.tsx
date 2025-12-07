@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList } from "lucide-react";
+import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList, CalendarClock } from "lucide-react";
 import bookLogo from "@/assets/book-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -13,6 +13,7 @@ const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'journal', label: 'Journal', icon: BookOpen },
   { id: 'chart', label: 'Chart', icon: BarChart3 },
+  { id: 'calendar', label: 'Economic Calendar', icon: CalendarClock },
   { id: 'playbook', label: 'Playbook', icon: ClipboardList },
   { id: 'notebook', label: 'Notebook', icon: NotebookPen },
   { id: 'settings', label: 'Settings', icon: Settings },

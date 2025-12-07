@@ -16,6 +16,7 @@ import { SettingsView, AccentColor } from "@/components/Settings/SettingsView";
 import { CustomChart } from "@/components/Chart/CustomChart";
 import { TradingAssistant } from "@/components/AI/TradingAssistant";
 import { PlaybookView } from "@/components/Playbook/PlaybookView";
+import { EconomicCalendarView } from "@/components/EconomicCalendar/EconomicCalendarView";
 import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
@@ -28,6 +29,7 @@ const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
   journal: { title: 'Journal', subtitle: 'Log and manage your trades' },
   chart: { title: 'Chart', subtitle: 'Interactive chart with drawing tools' },
+  calendar: { title: 'Economic Calendar', subtitle: 'Live economic news and events' },
   playbook: { title: 'Playbook', subtitle: 'Your trading checklists and rules' },
   notebook: { title: 'Notebook', subtitle: 'Your personal trading notes and journal' },
   settings: { title: 'Settings', subtitle: 'Customize your preferences' },
@@ -561,6 +563,11 @@ const Index = () => {
             {/* Playbook Page */}
             {currentPage === 'playbook' && (
               <PlaybookView />
+            )}
+
+            {/* Economic Calendar Page */}
+            {currentPage === 'calendar' && (
+              <EconomicCalendarView />
             )}
 
             {/* Settings Page */}
