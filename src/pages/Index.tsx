@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useTrades } from "@/hooks/useTrades";
+import { useTradingAccounts } from "@/hooks/useTradingAccounts";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
@@ -17,6 +18,7 @@ import { CustomChart } from "@/components/Chart/CustomChart";
 import { TradingAssistant } from "@/components/AI/TradingAssistant";
 import { PlaybookView } from "@/components/Playbook/PlaybookView";
 import { EconomicCalendarView } from "@/components/EconomicCalendar/EconomicCalendarView";
+import { AccountSelector } from "@/components/Dashboard/AccountSelector";
 import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
@@ -52,7 +54,20 @@ const Index = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
   
-  // Use database-backed trades
+  // Use trading accounts
+  const {
+    accounts,
+    selectedAccount,
+    selectedAccountId,
+    setSelectedAccountId,
+    isLoading: accountsLoading,
+    addAccount,
+    updateAccount,
+    deleteAccount,
+    setDefaultAccount,
+  } = useTradingAccounts(user?.id);
+  
+  // Use database-backed trades filtered by selected account
   const { 
     trades, 
     isLoading: tradesLoading, 
@@ -61,10 +76,12 @@ const Index = () => {
     deleteTrade, 
     clearAllTrades, 
     importTrades 
-  } = useTrades(user?.id);
+  } = useTrades(user?.id, selectedAccountId);
+  
+  // Use the account's starting balance
+  const accountStartBalance = selectedAccount?.starting_balance || 10000;
   
   const [notebookEntries, setNotebookEntries] = useLocalStorage<NotebookEntry[]>('atp_notebook_v1', []);
-  const [startBalance, setStartBalance] = useLocalStorage<number>('atp_start_balance', 10000);
   const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('atp_theme', 'dark');
   const [accentColor, setAccentColor] = useLocalStorage<AccentColor>('atp_accent_color', 'emerald');
   const [customColor, setCustomColor] = useLocalStorage<string>('atp_custom_color', '#10b981');
@@ -339,9 +356,11 @@ const Index = () => {
     }
   }, [clearAllTrades, setNotebookEntries]);
 
-  const handleSetBalance = useCallback((value: number) => {
-    setStartBalance(value);
-  }, [setStartBalance]);
+  const handleSetBalance = useCallback(async (value: number) => {
+    if (selectedAccountId) {
+      await updateAccount(selectedAccountId, { starting_balance: value });
+    }
+  }, [selectedAccountId, updateAccount]);
 
   const handleSaveNotes = useCallback(async (id: string, notes: string) => {
     await updateTrade(id, { notebook: notes });
@@ -510,9 +529,22 @@ const Index = () => {
             {/* Dashboard Page */}
             {currentPage === 'dashboard' && (
               <div className="space-y-6 animate-fade-in">
+                {/* Account Selector */}
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <AccountSelector
+                    accounts={accounts}
+                    selectedAccount={selectedAccount}
+                    onSelectAccount={setSelectedAccountId}
+                    onAddAccount={addAccount}
+                    onUpdateAccount={updateAccount}
+                    onDeleteAccount={deleteAccount}
+                    onSetDefault={setDefaultAccount}
+                  />
+                </div>
+                
                 <EquityChart
                   trades={trades}
-                  startBalance={startBalance}
+                  startBalance={accountStartBalance}
                   onSetBalance={handleSetBalance}
                 />
                 <StatsGrid trades={trades} />
@@ -529,19 +561,35 @@ const Index = () => {
 
             {/* Journal Page */}
             {currentPage === 'journal' && (
-              <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.4fr] gap-6 animate-fade-in">
-                <TradeForm
-                  editingTrade={editingTrade}
-                  onSubmit={handleAddTrade}
-                  onCancelEdit={() => setEditingTrade(null)}
-                />
-                <TradeTable
-                  trades={trades}
-                  onEdit={setEditingTrade}
-                  onDelete={handleDeleteTrade}
-                  onSelectForNotebook={handleSelectForNotebook}
-                  onClearAll={handleClearAll}
-                />
+              <div className="space-y-6 animate-fade-in">
+                {/* Account Selector for Journal */}
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-muted-foreground">Trading Account:</span>
+                  <AccountSelector
+                    accounts={accounts}
+                    selectedAccount={selectedAccount}
+                    onSelectAccount={setSelectedAccountId}
+                    onAddAccount={addAccount}
+                    onUpdateAccount={updateAccount}
+                    onDeleteAccount={deleteAccount}
+                    onSetDefault={setDefaultAccount}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.4fr] gap-6">
+                  <TradeForm
+                    editingTrade={editingTrade}
+                    onSubmit={handleAddTrade}
+                    onCancelEdit={() => setEditingTrade(null)}
+                  />
+                  <TradeTable
+                    trades={trades}
+                    onEdit={setEditingTrade}
+                    onDelete={handleDeleteTrade}
+                    onSelectForNotebook={handleSelectForNotebook}
+                    onClearAll={handleClearAll}
+                  />
+                </div>
               </div>
             )}
 
