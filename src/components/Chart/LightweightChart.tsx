@@ -129,6 +129,14 @@ export function LightweightChart() {
             <span className="text-foreground font-medium">{symbol}</span>
           </span>
           <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleChartTheme}
+            title={chartTheme === "dark" ? "Light chart" : "Dark chart"}
+          >
+            {chartTheme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </Button>
+          <Button
             variant={showCalculator ? "secondary" : "ghost"}
             size="icon"
             onClick={() => setShowCalculator(!showCalculator)}
@@ -152,19 +160,6 @@ export function LightweightChart() {
           className="tradingview-widget-container flex-1 rounded-lg overflow-hidden border border-border/50"
           style={{ minHeight: "400px" }}
         />
-
-        {/* Theme Switch - Bottom Center */}
-        <div className="flex justify-center mt-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleChartTheme}
-            title={chartTheme === "dark" ? "Light chart" : "Dark chart"}
-            className="bg-background/80 backdrop-blur-sm border border-border/50"
-          >
-            {chartTheme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </Button>
-        </div>
       </div>
 
       {/* Calculator Panel - hidden in fullscreen */}
