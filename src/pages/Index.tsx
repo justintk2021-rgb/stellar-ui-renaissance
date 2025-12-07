@@ -370,7 +370,7 @@ const Index = () => {
         />
       )}
 
-      {/* Centered popup sidebar for chart page */}
+      {/* Slide-out sidebar for chart page - from left, vertically centered */}
       {isChartPage && (
         <>
           {/* Backdrop */}
@@ -381,8 +381,8 @@ const Index = () => {
             />
           )}
           <div className={cn(
-            "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 transition-all duration-300 ease-in-out",
-            sidebarOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
+            "fixed top-1/2 left-4 -translate-y-1/2 z-50 transition-all duration-300 ease-in-out",
+            sidebarOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-full pointer-events-none"
           )}>
             <div className="relative">
               <button 
