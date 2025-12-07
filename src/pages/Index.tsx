@@ -370,22 +370,31 @@ const Index = () => {
         />
       )}
 
-      {/* Slide-out sidebar for chart page - from bottom left */}
+      {/* Centered popup sidebar for chart page */}
       {isChartPage && (
-        <div className={cn(
-          "fixed bottom-4 left-4 z-50 transition-all duration-300 ease-in-out",
-          sidebarOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
-        )}>
-          <div className="relative">
-            <button 
+        <>
+          {/* Backdrop */}
+          {sidebarOpen && (
+            <div 
+              className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40"
               onClick={() => setSidebarOpen(false)}
-              className="absolute -right-3 -top-3 w-8 h-8 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted transition-colors z-10"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <Sidebar currentPage={currentPage} onPageChange={handlePageChange} />
+            />
+          )}
+          <div className={cn(
+            "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 transition-all duration-300 ease-in-out",
+            sidebarOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
+          )}>
+            <div className="relative">
+              <button 
+                onClick={() => setSidebarOpen(false)}
+                className="absolute -right-3 -top-3 w-8 h-8 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted transition-colors z-10"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <Sidebar currentPage={currentPage} onPageChange={handlePageChange} />
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       <div className={cn(
