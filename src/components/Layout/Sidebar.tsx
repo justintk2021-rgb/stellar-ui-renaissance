@@ -76,29 +76,40 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
+          const isDisabled = item.id === 'calendar';
           
           return (
             <button
               key={item.id}
-              onClick={() => onPageChange(item.id)}
+              onClick={() => !isDisabled && onPageChange(item.id)}
+              disabled={isDisabled}
               className={cn(
                 "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 group",
-                isActive
-                  ? "bg-gradient-to-r from-primary/20 to-secondary/10 border border-primary/50 text-foreground shadow-glow-sm"
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
+                isDisabled
+                  ? "text-muted-foreground/50 cursor-not-allowed opacity-50"
+                  : isActive
+                    ? "bg-gradient-to-r from-primary/20 to-secondary/10 border border-primary/50 text-foreground shadow-glow-sm"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
               )}
             >
               <Icon className={cn(
                 "w-5 h-5 transition-colors",
-                isActive ? "text-primary" : "text-muted-foreground group-hover:text-primary"
+                isDisabled
+                  ? "text-muted-foreground/50"
+                  : isActive ? "text-primary" : "text-muted-foreground group-hover:text-primary"
               )} />
               <span>{item.label}</span>
-              <span className={cn(
-                "ml-auto text-xs transition-all duration-300",
-                isActive ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"
-              )}>
-                ›
-              </span>
+              {isDisabled && (
+                <span className="ml-auto text-[10px] bg-muted/50 px-1.5 py-0.5 rounded">Soon</span>
+              )}
+              {!isDisabled && (
+                <span className={cn(
+                  "ml-auto text-xs transition-all duration-300",
+                  isActive ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"
+                )}>
+                  ›
+                </span>
+              )}
             </button>
           );
         })}
