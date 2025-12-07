@@ -69,6 +69,49 @@ const Index = () => {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // Draggable hamburger menu state
+  const [menuPosition, setMenuPosition] = useLocalStorage<{ x: number; y: number }>('atp_menu_position', { x: 16, y: 16 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // Handle drag start for hamburger menu
+  const handleMenuDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    setDragOffset({ x: clientX - menuPosition.x, y: clientY - menuPosition.y });
+    setIsDragging(true);
+  }, [menuPosition]);
+
+  // Handle drag move
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      const newX = Math.max(0, Math.min(window.innerWidth - 56, clientX - dragOffset.x));
+      const newY = Math.max(0, Math.min(window.innerHeight - 56, clientY - dragOffset.y));
+      setMenuPosition({ x: newX, y: newY });
+    };
+
+    const handleEnd = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleMove);
+    window.addEventListener('touchend', handleEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleEnd);
+    };
+  }, [isDragging, dragOffset, setMenuPosition]);
 
   // Close sidebar when clicking outside or changing page
   const handlePageChange = useCallback((page: string) => {
@@ -355,13 +398,24 @@ const Index = () => {
         {/* Mobile Header - or controls on chart page */}
         {isChartPage ? (
           <>
-            {/* Hamburger menu - top left */}
-            <div className="fixed top-4 left-4 z-10">
+            {/* Draggable Hamburger menu */}
+            <div 
+              className="fixed z-10 cursor-grab active:cursor-grabbing"
+              style={{ 
+                top: menuPosition.y, 
+                left: menuPosition.x,
+                touchAction: 'none'
+              }}
+              onMouseDown={handleMenuDragStart}
+              onTouchStart={handleMenuDragStart}
+            >
               <button 
-                onClick={() => setSidebarOpen(true)}
-                className="w-10 h-10 rounded-xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg"
+                onClick={(e) => {
+                  if (!isDragging) setSidebarOpen(true);
+                }}
+                className="w-14 h-14 rounded-2xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg border border-border/30"
               >
-                <Menu className="w-4 h-4" />
+                <Menu className="w-6 h-6" />
               </button>
             </div>
             {/* Theme switch - top right */}
