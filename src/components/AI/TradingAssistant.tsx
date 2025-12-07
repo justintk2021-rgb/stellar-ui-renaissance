@@ -16,6 +16,9 @@ interface TradingAssistantProps {
   onAddTrade: (trade: Omit<Trade, "id">) => Promise<Trade | null | void>;
 }
 
+// Check for browser speech recognition support
+const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
 export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -23,12 +26,10 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
   const [isLoading, setIsLoading] = useState(false);
   const [pendingTrade, setPendingTrade] = useState<Omit<Trade, "id"> | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -37,6 +38,45 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          sendMessage(transcript);
+        }
+        setIsRecording(false);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error !== 'no-speech') {
+          toast.error(`Voice error: ${event.error}`);
+        }
+        setIsRecording(false);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+      window.speechSynthesis.cancel();
+    };
+  }, []);
 
   const getTradeContext = () => {
     if (trades.length === 0) return null;
@@ -80,146 +120,54 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
     };
   };
 
-  const playAudioResponse = async (text: string) => {
-    if (!voiceEnabled) return;
+  const speak = (text: string) => {
+    if (!voiceEnabled || !window.speechSynthesis) return;
     
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      setIsPlayingAudio(true);
-      
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-to-voice`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ text, voice: 'alloy' }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to generate audio");
-      }
-
-      const { audioContent } = await response.json();
-      
-      // Create and play audio
-      const audio = new Audio(`data:audio/mp3;base64,${audioContent}`);
-      audioRef.current = audio;
-      
-      audio.onended = () => {
-        setIsPlayingAudio(false);
-        audioRef.current = null;
-      };
-      
-      audio.onerror = () => {
-        setIsPlayingAudio(false);
-        audioRef.current = null;
-      };
-
-      await audio.play();
-    } catch (error) {
-      console.error("Audio playback error:", error);
-      setIsPlayingAudio(false);
-    }
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    // Clean text for speech (remove markdown symbols)
+    const cleanText = text
+      .replace(/\*\*/g, '')
+      .replace(/\n/g, ' ')
+      .replace(/[📊📅💰⏰📈✅]/g, '');
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
   };
 
-  const stopAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-      setIsPlayingAudio(false);
-    }
+  const stopSpeaking = () => {
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
   };
 
-  const startRecording = async () => {
+  const startRecording = () => {
+    if (!SpeechRecognition) {
+      toast.error("Voice input not supported in this browser");
+      return;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        stream.getTracks().forEach(track => track.stop());
-        await processAudio(audioBlob);
-      };
-
-      mediaRecorder.start();
+      recognitionRef.current?.start();
       setIsRecording(true);
-      toast.info("Recording... Click again to stop");
+      toast.info("Listening... Speak now");
     } catch (error) {
-      console.error("Microphone access error:", error);
-      toast.error("Could not access microphone");
+      console.error("Error starting recognition:", error);
+      toast.error("Could not start voice input");
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
-  const processAudio = async (audioBlob: Blob) => {
-    try {
-      setIsLoading(true);
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Please log in to use voice input");
-        setIsLoading(false);
-        return;
-      }
-
-      // Convert blob to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
-      
-      reader.onloadend = async () => {
-        const base64Audio = (reader.result as string).split(',')[1];
-        
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/voice-to-text`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({ audio: base64Audio }),
-          }
-        );
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "Failed to transcribe audio");
-        }
-
-        const { text } = await response.json();
-        
-        if (text && text.trim()) {
-          await sendMessage(text);
-        } else {
-          toast.error("Could not understand audio. Please try again.");
-          setIsLoading(false);
-        }
-      };
-    } catch (error) {
-      console.error("Audio processing error:", error);
-      toast.error("Failed to process audio");
-      setIsLoading(false);
-    }
+    recognitionRef.current?.stop();
+    setIsRecording(false);
   };
 
   const sendMessage = async (content: string) => {
@@ -287,16 +235,14 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
           content: assistantMessage
         }]);
         
-        // Speak the response
-        playAudioResponse(`I can add this ${tradeData.pair} ${tradeData.direction} trade for ${tradeData.result > 0 ? 'a profit of' : 'a loss of'} $${Math.abs(tradeData.result)}. Should I add this trade?`);
+        speak(`I can add this ${tradeData.pair} ${tradeData.direction} trade for ${tradeData.result > 0 ? 'a profit of' : 'a loss of'} $${Math.abs(tradeData.result)}. Should I add this trade?`);
       } else {
         setMessages(prev => [...prev, {
           role: "assistant",
           content: data.message
         }]);
         
-        // Speak the response
-        playAudioResponse(data.message);
+        speak(data.message);
       }
     } catch (error) {
       console.error("AI error:", error);
@@ -322,7 +268,7 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
           content: `✅ ${successMessage}`
         }]);
         toast.success("Trade added to journal");
-        playAudioResponse(successMessage);
+        speak(successMessage);
       }
     } catch (error) {
       toast.error("Failed to add trade");
@@ -338,7 +284,7 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
       role: "assistant",
       content: cancelMessage
     }]);
-    playAudioResponse(cancelMessage);
+    speak(cancelMessage);
   };
 
   const quickPrompts = [
@@ -346,6 +292,8 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
     "What's my best trading pair?",
     "How can I improve?",
   ];
+
+  const hasSpeechRecognition = !!SpeechRecognition;
 
   return (
     <>
@@ -399,7 +347,9 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
                 <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">Hi! I can help analyze your trades or add new ones.</p>
                 <p className="text-xs mt-1">Try saying "I went long EURUSD today and made $150"</p>
-                <p className="text-xs mt-2 text-primary">🎤 Use the mic button for voice input!</p>
+                {hasSpeechRecognition && (
+                  <p className="text-xs mt-2 text-primary">🎤 Use the mic button for voice input!</p>
+                )}
                 <div className="flex flex-wrap gap-2 justify-center mt-4">
                   {quickPrompts.map((prompt) => (
                     <button
@@ -464,10 +414,10 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
               </div>
             )}
 
-            {isPlayingAudio && (
+            {isSpeaking && (
               <div className="flex justify-start">
                 <button
-                  onClick={stopAudio}
+                  onClick={stopSpeaking}
                   className="flex items-center gap-2 text-xs text-primary hover:text-primary/80"
                 >
                   <Volume2 className="w-4 h-4 animate-pulse" />
@@ -488,21 +438,23 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
               }}
               className="flex gap-2"
             >
-              <Button
-                type="button"
-                size="icon"
-                variant={isRecording ? "destructive" : "outline"}
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={isLoading}
-                className="shrink-0"
-                title={isRecording ? "Stop recording" : "Start voice input"}
-              >
-                {isRecording ? (
-                  <MicOff className="w-4 h-4" />
-                ) : (
-                  <Mic className="w-4 h-4" />
-                )}
-              </Button>
+              {hasSpeechRecognition && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={isRecording ? "destructive" : "outline"}
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={isLoading}
+                  className="shrink-0"
+                  title={isRecording ? "Stop recording" : "Start voice input"}
+                >
+                  {isRecording ? (
+                    <MicOff className="w-4 h-4" />
+                  ) : (
+                    <Mic className="w-4 h-4" />
+                  )}
+                </Button>
+              )}
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
