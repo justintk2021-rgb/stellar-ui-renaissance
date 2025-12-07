@@ -22,6 +22,7 @@ import { User, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { Menu, X, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
 
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
@@ -351,22 +352,28 @@ const Index = () => {
           </div>
         )}
 
-        {/* Mobile Header - or Hamburger menu on chart page */}
+        {/* Mobile Header - or controls on chart page */}
         {isChartPage ? (
-          <div className="fixed top-4 left-4 z-10 flex items-center gap-2">
-            <button 
-              onClick={() => setSidebarOpen(true)}
-              className="w-10 h-10 rounded-xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg"
-            >
-              <Menu className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-10 h-10 rounded-xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg"
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-          </div>
+          <>
+            {/* Hamburger menu - top left */}
+            <div className="fixed top-4 left-4 z-10">
+              <button 
+                onClick={() => setSidebarOpen(true)}
+                className="w-10 h-10 rounded-xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg"
+              >
+                <Menu className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Theme switch - top right */}
+            <div className="fixed top-4 right-4 z-10 flex items-center gap-2 glass-strong rounded-xl px-3 py-2 shadow-lg">
+              <Sun className="w-4 h-4 text-muted-foreground" />
+              <Switch
+                checked={theme === 'dark'}
+                onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+              />
+              <Moon className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </>
         ) : (
           <div className="lg:hidden glass-strong rounded-2xl p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center glow-primary">
