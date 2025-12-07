@@ -75,6 +75,7 @@ const Index = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [showMenuHint, setShowMenuHint] = useState(false);
 
   // Handle drag start for hamburger menu
   const handleMenuDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -401,6 +402,14 @@ const Index = () => {
         {/* Mobile Header - or controls on chart page */}
         {isChartPage ? (
           <>
+            {/* Double-click hint message */}
+            {showMenuHint && (
+              <div className="fixed top-2 left-1/2 -translate-x-1/2 z-20 animate-fade-in">
+                <span className="text-xs text-muted-foreground bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border/30">
+                  Double-click to open menu
+                </span>
+              </div>
+            )}
             {/* Draggable Hamburger menu */}
             <div 
               className="fixed z-10 cursor-grab active:cursor-grabbing"
@@ -414,7 +423,14 @@ const Index = () => {
             >
               <button 
                 onClick={(e) => {
+                  if (!hasDragged) {
+                    setShowMenuHint(true);
+                    setTimeout(() => setShowMenuHint(false), 2000);
+                  }
+                }}
+                onDoubleClick={(e) => {
                   if (!hasDragged) setSidebarOpen(true);
+                  setShowMenuHint(false);
                 }}
                 className="w-14 h-14 rounded-2xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg border border-border/30"
               >
