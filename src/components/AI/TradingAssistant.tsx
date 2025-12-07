@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send, X, Sparkles, Plus } from "lucide-react";
+import { Bot, Send, X, Sparkles, Plus, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Trade } from "@/types/trade";
@@ -22,7 +22,13 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [pendingTrade, setPendingTrade] = useState<Omit<Trade, "id"> | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -74,6 +80,148 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
     };
   };
 
+  const playAudioResponse = async (text: string) => {
+    if (!voiceEnabled) return;
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      setIsPlayingAudio(true);
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-to-voice`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ text, voice: 'alloy' }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate audio");
+      }
+
+      const { audioContent } = await response.json();
+      
+      // Create and play audio
+      const audio = new Audio(`data:audio/mp3;base64,${audioContent}`);
+      audioRef.current = audio;
+      
+      audio.onended = () => {
+        setIsPlayingAudio(false);
+        audioRef.current = null;
+      };
+      
+      audio.onerror = () => {
+        setIsPlayingAudio(false);
+        audioRef.current = null;
+      };
+
+      await audio.play();
+    } catch (error) {
+      console.error("Audio playback error:", error);
+      setIsPlayingAudio(false);
+    }
+  };
+
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setIsPlayingAudio(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+        await processAudio(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      toast.info("Recording... Click again to stop");
+    } catch (error) {
+      console.error("Microphone access error:", error);
+      toast.error("Could not access microphone");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const processAudio = async (audioBlob: Blob) => {
+    try {
+      setIsLoading(true);
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please log in to use voice input");
+        setIsLoading(false);
+        return;
+      }
+
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      
+      reader.onloadend = async () => {
+        const base64Audio = (reader.result as string).split(',')[1];
+        
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/voice-to-text`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ audio: base64Audio }),
+          }
+        );
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Failed to transcribe audio");
+        }
+
+        const { text } = await response.json();
+        
+        if (text && text.trim()) {
+          await sendMessage(text);
+        } else {
+          toast.error("Could not understand audio. Please try again.");
+          setIsLoading(false);
+        }
+      };
+    } catch (error) {
+      console.error("Audio processing error:", error);
+      toast.error("Failed to process audio");
+      setIsLoading(false);
+    }
+  };
+
   const sendMessage = async (content: string) => {
     if (!content.trim()) return;
 
@@ -83,7 +231,6 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
     setIsLoading(true);
 
     try {
-      // Get the current session for authenticated requests
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
@@ -122,7 +269,6 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
       const data = await response.json();
       
       if (data.type === "tool_call" && data.tool === "add_trade") {
-        // Store pending trade and show confirmation
         const tradeData: Omit<Trade, "id"> = {
           date: data.data.date,
           pair: data.data.pair,
@@ -134,15 +280,23 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
         };
         setPendingTrade(tradeData);
         
+        const assistantMessage = `I can add this trade for you:\n\n📊 **${tradeData.pair}** - ${tradeData.direction}\n📅 Date: ${tradeData.date}\n💰 Result: $${tradeData.result > 0 ? '+' : ''}${tradeData.result}\n${tradeData.session ? `⏰ Session: ${tradeData.session}\n` : ''}${tradeData.strategy ? `📈 Strategy: ${tradeData.strategy}\n` : ''}\nShould I add this trade?`;
+        
         setMessages(prev => [...prev, {
           role: "assistant",
-          content: `I can add this trade for you:\n\n📊 **${tradeData.pair}** - ${tradeData.direction}\n📅 Date: ${tradeData.date}\n💰 Result: $${tradeData.result > 0 ? '+' : ''}${tradeData.result}\n${tradeData.session ? `⏰ Session: ${tradeData.session}\n` : ''}${tradeData.strategy ? `📈 Strategy: ${tradeData.strategy}\n` : ''}\nShould I add this trade?`
+          content: assistantMessage
         }]);
+        
+        // Speak the response
+        playAudioResponse(`I can add this ${tradeData.pair} ${tradeData.direction} trade for ${tradeData.result > 0 ? 'a profit of' : 'a loss of'} $${Math.abs(tradeData.result)}. Should I add this trade?`);
       } else {
         setMessages(prev => [...prev, {
           role: "assistant",
           content: data.message
         }]);
+        
+        // Speak the response
+        playAudioResponse(data.message);
       }
     } catch (error) {
       console.error("AI error:", error);
@@ -162,11 +316,13 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
     try {
       const result = await onAddTrade(pendingTrade);
       if (result) {
+        const successMessage = `Trade added successfully! Your ${pendingTrade.pair} ${pendingTrade.direction} trade has been logged.`;
         setMessages(prev => [...prev, {
           role: "assistant",
-          content: `✅ Trade added successfully! Your ${pendingTrade.pair} ${pendingTrade.direction} trade has been logged.`
+          content: `✅ ${successMessage}`
         }]);
         toast.success("Trade added to journal");
+        playAudioResponse(successMessage);
       }
     } catch (error) {
       toast.error("Failed to add trade");
@@ -177,10 +333,12 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
 
   const cancelAddTrade = () => {
     setPendingTrade(null);
+    const cancelMessage = "No problem! Let me know if you'd like to add a different trade or need anything else.";
     setMessages(prev => [...prev, {
       role: "assistant",
-      content: "No problem! Let me know if you'd like to add a different trade or need anything else."
+      content: cancelMessage
     }]);
+    playAudioResponse(cancelMessage);
   };
 
   const quickPrompts = [
@@ -208,14 +366,29 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
         <div className="fixed bottom-40 lg:bottom-24 right-6 z-50 w-[calc(100vw-48px)] max-w-md h-[500px] glass-strong rounded-2xl flex flex-col overflow-hidden shadow-2xl border border-border/50 animate-fade-in">
           {/* Header */}
           <div className="p-4 border-b border-border/50 bg-gradient-to-r from-primary/10 to-secondary/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-primary-foreground" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Trading Assistant</h3>
+                  <p className="text-xs text-muted-foreground">Voice & text enabled</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Trading Assistant</h3>
-                <p className="text-xs text-muted-foreground">Ask me anything or describe a trade to add</p>
-              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setVoiceEnabled(!voiceEnabled)}
+                className="h-8 w-8"
+                title={voiceEnabled ? "Disable voice responses" : "Enable voice responses"}
+              >
+                {voiceEnabled ? (
+                  <Volume2 className="w-4 h-4 text-primary" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-muted-foreground" />
+                )}
+              </Button>
             </div>
           </div>
 
@@ -226,6 +399,7 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
                 <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">Hi! I can help analyze your trades or add new ones.</p>
                 <p className="text-xs mt-1">Try saying "I went long EURUSD today and made $150"</p>
+                <p className="text-xs mt-2 text-primary">🎤 Use the mic button for voice input!</p>
                 <div className="flex flex-wrap gap-2 justify-center mt-4">
                   {quickPrompts.map((prompt) => (
                     <button
@@ -289,6 +463,19 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
                 </div>
               </div>
             )}
+
+            {isPlayingAudio && (
+              <div className="flex justify-start">
+                <button
+                  onClick={stopAudio}
+                  className="flex items-center gap-2 text-xs text-primary hover:text-primary/80"
+                >
+                  <Volume2 className="w-4 h-4 animate-pulse" />
+                  Speaking... (click to stop)
+                </button>
+              </div>
+            )}
+            
             <div ref={messagesEndRef} />
           </div>
 
@@ -301,17 +488,32 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
               }}
               className="flex gap-2"
             >
+              <Button
+                type="button"
+                size="icon"
+                variant={isRecording ? "destructive" : "outline"}
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={isLoading}
+                className="shrink-0"
+                title={isRecording ? "Stop recording" : "Start voice input"}
+              >
+                {isRecording ? (
+                  <MicOff className="w-4 h-4" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </Button>
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Describe a trade or ask a question..."
+                placeholder="Type or use voice..."
                 className="flex-1 bg-background/50"
-                disabled={isLoading}
+                disabled={isLoading || isRecording}
               />
               <Button
                 type="submit"
                 size="icon"
-                disabled={isLoading || !input.trim()}
+                disabled={isLoading || !input.trim() || isRecording}
                 className="shrink-0"
               >
                 <Send className="w-4 h-4" />
