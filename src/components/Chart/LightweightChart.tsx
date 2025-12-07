@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Sun, Moon, Calculator, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Sun, Moon, Calculator, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
 import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
+import { cn } from "@/lib/utils";
 
 type ChartTheme = "light" | "dark";
 
@@ -19,6 +20,7 @@ export function LightweightChart() {
   const [showCalculator, setShowCalculator] = useState(() => {
     return localStorage.getItem("chart-show-calculator") === "true";
   });
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Save calculator visibility to localStorage
   useEffect(() => {
@@ -34,6 +36,17 @@ export function LightweightChart() {
   useEffect(() => {
     localStorage.setItem("chart-symbol", symbol);
   }, [symbol]);
+
+  // Handle escape key to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Load TradingView widget
   useEffect(() => {
@@ -89,7 +102,15 @@ export function LightweightChart() {
   };
 
   return (
-    <div className="flex gap-4 animate-fade-in" style={{ height: "calc(100vh - 140px)" }}>
+    <div 
+      className={cn(
+        "flex gap-4 animate-fade-in transition-all duration-300",
+        isFullscreen 
+          ? "fixed inset-0 z-[100] bg-background p-4" 
+          : ""
+      )}
+      style={{ height: isFullscreen ? "100vh" : "calc(100vh - 140px)" }}
+    >
       {/* Main Chart Section */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Header - Centered Search */}
@@ -123,6 +144,14 @@ export function LightweightChart() {
           >
             <Calculator className="w-4 h-4" />
           </Button>
+          <Button
+            variant={isFullscreen ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </Button>
         </div>
 
         {/* TradingView Widget */}
@@ -133,8 +162,8 @@ export function LightweightChart() {
         />
       </div>
 
-      {/* Calculator Panel */}
-      {showCalculator && (
+      {/* Calculator Panel - hidden in fullscreen */}
+      {showCalculator && !isFullscreen && (
         <div className="w-[420px] flex-shrink-0 overflow-y-auto border-l border-border/50 pl-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-muted-foreground">Lot Size Calculator</h3>
