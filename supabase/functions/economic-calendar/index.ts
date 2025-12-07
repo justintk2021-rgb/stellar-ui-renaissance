@@ -5,17 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface FinnhubEvent {
-  actual?: number;
-  country: string;
-  estimate?: number;
-  event: string;
-  impact: string;
-  prev?: number;
-  time: string;
-  unit: string;
-}
-
 interface EconomicEvent {
   id: string;
   title: string;
@@ -32,139 +21,129 @@ interface EconomicEvent {
 
 // Country to currency mapping
 const countryCurrency: Record<string, string> = {
-  "US": "USD",
-  "United States": "USD",
-  "GB": "GBP",
-  "United Kingdom": "GBP",
-  "EU": "EUR",
-  "European Union": "EUR",
-  "Eurozone": "EUR",
-  "Germany": "EUR",
-  "France": "EUR",
-  "Italy": "EUR",
-  "Spain": "EUR",
-  "JP": "JPY",
-  "Japan": "JPY",
-  "AU": "AUD",
-  "Australia": "AUD",
-  "CA": "CAD",
-  "Canada": "CAD",
-  "NZ": "NZD",
-  "New Zealand": "NZD",
-  "CH": "CHF",
-  "Switzerland": "CHF",
-  "CN": "CNY",
-  "China": "CNY",
+  "US": "USD", "USD": "USD",
+  "GB": "GBP", "UK": "GBP", "GBP": "GBP",
+  "EU": "EUR", "EUR": "EUR", "EMU": "EUR",
+  "DE": "EUR", "FR": "EUR", "IT": "EUR", "ES": "EUR",
+  "JP": "JPY", "JPY": "JPY",
+  "AU": "AUD", "AUD": "AUD",
+  "CA": "CAD", "CAD": "CAD",
+  "NZ": "NZD", "NZD": "NZD",
+  "CH": "CHF", "CHF": "CHF",
+  "CN": "CNY", "CNY": "CNY",
 };
 
-// Country to code mapping
-const countryToCode: Record<string, string> = {
-  "United States": "US",
-  "United Kingdom": "GB",
-  "European Union": "EU",
-  "Eurozone": "EU",
-  "Germany": "DE",
-  "France": "FR",
-  "Italy": "IT",
-  "Spain": "ES",
-  "Japan": "JP",
-  "Australia": "AU",
-  "Canada": "CA",
-  "New Zealand": "NZ",
-  "Switzerland": "CH",
-  "China": "CN",
+// Country flags
+const countryFlags: Record<string, string> = {
+  "US": "🇺🇸", "USD": "🇺🇸",
+  "GB": "🇬🇧", "UK": "🇬🇧", "GBP": "🇬🇧",
+  "EU": "🇪🇺", "EUR": "🇪🇺", "EMU": "🇪🇺",
+  "DE": "🇩🇪", "FR": "🇫🇷", "IT": "🇮🇹", "ES": "🇪🇸",
+  "JP": "🇯🇵", "JPY": "🇯🇵",
+  "AU": "🇦🇺", "AUD": "🇦🇺",
+  "CA": "🇨🇦", "CAD": "🇨🇦",
+  "NZ": "🇳🇿", "NZD": "🇳🇿",
+  "CH": "🇨🇭", "CHF": "🇨🇭",
+  "CN": "🇨🇳", "CNY": "🇨🇳",
 };
-
-// Map Finnhub impact to our impact levels
-function mapImpact(impact: string): "low" | "medium" | "high" {
-  const impactLower = impact.toLowerCase();
-  if (impactLower === "high" || impactLower === "3") return "high";
-  if (impactLower === "medium" || impactLower === "2") return "medium";
-  return "low";
-}
-
-// Format value with unit
-function formatValue(value: number | undefined, unit: string): string | undefined {
-  if (value === undefined || value === null) return undefined;
-  
-  if (unit === "%") return `${value}%`;
-  if (unit === "K" || unit === "k") return `${value}K`;
-  if (unit === "M" || unit === "m") return `${value}M`;
-  if (unit === "B" || unit === "b") return `${value}B`;
-  
-  return value.toString();
-}
 
 async function fetchEconomicEvents(): Promise<EconomicEvent[]> {
-  const apiKey = Deno.env.get("FINNHUB_API_KEY");
+  console.log("Fetching economic calendar from FCS API...");
   
-  if (!apiKey) {
-    console.error("FINNHUB_API_KEY not configured");
-    throw new Error("API key not configured");
-  }
-
+  // Using the free FCS API for economic calendar
+  // Alternative: investing.com calendar widget data
   const today = new Date();
-  const nextWeek = new Date(today);
-  nextWeek.setDate(nextWeek.getDate() + 7);
+  const endDate = new Date(today);
+  endDate.setDate(endDate.getDate() + 7);
   
-  const fromDate = today.toISOString().split('T')[0];
-  const toDate = nextWeek.toISOString().split('T')[0];
-  
-  console.log(`Fetching economic calendar from ${fromDate} to ${toDate}`);
-  
-  const url = `https://finnhub.io/api/v1/calendar/economic?from=${fromDate}&to=${toDate}&token=${apiKey}`;
-  
-  const response = await fetch(url);
-  
-  if (!response.ok) {
-    console.error(`Finnhub API error: ${response.status} ${response.statusText}`);
-    throw new Error(`Failed to fetch from Finnhub: ${response.status}`);
+  try {
+    // Fetch from the free ForexFactory-style calendar
+    // Using a public calendar feed
+    const response = await fetch(
+      `https://nfs.faireconomy.media/ff_calendar_thisweek.json`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "application/json",
+        },
+      }
+    );
+    
+    if (!response.ok) {
+      console.error(`Calendar API error: ${response.status}`);
+      throw new Error(`Failed to fetch calendar: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log(`Received ${data?.length || 0} events`);
+    
+    if (!Array.isArray(data)) {
+      console.log("Unexpected data format, returning empty array");
+      return [];
+    }
+    
+    const events: EconomicEvent[] = data.map((event: any, index: number) => {
+      // Parse the date
+      const eventDate = new Date(event.date);
+      const dateStr = eventDate.toISOString().split('T')[0];
+      const timeStr = eventDate.toTimeString().substring(0, 5);
+      
+      // Map impact level
+      let impact: "low" | "medium" | "high" = "low";
+      if (event.impact === "High" || event.impact === "high") {
+        impact = "high";
+      } else if (event.impact === "Medium" || event.impact === "medium") {
+        impact = "medium";
+      }
+      
+      const countryCode = event.country || "US";
+      const currency = countryCurrency[countryCode] || "USD";
+      
+      return {
+        id: `${dateStr}-${countryCode}-${index}`,
+        title: event.title || event.name || "Unknown Event",
+        country: getCountryName(countryCode),
+        countryCode: countryCode,
+        date: dateStr,
+        time: timeStr,
+        impact: impact,
+        actual: event.actual || undefined,
+        forecast: event.forecast || undefined,
+        previous: event.previous || undefined,
+        currency: currency,
+      };
+    });
+    
+    // Sort by date and time
+    events.sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.time.localeCompare(b.time);
+    });
+    
+    console.log(`Processed ${events.length} events successfully`);
+    return events;
+    
+  } catch (error) {
+    console.error("Error fetching from primary source:", error);
+    throw error;
   }
-  
-  const data = await response.json();
-  console.log(`Received ${data.economicCalendar?.length || 0} events from Finnhub`);
-  
-  if (!data.economicCalendar || !Array.isArray(data.economicCalendar)) {
-    console.log("No economic calendar data received");
-    return [];
-  }
-  
-  const events: EconomicEvent[] = data.economicCalendar.map((event: FinnhubEvent, index: number) => {
-    const eventTime = event.time || "00:00:00";
-    const [datePart, timePart] = eventTime.includes('T') 
-      ? eventTime.split('T') 
-      : [eventTime.split(' ')[0], eventTime.split(' ')[1] || "00:00"];
-    
-    const countryCode = countryToCode[event.country] || event.country.substring(0, 2).toUpperCase();
-    const currency = countryCurrency[event.country] || countryCurrency[countryCode] || "USD";
-    
-    // Extract just HH:MM from time
-    const timeFormatted = timePart ? timePart.substring(0, 5) : "00:00";
-    
-    return {
-      id: `${datePart}-${countryCode}-${index}`,
-      title: event.event,
-      country: event.country,
-      countryCode: countryCode,
-      date: datePart,
-      time: timeFormatted,
-      impact: mapImpact(event.impact),
-      actual: formatValue(event.actual, event.unit),
-      forecast: formatValue(event.estimate, event.unit),
-      previous: formatValue(event.prev, event.unit),
-      currency: currency,
-    };
-  });
-  
-  // Sort by date and time
-  events.sort((a, b) => {
-    const dateCompare = a.date.localeCompare(b.date);
-    if (dateCompare !== 0) return dateCompare;
-    return a.time.localeCompare(b.time);
-  });
-  
-  console.log(`Processed ${events.length} events`);
-  return events;
+}
+
+function getCountryName(code: string): string {
+  const countryNames: Record<string, string> = {
+    "US": "United States", "USD": "United States",
+    "GB": "United Kingdom", "UK": "United Kingdom", "GBP": "United Kingdom",
+    "EU": "European Union", "EUR": "European Union", "EMU": "Eurozone",
+    "DE": "Germany", "FR": "France", "IT": "Italy", "ES": "Spain",
+    "JP": "Japan", "JPY": "Japan",
+    "AU": "Australia", "AUD": "Australia",
+    "CA": "Canada", "CAD": "Canada",
+    "NZ": "New Zealand", "NZD": "New Zealand",
+    "CH": "Switzerland", "CHF": "Switzerland",
+    "CN": "China", "CNY": "China",
+  };
+  return countryNames[code] || code;
 }
 
 serve(async (req) => {
@@ -181,7 +160,7 @@ serve(async (req) => {
       JSON.stringify({ 
         events,
         lastUpdated: new Date().toISOString(),
-        source: "Finnhub"
+        source: "ForexFactory"
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
