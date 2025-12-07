@@ -73,6 +73,7 @@ const Index = () => {
   // Draggable hamburger menu state
   const [menuPosition, setMenuPosition] = useLocalStorage<{ x: number; y: number }>('atp_menu_position', { x: 16, y: 16 });
   const [isDragging, setIsDragging] = useState(false);
+  const [hasDragged, setHasDragged] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   // Handle drag start for hamburger menu
@@ -82,6 +83,7 @@ const Index = () => {
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     setDragOffset({ x: clientX - menuPosition.x, y: clientY - menuPosition.y });
     setIsDragging(true);
+    setHasDragged(false);
   }, [menuPosition]);
 
   // Handle drag move
@@ -94,6 +96,7 @@ const Index = () => {
       const newX = Math.max(0, Math.min(window.innerWidth - 56, clientX - dragOffset.x));
       const newY = Math.max(0, Math.min(window.innerHeight - 56, clientY - dragOffset.y));
       setMenuPosition({ x: newX, y: newY });
+      setHasDragged(true);
     };
 
     const handleEnd = () => {
@@ -411,7 +414,7 @@ const Index = () => {
             >
               <button 
                 onClick={(e) => {
-                  if (!isDragging) setSidebarOpen(true);
+                  if (!hasDragged) setSidebarOpen(true);
                 }}
                 className="w-14 h-14 rounded-2xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg border border-border/30"
               >
