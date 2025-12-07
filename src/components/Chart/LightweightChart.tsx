@@ -129,14 +129,6 @@ export function LightweightChart() {
             <span className="text-foreground font-medium">{symbol}</span>
           </span>
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleChartTheme}
-            title={chartTheme === "dark" ? "Light chart" : "Dark chart"}
-          >
-            {chartTheme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </Button>
-          <Button
             variant={showCalculator ? "secondary" : "ghost"}
             size="icon"
             onClick={() => setShowCalculator(!showCalculator)}
@@ -155,11 +147,36 @@ export function LightweightChart() {
         </div>
 
         {/* TradingView Widget */}
-        <div
-          ref={containerRef}
-          className="tradingview-widget-container flex-1 rounded-lg overflow-hidden border border-border/50"
-          style={{ minHeight: "400px" }}
-        />
+        <div className="relative flex-1">
+          <div
+            ref={containerRef}
+            className="tradingview-widget-container h-full rounded-lg overflow-hidden border border-border/50"
+            style={{ minHeight: "400px" }}
+          />
+          
+          {/* Bottom Center Theme Toggle */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={toggleChartTheme}
+              className="flex items-center gap-2 bg-background/80 backdrop-blur-sm border border-border/50 shadow-lg"
+              title={chartTheme === "dark" ? "Switch to light chart" : "Switch to dark chart"}
+            >
+              {chartTheme === "dark" ? (
+                <>
+                  <Sun className="w-4 h-4" />
+                  <span className="text-xs">Light</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4" />
+                  <span className="text-xs">Dark</span>
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Calculator Panel - hidden in fullscreen */}
