@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Trade } from '@/types/trade';
 import { toast } from 'sonner';
 
-export function useTrades(userId: string | undefined) {
+export function useTrades(userId: string | undefined, accountId: string | null = null) {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -16,11 +16,18 @@ export function useTrades(userId: string | undefined) {
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('trades')
         .select('*')
         .eq('user_id', userId)
         .order('date', { ascending: false });
+      
+      // Filter by account if specified
+      if (accountId) {
+        query = query.eq('account_id', accountId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -35,6 +42,7 @@ export function useTrades(userId: string | undefined) {
         notes: t.notes || undefined,
         notebook: t.notebook || undefined,
         chartImage: t.chart_image || undefined,
+        accountId: t.account_id || undefined,
       }));
 
       setTrades(formattedTrades);
@@ -44,7 +52,7 @@ export function useTrades(userId: string | undefined) {
     } finally {
       setIsLoading(false);
     }
-  }, [userId]);
+  }, [userId, accountId]);
 
   useEffect(() => {
     fetchTrades();
@@ -59,6 +67,7 @@ export function useTrades(userId: string | undefined) {
         .from('trades')
         .insert({
           user_id: userId,
+          account_id: accountId,
           date: tradeData.date,
           pair: tradeData.pair,
           direction: tradeData.direction,
@@ -85,6 +94,7 @@ export function useTrades(userId: string | undefined) {
         notes: data.notes || undefined,
         notebook: data.notebook || undefined,
         chartImage: data.chart_image || undefined,
+        accountId: data.account_id || undefined,
       };
 
       setTrades(prev => [newTrade, ...prev]);
@@ -94,7 +104,7 @@ export function useTrades(userId: string | undefined) {
       toast.error('Failed to add trade');
       return null;
     }
-  }, [userId]);
+  }, [userId, accountId]);
 
   // Update an existing trade
   const updateTrade = useCallback(async (id: string, tradeData: Partial<Trade>) => {
@@ -153,15 +163,21 @@ export function useTrades(userId: string | undefined) {
     }
   }, [userId]);
 
-  // Clear all trades
+  // Clear all trades for the current account
   const clearAllTrades = useCallback(async () => {
     if (!userId) return false;
 
     try {
-      const { error } = await supabase
+      let query = supabase
         .from('trades')
         .delete()
         .eq('user_id', userId);
+      
+      if (accountId) {
+        query = query.eq('account_id', accountId);
+      }
+
+      const { error } = await query;
 
       if (error) throw error;
 
@@ -172,7 +188,7 @@ export function useTrades(userId: string | undefined) {
       toast.error('Failed to clear trades');
       return false;
     }
-  }, [userId]);
+  }, [userId, accountId]);
 
   // Import trades (for broker sync)
   const importTrades = useCallback(async (importedTrades: Omit<Trade, 'id'>[]) => {
@@ -181,6 +197,7 @@ export function useTrades(userId: string | undefined) {
     try {
       const tradesData = importedTrades.map(t => ({
         user_id: userId,
+        account_id: accountId,
         date: t.date,
         pair: t.pair,
         direction: t.direction,
@@ -210,6 +227,7 @@ export function useTrades(userId: string | undefined) {
         notes: t.notes || undefined,
         notebook: t.notebook || undefined,
         chartImage: t.chart_image || undefined,
+        accountId: t.account_id || undefined,
       }));
 
       setTrades(prev => [...newTrades, ...prev]);
@@ -219,7 +237,7 @@ export function useTrades(userId: string | undefined) {
       toast.error('Failed to import trades');
       return false;
     }
-  }, [userId]);
+  }, [userId, accountId]);
 
   return {
     trades,

@@ -9,6 +9,7 @@ export interface Trade {
   notes?: string;
   notebook?: string;
   chartImage?: string; // Base64 image of trade chart with entry/TP/SL
+  accountId?: string; // Trading account this trade belongs to
 }
 
 export interface DailyStats {

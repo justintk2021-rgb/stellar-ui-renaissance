@@ -1,0 +1,240 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+export interface TradingAccount {
+  id: string;
+  user_id: string;
+  name: string;
+  broker: string | null;
+  starting_balance: number;
+  currency: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export function useTradingAccounts(userId: string | undefined) {
+  const [accounts, setAccounts] = useState<TradingAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch accounts from database
+  const fetchAccounts = useCallback(async () => {
+    if (!userId) {
+      setAccounts([]);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // First, ensure user has a default account
+      const { data: ensuredAccountId, error: ensureError } = await supabase
+        .rpc('ensure_default_account', { p_user_id: userId });
+
+      if (ensureError) {
+        console.error('Error ensuring default account:', ensureError);
+      }
+
+      // Fetch all accounts
+      const { data, error } = await supabase
+        .from('trading_accounts')
+        .select('*')
+        .eq('user_id', userId)
+        .order('is_default', { ascending: false })
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const formattedAccounts: TradingAccount[] = (data || []).map((a) => ({
+        id: a.id,
+        user_id: a.user_id,
+        name: a.name,
+        broker: a.broker,
+        starting_balance: Number(a.starting_balance),
+        currency: a.currency,
+        is_default: a.is_default,
+        created_at: a.created_at,
+        updated_at: a.updated_at,
+      }));
+
+      setAccounts(formattedAccounts);
+      
+      // Set selected account to default or first account
+      if (!selectedAccountId || !formattedAccounts.find(a => a.id === selectedAccountId)) {
+        const defaultAccount = formattedAccounts.find(a => a.is_default) || formattedAccounts[0];
+        if (defaultAccount) {
+          setSelectedAccountId(defaultAccount.id);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error fetching accounts:', error);
+      toast.error('Failed to load trading accounts');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId, selectedAccountId]);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
+
+  // Add a new account
+  const addAccount = useCallback(async (accountData: { name: string; broker?: string; starting_balance?: number; currency?: string }) => {
+    if (!userId) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('trading_accounts')
+        .insert({
+          user_id: userId,
+          name: accountData.name,
+          broker: accountData.broker || null,
+          starting_balance: accountData.starting_balance || 10000,
+          currency: accountData.currency || 'USD',
+          is_default: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newAccount: TradingAccount = {
+        id: data.id,
+        user_id: data.user_id,
+        name: data.name,
+        broker: data.broker,
+        starting_balance: Number(data.starting_balance),
+        currency: data.currency,
+        is_default: data.is_default,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
+
+      setAccounts(prev => [...prev, newAccount]);
+      toast.success('Account created successfully');
+      return newAccount;
+    } catch (error: any) {
+      console.error('Error adding account:', error);
+      toast.error('Failed to create account');
+      return null;
+    }
+  }, [userId]);
+
+  // Update an account
+  const updateAccount = useCallback(async (id: string, accountData: Partial<TradingAccount>) => {
+    if (!userId) return false;
+
+    try {
+      const updateData: Record<string, any> = {};
+      if (accountData.name !== undefined) updateData.name = accountData.name;
+      if (accountData.broker !== undefined) updateData.broker = accountData.broker;
+      if (accountData.starting_balance !== undefined) updateData.starting_balance = accountData.starting_balance;
+      if (accountData.currency !== undefined) updateData.currency = accountData.currency;
+
+      const { error } = await supabase
+        .from('trading_accounts')
+        .update(updateData)
+        .eq('id', id)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      setAccounts(prev => prev.map(a => 
+        a.id === id ? { ...a, ...accountData } : a
+      ));
+      toast.success('Account updated');
+      return true;
+    } catch (error: any) {
+      console.error('Error updating account:', error);
+      toast.error('Failed to update account');
+      return false;
+    }
+  }, [userId]);
+
+  // Delete an account
+  const deleteAccount = useCallback(async (id: string) => {
+    if (!userId) return false;
+
+    // Don't allow deleting the only account
+    if (accounts.length <= 1) {
+      toast.error('Cannot delete the only account');
+      return false;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('trading_accounts')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      setAccounts(prev => prev.filter(a => a.id !== id));
+      
+      // If deleted account was selected, select another
+      if (selectedAccountId === id) {
+        const remaining = accounts.filter(a => a.id !== id);
+        const defaultAcc = remaining.find(a => a.is_default) || remaining[0];
+        setSelectedAccountId(defaultAcc?.id || null);
+      }
+      
+      toast.success('Account deleted');
+      return true;
+    } catch (error: any) {
+      console.error('Error deleting account:', error);
+      toast.error('Failed to delete account');
+      return false;
+    }
+  }, [userId, accounts, selectedAccountId]);
+
+  // Set default account
+  const setDefaultAccount = useCallback(async (id: string) => {
+    if (!userId) return false;
+
+    try {
+      // First, unset all defaults
+      await supabase
+        .from('trading_accounts')
+        .update({ is_default: false })
+        .eq('user_id', userId);
+
+      // Then set the new default
+      const { error } = await supabase
+        .from('trading_accounts')
+        .update({ is_default: true })
+        .eq('id', id)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      setAccounts(prev => prev.map(a => ({
+        ...a,
+        is_default: a.id === id
+      })));
+      
+      toast.success('Default account updated');
+      return true;
+    } catch (error: any) {
+      console.error('Error setting default account:', error);
+      toast.error('Failed to update default account');
+      return false;
+    }
+  }, [userId]);
+
+  const selectedAccount = accounts.find(a => a.id === selectedAccountId) || null;
+
+  return {
+    accounts,
+    selectedAccount,
+    selectedAccountId,
+    setSelectedAccountId,
+    isLoading,
+    addAccount,
+    updateAccount,
+    deleteAccount,
+    setDefaultAccount,
+    refetch: fetchAccounts,
+  };
+}

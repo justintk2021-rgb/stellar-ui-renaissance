@@ -106,6 +106,7 @@ export type Database = {
       }
       trades: {
         Row: {
+          account_id: string | null
           chart_image: string | null
           created_at: string
           date: string
@@ -121,6 +122,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           chart_image?: string | null
           created_at?: string
           date: string
@@ -136,6 +138,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string | null
           chart_image?: string | null
           created_at?: string
           date?: string
@@ -150,6 +153,50 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "trades_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "trading_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trading_accounts: {
+        Row: {
+          broker: string | null
+          created_at: string
+          currency: string
+          id: string
+          is_default: boolean
+          name: string
+          starting_balance: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          broker?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          starting_balance?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          broker?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          starting_balance?: number
+          updated_at?: string
+          user_id?: string
+        }
         Relationships: []
       }
     }
@@ -157,7 +204,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      ensure_default_account: { Args: { p_user_id: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
