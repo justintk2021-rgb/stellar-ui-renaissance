@@ -353,8 +353,8 @@ export function NotebookView({
             </div>
 
             {/* Categories */}
-            <ScrollArea className="flex-1 px-4">
-              <div className="space-y-1 pb-4">
+            <ScrollArea className="flex-1 px-2">
+              <div className="space-y-1 pb-4 px-2 pr-3">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-2">
                   Categories
                 </div>
