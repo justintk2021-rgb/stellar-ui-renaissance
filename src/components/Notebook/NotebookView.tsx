@@ -1210,10 +1210,10 @@ export function NotebookView({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="w-6 h-6 p-0 opacity-40 hover:opacity-100 hover:bg-primary/10 rounded transition-all duration-200 group"
+                      className="w-6 h-6 p-0 opacity-30 hover:opacity-100 hover:bg-muted rounded transition-opacity duration-150"
                       onClick={openBlockMenu}
                     >
-                      <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-transform duration-200 group-hover:rotate-90" />
+                      <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
                     </Button>
                   </div>
                 )}
