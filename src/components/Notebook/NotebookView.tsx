@@ -8,6 +8,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Switch } from "@/components/ui/switch";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -32,7 +38,6 @@ import {
   Search,
   Trash2,
   ChevronRight,
-  ChevronLeft,
   ListOrdered,
   Quote,
   MoreHorizontal,
@@ -46,8 +51,7 @@ import {
   Clock,
   Star,
   RotateCcw,
-  Menu,
-  X,
+  PanelLeftOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -94,7 +98,6 @@ export function NotebookView({
   const [isFoldersPanelOpen, setIsFoldersPanelOpen] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
-  const foldersPanelRef = useRef<HTMLDivElement>(null);
 
   // Find selected entry
   const selectedEntry = notebookEntries.find((e) => e.id === selectedEntryId);
@@ -146,21 +149,6 @@ export function NotebookView({
     }
   }, [selectedEntry, isCreatingNew]);
 
-  // Close folders panel when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        isFoldersPanelOpen &&
-        foldersPanelRef.current &&
-        !foldersPanelRef.current.contains(e.target as Node)
-      ) {
-        setIsFoldersPanelOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isFoldersPanelOpen]);
 
   const execCommand = (cmd: string, value?: string) => {
     if (isLocked) return;
@@ -336,72 +324,45 @@ export function NotebookView({
 
   return (
     <div className={cn(
-      "h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4 transition-all duration-300 relative",
+      "h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4 transition-all duration-300",
       isFullWidth && "px-0"
     )}>
-      {/* Folders Toggle Button */}
-      <button
-        onClick={() => setIsFoldersPanelOpen(true)}
-        className={cn(
-          "fixed left-0 top-1/2 -translate-y-1/2 w-6 h-16 bg-primary/90 hover:bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-lg transition-all duration-200 hover:w-8 z-30",
-          (isFoldersPanelOpen || isFullWidth) && "opacity-0 pointer-events-none"
-        )}
-      >
-        <ChevronRight className="w-4 h-4" />
-      </button>
-
-      {/* Slide-out Folders Panel */}
-      {isFoldersPanelOpen && (
-        <div 
-          className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40"
-          onClick={() => setIsFoldersPanelOpen(false)}
-        />
-      )}
-      <div 
-        ref={foldersPanelRef}
-        className={cn(
-          "fixed left-0 top-0 h-full z-50 transition-transform duration-300 ease-in-out",
-          isFoldersPanelOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        <div className="h-full p-4">
-          <div className="glass-strong rounded-2xl p-4 flex flex-col gap-4 shadow-card h-full w-64 relative">
-            {/* Close Button */}
-            <button
-              onClick={() => setIsFoldersPanelOpen(false)}
-              className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-16 bg-primary/90 hover:bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-lg transition-all duration-200 hover:w-8 z-10"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            {/* Header */}
-            <div className="flex items-center gap-2 pb-2 border-b border-border/30">
-              <FolderOpen className="w-5 h-5 text-primary" />
-              <span className="font-semibold">Folders</span>
-            </div>
+      {/* Folders Sheet */}
+      <Sheet open={isFoldersPanelOpen} onOpenChange={setIsFoldersPanelOpen}>
+        <SheetContent side="left" className="w-80 p-0 border-r border-border/50 bg-background">
+          <div className="flex flex-col h-full">
+            <SheetHeader className="p-4 border-b border-border/30">
+              <SheetTitle className="flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-primary" />
+                Folders
+              </SheetTitle>
+            </SheetHeader>
 
             {/* New Note Button */}
-            <Button
-              onClick={() => {
-                handleNewNote();
-                setIsFoldersPanelOpen(false);
-              }}
-              className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-xs font-medium"
-            >
-              <Plus className="w-3 h-3 mr-1" />
-              Add Note
-            </Button>
+            <div className="p-4">
+              <Button
+                onClick={() => {
+                  handleNewNote();
+                  setIsFoldersPanelOpen(false);
+                }}
+                className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-sm font-medium"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Note
+              </Button>
+            </div>
 
             {/* Categories */}
-            <ScrollArea className="flex-1">
-              <div className="space-y-1">
-                {CATEGORIES.map((cat) => {
+            <ScrollArea className="flex-1 px-4">
+              <div className="space-y-1 pb-4">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-2">
+                  Categories
+                </div>
+                {CATEGORIES.filter(c => c.id !== "trash").map((cat) => {
                   const Icon = cat.icon;
                   const count = cat.id === "all" 
                     ? notebookEntries.filter(e => !e.isDeleted).length 
-                    : cat.id === "trash"
-                      ? trashCount
-                      : notebookEntries.filter((e) => e.category === cat.id && !e.isDeleted).length;
+                    : notebookEntries.filter((e) => e.category === cat.id && !e.isDeleted).length;
                   
                   return (
                     <button
@@ -413,59 +374,81 @@ export function NotebookView({
                         setIsFoldersPanelOpen(false);
                       }}
                       className={cn(
-                        "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-all",
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
                         selectedCategory === cat.id
                           ? "bg-primary/20 text-primary border border-primary/30"
-                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                        cat.id === "trash" && "mt-4 border-t border-border/30 pt-4"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
                       )}
                     >
-                      <Icon className={cn(
-                        "w-4 h-4",
-                        cat.id === "trash" && trashCount > 0 && "text-destructive"
-                      )} />
+                      <Icon className="w-4 h-4" />
                       <span className="flex-1 text-left">{cat.label}</span>
-                      <span className={cn(
-                        "text-xs opacity-60",
-                        cat.id === "trash" && trashCount > 0 && "text-destructive opacity-100"
-                      )}>
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                         {count}
-                      </span>
+                      </Badge>
                     </button>
                   );
                 })}
+
+                {/* Trash - separated */}
+                <div className="pt-4 mt-4 border-t border-border/30">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-2">
+                    System
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedCategory("trash");
+                      setSelectedEntryId(null);
+                      setIsCreatingNew(false);
+                      setIsFoldersPanelOpen(false);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
+                      selectedCategory === "trash"
+                        ? "bg-destructive/20 text-destructive border border-destructive/30"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
+                    )}
+                  >
+                    <Trash2 className={cn("w-4 h-4", trashCount > 0 && "text-destructive")} />
+                    <span className="flex-1 text-left">Trash</span>
+                    {trashCount > 0 && (
+                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                        {trashCount}
+                      </Badge>
+                    )}
+                  </button>
+                </div>
               </div>
             </ScrollArea>
 
-            {/* Trade Stats */}
-            <div className="pt-3 border-t border-border/30 space-y-2">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {/* Trade Stats Footer */}
+            <div className="p-4 border-t border-border/30 bg-muted/20">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
                 <TrendingUp className="w-3 h-3" />
                 <span>Trading Summary</span>
               </div>
               <div className={cn(
-                "p-2 rounded-lg border text-center",
+                "p-3 rounded-lg border text-center mb-3",
                 overallStats.netPnL >= 0 
                   ? "bg-primary/10 border-primary/30" 
                   : "bg-destructive/10 border-destructive/30"
               )}>
                 <div className="text-[10px] uppercase text-muted-foreground">Net P&L</div>
                 <div className={cn(
-                  "text-lg font-bold font-mono",
+                  "text-xl font-bold font-mono",
                   overallStats.netPnL >= 0 ? "text-primary" : "text-destructive"
                 )}>
                   {overallStats.netPnL >= 0 ? "+" : ""}${overallStats.netPnL.toFixed(2)}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                <div className="p-1.5 rounded bg-muted/30">
+                <div className="p-2 rounded-lg bg-background border border-border/30">
                   <div className="text-muted-foreground">Trades</div>
-                  <div className="font-bold">{overallStats.totalTrades}</div>
+                  <div className="font-bold text-sm">{overallStats.totalTrades}</div>
                 </div>
-                <div className="p-1.5 rounded bg-muted/30">
+                <div className="p-2 rounded-lg bg-background border border-border/30">
                   <div className="text-muted-foreground">Win Rate</div>
                   <div className={cn(
-                    "font-bold",
+                    "font-bold text-sm",
                     overallStats.winRate >= 50 ? "text-primary" : "text-destructive"
                   )}>
                     {overallStats.winRate.toFixed(0)}%
@@ -474,8 +457,8 @@ export function NotebookView({
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Entries List */}
       <div className={cn(
@@ -484,12 +467,14 @@ export function NotebookView({
       )}>
         <div className="p-3 border-b border-border/30 space-y-2">
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setIsFoldersPanelOpen(true)}
-              className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+              className="h-8 w-8 p-0"
             >
-              <Menu className="w-4 h-4 text-muted-foreground" />
-            </button>
+              <PanelLeftOpen className="w-4 h-4" />
+            </Button>
             <span className="text-sm font-medium flex-1">
               {CATEGORIES.find((c) => c.id === selectedCategory)?.label}
             </span>
