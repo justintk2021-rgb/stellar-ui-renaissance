@@ -1043,6 +1043,16 @@ export function NotebookView({
                 data-placeholder="Start writing your notes..."
               />
             </ScrollArea>
+
+            {/* Floating Add Note Button */}
+            {!isViewingTrash && (
+              <Button
+                onClick={handleNewNote}
+                className="absolute bottom-6 left-6 w-12 h-12 rounded-full bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all duration-300 group"
+              >
+                <Plus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
+              </Button>
+            )}
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
