@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList, CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
 import bookLogo from "@/assets/book-logo.png";
@@ -23,6 +23,34 @@ const navItems = [
 
 export function Sidebar({ currentPage, onPageChange, isCollapsed = false, onToggleCollapse }: SidebarProps) {
   const [userName, setUserName] = useState<string>("NSYNC JOURNAL");
+  const [isHovering, setIsHovering] = useState(false);
+  const [isPinned, setIsPinned] = useState(!isCollapsed);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const arrowRef = useRef<HTMLButtonElement>(null);
+
+  // Sync pinned state with collapsed prop
+  useEffect(() => {
+    setIsPinned(!isCollapsed);
+  }, [isCollapsed]);
+
+  // Handle click outside to close
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        isPinned &&
+        sidebarRef.current &&
+        !sidebarRef.current.contains(e.target as Node) &&
+        arrowRef.current &&
+        !arrowRef.current.contains(e.target as Node)
+      ) {
+        setIsPinned(false);
+        onToggleCollapse?.();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isPinned, onToggleCollapse]);
 
   useEffect(() => {
     const fetchUserName = async () => {
@@ -52,30 +80,57 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = false, onTogg
     return () => subscription.unsubscribe();
   }, []);
 
+  const showSidebar = isPinned || isHovering;
+
+  const handleArrowClick = () => {
+    const newPinned = !isPinned;
+    setIsPinned(newPinned);
+    onToggleCollapse?.();
+  };
+
+  const handleArrowHover = () => {
+    if (!isPinned) {
+      setIsHovering(true);
+    }
+  };
+
+  const handleSidebarLeave = () => {
+    if (!isPinned) {
+      setIsHovering(false);
+    }
+  };
+
   return (
     <>
-      {/* Collapsed state - just show arrow button */}
-      {isCollapsed && onToggleCollapse && (
-        <button
-          onClick={onToggleCollapse}
-          className="fixed left-0 top-1/2 -translate-y-1/2 w-6 h-16 bg-primary/90 hover:bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-lg transition-all duration-200 hover:w-8 z-40"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      )}
+      {/* Arrow toggle - always visible on the left edge */}
+      <button
+        ref={arrowRef}
+        onClick={handleArrowClick}
+        onMouseEnter={handleArrowHover}
+        className={cn(
+          "fixed left-0 top-1/2 -translate-y-1/2 w-6 h-16 bg-primary/90 hover:bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-lg transition-all duration-200 hover:w-8 z-50",
+          showSidebar && "opacity-0 pointer-events-none"
+        )}
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
 
       {/* Sidebar panel */}
-      <aside className={cn(
-        "fixed left-0 top-0 h-full z-50 transition-transform duration-300 ease-in-out",
-        isCollapsed ? "-translate-x-full" : "translate-x-0"
-      )}>
+      <aside 
+        ref={sidebarRef}
+        className={cn(
+          "fixed left-0 top-0 h-full z-50 transition-transform duration-300 ease-in-out",
+          showSidebar ? "translate-x-0" : "-translate-x-full"
+        )}
+        onMouseLeave={handleSidebarLeave}
+      >
         <div className="h-full p-4">
           <div className="glass-strong rounded-2xl p-5 flex flex-col gap-6 shadow-card h-full w-64 lg:w-72 relative">
-            {/* Collapse Toggle Button */}
+            {/* Collapse Toggle Button - same arrow style */}
             {onToggleCollapse && (
               <button
-                onClick={onToggleCollapse}
-                className="absolute -right-3 top-8 w-6 h-6 rounded-full bg-primary/90 hover:bg-primary text-primary-foreground flex items-center justify-center shadow-lg transition-all duration-200 hover:scale-110 z-10"
+                onClick={handleArrowClick}
+                className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-16 bg-primary/90 hover:bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-lg transition-all duration-200 hover:w-8 z-10"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -152,11 +207,15 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = false, onTogg
         </div>
       </aside>
 
-      {/* Backdrop when sidebar is open */}
-      {!isCollapsed && onToggleCollapse && (
+      {/* Backdrop when sidebar is open on mobile */}
+      {showSidebar && (
         <div 
           className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={onToggleCollapse}
+          onClick={() => {
+            setIsPinned(false);
+            setIsHovering(false);
+            onToggleCollapse?.();
+          }}
         />
       )}
     </>
