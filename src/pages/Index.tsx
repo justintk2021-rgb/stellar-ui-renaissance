@@ -388,7 +388,7 @@ const Index = () => {
 
             {/* Dashboard Page */}
             {currentPage === 'dashboard' && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
                 {/* Account Selector */}
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <AccountSelector
@@ -421,7 +421,7 @@ const Index = () => {
 
             {/* Journal Page */}
             {currentPage === 'journal' && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
                 {/* Account Selector for Journal */}
                 <div className="flex items-center gap-4">
                   <span className="text-sm text-muted-foreground">Trading Account:</span>
@@ -455,7 +455,7 @@ const Index = () => {
 
             {/* Notebook Page */}
             {currentPage === 'notebook' && (
-              <div className="animate-fade-in">
+              <div className="animate-fade-in max-w-7xl mx-auto">
                 <NotebookView
                   trades={trades}
                   selectedTradeId={selectedTradeId}
@@ -470,26 +470,32 @@ const Index = () => {
 
             {/* Playbook Page */}
             {currentPage === 'playbook' && (
-              <PlaybookView />
+              <div className="max-w-7xl mx-auto">
+                <PlaybookView />
+              </div>
             )}
 
             {/* Economic Calendar Page */}
             {currentPage === 'calendar' && (
-              <EconomicCalendarView />
+              <div className="max-w-7xl mx-auto">
+                <EconomicCalendarView />
+              </div>
             )}
 
             {/* Settings Page */}
             {currentPage === 'settings' && (
-              <SettingsView 
-                theme={theme} 
-                onThemeChange={setTheme}
-                accentColor={accentColor}
-                onAccentColorChange={setAccentColor}
-                userProfile={userProfile}
-                onLogout={handleLogout}
-                customColor={customColor}
-                onCustomColorChange={setCustomColor}
-              />
+              <div className="max-w-7xl mx-auto">
+                <SettingsView 
+                  theme={theme} 
+                  onThemeChange={setTheme}
+                  accentColor={accentColor}
+                  onAccentColorChange={setAccentColor}
+                  userProfile={userProfile}
+                  onLogout={handleLogout}
+                  customColor={customColor}
+                  onCustomColorChange={setCustomColor}
+                />
+              </div>
             )}
 
             {/* Chart Page */}
