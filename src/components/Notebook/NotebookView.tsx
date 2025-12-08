@@ -32,6 +32,7 @@ import {
   Search,
   Trash2,
   ChevronRight,
+  ChevronLeft,
   ListOrdered,
   Quote,
   MoreHorizontal,
@@ -44,6 +45,9 @@ import {
   Minimize2,
   Clock,
   Star,
+  RotateCcw,
+  Menu,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -65,6 +69,7 @@ const CATEGORIES = [
   { id: "goals", label: "Goals", icon: Lightbulb },
   { id: "mistakes", label: "Mistakes & Lessons", icon: AlertTriangle },
   { id: "general", label: "General Notes", icon: BookOpen },
+  { id: "trash", label: "Trash", icon: Trash2 },
 ];
 
 type FontStyle = 'default' | 'serif' | 'mono';
@@ -86,8 +91,10 @@ export function NotebookView({
   const [isSmallText, setIsSmallText] = useState(false);
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
+  const [isFoldersPanelOpen, setIsFoldersPanelOpen] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const foldersPanelRef = useRef<HTMLDivElement>(null);
 
   // Find selected entry
   const selectedEntry = notebookEntries.find((e) => e.id === selectedEntryId);
@@ -99,17 +106,30 @@ export function NotebookView({
     return text.trim().split(/\s+/).filter(word => word.length > 0).length;
   }, [selectedEntry?.content]);
 
-  // Filter entries by category and search
+  // Filter entries by category and search (excluding trash unless viewing trash)
   const filteredEntries = notebookEntries.filter((entry) => {
+    // Trash filter
+    if (selectedCategory === "trash") {
+      return entry.isDeleted === true;
+    }
+    
+    // For other categories, exclude deleted items
+    if (entry.isDeleted) return false;
+    
     const matchesCategory = selectedCategory === "all" || entry.category === selectedCategory;
     const matchesSearch = entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       entry.content.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
+  // Count trash items
+  const trashCount = notebookEntries.filter(e => e.isDeleted).length;
+
   // Group entries by date
   const groupedEntries = filteredEntries.reduce((acc, entry) => {
-    const date = entry.date;
+    const date = entry.isDeleted && entry.deletedAt 
+      ? entry.deletedAt.slice(0, 10) 
+      : entry.date;
     if (!acc[date]) acc[date] = [];
     acc[date].push(entry);
     return acc;
@@ -125,6 +145,22 @@ export function NotebookView({
       editorRef.current.innerHTML = "";
     }
   }, [selectedEntry, isCreatingNew]);
+
+  // Close folders panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        isFoldersPanelOpen &&
+        foldersPanelRef.current &&
+        !foldersPanelRef.current.contains(e.target as Node)
+      ) {
+        setIsFoldersPanelOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isFoldersPanelOpen]);
 
   const execCommand = (cmd: string, value?: string) => {
     if (isLocked) return;
@@ -143,7 +179,7 @@ export function NotebookView({
         id: Date.now().toString(),
         title,
         content,
-        category: selectedCategory === "all" ? "general" : selectedCategory,
+        category: selectedCategory === "all" || selectedCategory === "trash" ? "general" : selectedCategory,
         date: new Date().toISOString().slice(0, 10),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -164,6 +200,9 @@ export function NotebookView({
   };
 
   const handleNewNote = () => {
+    if (selectedCategory === "trash") {
+      setSelectedCategory("general");
+    }
     setIsCreatingNew(true);
     setSelectedEntryId(null);
     setIsLocked(false);
@@ -171,12 +210,50 @@ export function NotebookView({
     if (editorRef.current) editorRef.current.innerHTML = "";
   };
 
-  const handleDeleteEntry = () => {
+  // Soft delete - move to trash
+  const handleMoveToTrash = () => {
+    if (selectedEntry) {
+      onSaveEntry({
+        ...selectedEntry,
+        isDeleted: true,
+        deletedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      setSelectedEntryId(null);
+      toast.success("Note moved to trash!");
+    }
+  };
+
+  // Restore from trash
+  const handleRestoreFromTrash = () => {
+    if (selectedEntry) {
+      onSaveEntry({
+        ...selectedEntry,
+        isDeleted: false,
+        deletedAt: undefined,
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success("Note restored!");
+    }
+  };
+
+  // Permanent delete
+  const handlePermanentDelete = () => {
     if (selectedEntry) {
       onDeleteEntry(selectedEntry.id);
       setSelectedEntryId(null);
-      toast.success("Note deleted!");
+      toast.success("Note permanently deleted!");
     }
+  };
+
+  // Empty trash
+  const handleEmptyTrash = () => {
+    const trashedEntries = notebookEntries.filter(e => e.isDeleted);
+    trashedEntries.forEach(entry => {
+      onDeleteEntry(entry.id);
+    });
+    setSelectedEntryId(null);
+    toast.success("Trash emptied!");
   };
 
   const handleDuplicate = () => {
@@ -238,13 +315,6 @@ export function NotebookView({
   // Find linked trade for entry
   const linkedTrade = selectedEntry?.tradeId ? trades.find((t) => t.id === selectedEntry.tradeId) : null;
 
-  // Calculate stats for linked trade
-  const tradeStats = linkedTrade ? {
-    pnl: linkedTrade.result,
-    wins: linkedTrade.result > 0 ? 1 : 0,
-    losses: linkedTrade.result < 0 ? 1 : 0,
-  } : null;
-
   // Calculate overall trade stats
   const overallStats = {
     totalTrades: trades.length,
@@ -261,155 +331,182 @@ export function NotebookView({
     mono: 'font-mono',
   };
 
+  const isViewingTrash = selectedCategory === "trash";
+  const isSelectedEntryInTrash = selectedEntry?.isDeleted;
+
   return (
     <div className={cn(
-      "h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4 transition-all duration-300",
+      "h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4 transition-all duration-300 relative",
       isFullWidth && "px-0"
     )}>
-      {/* Left Sidebar - Categories & Trade Stats */}
-      <div className={cn(
-        "w-52 flex-shrink-0 flex flex-col gap-4 transition-all duration-300",
-        isFullWidth && "hidden"
-      )}>
-        {/* Categories */}
-        <div className="glass rounded-xl border border-border/40 overflow-hidden flex flex-col flex-1">
-          <div className="p-3 border-b border-border/30">
+      {/* Folders Toggle Button */}
+      <button
+        onClick={() => setIsFoldersPanelOpen(true)}
+        className={cn(
+          "fixed left-0 top-1/2 -translate-y-1/2 w-6 h-16 bg-primary/90 hover:bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-lg transition-all duration-200 hover:w-8 z-30",
+          (isFoldersPanelOpen || isFullWidth) && "opacity-0 pointer-events-none"
+        )}
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
+
+      {/* Slide-out Folders Panel */}
+      {isFoldersPanelOpen && (
+        <div 
+          className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40"
+          onClick={() => setIsFoldersPanelOpen(false)}
+        />
+      )}
+      <div 
+        ref={foldersPanelRef}
+        className={cn(
+          "fixed left-0 top-0 h-full z-50 transition-transform duration-300 ease-in-out",
+          isFoldersPanelOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="h-full p-4">
+          <div className="glass-strong rounded-2xl p-4 flex flex-col gap-4 shadow-card h-full w-64 relative">
+            {/* Close Button */}
+            <button
+              onClick={() => setIsFoldersPanelOpen(false)}
+              className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-16 bg-primary/90 hover:bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-lg transition-all duration-200 hover:w-8 z-10"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-2 pb-2 border-b border-border/30">
+              <FolderOpen className="w-5 h-5 text-primary" />
+              <span className="font-semibold">Folders</span>
+            </div>
+
+            {/* New Note Button */}
             <Button
-              onClick={handleNewNote}
+              onClick={() => {
+                handleNewNote();
+                setIsFoldersPanelOpen(false);
+              }}
               className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-xs font-medium"
             >
               <Plus className="w-3 h-3 mr-1" />
               Add Note
             </Button>
-          </div>
-          
-          <ScrollArea className="flex-1">
-            <div className="p-2 space-y-1">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1">
-                Folders
+
+            {/* Categories */}
+            <ScrollArea className="flex-1">
+              <div className="space-y-1">
+                {CATEGORIES.map((cat) => {
+                  const Icon = cat.icon;
+                  const count = cat.id === "all" 
+                    ? notebookEntries.filter(e => !e.isDeleted).length 
+                    : cat.id === "trash"
+                      ? trashCount
+                      : notebookEntries.filter((e) => e.category === cat.id && !e.isDeleted).length;
+                  
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        setSelectedCategory(cat.id);
+                        setSelectedEntryId(null);
+                        setIsCreatingNew(false);
+                        setIsFoldersPanelOpen(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-all",
+                        selectedCategory === cat.id
+                          ? "bg-primary/20 text-primary border border-primary/30"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                        cat.id === "trash" && "mt-4 border-t border-border/30 pt-4"
+                      )}
+                    >
+                      <Icon className={cn(
+                        "w-4 h-4",
+                        cat.id === "trash" && trashCount > 0 && "text-destructive"
+                      )} />
+                      <span className="flex-1 text-left">{cat.label}</span>
+                      <span className={cn(
+                        "text-xs opacity-60",
+                        cat.id === "trash" && trashCount > 0 && "text-destructive opacity-100"
+                      )}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-              {CATEGORIES.map((cat) => {
-                const Icon = cat.icon;
-                const count = cat.id === "all" 
-                  ? notebookEntries.length 
-                  : notebookEntries.filter((e) => e.category === cat.id).length;
-                
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
-                      selectedCategory === cat.id
-                        ? "bg-primary/20 text-primary border border-primary/30"
-                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                    )}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="flex-1 text-left truncate">{cat.label}</span>
-                    <span className="text-[10px] opacity-60">({count})</span>
-                  </button>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </div>
+            </ScrollArea>
 
-        {/* Trade Stats Summary */}
-        <div className="glass rounded-xl border border-border/40 p-3 space-y-3">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-primary" />
-            <span className="text-xs font-medium">Trade Summary</span>
-          </div>
-          
-          <div className={cn(
-            "p-3 rounded-lg border text-center",
-            overallStats.netPnL >= 0 
-              ? "bg-primary/10 border-primary/30" 
-              : "bg-destructive/10 border-destructive/30"
-          )}>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Net P&L</div>
-            <div className={cn(
-              "text-xl font-bold font-mono",
-              overallStats.netPnL >= 0 ? "text-primary" : "text-destructive"
-            )}>
-              {overallStats.netPnL >= 0 ? "+" : ""}${overallStats.netPnL.toFixed(2)}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="p-2 rounded-lg bg-muted/30 text-center">
-              <div className="text-[10px] text-muted-foreground">Total</div>
-              <div className="text-sm font-bold">{overallStats.totalTrades}</div>
-            </div>
-            <div className="p-2 rounded-lg bg-muted/30 text-center">
-              <div className="text-[10px] text-muted-foreground">Win Rate</div>
+            {/* Trade Stats */}
+            <div className="pt-3 border-t border-border/30 space-y-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <TrendingUp className="w-3 h-3" />
+                <span>Trading Summary</span>
+              </div>
               <div className={cn(
-                "text-sm font-bold",
-                overallStats.winRate >= 50 ? "text-primary" : "text-destructive"
+                "p-2 rounded-lg border text-center",
+                overallStats.netPnL >= 0 
+                  ? "bg-primary/10 border-primary/30" 
+                  : "bg-destructive/10 border-destructive/30"
               )}>
-                {overallStats.winRate.toFixed(1)}%
+                <div className="text-[10px] uppercase text-muted-foreground">Net P&L</div>
+                <div className={cn(
+                  "text-lg font-bold font-mono",
+                  overallStats.netPnL >= 0 ? "text-primary" : "text-destructive"
+                )}>
+                  {overallStats.netPnL >= 0 ? "+" : ""}${overallStats.netPnL.toFixed(2)}
+                </div>
               </div>
-            </div>
-            <div className="p-2 rounded-lg bg-primary/10 text-center">
-              <div className="text-[10px] text-muted-foreground">Winners</div>
-              <div className="text-sm font-bold text-primary">{overallStats.wins}</div>
-            </div>
-            <div className="p-2 rounded-lg bg-destructive/10 text-center">
-              <div className="text-[10px] text-muted-foreground">Losers</div>
-              <div className="text-sm font-bold text-destructive">{overallStats.losses}</div>
+              <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                <div className="p-1.5 rounded bg-muted/30">
+                  <div className="text-muted-foreground">Trades</div>
+                  <div className="font-bold">{overallStats.totalTrades}</div>
+                </div>
+                <div className="p-1.5 rounded bg-muted/30">
+                  <div className="text-muted-foreground">Win Rate</div>
+                  <div className={cn(
+                    "font-bold",
+                    overallStats.winRate >= 50 ? "text-primary" : "text-destructive"
+                  )}>
+                    {overallStats.winRate.toFixed(0)}%
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-
-          {/* Recent Trades */}
-          {trades.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Recent Trades</div>
-              <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
-                {trades.slice(0, 5).map((trade) => (
-                  <div 
-                    key={trade.id}
-                    className="flex items-center justify-between p-2 rounded-lg bg-muted/20 text-xs"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Badge 
-                        variant="outline" 
-                        className={cn(
-                          "text-[9px] px-1.5 py-0",
-                          trade.direction === 'Long' 
-                            ? "border-primary/50 text-primary" 
-                            : "border-destructive/50 text-destructive"
-                        )}
-                      >
-                        {trade.direction.charAt(0)}
-                      </Badge>
-                      <span className="font-medium">{trade.pair}</span>
-                    </div>
-                    <span className={cn(
-                      "font-bold font-mono",
-                      trade.result >= 0 ? "text-primary" : "text-destructive"
-                    )}>
-                      {trade.result >= 0 ? "+" : ""}{trade.result.toFixed(0)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Middle - Entries List */}
+      {/* Entries List */}
       <div className={cn(
-        "w-64 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col transition-all duration-300",
+        "w-72 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col transition-all duration-300",
         isFullWidth && "hidden"
       )}>
         <div className="p-3 border-b border-border/30 space-y-2">
           <div className="flex items-center gap-2">
-            <FolderOpen className="w-4 h-4 text-muted-foreground" />
-            <span className="text-xs font-medium">
+            <button
+              onClick={() => setIsFoldersPanelOpen(true)}
+              className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+            >
+              <Menu className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <span className="text-sm font-medium flex-1">
               {CATEGORIES.find((c) => c.id === selectedCategory)?.label}
             </span>
+            {isViewingTrash && trashCount > 0 && (
+              <ConfirmDialog
+                trigger={
+                  <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive">
+                    Empty
+                  </Button>
+                }
+                title="Empty Trash"
+                description="Are you sure you want to permanently delete all items in trash? This action cannot be undone."
+                confirmLabel="Empty Trash"
+                variant="destructive"
+                onConfirm={handleEmptyTrash}
+              />
+            )}
           </div>
           <div className="relative">
             <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -426,13 +523,13 @@ export function NotebookView({
           <div className="p-2">
             {sortedDates.length === 0 && !isCreatingNew ? (
               <div className="text-center text-xs text-muted-foreground py-8">
-                No notes yet. Create one!
+                {isViewingTrash ? "Trash is empty" : "No notes yet. Create one!"}
               </div>
             ) : (
               sortedDates.map((date) => (
                 <div key={date} className="mb-3">
                   <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1 sticky top-0 bg-card/80 backdrop-blur-sm">
-                    {formatDate(date)}
+                    {isViewingTrash ? `Deleted ${formatDate(date)}` : formatDate(date)}
                   </div>
                   {groupedEntries[date].map((entry) => (
                     <button
@@ -445,20 +542,24 @@ export function NotebookView({
                         "w-full text-left p-2 rounded-lg transition-all mb-1",
                         selectedEntryId === entry.id
                           ? "bg-primary/20 border border-primary/40"
-                          : "hover:bg-muted/50 border border-transparent"
+                          : "hover:bg-muted/50 border border-transparent",
+                        entry.isDeleted && "opacity-70"
                       )}
                     >
                       <div className="flex items-center gap-2">
                         <ChevronRight className={cn(
-                          "w-3 h-3 transition-transform",
+                          "w-3 h-3 transition-transform flex-shrink-0",
                           selectedEntryId === entry.id && "rotate-90"
                         )} />
                         <span className="text-xs font-medium truncate flex-1">{entry.title}</span>
+                        {entry.isDeleted && (
+                          <Trash2 className="w-3 h-3 text-destructive flex-shrink-0" />
+                        )}
                       </div>
-                      {entry.tradeId && (() => {
+                      {entry.tradeId && !entry.isDeleted && (() => {
                         const trade = trades.find(t => t.id === entry.tradeId);
                         return trade ? (
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-2 mt-1 ml-5">
                             <Badge variant="outline" className={cn(
                               "text-[9px]",
                               trade.result >= 0 ? "border-primary/50 text-primary" : "border-destructive/50 text-destructive"
@@ -477,14 +578,52 @@ export function NotebookView({
         </ScrollArea>
       </div>
 
-      {/* Right - Editor */}
+      {/* Editor */}
       <div className="flex-1 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
         {selectedEntry || isCreatingNew ? (
           <>
-            {/* Header with Trade Metrics and Actions Menu */}
+            {/* Header */}
             <div className="p-4 border-b border-border/30">
+              {/* Trash Banner */}
+              {isSelectedEntryInTrash && (
+                <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/30 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-destructive">
+                    <Trash2 className="w-4 h-4" />
+                    <span>This note is in the trash</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRestoreFromTrash}
+                      className="h-7 text-xs border-primary/50 text-primary hover:bg-primary/10"
+                    >
+                      <RotateCcw className="w-3 h-3 mr-1" />
+                      Restore
+                    </Button>
+                    <ConfirmDialog
+                      trigger={
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs border-destructive/50 text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Delete Forever
+                        </Button>
+                      }
+                      title="Delete Permanently"
+                      description="Are you sure you want to permanently delete this note? This action cannot be undone."
+                      confirmLabel="Delete Forever"
+                      variant="destructive"
+                      onConfirm={handlePermanentDelete}
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Trade Metrics Banner (if linked) */}
-              {linkedTrade && (
+              {linkedTrade && !isSelectedEntryInTrash && (
                 <div className={cn(
                   "mb-4 p-4 rounded-xl border",
                   linkedTrade.result >= 0 
@@ -548,13 +687,13 @@ export function NotebookView({
                     ref={titleRef}
                     defaultValue={selectedEntry?.title || ""}
                     placeholder="Note title..."
-                    disabled={isLocked}
+                    disabled={isLocked || isSelectedEntryInTrash}
                     className={cn(
                       "text-lg font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/50",
-                      isLocked && "cursor-not-allowed opacity-70"
+                      (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70"
                     )}
                   />
-                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground flex-wrap">
                     <Calendar className="w-3 h-3" />
                     <span>{selectedEntry ? formatDate(selectedEntry.date) : formatDate(new Date().toISOString().slice(0, 10))}</span>
                     {selectedEntry && (
@@ -584,237 +723,241 @@ export function NotebookView({
                   </div>
                 </div>
 
-                {/* Actions Menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-64 glass-strong">
-                    {/* Font Style Options */}
-                    <div className="px-2 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Font Style</div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setFontStyle('default')}
-                          className={cn(
-                            "flex-1 py-2 rounded-lg text-center transition-all border",
-                            fontStyle === 'default' 
-                              ? "bg-primary/20 border-primary/50 text-primary" 
-                              : "bg-muted/30 border-transparent hover:bg-muted/50"
-                          )}
-                        >
-                          <span className="text-lg font-sans">Ag</span>
-                          <div className="text-[9px] text-muted-foreground mt-1">Default</div>
-                        </button>
-                        <button
-                          onClick={() => setFontStyle('serif')}
-                          className={cn(
-                            "flex-1 py-2 rounded-lg text-center transition-all border",
-                            fontStyle === 'serif' 
-                              ? "bg-primary/20 border-primary/50 text-primary" 
-                              : "bg-muted/30 border-transparent hover:bg-muted/50"
-                          )}
-                        >
-                          <span className="text-lg font-serif">Ag</span>
-                          <div className="text-[9px] text-muted-foreground mt-1">Serif</div>
-                        </button>
-                        <button
-                          onClick={() => setFontStyle('mono')}
-                          className={cn(
-                            "flex-1 py-2 rounded-lg text-center transition-all border",
-                            fontStyle === 'mono' 
-                              ? "bg-primary/20 border-primary/50 text-primary" 
-                              : "bg-muted/30 border-transparent hover:bg-muted/50"
-                          )}
-                        >
-                          <span className="text-lg font-mono">Ag</span>
-                          <div className="text-[9px] text-muted-foreground mt-1">Mono</div>
-                        </button>
+                {/* Actions Menu - hidden for trash items */}
+                {!isSelectedEntryInTrash && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64 glass-strong">
+                      {/* Font Style Options */}
+                      <div className="px-2 py-2">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Font Style</div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setFontStyle('default')}
+                            className={cn(
+                              "flex-1 py-2 rounded-lg text-center transition-all border",
+                              fontStyle === 'default' 
+                                ? "bg-primary/20 border-primary/50 text-primary" 
+                                : "bg-muted/30 border-transparent hover:bg-muted/50"
+                            )}
+                          >
+                            <span className="text-lg font-sans">Ag</span>
+                            <div className="text-[9px] text-muted-foreground mt-1">Default</div>
+                          </button>
+                          <button
+                            onClick={() => setFontStyle('serif')}
+                            className={cn(
+                              "flex-1 py-2 rounded-lg text-center transition-all border",
+                              fontStyle === 'serif' 
+                                ? "bg-primary/20 border-primary/50 text-primary" 
+                                : "bg-muted/30 border-transparent hover:bg-muted/50"
+                            )}
+                          >
+                            <span className="text-lg font-serif">Ag</span>
+                            <div className="text-[9px] text-muted-foreground mt-1">Serif</div>
+                          </button>
+                          <button
+                            onClick={() => setFontStyle('mono')}
+                            className={cn(
+                              "flex-1 py-2 rounded-lg text-center transition-all border",
+                              fontStyle === 'mono' 
+                                ? "bg-primary/20 border-primary/50 text-primary" 
+                                : "bg-muted/30 border-transparent hover:bg-muted/50"
+                            )}
+                          >
+                            <span className="text-lg font-mono">Ag</span>
+                            <div className="text-[9px] text-muted-foreground mt-1">Mono</div>
+                          </button>
+                        </div>
                       </div>
-                    </div>
 
-                    <DropdownMenuSeparator />
+                      <DropdownMenuSeparator />
 
-                    <DropdownMenuItem onClick={handleCopyContent} className="text-xs">
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy content
-                    </DropdownMenuItem>
-                    
-                    {selectedEntry && (
-                      <DropdownMenuItem onClick={handleDuplicate} className="text-xs">
-                        <FileText className="w-4 h-4 mr-2" />
-                        Duplicate
+                      <DropdownMenuItem onClick={handleCopyContent} className="text-xs">
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy content
                       </DropdownMenuItem>
-                    )}
-
-                    <DropdownMenuSeparator />
-
-                    {/* Toggle Options */}
-                    <div className="px-2 py-2 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs">
-                          <Type className="w-4 h-4" />
-                          Small text
-                        </div>
-                        <Switch 
-                          checked={isSmallText} 
-                          onCheckedChange={setIsSmallText}
-                          className="scale-75"
-                        />
-                      </div>
                       
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs">
-                          {isFullWidth ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                          Full width
-                        </div>
-                        <Switch 
-                          checked={isFullWidth} 
-                          onCheckedChange={setIsFullWidth}
-                          className="scale-75"
-                        />
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs">
-                          {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                          Lock page
-                        </div>
-                        <Switch 
-                          checked={isLocked} 
-                          onCheckedChange={setIsLocked}
-                          className="scale-75"
-                        />
-                      </div>
-                    </div>
-
-                    <DropdownMenuSeparator />
-
-                    <DropdownMenuItem onClick={handleExport} className="text-xs">
-                      <Download className="w-4 h-4 mr-2" />
-                      Export
-                    </DropdownMenuItem>
-
-                    {selectedEntry && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={handleDeleteEntry} 
-                          className="text-xs text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Move to Trash
+                      {selectedEntry && (
+                        <DropdownMenuItem onClick={handleDuplicate} className="text-xs">
+                          <FileText className="w-4 h-4 mr-2" />
+                          Duplicate
                         </DropdownMenuItem>
-                      </>
-                    )}
+                      )}
 
-                    {/* Footer Info */}
-                    <DropdownMenuSeparator />
-                    <div className="px-2 py-2 text-[10px] text-muted-foreground space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Type className="w-3 h-3" />
-                        Word count: {wordCount} words
+                      <DropdownMenuSeparator />
+
+                      {/* Toggle Options */}
+                      <div className="px-2 py-2 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-xs">
+                            <Type className="w-4 h-4" />
+                            Small text
+                          </div>
+                          <Switch 
+                            checked={isSmallText} 
+                            onCheckedChange={setIsSmallText}
+                            className="scale-75"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-xs">
+                            {isFullWidth ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                            Full width
+                          </div>
+                          <Switch 
+                            checked={isFullWidth} 
+                            onCheckedChange={setIsFullWidth}
+                            className="scale-75"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-xs">
+                            {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                            Lock page
+                          </div>
+                          <Switch 
+                            checked={isLocked} 
+                            onCheckedChange={setIsLocked}
+                            className="scale-75"
+                          />
+                        </div>
                       </div>
+
+                      <DropdownMenuSeparator />
+
+                      <DropdownMenuItem onClick={handleExport} className="text-xs">
+                        <Download className="w-4 h-4 mr-2" />
+                        Export
+                      </DropdownMenuItem>
+
                       {selectedEntry && (
                         <>
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-3 h-3" />
-                            Last edited: {formatDateTime(selectedEntry.updatedAt)}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Star className="w-3 h-3" />
-                            Created: {formatDateTime(selectedEntry.createdAt)}
-                          </div>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={handleMoveToTrash} 
+                            className="text-xs text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Move to Trash
+                          </DropdownMenuItem>
                         </>
                       )}
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+
+                      {/* Footer Info */}
+                      <DropdownMenuSeparator />
+                      <div className="px-2 py-2 text-[10px] text-muted-foreground space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Type className="w-3 h-3" />
+                          Word count: {wordCount} words
+                        </div>
+                        {selectedEntry && (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-3 h-3" />
+                              Last edited: {formatDateTime(selectedEntry.updatedAt)}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Star className="w-3 h-3" />
+                              Created: {formatDateTime(selectedEntry.createdAt)}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </div>
 
-            {/* Toolbar */}
-            <div className="px-4 py-2 border-b border-border/30 flex items-center gap-1 flex-wrap">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => execCommand("bold")} 
-                className="w-7 h-7 p-0"
-                disabled={isLocked}
-              >
-                <Bold className="w-3 h-3" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => execCommand("italic")} 
-                className="w-7 h-7 p-0"
-                disabled={isLocked}
-              >
-                <Italic className="w-3 h-3" />
-              </Button>
-              <div className="w-px h-5 bg-border/50 mx-1" />
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => execCommand("formatBlock", "h2")} 
-                className="w-7 h-7 p-0"
-                disabled={isLocked}
-              >
-                <Heading1 className="w-3 h-3" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => execCommand("insertUnorderedList")} 
-                className="w-7 h-7 p-0"
-                disabled={isLocked}
-              >
-                <List className="w-3 h-3" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => execCommand("insertOrderedList")} 
-                className="w-7 h-7 p-0"
-                disabled={isLocked}
-              >
-                <ListOrdered className="w-3 h-3" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => execCommand("formatBlock", "blockquote")} 
-                className="w-7 h-7 p-0"
-                disabled={isLocked}
-              >
-                <Quote className="w-3 h-3" />
-              </Button>
-              
-              <div className="flex-1" />
-              
-              <Button
-                onClick={handleSave}
-                disabled={isLocked}
-                className="bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-xs font-medium"
-              >
-                <Save className="w-3 h-3 mr-1" />
-                Save
-              </Button>
-            </div>
+            {/* Toolbar - hidden for trash items */}
+            {!isSelectedEntryInTrash && (
+              <div className="px-4 py-2 border-b border-border/30 flex items-center gap-1 flex-wrap">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => execCommand("bold")} 
+                  className="w-7 h-7 p-0"
+                  disabled={isLocked}
+                >
+                  <Bold className="w-3 h-3" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => execCommand("italic")} 
+                  className="w-7 h-7 p-0"
+                  disabled={isLocked}
+                >
+                  <Italic className="w-3 h-3" />
+                </Button>
+                <div className="w-px h-5 bg-border/50 mx-1" />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => execCommand("formatBlock", "h2")} 
+                  className="w-7 h-7 p-0"
+                  disabled={isLocked}
+                >
+                  <Heading1 className="w-3 h-3" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => execCommand("insertUnorderedList")} 
+                  className="w-7 h-7 p-0"
+                  disabled={isLocked}
+                >
+                  <List className="w-3 h-3" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => execCommand("insertOrderedList")} 
+                  className="w-7 h-7 p-0"
+                  disabled={isLocked}
+                >
+                  <ListOrdered className="w-3 h-3" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => execCommand("formatBlock", "blockquote")} 
+                  className="w-7 h-7 p-0"
+                  disabled={isLocked}
+                >
+                  <Quote className="w-3 h-3" />
+                </Button>
+                
+                <div className="flex-1" />
+                
+                <Button
+                  onClick={handleSave}
+                  disabled={isLocked}
+                  className="bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-xs font-medium"
+                >
+                  <Save className="w-3 h-3 mr-1" />
+                  Save
+                </Button>
+              </div>
+            )}
 
             {/* Editor */}
             <ScrollArea className="flex-1">
               <div
                 ref={editorRef}
-                contentEditable={!isLocked}
+                contentEditable={!isLocked && !isSelectedEntryInTrash}
                 className={cn(
                   "min-h-full p-4 focus:outline-none transition-all",
                   fontClasses[fontStyle],
                   isSmallText ? "text-xs" : "text-sm",
-                  isLocked && "cursor-not-allowed opacity-70",
+                  (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70",
                   "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2",
                   "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2",
                   "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1",
@@ -833,15 +976,17 @@ export function NotebookView({
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
             <BookOpen className="w-12 h-12 mb-4 opacity-30" />
-            <p className="text-sm">Select a note or create a new one</p>
-            <Button
-              onClick={handleNewNote}
-              variant="outline"
-              className="mt-4 text-xs"
-            >
-              <Plus className="w-3 h-3 mr-1" />
-              Create Note
-            </Button>
+            <p className="text-sm">{isViewingTrash ? "Select a note to view" : "Select a note or create a new one"}</p>
+            {!isViewingTrash && (
+              <Button
+                onClick={handleNewNote}
+                variant="outline"
+                className="mt-4 text-xs"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Create Note
+              </Button>
+            )}
           </div>
         )}
       </div>

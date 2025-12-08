@@ -26,4 +26,6 @@ export interface NotebookEntry {
   tradeId?: string; // Optional link to a trade
   createdAt: string;
   updatedAt: string;
+  isDeleted?: boolean; // Soft delete flag for trash
+  deletedAt?: string; // When it was moved to trash
 }
