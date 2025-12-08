@@ -651,21 +651,36 @@ serve(async (req) => {
         });
       }
 
-      const positionsResponse = await fetch(
-        `https://mt-client-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${connection.metaapi_account_id}/positions`,
-        {
-          headers: { 'auth-token': metaApiToken },
-        }
-      );
+      let positions: MetaApiPosition[] = [];
+      try {
+        const positionsResponse = await fetch(
+          `https://mt-client-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${connection.metaapi_account_id}/positions`,
+          {
+            headers: { 'auth-token': metaApiToken },
+          }
+        );
 
-      if (!positionsResponse.ok) {
-        return new Response(JSON.stringify({ error: 'Failed to fetch positions' }), {
-          status: 500,
+        if (!positionsResponse.ok) {
+          const errorText = await positionsResponse.text();
+          console.error('MetaAPI positions error:', errorText);
+          return new Response(JSON.stringify({ error: 'Failed to fetch positions from MetaAPI' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        positions = await positionsResponse.json();
+      } catch (fetchError) {
+        console.error('MetaAPI fetch error (positions):', fetchError);
+        // SSL certificate errors - MetaAPI server issue
+        return new Response(JSON.stringify({ 
+          error: 'MetaAPI connection issue. The account may still be syncing or there is a temporary server issue. Please try again in a few minutes.',
+          details: String(fetchError)
+        }), {
+          status: 503,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-
-      const positions: MetaApiPosition[] = await positionsResponse.json();
       
       await supabase.from('broker_positions').delete().eq('broker_connection_id', connectionId);
       
@@ -798,21 +813,36 @@ serve(async (req) => {
       const startTime = new Date();
       startTime.setDate(startTime.getDate() - 90);
 
-      const historyResponse = await fetch(
-        `https://mt-client-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${connection.metaapi_account_id}/history-deals/time/${startTime.toISOString()}/${new Date().toISOString()}`,
-        {
-          headers: { 'auth-token': metaApiToken },
-        }
-      );
+      let deals: MetaApiDeal[] = [];
+      try {
+        const historyResponse = await fetch(
+          `https://mt-client-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${connection.metaapi_account_id}/history-deals/time/${startTime.toISOString()}/${new Date().toISOString()}`,
+          {
+            headers: { 'auth-token': metaApiToken },
+          }
+        );
 
-      if (!historyResponse.ok) {
-        return new Response(JSON.stringify({ error: 'Failed to fetch trade history. Account may still be syncing.' }), {
-          status: 500,
+        if (!historyResponse.ok) {
+          const errorText = await historyResponse.text();
+          console.error('MetaAPI history error:', errorText);
+          return new Response(JSON.stringify({ error: 'Failed to fetch trade history. Account may still be syncing.' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        deals = await historyResponse.json();
+      } catch (fetchError) {
+        console.error('MetaAPI fetch error (history):', fetchError);
+        // SSL certificate errors - MetaAPI server issue
+        return new Response(JSON.stringify({ 
+          error: 'MetaAPI connection issue. The account may still be syncing or there is a temporary server issue. Please try again in a few minutes.',
+          details: String(fetchError)
+        }), {
+          status: 503,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-
-      const deals: MetaApiDeal[] = await historyResponse.json();
       const closedDeals = deals.filter(d => 
         (d.type === 'DEAL_TYPE_BUY' || d.type === 'DEAL_TYPE_SELL') && d.profit !== 0
       );
