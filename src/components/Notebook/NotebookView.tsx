@@ -548,7 +548,7 @@ export function NotebookView({
       {/* Folders Popup Overlay */}
       {isFoldersPanelOpen && (
         <div 
-          className="absolute left-4 top-4 z-50 w-72 bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl animate-scale-in overflow-hidden"
+          className="fixed left-4 top-1/2 -translate-y-1/2 z-50 w-72 bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl animate-scale-in overflow-hidden"
           onMouseLeave={() => setIsFoldersPanelOpen(false)}
         >
           <div className="flex flex-col max-h-[70vh]">
