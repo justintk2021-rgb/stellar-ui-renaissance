@@ -623,7 +623,7 @@
   left: -85px;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 10;
+  z-index: 0;
   display: flex;
   flex-direction: row-reverse;
   align-items: center;
