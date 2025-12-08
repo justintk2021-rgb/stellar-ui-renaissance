@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useBrokerConnections } from '@/hooks/useBrokerConnections';
 import { useTradingAccounts } from '@/hooks/useTradingAccounts';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Link2, Unlink, RefreshCw, Loader2, CheckCircle2, XCircle, AlertCircle,
   TrendingUp, TrendingDown, Eye, EyeOff, DollarSign, Activity,
@@ -22,9 +23,13 @@ const PLATFORMS = [
   { value: 'ctrader', label: 'cTrader' },
 ];
 
-export function BrokerManagement() {
+interface BrokerManagementProps {
+  userId?: string;
+}
+
+export function BrokerManagement({ userId }: BrokerManagementProps) {
   const { connections, positions, loading, connectBroker, disconnectBroker, checkStatus, refreshPositions, syncTrades, fetchPositions } = useBrokerConnections();
-  const { accounts } = useTradingAccounts();
+  const { accounts } = useTradingAccounts(userId);
   
   const [isConnecting, setIsConnecting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
