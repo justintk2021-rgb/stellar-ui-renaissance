@@ -1,330 +1,141 @@
-import { useState, useEffect, useRef } from 'react';
-import { Link2, Plus, Trash2, RefreshCw, Loader2, Check, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useBrokerConnections, BrokerConnection, BrokerSyncStatus } from '@/hooks/useBrokerConnections';
-import { useTradingAccounts, TradingAccount } from '@/hooks/useTradingAccounts';
-import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { useBrokerConnections } from '@/hooks/useBrokerConnections';
+import { useTradingAccounts } from '@/hooks/useTradingAccounts';
+import { 
+  Link2, Unlink, RefreshCw, Loader2, CheckCircle2, XCircle, AlertCircle,
+  TrendingUp, TrendingDown, Eye, EyeOff, DollarSign, Activity,
+} from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-interface BrokerManagementProps {
-  userId: string | undefined;
-}
+const PLATFORMS = [
+  { value: 'mt5', label: 'MetaTrader 5' },
+  { value: 'mt4', label: 'MetaTrader 4' },
+  { value: 'tradelocker', label: 'Trade Locker' },
+  { value: 'ctrader', label: 'cTrader' },
+];
 
-export function BrokerManagement({ userId }: BrokerManagementProps) {
-  const { 
-    connections, 
-    syncStatuses, 
-    isLoading, 
-    isSyncing,
-    connectAccount, 
-    addConnection, 
-    deleteConnection,
-    syncTrades,
-  } = useBrokerConnections(userId);
+export function BrokerManagement() {
+  const { connections, positions, loading, connectBroker, disconnectBroker, checkStatus, refreshPositions, syncTrades, fetchPositions } = useBrokerConnections();
+  const { accounts } = useTradingAccounts();
   
-  const { accounts } = useTradingAccounts(userId);
-  
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [accountId, setAccountId] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
-  const [selectedTradingAccount, setSelectedTradingAccount] = useState<string>('');
-  const [autoSyncEnabled, setAutoSyncEnabled] = useState<Record<string, boolean>>({});
-  const syncIntervalRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
+  
+  const [formData, setFormData] = useState({ platform: '', brokerName: '', server: '', login: '', password: '' });
 
-  // Set default trading account when accounts load
   useEffect(() => {
-    if (accounts.length > 0 && !selectedTradingAccount) {
-      const defaultAccount = accounts.find(a => a.is_default) || accounts[0];
-      setSelectedTradingAccount(defaultAccount.id);
+    const connectingAccounts = connections.filter(c => c.connection_status === 'connecting');
+    if (connectingAccounts.length > 0) {
+      const interval = setInterval(() => { connectingAccounts.forEach(c => checkStatus(c.id)); }, 5000);
+      return () => clearInterval(interval);
     }
-  }, [accounts, selectedTradingAccount]);
-
-  // Load auto-sync settings from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('broker_auto_sync');
-    if (saved) {
-      try {
-        setAutoSyncEnabled(JSON.parse(saved));
-      } catch {
-        // ignore
-      }
-    }
-  }, []);
-
-  // Set up auto-sync intervals
-  useEffect(() => {
-    Object.entries(autoSyncEnabled).forEach(([connectionId, enabled]) => {
-      if (enabled && selectedTradingAccount) {
-        // Clear existing interval
-        if (syncIntervalRef.current[connectionId]) {
-          clearInterval(syncIntervalRef.current[connectionId]);
-        }
-        
-        // Set up new interval (sync every 5 minutes)
-        syncIntervalRef.current[connectionId] = setInterval(() => {
-          console.log('Auto-syncing trades for connection:', connectionId);
-          syncTrades(connectionId, selectedTradingAccount);
-        }, 5 * 60 * 1000);
-      } else if (syncIntervalRef.current[connectionId]) {
-        clearInterval(syncIntervalRef.current[connectionId]);
-        delete syncIntervalRef.current[connectionId];
-      }
-    });
-
-    // Cleanup on unmount
-    return () => {
-      Object.values(syncIntervalRef.current).forEach(clearInterval);
-    };
-  }, [autoSyncEnabled, selectedTradingAccount, syncTrades]);
+  }, [connections, checkStatus]);
 
   const handleConnect = async () => {
-    if (!accountId.trim()) {
-      toast.error('Please enter a MetaAPI account ID');
-      return;
-    }
-
+    if (!formData.platform || !formData.brokerName || !formData.server || !formData.login || !formData.password) return;
     setIsConnecting(true);
     try {
-      const result = await connectAccount(accountId);
-      if (result.success && result.accountInfo) {
-        const connection = await addConnection(accountId, result.accountInfo);
-        if (connection) {
-          setAccountId('');
-          setShowAddForm(false);
-        }
-      }
-    } finally {
-      setIsConnecting(false);
+      await connectBroker(formData.platform, formData.brokerName, formData.server, formData.login, formData.password);
+      setDialogOpen(false);
+      setFormData({ platform: '', brokerName: '', server: '', login: '', password: '' });
+    } finally { setIsConnecting(false); }
+  };
+
+  const handleSync = async (connectionId: string) => {
+    setSyncingId(connectionId);
+    try { const defaultAccount = accounts.find(a => a.is_default); await syncTrades(connectionId, defaultAccount?.id); } 
+    finally { setSyncingId(null); }
+  };
+
+  const handleRefreshPositions = async (connectionId: string) => {
+    setRefreshingId(connectionId);
+    try { await refreshPositions(connectionId); } finally { setRefreshingId(null); }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'connected': return <Badge className="bg-green-500"><CheckCircle2 className="w-3 h-3 mr-1" /> Connected</Badge>;
+      case 'connecting': return <Badge variant="secondary"><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Connecting</Badge>;
+      case 'error': return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" /> Error</Badge>;
+      default: return <Badge variant="outline"><AlertCircle className="w-3 h-3 mr-1" /> Disconnected</Badge>;
     }
   };
 
-  const toggleAutoSync = (connectionId: string) => {
-    const newState = { ...autoSyncEnabled, [connectionId]: !autoSyncEnabled[connectionId] };
-    setAutoSyncEnabled(newState);
-    localStorage.setItem('broker_auto_sync', JSON.stringify(newState));
-    
-    if (newState[connectionId]) {
-      toast.success('Auto-sync enabled (every 5 minutes)');
-    } else {
-      toast.success('Auto-sync disabled');
-    }
-  };
-
-  const formatLastSync = (status: BrokerSyncStatus | undefined) => {
-    if (!status?.last_sync_at) return 'Never synced';
-    const date = new Date(status.last_sync_at);
-    return `Last synced: ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const formatCurrency = (value: number | null, currency: string = 'USD') => value === null ? '-' : new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
 
   return (
-    <div className="space-y-4">
-      {/* Trading Account Selection */}
-      {accounts.length > 0 && (
-        <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
-          <label className="text-sm font-medium text-foreground mb-2 block">
-            Link trades to account:
-          </label>
-          <Select value={selectedTradingAccount} onValueChange={setSelectedTradingAccount}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select trading account" />
-            </SelectTrigger>
-            <SelectContent>
-              {accounts.map(account => (
-                <SelectItem key={account.id} value={account.id}>
-                  {account.name} {account.is_default ? '(Default)' : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div><CardTitle className="flex items-center gap-2"><Activity className="w-5 h-5" />Broker Connections</CardTitle><CardDescription>Connect your trading accounts for real-time syncing</CardDescription></div>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild><Button><Link2 className="w-4 h-4 mr-2" />Add Account</Button></DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader><DialogTitle>Connect Trading Account</DialogTitle><DialogDescription>Enter your broker credentials to connect.</DialogDescription></DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2"><Label>Platform</Label><Select value={formData.platform} onValueChange={(v) => setFormData(f => ({ ...f, platform: v }))}><SelectTrigger><SelectValue placeholder="Select platform" /></SelectTrigger><SelectContent>{PLATFORMS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><Label>Broker Name</Label><Input placeholder="e.g., ICMarkets" value={formData.brokerName} onChange={(e) => setFormData(f => ({ ...f, brokerName: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>Server</Label><Input placeholder="e.g., ICMarketsSC-Demo" value={formData.server} onChange={(e) => setFormData(f => ({ ...f, server: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>Login ID</Label><Input placeholder="Account login number" value={formData.login} onChange={(e) => setFormData(f => ({ ...f, login: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>Password</Label><div className="relative"><Input type={showPassword ? 'text' : 'password'} placeholder="Trading password" value={formData.password} onChange={(e) => setFormData(f => ({ ...f, password: e.target.value }))} /><Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</Button></div></div>
+                <Button className="w-full" onClick={handleConnect} disabled={isConnecting || !formData.platform || !formData.server || !formData.login || !formData.password}>{isConnecting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Connecting...</> : <><Link2 className="w-4 h-4 mr-2" />Connect Account</>}</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
-      )}
-
-      {/* Connected Accounts List */}
-      {connections.length > 0 ? (
-        <div className="space-y-3">
-          {connections.map(connection => {
-            const status = syncStatuses[connection.id];
-            const isThisSyncing = isSyncing === connection.id;
-            const isAutoSync = autoSyncEnabled[connection.id];
-            
-            return (
-              <div 
-                key={connection.id}
-                className="p-4 rounded-lg bg-muted/30 border border-border/50 space-y-3"
-              >
-                <div className="flex items-start justify-between">
+      </CardHeader>
+      <CardContent>
+        {loading ? <div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div> : connections.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground"><Activity className="w-12 h-12 mx-auto mb-4 opacity-50" /><p>No broker accounts connected yet.</p><p className="text-sm">Click "Add Account" to connect your trading account.</p></div>
+        ) : (
+          <div className="space-y-4">
+            {connections.map((connection) => (
+              <div key={connection.id} className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-10 h-10 rounded-lg flex items-center justify-center",
-                      status?.sync_status === 'success' ? "bg-green-500/20" : "bg-primary/20"
-                    )}>
-                      {status?.sync_status === 'success' ? (
-                        <Check className="w-5 h-5 text-green-500" />
-                      ) : (
-                        <Link2 className="w-5 h-5 text-primary" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">{connection.broker}</p>
-                      <p className="text-xs text-muted-foreground">Login: {connection.login}</p>
-                    </div>
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center"><Activity className="w-5 h-5 text-primary" /></div>
+                    <div><div className="font-medium">{connection.broker_name}</div><div className="text-sm text-muted-foreground">{connection.platform.toUpperCase()} • {connection.login}</div></div>
                   </div>
-                  
-                  <ConfirmDialog
-                    trigger={
-                      <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    }
-                    title="Remove Broker Connection"
-                    description="Are you sure you want to remove this broker connection? Your synced trades will remain in the journal."
-                    confirmLabel="Remove"
-                    variant="destructive"
-                    onConfirm={() => deleteConnection(connection.id)}
-                  />
+                  {getStatusBadge(connection.connection_status)}
                 </div>
-
-                {/* Sync Status */}
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{formatLastSync(status)}</span>
-                  {status?.trades_synced !== undefined && status.trades_synced > 0 && (
-                    <span className="text-primary">{status.trades_synced} trades imported</span>
-                  )}
-                </div>
-
-                {status?.last_error && (
-                  <div className="flex items-center gap-2 text-xs text-destructive">
-                    <AlertCircle className="w-3 h-3" />
-                    <span>{status.last_error}</span>
+                {connection.connection_status === 'connected' && (
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div className="flex items-center gap-2"><DollarSign className="w-4 h-4 text-muted-foreground" /><div><div className="text-xs text-muted-foreground">Balance</div><div className="font-medium">{formatCurrency(connection.account_balance, connection.account_currency)}</div></div></div>
+                    <div className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-muted-foreground" /><div><div className="text-xs text-muted-foreground">Equity</div><div className="font-medium">{formatCurrency(connection.account_equity, connection.account_currency)}</div></div></div>
                   </div>
                 )}
-
-                {/* Action Buttons */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => syncTrades(connection.id, selectedTradingAccount)}
-                    disabled={isThisSyncing || !selectedTradingAccount}
-                    className="flex-1"
-                  >
-                    {isThisSyncing ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                    )}
-                    {isThisSyncing ? 'Syncing...' : 'Sync Now'}
-                  </Button>
-                  
-                  <Button
-                    variant={isAutoSync ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => toggleAutoSync(connection.id)}
-                    className={cn(
-                      "flex-1",
-                      isAutoSync && "bg-primary text-primary-foreground"
-                    )}
-                  >
-                    {isAutoSync ? 'Auto-Sync ON' : 'Auto-Sync OFF'}
-                  </Button>
+                {connection.last_error && <div className="text-sm text-destructive bg-destructive/10 rounded p-2">{connection.last_error}</div>}
+                <Separator />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={() => handleRefreshPositions(connection.id)} disabled={connection.connection_status !== 'connected' || refreshingId === connection.id}>{refreshingId === connection.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}Positions</Button>
+                  <Button variant="outline" size="sm" onClick={() => handleSync(connection.id)} disabled={connection.connection_status !== 'connected' || syncingId === connection.id}>{syncingId === connection.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}Sync Trades</Button>
+                  <Dialog><DialogTrigger asChild><Button variant="outline" size="sm" onClick={() => fetchPositions(connection.id)} disabled={connection.connection_status !== 'connected'}><Eye className="w-4 h-4 mr-1" />View Positions</Button></DialogTrigger>
+                    <DialogContent className="max-w-3xl"><DialogHeader><DialogTitle>Open Positions - {connection.broker_name}</DialogTitle></DialogHeader>
+                      <div className="max-h-96 overflow-auto">{positions.length === 0 ? <div className="text-center py-8 text-muted-foreground">No open positions</div> : (
+                        <Table><TableHeader><TableRow><TableHead>Symbol</TableHead><TableHead>Type</TableHead><TableHead>Volume</TableHead><TableHead>Open Price</TableHead><TableHead>Current</TableHead><TableHead>P&L</TableHead></TableRow></TableHeader>
+                          <TableBody>{positions.map((pos) => <TableRow key={pos.id}><TableCell className="font-medium">{pos.symbol}</TableCell><TableCell><Badge variant={pos.type === 'buy' ? 'default' : 'destructive'}>{pos.type === 'buy' ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}{pos.type.toUpperCase()}</Badge></TableCell><TableCell>{pos.volume}</TableCell><TableCell>{pos.open_price}</TableCell><TableCell>{pos.current_price || '-'}</TableCell><TableCell className={pos.profit >= 0 ? 'text-green-500' : 'text-red-500'}>{formatCurrency(pos.profit)}</TableCell></TableRow>)}</TableBody>
+                        </Table>
+                      )}</div>
+                    </DialogContent>
+                  </Dialog>
+                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => disconnectBroker(connection.id)}><Unlink className="w-4 h-4 mr-1" />Disconnect</Button>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      ) : !showAddForm ? (
-        <div className="flex flex-col items-center justify-center py-8 space-y-3">
-          <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center">
-            <Link2 className="w-8 h-8 text-muted-foreground/50" />
+            ))}
           </div>
-          <p className="text-lg font-medium text-muted-foreground">No Broker Connected</p>
-          <p className="text-sm text-muted-foreground/70 text-center max-w-xs">
-            Connect your MT4/MT5 account via MetaAPI to automatically sync your trades
-          </p>
-        </div>
-      ) : null}
-
-      {/* Add Connection Form */}
-      {showAddForm ? (
-        <div className="p-4 rounded-lg bg-muted/30 border border-border/50 space-y-4">
-          <h4 className="font-medium text-foreground">Connect MetaAPI Account</h4>
-          
-          <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">MetaAPI Account ID</label>
-            <Input
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
-              placeholder="Enter your MetaAPI account ID"
-              className="bg-background"
-            />
-            <p className="text-xs text-muted-foreground">
-              Get your account ID from{' '}
-              <a 
-                href="https://app.metaapi.cloud/accounts" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                MetaAPI Dashboard
-              </a>
-            </p>
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowAddForm(false);
-                setAccountId('');
-              }}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConnect}
-              disabled={isConnecting || !accountId.trim()}
-              className="flex-1"
-            >
-              {isConnecting ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : null}
-              {isConnecting ? 'Connecting...' : 'Connect'}
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <Button
-          onClick={() => setShowAddForm(true)}
-          variant="outline"
-          className="w-full"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Connect MetaAPI Account
-        </Button>
-      )}
-
-      {/* Help Text */}
-      <div className="text-xs text-muted-foreground space-y-1 p-3 rounded-lg bg-muted/20">
-        <p className="font-medium">How to get your MetaAPI Account ID:</p>
-        <ol className="list-decimal list-inside space-y-1 ml-1">
-          <li>Sign up at <a href="https://metaapi.cloud" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">metaapi.cloud</a></li>
-          <li>Add your MT4/MT5 account in the dashboard</li>
-          <li>Copy the Account ID from your connected account</li>
-          <li>Paste it here to start syncing trades!</li>
-        </ol>
-      </div>
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

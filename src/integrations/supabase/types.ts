@@ -16,71 +16,209 @@ export type Database = {
     Tables: {
       broker_connections: {
         Row: {
-          account_id: string
-          broker: string
+          account_balance: number | null
+          account_currency: string | null
+          account_equity: number | null
+          broker_name: string
+          connection_status: string | null
           created_at: string
           id: string
+          last_connected_at: string | null
+          last_error: string | null
           login: string
+          metaapi_account_id: string | null
+          platform: string
+          server: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          account_id: string
-          broker: string
+          account_balance?: number | null
+          account_currency?: string | null
+          account_equity?: number | null
+          broker_name: string
+          connection_status?: string | null
           created_at?: string
           id?: string
+          last_connected_at?: string | null
+          last_error?: string | null
           login: string
+          metaapi_account_id?: string | null
+          platform: string
+          server: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          account_id?: string
-          broker?: string
+          account_balance?: number | null
+          account_currency?: string | null
+          account_equity?: number | null
+          broker_name?: string
+          connection_status?: string | null
           created_at?: string
           id?: string
+          last_connected_at?: string | null
+          last_error?: string | null
           login?: string
+          metaapi_account_id?: string | null
+          platform?: string
+          server?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: []
       }
-      broker_sync_status: {
+      broker_positions: {
         Row: {
           broker_connection_id: string
+          comment: string | null
+          commission: number | null
           created_at: string
+          current_price: number | null
           id: string
-          last_error: string | null
-          last_sync_at: string | null
-          sync_status: string | null
-          trades_synced: number | null
+          magic_number: number | null
+          open_price: number
+          open_time: string
+          position_id: string
+          profit: number | null
+          stop_loss: number | null
+          swap: number | null
+          symbol: string
+          take_profit: number | null
+          type: string
           updated_at: string
+          volume: number
         }
         Insert: {
           broker_connection_id: string
+          comment?: string | null
+          commission?: number | null
           created_at?: string
+          current_price?: number | null
           id?: string
-          last_error?: string | null
-          last_sync_at?: string | null
-          sync_status?: string | null
-          trades_synced?: number | null
+          magic_number?: number | null
+          open_price: number
+          open_time: string
+          position_id: string
+          profit?: number | null
+          stop_loss?: number | null
+          swap?: number | null
+          symbol: string
+          take_profit?: number | null
+          type: string
           updated_at?: string
+          volume: number
         }
         Update: {
           broker_connection_id?: string
+          comment?: string | null
+          commission?: number | null
           created_at?: string
+          current_price?: number | null
           id?: string
-          last_error?: string | null
-          last_sync_at?: string | null
-          sync_status?: string | null
-          trades_synced?: number | null
+          magic_number?: number | null
+          open_price?: number
+          open_time?: string
+          position_id?: string
+          profit?: number | null
+          stop_loss?: number | null
+          swap?: number | null
+          symbol?: string
+          take_profit?: number | null
+          type?: string
           updated_at?: string
+          volume?: number
         }
         Relationships: [
           {
-            foreignKeyName: "broker_sync_status_broker_connection_id_fkey"
+            foreignKeyName: "broker_positions_broker_connection_id_fkey"
             columns: ["broker_connection_id"]
             isOneToOne: false
             referencedRelation: "broker_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      broker_trades: {
+        Row: {
+          broker_connection_id: string
+          close_price: number | null
+          close_time: string | null
+          comment: string | null
+          commission: number | null
+          created_at: string
+          id: string
+          journal_trade_id: string | null
+          magic_number: number | null
+          open_price: number
+          open_time: string
+          profit: number | null
+          stop_loss: number | null
+          swap: number | null
+          symbol: string
+          take_profit: number | null
+          trade_id: string
+          type: string
+          updated_at: string
+          volume: number
+        }
+        Insert: {
+          broker_connection_id: string
+          close_price?: number | null
+          close_time?: string | null
+          comment?: string | null
+          commission?: number | null
+          created_at?: string
+          id?: string
+          journal_trade_id?: string | null
+          magic_number?: number | null
+          open_price: number
+          open_time: string
+          profit?: number | null
+          stop_loss?: number | null
+          swap?: number | null
+          symbol: string
+          take_profit?: number | null
+          trade_id: string
+          type: string
+          updated_at?: string
+          volume: number
+        }
+        Update: {
+          broker_connection_id?: string
+          close_price?: number | null
+          close_time?: string | null
+          comment?: string | null
+          commission?: number | null
+          created_at?: string
+          id?: string
+          journal_trade_id?: string | null
+          magic_number?: number | null
+          open_price?: number
+          open_time?: string
+          profit?: number | null
+          stop_loss?: number | null
+          swap?: number | null
+          symbol?: string
+          take_profit?: number | null
+          trade_id?: string
+          type?: string
+          updated_at?: string
+          volume?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broker_trades_broker_connection_id_fkey"
+            columns: ["broker_connection_id"]
+            isOneToOne: false
+            referencedRelation: "broker_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "broker_trades_journal_trade_id_fkey"
+            columns: ["journal_trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
             referencedColumns: ["id"]
           },
         ]
