@@ -68,6 +68,11 @@ import {
   FolderInput,
   CheckSquare,
   ListCollapse,
+  ChevronDown,
+  MessageSquare,
+  Table,
+  Minus,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -346,20 +351,39 @@ export function NotebookView({
 
   // Block formatting options
   const BLOCK_OPTIONS = [
-    { id: 'text', label: 'Text', icon: Type, command: 'formatBlock', value: 'p', shortcut: '' },
-    { id: 'h1', label: 'Heading 1', icon: Heading1, command: 'formatBlock', value: 'h1', shortcut: '#' },
-    { id: 'h2', label: 'Heading 2', icon: Heading2, command: 'formatBlock', value: 'h2', shortcut: '##' },
-    { id: 'h3', label: 'Heading 3', icon: Heading3, command: 'formatBlock', value: 'h3', shortcut: '###' },
-    { id: 'bullet', label: 'Bulleted list', icon: List, command: 'insertUnorderedList', value: '', shortcut: '-' },
-    { id: 'numbered', label: 'Numbered list', icon: ListOrdered, command: 'insertOrderedList', value: '', shortcut: '1.' },
-    { id: 'todo', label: 'To-do list', icon: CheckSquare, command: 'insertUnorderedList', value: '', shortcut: '[]' },
-    { id: 'quote', label: 'Quote', icon: Quote, command: 'formatBlock', value: 'blockquote', shortcut: '>' },
+    { id: 'text', label: 'Text', icon: Type, command: 'formatBlock', value: 'p' },
+    { id: 'h1', label: 'Heading 1', icon: Heading1, command: 'formatBlock', value: 'h1' },
+    { id: 'h2', label: 'Heading 2', icon: Heading2, command: 'formatBlock', value: 'h2' },
+    { id: 'h3', label: 'Heading 3', icon: Heading3, command: 'formatBlock', value: 'h3' },
+    { id: 'bullet', label: 'Bulleted list', icon: List, command: 'insertUnorderedList', value: '' },
+    { id: 'numbered', label: 'Numbered list', icon: ListOrdered, command: 'insertOrderedList', value: '' },
+    { id: 'todo', label: 'To-do list', icon: CheckSquare, command: 'insertUnorderedList', value: '' },
+    { id: 'toggle', label: 'Toggle list', icon: ChevronDown, command: 'formatBlock', value: 'details' },
+    { id: 'quote', label: 'Quote', icon: Quote, command: 'formatBlock', value: 'blockquote' },
+    { id: 'callout', label: 'Callout', icon: MessageSquare, command: 'formatBlock', value: 'aside' },
+    { id: 'divider', label: 'Divider', icon: Minus, command: 'insertHorizontalRule', value: '' },
+    { id: 'table', label: 'Table', icon: Table, command: 'insertTable', value: '' },
+    { id: 'link', label: 'Link to page', icon: ExternalLink, command: 'createLink', value: '' },
   ];
 
   const handleBlockFormat = (option: typeof BLOCK_OPTIONS[0]) => {
     if (!editorRef.current) return;
     editorRef.current.focus();
-    if (option.value) {
+    
+    if (option.id === 'divider') {
+      document.execCommand('insertHTML', false, '<hr class="my-4 border-border" />');
+    } else if (option.id === 'table') {
+      document.execCommand('insertHTML', false, '<table class="w-full border-collapse my-2"><tr><td class="border border-border p-2">Cell 1</td><td class="border border-border p-2">Cell 2</td></tr><tr><td class="border border-border p-2">Cell 3</td><td class="border border-border p-2">Cell 4</td></tr></table>');
+    } else if (option.id === 'callout') {
+      document.execCommand('insertHTML', false, '<div class="bg-primary/10 border-l-4 border-primary p-3 my-2 rounded-r">Type your callout here...</div>');
+    } else if (option.id === 'toggle') {
+      document.execCommand('insertHTML', false, '<details class="my-2"><summary class="cursor-pointer font-medium">Toggle title</summary><div class="pl-4 pt-2">Toggle content...</div></details>');
+    } else if (option.id === 'link') {
+      const url = prompt('Enter URL:');
+      if (url) {
+        document.execCommand('createLink', false, url);
+      }
+    } else if (option.value) {
       document.execCommand(option.command, false, option.value);
     } else {
       document.execCommand(option.command, false);
