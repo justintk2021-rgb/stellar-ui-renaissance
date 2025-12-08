@@ -688,7 +688,7 @@ export function NotebookView({
                     placeholder="Note title..."
                     disabled={isLocked || isSelectedEntryInTrash}
                     className={cn(
-                      "text-lg font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/50",
+                      "text-lg font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0 focus:ring-0 focus:outline-none placeholder:text-muted-foreground/50",
                       (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70"
                     )}
                   />
@@ -953,7 +953,7 @@ export function NotebookView({
                 ref={editorRef}
                 contentEditable={!isLocked && !isSelectedEntryInTrash}
                 className={cn(
-                  "min-h-full p-4 focus:outline-none transition-all",
+                  "min-h-full p-4 outline-none focus:outline-none focus-visible:outline-none transition-all caret-primary",
                   fontClasses[fontStyle],
                   isSmallText ? "text-xs" : "text-sm",
                   (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70",
