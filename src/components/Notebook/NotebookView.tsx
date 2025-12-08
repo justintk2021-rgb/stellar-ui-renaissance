@@ -1204,7 +1204,7 @@ export function NotebookView({
                 {/* Floating Block Button */}
                 {showBlockButton && !isLocked && !isSelectedEntryInTrash && (
                   <div
-                    className="absolute z-20 transition-all duration-150"
+                    className="absolute z-20"
                     style={{ left: blockButtonPosition.x, top: blockButtonPosition.y }}
                   >
                     <Button
