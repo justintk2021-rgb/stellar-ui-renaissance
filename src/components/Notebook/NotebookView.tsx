@@ -12,6 +12,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import {
   DropdownMenu,
@@ -329,13 +330,16 @@ export function NotebookView({
     )}>
       {/* Folders Sheet */}
       <Sheet open={isFoldersPanelOpen} onOpenChange={setIsFoldersPanelOpen}>
-        <SheetContent side="left" className="w-80 p-0 border-r border-border/50 bg-background">
+        <SheetContent side="left" className="w-80 p-0 border-none bg-background">
           <div className="flex flex-col h-full">
             <SheetHeader className="p-4 border-b border-border/30">
               <SheetTitle className="flex items-center gap-2">
                 <FolderOpen className="w-5 h-5 text-primary" />
                 Folders
               </SheetTitle>
+              <SheetDescription className="sr-only">
+                Navigate between note categories and folders
+              </SheetDescription>
             </SheetHeader>
 
             {/* New Note Button */}
