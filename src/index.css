@@ -620,7 +620,7 @@
 /* Bookmark Tab Styles */
 .bookmark-tab {
   position: absolute;
-  left: -60px;
+  left: -85px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 30;
