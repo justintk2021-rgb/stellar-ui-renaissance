@@ -625,15 +625,15 @@ export function NotebookView({
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button 
-                              className="w-6 h-6 rounded-md bg-muted/60 hover:bg-muted flex items-center justify-center transition-all border border-border/30 shadow-sm"
+                              className="w-7 h-7 rounded-lg opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-accent flex items-center justify-center transition-all border border-border shadow-md"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <div 
                                 className={cn(
-                                  "w-3.5 h-3.5 rounded-full border-2",
-                                  markerColor ? "border-white/50 shadow-sm" : "border-dashed border-muted-foreground/40"
+                                  "w-4 h-4 rounded-full border-2 shadow-sm",
+                                  markerColor ? "border-white/60" : "border-dashed border-foreground/40 bg-muted"
                                 )}
-                                style={{ backgroundColor: markerColor || 'transparent' }}
+                                style={{ backgroundColor: markerColor || undefined }}
                               />
                             </button>
                           </DropdownMenuTrigger>
@@ -714,15 +714,15 @@ export function NotebookView({
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button 
-                                className="w-6 h-6 rounded-md bg-muted/60 hover:bg-muted flex items-center justify-center transition-all border border-border/30 shadow-sm"
+                                className="w-7 h-7 rounded-lg opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-accent flex items-center justify-center transition-all border border-border shadow-md"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div 
                                   className={cn(
-                                    "w-3.5 h-3.5 rounded-full border-2",
-                                    markerColor ? "border-white/50 shadow-sm" : "border-dashed border-muted-foreground/40"
+                                    "w-4 h-4 rounded-full border-2 shadow-sm",
+                                    markerColor ? "border-white/60" : "border-dashed border-foreground/40 bg-muted"
                                   )}
-                                  style={{ backgroundColor: markerColor || 'transparent' }}
+                                  style={{ backgroundColor: markerColor || undefined }}
                                 />
                               </button>
                             </DropdownMenuTrigger>
