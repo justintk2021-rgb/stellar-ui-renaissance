@@ -768,7 +768,7 @@ export function NotebookView({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setIsFoldersPanelOpen(true)}
+              onClick={() => setIsFoldersPanelOpen(!isFoldersPanelOpen)}
               className="h-8 w-8 p-0"
             >
               <PanelLeftOpen className="w-4 h-4" />
