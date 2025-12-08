@@ -6,16 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface MetaApiAccount {
-  _id: string;
-  login: string;
-  name: string;
-  server: string;
-  platform: string;
-  state: string;
-  connectionStatus: string;
-  type: string;
-}
+// ====================== INTERFACES ======================
 
 interface MetaApiPosition {
   id: string;
@@ -49,6 +40,163 @@ interface MetaApiDeal {
   comment?: string;
 }
 
+interface TradeLockerPosition {
+  id: number;
+  tradableInstrumentId: number;
+  side: string;
+  qty: number;
+  avgPrice: number;
+  openTime: string;
+  unrealizedPl: number;
+  instrument?: string;
+}
+
+interface TradeLockerOrder {
+  id: number;
+  tradableInstrumentId: number;
+  side: string;
+  qty: number;
+  filledQty: number;
+  avgFilledPrice: number;
+  status: string;
+  createdAt: string;
+  filledAt?: string;
+  realizedPl?: number;
+  instrument?: string;
+}
+
+// ====================== HELPERS ======================
+
+function getSession(date: Date): string {
+  const hour = date.getUTCHours();
+  if (hour >= 0 && hour < 8) return 'Asia';
+  if (hour >= 8 && hour < 13) return 'London';
+  return 'New York';
+}
+
+// ====================== TRADELOCKER API ======================
+
+async function tradeLockerAuth(email: string, password: string, server: string): Promise<{ accessToken: string; refreshToken: string; accounts: any[] } | null> {
+  const baseUrl = server.includes('demo') ? 'https://demo.tradelocker.com' : 'https://live.tradelocker.com';
+  
+  try {
+    // Get JWT token
+    const authResponse = await fetch(`${baseUrl}/backend-api/auth/jwt/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, server }),
+    });
+
+    if (!authResponse.ok) {
+      console.error('TradeLocker auth failed:', await authResponse.text());
+      return null;
+    }
+
+    const authData = await authResponse.json();
+    
+    // Get all accounts
+    const accountsResponse = await fetch(`${baseUrl}/backend-api/auth/jwt/all-accounts`, {
+      headers: { 
+        'Authorization': `Bearer ${authData.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!accountsResponse.ok) {
+      console.error('TradeLocker accounts failed:', await accountsResponse.text());
+      return null;
+    }
+
+    const accountsData = await accountsResponse.json();
+    
+    return {
+      accessToken: authData.accessToken,
+      refreshToken: authData.refreshToken,
+      accounts: accountsData.accounts || [],
+    };
+  } catch (e) {
+    console.error('TradeLocker auth error:', e);
+    return null;
+  }
+}
+
+async function tradeLockerGetPositions(accessToken: string, accountId: string, accNum: number, server: string): Promise<TradeLockerPosition[]> {
+  const baseUrl = server.includes('demo') ? 'https://demo.tradelocker.com' : 'https://live.tradelocker.com';
+  
+  try {
+    const response = await fetch(`${baseUrl}/backend-api/trade/accounts/${accountId}/positions`, {
+      headers: { 
+        'Authorization': `Bearer ${accessToken}`,
+        'accNum': String(accNum),
+      },
+    });
+
+    if (!response.ok) {
+      console.error('TradeLocker positions failed:', await response.text());
+      return [];
+    }
+
+    const data = await response.json();
+    return data.d?.positions || [];
+  } catch (e) {
+    console.error('TradeLocker positions error:', e);
+    return [];
+  }
+}
+
+async function tradeLockerGetOrders(accessToken: string, accountId: string, accNum: number, server: string): Promise<TradeLockerOrder[]> {
+  const baseUrl = server.includes('demo') ? 'https://demo.tradelocker.com' : 'https://live.tradelocker.com';
+  
+  try {
+    const response = await fetch(`${baseUrl}/backend-api/trade/accounts/${accountId}/ordersHistory`, {
+      headers: { 
+        'Authorization': `Bearer ${accessToken}`,
+        'accNum': String(accNum),
+      },
+    });
+
+    if (!response.ok) {
+      console.error('TradeLocker orders failed:', await response.text());
+      return [];
+    }
+
+    const data = await response.json();
+    return data.d?.ordersHistory || [];
+  } catch (e) {
+    console.error('TradeLocker orders error:', e);
+    return [];
+  }
+}
+
+async function tradeLockerGetAccountInfo(accessToken: string, accountId: string, accNum: number, server: string): Promise<{ balance: number; equity: number } | null> {
+  const baseUrl = server.includes('demo') ? 'https://demo.tradelocker.com' : 'https://live.tradelocker.com';
+  
+  try {
+    const response = await fetch(`${baseUrl}/backend-api/trade/accounts/${accountId}/state`, {
+      headers: { 
+        'Authorization': `Bearer ${accessToken}`,
+        'accNum': String(accNum),
+      },
+    });
+
+    if (!response.ok) {
+      console.error('TradeLocker account info failed:', await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    return {
+      balance: data.d?.balance || 0,
+      equity: data.d?.equity || 0,
+    };
+  } catch (e) {
+    console.error('TradeLocker account info error:', e);
+    return null;
+  }
+}
+
+// ====================== MAIN HANDLER ======================
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -67,13 +215,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const metaApiToken = Deno.env.get('METAAPI_TOKEN');
 
-    if (!metaApiToken) {
-      return new Response(JSON.stringify({ error: 'MetaAPI token not configured. Please add METAAPI_TOKEN secret.' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const supabase = createClient(supabaseUrl, supabaseKey);
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
@@ -85,104 +226,259 @@ serve(async (req) => {
       });
     }
 
-    const { action, connectionId, platform, brokerName, server, login, password, tradingAccountId } = await req.json();
-    console.log(`Action: ${action}, User: ${user.id}`);
+    const { action, connectionId, platform, brokerName, server, login, password, tradingAccountId, metaapiAccountId } = await req.json();
+    console.log(`Action: ${action}, Platform: ${platform}, User: ${user.id}`);
 
-    // ACTION: Create a new MetaAPI account with broker credentials
+    // ====================== CONNECT ======================
     if (action === 'connect') {
-      console.log(`Creating MetaAPI account for ${platform} - ${server} - ${login}`);
-      
-      // Step 1: Create account in MetaAPI
-      const createAccountResponse = await fetch(
-        'https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts',
-        {
-          method: 'POST',
-          headers: {
-            'auth-token': metaApiToken,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            login: login,
-            password: password,
-            name: `${brokerName}-${login}`,
-            server: server,
+      // TradeLocker direct connection
+      if (platform === 'tradelocker') {
+        console.log(`Connecting to TradeLocker - ${server}`);
+        
+        const authResult = await tradeLockerAuth(login, password, server);
+        
+        if (!authResult) {
+          return new Response(JSON.stringify({ error: 'Failed to authenticate with TradeLocker. Please check your credentials.' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Get first account info
+        const firstAccount = authResult.accounts[0];
+        if (!firstAccount) {
+          return new Response(JSON.stringify({ error: 'No TradeLocker accounts found.' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const accountInfo = await tradeLockerGetAccountInfo(
+          authResult.accessToken, 
+          String(firstAccount.id), 
+          firstAccount.accNum,
+          server
+        );
+
+        // Save connection
+        const { data: connection, error: insertError } = await supabase
+          .from('broker_connections')
+          .insert({
+            user_id: user.id,
             platform: platform,
-            magic: 0,
-            type: 'cloud-g2',
-            region: 'new-york',
-          }),
-        }
-      );
+            broker_name: brokerName || 'TradeLocker',
+            server: server,
+            login: login,
+            metaapi_account_id: `tl_${firstAccount.id}_${firstAccount.accNum}`, // Store TL account info
+            connection_status: 'connected',
+            account_balance: accountInfo?.balance,
+            account_equity: accountInfo?.equity,
+            last_connected_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
 
-      if (!createAccountResponse.ok) {
-        const errorText = await createAccountResponse.text();
-        console.error('MetaAPI create account error:', errorText);
-        
-        let errorMessage = 'Failed to connect to broker. Please check your credentials.';
-        try {
-          const errorJson = JSON.parse(errorText);
-          if (errorJson.message) {
-            errorMessage = errorJson.message;
+        if (insertError) {
+          console.error('Error saving connection:', insertError);
+          return new Response(JSON.stringify({ error: 'Failed to save connection' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          connection,
+          message: 'TradeLocker connected successfully!',
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // MT4/MT5 via MetaAPI Account ID
+      if (platform === 'mt4' || platform === 'mt5') {
+        if (!metaApiToken) {
+          return new Response(JSON.stringify({ error: 'MetaAPI token not configured. Please add METAAPI_TOKEN secret.' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // If user provides MetaAPI Account ID directly
+        if (metaapiAccountId) {
+          console.log(`Using existing MetaAPI account: ${metaapiAccountId}`);
+          
+          // Verify the account exists
+          const verifyResponse = await fetch(
+            `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${metaapiAccountId}`,
+            {
+              headers: { 'auth-token': metaApiToken },
+            }
+          );
+
+          if (!verifyResponse.ok) {
+            return new Response(JSON.stringify({ error: 'Invalid MetaAPI Account ID. Please check and try again.' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
           }
-        } catch {}
-        
-        return new Response(JSON.stringify({ error: errorMessage }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
 
-      const accountData = await createAccountResponse.json();
-      console.log('MetaAPI account created:', accountData.id);
+          const accountData = await verifyResponse.json();
+          
+          // Get account metrics
+          let balance = null;
+          let equity = null;
+          
+          if (accountData.state === 'DEPLOYED' && accountData.connectionStatus === 'CONNECTED') {
+            try {
+              const metricsResponse = await fetch(
+                `https://mt-client-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${metaapiAccountId}/account-information`,
+                {
+                  headers: { 'auth-token': metaApiToken },
+                }
+              );
+              
+              if (metricsResponse.ok) {
+                const metrics = await metricsResponse.json();
+                balance = metrics.balance;
+                equity = metrics.equity;
+              }
+            } catch (e) {
+              console.log('Could not fetch metrics:', e);
+            }
+          }
 
-      // Step 2: Deploy the account
-      const deployResponse = await fetch(
-        `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${accountData.id}/deploy`,
-        {
-          method: 'POST',
-          headers: {
-            'auth-token': metaApiToken,
-          },
+          // Save connection
+          const { data: connection, error: insertError } = await supabase
+            .from('broker_connections')
+            .insert({
+              user_id: user.id,
+              platform: platform,
+              broker_name: brokerName || accountData.name,
+              server: accountData.server || server,
+              login: accountData.login || login,
+              metaapi_account_id: metaapiAccountId,
+              connection_status: accountData.connectionStatus === 'CONNECTED' ? 'connected' : 'connecting',
+              account_balance: balance,
+              account_equity: equity,
+              last_connected_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error('Error saving connection:', insertError);
+            return new Response(JSON.stringify({ error: 'Failed to save connection' }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          return new Response(JSON.stringify({ 
+            success: true, 
+            connection,
+            message: 'MT account connected via MetaAPI!',
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
-      );
 
-      if (!deployResponse.ok) {
-        console.error('Failed to deploy account');
-      }
+        // Try to create account (may fail if subscription doesn't support it)
+        console.log(`Creating MetaAPI account for ${platform} - ${server} - ${login}`);
+        
+        const createAccountResponse = await fetch(
+          'https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts',
+          {
+            method: 'POST',
+            headers: {
+              'auth-token': metaApiToken,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              login: login,
+              password: password,
+              name: `${brokerName}-${login}`,
+              server: server,
+              platform: platform,
+              magic: 0,
+              type: 'cloud-g2',
+              region: 'new-york',
+            }),
+          }
+        );
 
-      // Step 3: Save connection to database
-      const { data: connection, error: insertError } = await supabase
-        .from('broker_connections')
-        .insert({
-          user_id: user.id,
-          platform: platform,
-          broker_name: brokerName,
-          server: server,
-          login: login,
-          metaapi_account_id: accountData.id,
-          connection_status: 'connecting',
-        })
-        .select()
-        .single();
+        if (!createAccountResponse.ok) {
+          const errorText = await createAccountResponse.text();
+          console.error('MetaAPI create account error:', errorText);
+          
+          // Check if it's a permission error
+          if (errorText.includes('do not have access')) {
+            return new Response(JSON.stringify({ 
+              error: 'MetaAPI account creation requires a paid subscription. Please either:\n1. Upgrade your MetaAPI plan, or\n2. Create the account in MetaAPI dashboard and enter the Account ID here.',
+              requiresAccountId: true,
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          
+          return new Response(JSON.stringify({ error: 'Failed to connect to broker. Please check your credentials.' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
 
-      if (insertError) {
-        console.error('Error saving connection:', insertError);
-        return new Response(JSON.stringify({ error: 'Failed to save connection' }), {
-          status: 500,
+        const accountData = await createAccountResponse.json();
+        console.log('MetaAPI account created:', accountData.id);
+
+        // Deploy the account
+        await fetch(
+          `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${accountData.id}/deploy`,
+          {
+            method: 'POST',
+            headers: { 'auth-token': metaApiToken },
+          }
+        );
+
+        // Save connection
+        const { data: connection, error: insertError } = await supabase
+          .from('broker_connections')
+          .insert({
+            user_id: user.id,
+            platform: platform,
+            broker_name: brokerName,
+            server: server,
+            login: login,
+            metaapi_account_id: accountData.id,
+            connection_status: 'connecting',
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Error saving connection:', insertError);
+          return new Response(JSON.stringify({ error: 'Failed to save connection' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          connection,
+          message: 'Account connected. It may take a few moments to fully sync.',
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      return new Response(JSON.stringify({ 
-        success: true, 
-        connection,
-        message: 'Account connected. It may take a few moments to fully sync.',
-      }), {
+      return new Response(JSON.stringify({ error: 'Unsupported platform' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // ACTION: Check connection status and update account info
+    // ====================== STATUS ======================
     if (action === 'status') {
       const { data: connection, error: connError } = await supabase
         .from('broker_connections')
@@ -198,14 +494,28 @@ serve(async (req) => {
         });
       }
 
-      if (!connection.metaapi_account_id) {
-        return new Response(JSON.stringify({ error: 'No MetaAPI account linked' }), {
+      // TradeLocker status check
+      if (connection.platform === 'tradelocker') {
+        // For TradeLocker, we need to re-auth to check status
+        // In production, you'd store encrypted credentials or use refresh token
+        return new Response(JSON.stringify({ 
+          success: true,
+          status: connection.connection_status,
+          balance: connection.account_balance,
+          equity: connection.account_equity,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // MetaAPI status check
+      if (!connection.metaapi_account_id || !metaApiToken) {
+        return new Response(JSON.stringify({ error: 'No MetaAPI account linked or token missing' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Get account status from MetaAPI
       const accountResponse = await fetch(
         `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${connection.metaapi_account_id}`,
         {
@@ -225,9 +535,8 @@ serve(async (req) => {
         });
       }
 
-      const accountInfo: MetaApiAccount = await accountResponse.json();
+      const accountInfo = await accountResponse.json();
       
-      // Get account metrics if connected
       let balance = null;
       let equity = null;
       
@@ -250,7 +559,6 @@ serve(async (req) => {
         }
       }
 
-      // Update connection in database
       const connectionStatus = accountInfo.connectionStatus === 'CONNECTED' ? 'connected' : 
                                accountInfo.state === 'DEPLOYING' ? 'connecting' : 'disconnected';
       
@@ -276,7 +584,7 @@ serve(async (req) => {
       });
     }
 
-    // ACTION: Fetch open positions
+    // ====================== POSITIONS ======================
     if (action === 'positions') {
       const { data: connection, error: connError } = await supabase
         .from('broker_connections')
@@ -285,9 +593,60 @@ serve(async (req) => {
         .eq('user_id', user.id)
         .single();
 
-      if (connError || !connection || !connection.metaapi_account_id) {
+      if (connError || !connection) {
         return new Response(JSON.stringify({ error: 'Connection not found' }), {
           status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // TradeLocker positions
+      if (connection.platform === 'tradelocker' && password) {
+        const authResult = await tradeLockerAuth(connection.login, password, connection.server);
+        
+        if (!authResult || authResult.accounts.length === 0) {
+          return new Response(JSON.stringify({ error: 'Failed to authenticate with TradeLocker' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const firstAccount = authResult.accounts[0];
+        const positions = await tradeLockerGetPositions(
+          authResult.accessToken,
+          String(firstAccount.id),
+          firstAccount.accNum,
+          connection.server
+        );
+
+        // Update positions in database
+        await supabase.from('broker_positions').delete().eq('broker_connection_id', connectionId);
+        
+        if (positions.length > 0) {
+          const positionsToInsert = positions.map(p => ({
+            broker_connection_id: connectionId,
+            position_id: String(p.id),
+            symbol: p.instrument || `ID:${p.tradableInstrumentId}`,
+            type: p.side.toLowerCase(),
+            volume: p.qty,
+            open_price: p.avgPrice,
+            current_price: null,
+            profit: p.unrealizedPl,
+            open_time: p.openTime,
+          }));
+
+          await supabase.from('broker_positions').insert(positionsToInsert);
+        }
+
+        return new Response(JSON.stringify({ success: true, positions: positions.length }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // MetaAPI positions
+      if (!connection.metaapi_account_id || !metaApiToken) {
+        return new Response(JSON.stringify({ error: 'No MetaAPI account linked' }), {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -308,14 +667,8 @@ serve(async (req) => {
 
       const positions: MetaApiPosition[] = await positionsResponse.json();
       
-      // Update positions in database
-      // First, delete old positions
-      await supabase
-        .from('broker_positions')
-        .delete()
-        .eq('broker_connection_id', connectionId);
+      await supabase.from('broker_positions').delete().eq('broker_connection_id', connectionId);
       
-      // Insert current positions
       if (positions.length > 0) {
         const positionsToInsert = positions.map(p => ({
           broker_connection_id: connectionId,
@@ -338,15 +691,12 @@ serve(async (req) => {
         await supabase.from('broker_positions').insert(positionsToInsert);
       }
 
-      return new Response(JSON.stringify({ 
-        success: true,
-        positions: positions.length,
-      }), {
+      return new Response(JSON.stringify({ success: true, positions: positions.length }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // ACTION: Sync historical trades
+    // ====================== SYNC TRADES ======================
     if (action === 'sync-trades') {
       const { data: connection, error: connError } = await supabase
         .from('broker_connections')
@@ -355,14 +705,96 @@ serve(async (req) => {
         .eq('user_id', user.id)
         .single();
 
-      if (connError || !connection || !connection.metaapi_account_id) {
+      if (connError || !connection) {
         return new Response(JSON.stringify({ error: 'Connection not found' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Fetch history deals from last 90 days
+      // TradeLocker sync
+      if (connection.platform === 'tradelocker' && password) {
+        const authResult = await tradeLockerAuth(connection.login, password, connection.server);
+        
+        if (!authResult || authResult.accounts.length === 0) {
+          return new Response(JSON.stringify({ error: 'Failed to authenticate with TradeLocker' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const firstAccount = authResult.accounts[0];
+        const orders = await tradeLockerGetOrders(
+          authResult.accessToken,
+          String(firstAccount.id),
+          firstAccount.accNum,
+          connection.server
+        );
+
+        // Filter for filled orders
+        const filledOrders = orders.filter(o => o.status === 'filled' && o.realizedPl !== undefined);
+        
+        // Get existing trades
+        const { data: existingTrades } = await supabase
+          .from('broker_trades')
+          .select('trade_id')
+          .eq('broker_connection_id', connectionId);
+
+        const existingIds = new Set((existingTrades || []).map(t => t.trade_id));
+
+        const newTrades = filledOrders
+          .filter(o => !existingIds.has(String(o.id)))
+          .map(o => ({
+            broker_connection_id: connectionId,
+            trade_id: String(o.id),
+            symbol: o.instrument || `ID:${o.tradableInstrumentId}`,
+            type: o.side.toLowerCase(),
+            volume: o.filledQty,
+            open_price: o.avgFilledPrice,
+            close_price: o.avgFilledPrice,
+            profit: o.realizedPl || 0,
+            open_time: o.createdAt,
+            close_time: o.filledAt || o.createdAt,
+          }));
+
+        if (newTrades.length > 0) {
+          await supabase.from('broker_trades').insert(newTrades);
+
+          // Auto-journal
+          if (tradingAccountId) {
+            const journalTrades = newTrades.map(t => ({
+              user_id: user.id,
+              account_id: tradingAccountId,
+              date: new Date(t.close_time).toISOString().split('T')[0],
+              pair: t.symbol,
+              direction: t.type === 'buy' ? 'Long' : 'Short',
+              result: t.profit,
+              session: getSession(new Date(t.close_time)),
+              strategy: 'Synced from TradeLocker',
+              notes: `Trade ID: ${t.trade_id}\nVolume: ${t.volume}`,
+            }));
+
+            await supabase.from('trades').insert(journalTrades);
+          }
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true,
+          totalDeals: filledOrders.length,
+          newTradesImported: newTrades.length,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // MetaAPI sync
+      if (!connection.metaapi_account_id || !metaApiToken) {
+        return new Response(JSON.stringify({ error: 'No MetaAPI account linked' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const startTime = new Date();
       startTime.setDate(startTime.getDate() - 90);
 
@@ -374,8 +806,6 @@ serve(async (req) => {
       );
 
       if (!historyResponse.ok) {
-        const errorText = await historyResponse.text();
-        console.error('Failed to fetch history:', errorText);
         return new Response(JSON.stringify({ error: 'Failed to fetch trade history. Account may still be syncing.' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -383,16 +813,10 @@ serve(async (req) => {
       }
 
       const deals: MetaApiDeal[] = await historyResponse.json();
-      
-      // Filter for closing deals (entries are DEAL_ENTRY_OUT or DEAL_ENTRY_INOUT)
       const closedDeals = deals.filter(d => 
-        (d.type === 'DEAL_TYPE_BUY' || d.type === 'DEAL_TYPE_SELL') &&
-        d.profit !== 0
+        (d.type === 'DEAL_TYPE_BUY' || d.type === 'DEAL_TYPE_SELL') && d.profit !== 0
       );
 
-      console.log(`Found ${closedDeals.length} closed deals`);
-
-      // Get existing broker trades to avoid duplicates
       const { data: existingTrades } = await supabase
         .from('broker_trades')
         .select('trade_id')
@@ -400,7 +824,6 @@ serve(async (req) => {
 
       const existingIds = new Set((existingTrades || []).map(t => t.trade_id));
 
-      // Insert new trades
       const newTrades = closedDeals
         .filter(d => !existingIds.has(d.id))
         .map(d => ({
@@ -422,23 +845,22 @@ serve(async (req) => {
 
       if (newTrades.length > 0) {
         await supabase.from('broker_trades').insert(newTrades);
-      }
 
-      // Auto-journal: Create trade entries for new closed trades
-      if (tradingAccountId && newTrades.length > 0) {
-        const journalTrades = newTrades.map(t => ({
-          user_id: user.id,
-          account_id: tradingAccountId,
-          date: new Date(t.close_time).toISOString().split('T')[0],
-          pair: t.symbol,
-          direction: t.type === 'buy' ? 'long' : 'short',
-          result: t.profit + (t.swap || 0) + (t.commission || 0),
-          session: getSession(new Date(t.close_time)),
-          strategy: 'Synced from Broker',
-          notes: `Auto-synced from ${connection.broker_name}\nTrade ID: ${t.trade_id}\nVolume: ${t.volume}`,
-        }));
+        if (tradingAccountId) {
+          const journalTrades = newTrades.map(t => ({
+            user_id: user.id,
+            account_id: tradingAccountId,
+            date: new Date(t.close_time).toISOString().split('T')[0],
+            pair: t.symbol,
+            direction: t.type === 'buy' ? 'Long' : 'Short',
+            result: t.profit + (t.swap || 0) + (t.commission || 0),
+            session: getSession(new Date(t.close_time)),
+            strategy: 'Synced from Broker',
+            notes: `Trade ID: ${t.trade_id}\nVolume: ${t.volume}`,
+          }));
 
-        await supabase.from('trades').insert(journalTrades);
+          await supabase.from('trades').insert(journalTrades);
+        }
       }
 
       return new Response(JSON.stringify({ 
@@ -450,7 +872,7 @@ serve(async (req) => {
       });
     }
 
-    // ACTION: Disconnect and remove MetaAPI account
+    // ====================== DISCONNECT ======================
     if (action === 'disconnect') {
       const { data: connection, error: connError } = await supabase
         .from('broker_connections')
@@ -466,8 +888,8 @@ serve(async (req) => {
         });
       }
 
-      // Delete from MetaAPI if account exists
-      if (connection.metaapi_account_id) {
+      // Delete MetaAPI account if exists (not for TradeLocker)
+      if (connection.metaapi_account_id && !connection.metaapi_account_id.startsWith('tl_') && metaApiToken) {
         try {
           await fetch(
             `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${connection.metaapi_account_id}`,
@@ -481,11 +903,10 @@ serve(async (req) => {
         }
       }
 
-      // Delete from database (cascade will delete positions and trades)
-      await supabase
-        .from('broker_connections')
-        .delete()
-        .eq('id', connectionId);
+      // Delete related data
+      await supabase.from('broker_positions').delete().eq('broker_connection_id', connectionId);
+      await supabase.from('broker_trades').delete().eq('broker_connection_id', connectionId);
+      await supabase.from('broker_connections').delete().eq('id', connectionId);
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -498,19 +919,10 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Edge function error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
-
-function getSession(date: Date): string {
-  const hour = date.getUTCHours();
-  if (hour >= 0 && hour < 8) return 'Asia';
-  if (hour >= 8 && hour < 12) return 'London';
-  if (hour >= 12 && hour < 17) return 'New York AM';
-  if (hour >= 17 && hour < 21) return 'New York PM';
-  return 'Asia';
-}
