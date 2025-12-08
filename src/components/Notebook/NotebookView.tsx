@@ -582,13 +582,15 @@ export function NotebookView({
       isFullWidth && "px-0"
     )}>
       {/* Bookmark Tab Toggle - Outside */}
-      <button
-        onClick={toggleEntriesPanel}
-        className="bookmark-tab"
-      >
-        <FileText className="w-4 h-4" />
-        <span className="bookmark-label">Notes</span>
-      </button>
+      {!isEntriesPanelOpen && (
+        <button
+          onClick={toggleEntriesPanel}
+          className="bookmark-tab"
+        >
+          <FileText className="w-4 h-4" />
+          <span className="bookmark-label">Notes</span>
+        </button>
+      )}
 
       {/* Folders Popup Overlay */}
       {isFoldersPanelOpen && (
