@@ -152,7 +152,9 @@ export function NotebookView({
   const [showTableControls, setShowTableControls] = useState(false);
   const [selectedTable, setSelectedTable] = useState<HTMLTableElement | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const fullscreenEditorRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const fullscreenTitleRef = useRef<HTMLInputElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
   // Find selected entry
@@ -205,8 +207,25 @@ export function NotebookView({
     }
   }, [selectedEntry, isCreatingNew]);
 
-  // Close fullscreen with animation
+  // Sync content when entering fullscreen
+  useEffect(() => {
+    if (isFullWidth && editorRef.current && fullscreenEditorRef.current) {
+      fullscreenEditorRef.current.innerHTML = editorRef.current.innerHTML;
+      if (titleRef.current && fullscreenTitleRef.current) {
+        fullscreenTitleRef.current.value = titleRef.current.value;
+      }
+    }
+  }, [isFullWidth]);
+
+  // Close fullscreen with animation and sync content back
   const closeFullscreen = () => {
+    // Sync content back to main editor before closing
+    if (fullscreenEditorRef.current && editorRef.current) {
+      editorRef.current.innerHTML = fullscreenEditorRef.current.innerHTML;
+    }
+    if (fullscreenTitleRef.current && titleRef.current) {
+      titleRef.current.value = fullscreenTitleRef.current.value;
+    }
     setIsFullWidthClosing(true);
     setTimeout(() => {
       setIsFullWidth(false);
@@ -265,10 +284,14 @@ export function NotebookView({
   };
 
   const handleSave = () => {
-    if (!editorRef.current) return;
+    // Use fullscreen refs if in fullscreen mode, otherwise use regular refs
+    const currentEditorRef = isFullWidth ? fullscreenEditorRef : editorRef;
+    const currentTitleRef = isFullWidth ? fullscreenTitleRef : titleRef;
     
-    const content = editorRef.current.innerHTML;
-    const title = titleRef.current?.value || "Untitled Note";
+    if (!currentEditorRef.current) return;
+    
+    const content = currentEditorRef.current.innerHTML;
+    const title = currentTitleRef.current?.value || "Untitled Note";
     
     if (isCreatingNew) {
       const newEntry: NotebookEntry = {
@@ -630,7 +653,7 @@ export function NotebookView({
               </Button>
               <div className="h-6 w-px bg-border/50" />
               <Input
-                ref={titleRef}
+                ref={fullscreenTitleRef}
                 defaultValue={selectedEntry?.title || ""}
                 placeholder="Note title..."
                 disabled={isLocked}
@@ -717,7 +740,7 @@ export function NotebookView({
           <ScrollArea className="flex-1 bg-gradient-to-b from-transparent to-muted/5">
             <div className="max-w-3xl mx-auto px-12 py-10">
               <div
-                ref={editorRef}
+                ref={fullscreenEditorRef}
                 contentEditable={!isLocked}
                 className={cn(
                   "min-h-[calc(100vh-280px)] outline-none focus:outline-none caret-primary",
