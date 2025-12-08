@@ -359,7 +359,7 @@ export function NotebookView({
     { id: 'h3', label: 'Heading 3', icon: Heading3, command: 'formatBlock', value: 'h3' },
     { id: 'bullet', label: 'Bulleted list', icon: List, command: 'insertUnorderedList', value: '' },
     { id: 'numbered', label: 'Numbered list', icon: ListOrdered, command: 'insertOrderedList', value: '' },
-    { id: 'todo', label: 'To-do list', icon: CheckSquare, command: 'insertUnorderedList', value: '' },
+    { id: 'todo', label: 'To-do list', icon: CheckSquare, command: 'custom', value: '' },
     { id: 'toggle', label: 'Toggle list', icon: ChevronDown, command: 'formatBlock', value: 'details' },
     { id: 'quote', label: 'Quote', icon: Quote, command: 'formatBlock', value: 'blockquote' },
     { id: 'callout', label: 'Callout', icon: MessageSquare, command: 'formatBlock', value: 'aside' },
@@ -404,6 +404,15 @@ export function NotebookView({
       document.execCommand('insertHTML', false, '<div class="bg-primary/10 border-l-4 border-primary p-3 my-2 rounded-r">Type your callout here...</div>');
     } else if (option.id === 'toggle') {
       document.execCommand('insertHTML', false, '<details class="my-2"><summary class="cursor-pointer font-medium">Toggle title</summary><div class="pl-4 pt-2">Toggle content...</div></details>');
+    } else if (option.id === 'todo') {
+      const todoHTML = `
+        <div class="notebook-todo-item flex items-start gap-2 my-1 group" contenteditable="false">
+          <input type="checkbox" class="mt-1 w-4 h-4 rounded border-2 border-primary/50 accent-primary cursor-pointer" onchange="this.nextElementSibling.classList.toggle('line-through', this.checked); this.nextElementSibling.classList.toggle('text-muted-foreground', this.checked);" />
+          <span contenteditable="true" class="flex-1 outline-none transition-all">New task</span>
+          <button onclick="this.closest('.notebook-todo-item').remove();" class="w-5 h-5 rounded opacity-0 group-hover:opacity-100 bg-destructive/20 hover:bg-destructive/40 flex items-center justify-center text-[10px] text-destructive transition-all" title="Delete">✕</button>
+        </div>
+      `;
+      document.execCommand('insertHTML', false, todoHTML);
     } else if (option.id === 'link') {
       const url = prompt('Enter URL:');
       if (url) {
