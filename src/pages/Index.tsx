@@ -88,6 +88,7 @@ const Index = () => {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>('atp_sidebar_collapsed', false);
   
   // Draggable hamburger menu state
   const [menuPosition, setMenuPosition] = useLocalStorage<{ x: number; y: number }>('atp_menu_position', { x: 16, y: 16 });
@@ -419,13 +420,22 @@ const Index = () => {
       )}
 
       <div className={cn(
-        "min-h-screen flex flex-col gap-4 p-4 mx-auto pb-24",
-        isChartPage ? "lg:p-4 max-w-full" : "lg:flex-row lg:p-5 max-w-[1400px] lg:pb-5"
+        "min-h-screen flex flex-col gap-4 p-4 pb-24 transition-all duration-300",
+        isChartPage ? "lg:p-4" : "lg:flex-row lg:p-5 lg:pb-5",
+        !isChartPage && !sidebarCollapsed ? "lg:max-w-[1400px] mx-auto" : "w-full"
       )}>
         {/* Desktop Sidebar - hidden on chart page, sticky on scroll */}
         {!isChartPage && (
-          <div className="hidden lg:block sticky top-5 h-fit">
-            <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
+          <div className={cn(
+            "hidden lg:block sticky top-5 h-fit transition-all duration-300",
+            sidebarCollapsed && "absolute left-5 z-30"
+          )}>
+            <Sidebar 
+              currentPage={currentPage} 
+              onPageChange={setCurrentPage} 
+              isCollapsed={sidebarCollapsed}
+              onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+            />
           </div>
         )}
 
@@ -499,8 +509,10 @@ const Index = () => {
           </div>
         )}
 
-        {/* Main Content */}
-        <main className="flex-1">
+        <main className={cn(
+          "flex-1 transition-all duration-300",
+          !isChartPage && sidebarCollapsed && "lg:ml-24"
+        )}>
           <div className={cn(
             "glass-strong rounded-2xl min-h-[calc(100vh-120px)]",
             isChartPage ? "p-4 lg:min-h-[calc(100vh-100px)]" : "p-5 lg:p-6 lg:min-h-[calc(100vh-60px)]"
