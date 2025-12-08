@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { BrokerManagement } from "./BrokerManagement";
+import { CSVImport } from "./CSVImport";
+import { useTrades } from "@/hooks/useTrades";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string {
@@ -93,6 +95,21 @@ const gradientPresets = [
   { name: 'Northern Lights', from: '#0be881', to: '#00d2d3' },
   { name: 'Fire', from: '#ff4757', to: '#ff6348' },
 ];
+
+// Wrapper component for CSV Import to use the trades hook
+function CSVImportWrapper({ userId }: { userId?: string }) {
+  const { importTrades } = useTrades(userId);
+  
+  const handleImport = async (trades: { date: string; pair: string; direction: string; result: number; session?: string; strategy?: string; notes?: string }[]) => {
+    await importTrades(trades.map(t => ({
+      ...t,
+      direction: t.direction as 'Long' | 'Short',
+      user_id: userId || '',
+    })));
+  };
+  
+  return <CSVImport onImport={handleImport} />;
+}
 
 export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorChange, userProfile, onLogout, customColor, onCustomColorChange }: SettingsViewProps) {
   const [presets, setPresets] = useState<SettingsPreset[]>([]);
@@ -918,6 +935,8 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
         </div>
 
         <BrokerManagement userId={userProfile?.user_id} />
+        
+        <CSVImportWrapper userId={userProfile?.user_id} />
       </section>
 
       {/* About */}
