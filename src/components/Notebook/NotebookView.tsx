@@ -578,9 +578,18 @@ export function NotebookView({
 
   return (
     <div className={cn(
-      "h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4 transition-all duration-300",
+      "h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4 transition-all duration-300 relative",
       isFullWidth && "px-0"
     )}>
+      {/* Bookmark Tab Toggle - Outside */}
+      <button
+        onClick={toggleEntriesPanel}
+        className="bookmark-tab"
+      >
+        <FileText className="w-4 h-4" />
+        <span className="bookmark-label">Notes</span>
+      </button>
+
       {/* Folders Popup Overlay */}
       {isFoldersPanelOpen && (
         <>
@@ -859,18 +868,6 @@ export function NotebookView({
           </div>
         )}
 
-        {/* Bookmark Tab Toggle */}
-        <button
-          onClick={toggleEntriesPanel}
-          className={cn(
-            "absolute top-8 z-30 bookmark-tab",
-            isEntriesPanelOpen ? "left-[17.5rem]" : "left-0"
-          )}
-        >
-          <div className="bookmark-tab-inner">
-            <FileText className="w-3.5 h-3.5" />
-          </div>
-        </button>
         
         <div className="flex-1 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
         {selectedEntry || isCreatingNew ? (
