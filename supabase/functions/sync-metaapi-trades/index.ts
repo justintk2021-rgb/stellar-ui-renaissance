@@ -71,19 +71,39 @@ serve(async (req) => {
       // Connect to MetaAPI account and verify connection
       console.log('Connecting to MetaAPI account:', accountId);
       
-      const accountInfoResponse = await fetch(
-        `https://mt-client-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${accountId}`,
-        {
-          headers: {
-            'auth-token': metaApiToken,
-          },
+      let accountInfoResponse;
+      try {
+        // Try the main MetaAPI endpoint
+        accountInfoResponse = await fetch(
+          `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${accountId}`,
+          {
+            headers: {
+              'auth-token': metaApiToken,
+            },
+          }
+        );
+      } catch (fetchError) {
+        console.error('MetaAPI fetch error:', fetchError);
+        // Check if it's a certificate error
+        const errorMessage = String(fetchError);
+        if (errorMessage.includes('certificate') || errorMessage.includes('Expired')) {
+          return new Response(JSON.stringify({ 
+            error: 'MetaAPI service is temporarily unavailable due to a certificate issue on their end. Please try again later or contact MetaAPI support.' 
+          }), {
+            status: 503,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
-      );
+        return new Response(JSON.stringify({ error: 'Failed to connect to MetaAPI. Please check your network and try again.' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       if (!accountInfoResponse.ok) {
         const errorText = await accountInfoResponse.text();
         console.error('MetaAPI account info error:', errorText);
-        return new Response(JSON.stringify({ error: 'Failed to connect to MetaAPI account. Please check the account ID.' }), {
+        return new Response(JSON.stringify({ error: 'Failed to connect to MetaAPI account. Please check the account ID and ensure your MetaAPI token is valid.' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -133,14 +153,32 @@ serve(async (req) => {
       
       console.log('Fetching trades from:', startTime.toISOString());
       
-      const tradesResponse = await fetch(
-        `https://mt-client-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${connection.account_id}/history-deals/time/${startTime.toISOString()}/${new Date().toISOString()}`,
-        {
-          headers: {
-            'auth-token': metaApiToken,
-          },
+      let tradesResponse;
+      try {
+        tradesResponse = await fetch(
+          `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${connection.account_id}/history-deals/time/${startTime.toISOString()}/${new Date().toISOString()}`,
+          {
+            headers: {
+              'auth-token': metaApiToken,
+            },
+          }
+        );
+      } catch (fetchError) {
+        console.error('MetaAPI trades fetch error:', fetchError);
+        const errorMessage = String(fetchError);
+        if (errorMessage.includes('certificate') || errorMessage.includes('Expired')) {
+          return new Response(JSON.stringify({ 
+            error: 'MetaAPI service is temporarily unavailable due to a certificate issue on their end. Please try again later.' 
+          }), {
+            status: 503,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
-      );
+        return new Response(JSON.stringify({ error: 'Failed to connect to MetaAPI for trade sync.' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       if (!tradesResponse.ok) {
         const errorText = await tradesResponse.text();
