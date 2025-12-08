@@ -623,7 +623,7 @@
   left: -85px;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 30;
+  z-index: 10;
   display: flex;
   flex-direction: row-reverse;
   align-items: center;
@@ -662,10 +662,10 @@
 }
 
 .bookmark-tab:hover {
-  left: -20px;
-  padding-right: 20px;
+  left: -50px;
+  padding-left: 20px;
   box-shadow: 
-    6px 0 20px hsl(var(--primary) / 0.35),
+    -6px 0 20px hsl(var(--primary) / 0.35),
     inset 0 1px 0 hsl(var(--primary-foreground) / 0.15);
 }
 
