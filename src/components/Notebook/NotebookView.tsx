@@ -980,36 +980,96 @@ export function NotebookView({
                         <MoreHorizontal className="w-4 h-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48 bg-background border border-border z-50">
+                    <DropdownMenuContent align="end" className="w-56 bg-background border border-border z-50 p-2">
+                      {/* Font Style Selector */}
+                      <div className="flex items-center justify-center gap-2 mb-2 p-1">
+                        <button 
+                          onClick={() => setFontStyle('default')}
+                          className={cn(
+                            "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors",
+                            fontStyle === 'default' ? "bg-primary/20 text-primary" : "hover:bg-muted"
+                          )}
+                        >
+                          <span className="text-lg font-sans">Ag</span>
+                          <span className="text-[10px] text-muted-foreground">Default</span>
+                        </button>
+                        <button 
+                          onClick={() => setFontStyle('serif')}
+                          className={cn(
+                            "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors",
+                            fontStyle === 'serif' ? "bg-primary/20 text-primary" : "hover:bg-muted"
+                          )}
+                        >
+                          <span className="text-lg font-serif">Ag</span>
+                          <span className="text-[10px] text-muted-foreground">Serif</span>
+                        </button>
+                        <button 
+                          onClick={() => setFontStyle('mono')}
+                          className={cn(
+                            "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors",
+                            fontStyle === 'mono' ? "bg-primary/20 text-primary" : "hover:bg-muted"
+                          )}
+                        >
+                          <span className="text-lg font-mono">Ag</span>
+                          <span className="text-[10px] text-muted-foreground">Mono</span>
+                        </button>
+                      </div>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={handleDuplicate} className="text-xs">
-                        <Copy className="w-3 h-3 mr-2" />
+                        <Copy className="w-3.5 h-3.5 mr-2" />
                         Duplicate
+                        <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+D</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={toggleFoldersPanel} className="text-xs">
+                        <FolderInput className="w-3.5 h-3.5 mr-2" />
+                        Move to
+                        <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+⇧+P</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleMoveToTrash} className="text-xs text-destructive">
+                        <Trash2 className="w-3.5 h-3.5 mr-2" />
+                        Move to Trash
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setFontStyle('default')} className="text-xs">
-                        <Type className="w-3 h-3 mr-2" />
-                        Sans Serif {fontStyle === 'default' && <span className="ml-auto text-primary">✓</span>}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setFontStyle('serif')} className="text-xs">
-                        <Type className="w-3 h-3 mr-2" />
-                        Serif {fontStyle === 'serif' && <span className="ml-auto text-primary">✓</span>}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setFontStyle('mono')} className="text-xs">
-                        <Type className="w-3 h-3 mr-2" />
-                        Monospace {fontStyle === 'mono' && <span className="ml-auto text-primary">✓</span>}
-                      </DropdownMenuItem>
+                      <div className="flex items-center justify-between px-2 py-1.5">
+                        <div className="flex items-center gap-2 text-xs">
+                          <Type className="w-3.5 h-3.5" />
+                          Small text
+                        </div>
+                        <Switch 
+                          checked={isSmallText} 
+                          onCheckedChange={setIsSmallText}
+                          className="scale-75"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between px-2 py-1.5">
+                        <div className="flex items-center gap-2 text-xs">
+                          <Maximize2 className="w-3.5 h-3.5" />
+                          Full width
+                        </div>
+                        <Switch 
+                          checked={isFullWidth} 
+                          onCheckedChange={setIsFullWidth}
+                          className="scale-75"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between px-2 py-1.5">
+                        <div className="flex items-center gap-2 text-xs">
+                          <Lock className="w-3.5 h-3.5" />
+                          Lock page
+                        </div>
+                        <Switch 
+                          checked={isLocked} 
+                          onCheckedChange={setIsLocked}
+                          className="scale-75"
+                        />
+                      </div>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setIsSmallText(!isSmallText)} className="text-xs">
-                        {isSmallText ? "A" : "a"} {isSmallText ? "Large Text" : "Small Text"}
+                      <DropdownMenuItem onClick={handleExport} className="text-xs">
+                        <Download className="w-3.5 h-3.5 mr-2" />
+                        Export
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Button variant="ghost" size="sm" onClick={() => setIsLocked(!isLocked)} className="h-7 w-7 p-0">
-                    {isLocked ? <Lock className="w-3 h-3 text-yellow-500" /> : <Unlock className="w-3 h-3" />}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setIsFullWidth(!isFullWidth)} className="h-7 w-7 p-0">
-                    {isFullWidth ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
-                  </Button>
                   <Button variant="outline" size="sm" onClick={handleSave} disabled={isLocked || isSelectedEntryInTrash} className="h-7 px-3 text-xs">
                     <Save className="w-3 h-3 mr-1" />
                     Save
