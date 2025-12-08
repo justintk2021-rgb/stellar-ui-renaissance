@@ -31,6 +31,7 @@ import {
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import {
   Bold,
@@ -1266,21 +1267,23 @@ export function NotebookView({
                           <FolderInput className="w-3.5 h-3.5 mr-2" />
                           Move to
                         </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="w-48">
-                          {CATEGORIES.filter(c => c.id !== "all" && c.id !== "trash" && c.id !== selectedEntry?.category).map((cat) => {
-                            const Icon = cat.icon;
-                            return (
-                              <DropdownMenuItem
-                                key={cat.id}
-                                onClick={() => selectedEntry && handleMoveToCategory(selectedEntry, cat.id)}
-                                className="text-xs"
-                              >
-                                <Icon className="w-3.5 h-3.5 mr-2" />
-                                {cat.label}
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </DropdownMenuSubContent>
+                        <DropdownMenuPortal>
+                          <DropdownMenuSubContent className="w-48 z-[100]">
+                            {CATEGORIES.filter(c => c.id !== "all" && c.id !== "trash" && c.id !== selectedEntry?.category).map((cat) => {
+                              const Icon = cat.icon;
+                              return (
+                                <DropdownMenuItem
+                                  key={cat.id}
+                                  onClick={() => selectedEntry && handleMoveToCategory(selectedEntry, cat.id)}
+                                  className="text-xs"
+                                >
+                                  <Icon className="w-3.5 h-3.5 mr-2" />
+                                  {cat.label}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
                       </DropdownMenuSub>
                       <DropdownMenuItem onClick={handleMoveToTrash} className="text-xs text-destructive">
                         <Trash2 className="w-3.5 h-3.5 mr-2" />
