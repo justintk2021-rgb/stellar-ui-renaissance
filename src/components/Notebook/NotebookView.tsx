@@ -577,9 +577,86 @@ export function NotebookView({
   const isSelectedEntryInTrash = selectedEntry?.isDeleted;
 
   return (
+    <>
+    {/* Fullscreen Overlay */}
+    {isFullWidth && selectedEntry && (
+      <div className="fixed inset-0 z-50 bg-background flex flex-col">
+        {/* Fullscreen Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border/30">
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setIsFullWidth(false)}
+              className="h-8 w-8 p-0"
+            >
+              <Minimize2 className="w-4 h-4" />
+            </Button>
+            <Input
+              ref={titleRef}
+              defaultValue={selectedEntry?.title || ""}
+              placeholder="Note title..."
+              disabled={isLocked}
+              className="text-xl font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 w-auto max-w-md"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-background border border-border z-50">
+                <DropdownMenuItem onClick={() => setFontStyle('default')} className="text-xs">
+                  Sans Serif {fontStyle === 'default' && <span className="ml-auto text-primary">✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFontStyle('serif')} className="text-xs">
+                  Serif {fontStyle === 'serif' && <span className="ml-auto text-primary">✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFontStyle('mono')} className="text-xs">
+                  Monospace {fontStyle === 'mono' && <span className="ml-auto text-primary">✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="flex items-center justify-between px-2 py-1.5">
+                  <span className="text-xs">Small text</span>
+                  <Switch checked={isSmallText} onCheckedChange={setIsSmallText} className="scale-75" />
+                </div>
+                <div className="flex items-center justify-between px-2 py-1.5">
+                  <span className="text-xs">Lock page</span>
+                  <Switch checked={isLocked} onCheckedChange={setIsLocked} className="scale-75" />
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="outline" size="sm" onClick={handleSave} disabled={isLocked} className="h-8 px-4 text-xs">
+              <Save className="w-3 h-3 mr-1" />
+              Save
+            </Button>
+          </div>
+        </div>
+        {/* Fullscreen Editor */}
+        <ScrollArea className="flex-1">
+          <div className="max-w-4xl mx-auto px-8 py-6">
+            <div
+              ref={editorRef}
+              contentEditable={!isLocked}
+              className={cn(
+                "min-h-[calc(100vh-120px)] outline-none focus:outline-none caret-primary",
+                fontClasses[fontStyle],
+                isSmallText ? "text-sm" : "text-base",
+                "leading-relaxed"
+              )}
+              
+              suppressContentEditableWarning
+            />
+          </div>
+        </ScrollArea>
+      </div>
+    )}
+    
     <div className={cn(
       "h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4 transition-all duration-300 relative",
-      isFullWidth && "px-0"
+      isFullWidth && "invisible"
     )}>
       {/* Bookmark Tab Toggle - Outside */}
       {!isEntriesPanelOpen && (
@@ -1313,5 +1390,6 @@ export function NotebookView({
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }
