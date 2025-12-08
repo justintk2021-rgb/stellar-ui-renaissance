@@ -130,6 +130,8 @@ export function NotebookView({
   const [isLocked, setIsLocked] = useState(false);
   const [isFoldersPanelOpen, setIsFoldersPanelOpen] = useState(false);
   const [isFoldersPanelClosing, setIsFoldersPanelClosing] = useState(false);
+  const [isEntriesPanelOpen, setIsEntriesPanelOpen] = useState(true);
+  const [isEntriesPanelClosing, setIsEntriesPanelClosing] = useState(false);
   const [isAddFolderDialogOpen, setIsAddFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [folderSearchQuery, setFolderSearchQuery] = useState("");
@@ -214,6 +216,22 @@ export function NotebookView({
       closeFoldersPanel();
     } else {
       setIsFoldersPanelOpen(true);
+    }
+  };
+
+  const closeEntriesPanel = () => {
+    setIsEntriesPanelClosing(true);
+    setTimeout(() => {
+      setIsEntriesPanelOpen(false);
+      setIsEntriesPanelClosing(false);
+    }, 200);
+  };
+
+  const toggleEntriesPanel = () => {
+    if (isEntriesPanelOpen) {
+      closeEntriesPanel();
+    } else {
+      setIsEntriesPanelOpen(true);
     }
   };
 
@@ -797,10 +815,12 @@ export function NotebookView({
       )}
 
       {/* Entries List */}
-      <div className={cn(
-        "w-72 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col transition-all duration-300",
-        isFullWidth && "hidden"
-      )}>
+      {isEntriesPanelOpen && (
+        <div className={cn(
+          "w-72 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col",
+          isFullWidth && "hidden",
+          isEntriesPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
+        )}>
         <div className="p-3 border-b border-border/30 space-y-2">
           <div className="flex items-center gap-2">
             <Button
@@ -995,6 +1015,7 @@ export function NotebookView({
           </div>
         </ScrollArea>
       </div>
+      )}
 
       {/* Editor */}
       <div className="flex-1 flex overflow-hidden gap-3">
@@ -1042,7 +1063,18 @@ export function NotebookView({
               )}
 
               <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
+                <div className="flex items-center gap-2 flex-1">
+                  {!isEntriesPanelOpen && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleEntriesPanel}
+                      className="h-8 w-8 p-0 shrink-0"
+                    >
+                      <PanelLeftOpen className="w-4 h-4" />
+                    </Button>
+                  )}
+                  <div className="flex-1">
                   <Input
                     ref={titleRef}
                     defaultValue={selectedEntry?.title || ""}
@@ -1082,6 +1114,7 @@ export function NotebookView({
                     )}
                   </div>
                 </div>
+              </div>
 
                 {/* Actions - hidden for trash items */}
                 {!isSelectedEntryInTrash && (

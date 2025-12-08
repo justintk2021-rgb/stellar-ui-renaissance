@@ -583,6 +583,40 @@
   animation: folder-popup-out 0.2s ease-in forwards;
 }
 
+@keyframes entries-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+    width: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    width: 18rem;
+  }
+}
+
+@keyframes entries-panel-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+    width: 18rem;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-20px);
+    width: 0;
+  }
+}
+
+.animate-entries-panel-in {
+  animation: entries-panel-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-entries-panel-out {
+  animation: entries-panel-out 0.2s ease-in forwards;
+}
+
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
 }
