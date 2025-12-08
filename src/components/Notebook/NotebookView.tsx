@@ -50,6 +50,7 @@ import {
   Search,
   Trash2,
   ChevronRight,
+  ChevronLeft,
   ListOrdered,
   Quote,
   MoreHorizontal,
@@ -130,7 +131,7 @@ export function NotebookView({
   const [isLocked, setIsLocked] = useState(false);
   const [isFoldersPanelOpen, setIsFoldersPanelOpen] = useState(false);
   const [isFoldersPanelClosing, setIsFoldersPanelClosing] = useState(false);
-  const [isEntriesPanelOpen, setIsEntriesPanelOpen] = useState(true);
+  const [isEntriesPanelOpen, setIsEntriesPanelOpen] = useState(false);
   const [isEntriesPanelClosing, setIsEntriesPanelClosing] = useState(false);
   const [isAddFolderDialogOpen, setIsAddFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -814,211 +815,24 @@ export function NotebookView({
         </>
       )}
 
-      {/* Entries List */}
-      {isEntriesPanelOpen && (
-        <div className={cn(
-          "w-72 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col",
-          isFullWidth && "hidden",
-          isEntriesPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
-        )}>
-        <div className="p-3 border-b border-border/30 space-y-2">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleFoldersPanel}
-              className="h-8 w-8 p-0"
-            >
-              <PanelLeftOpen className="w-4 h-4" />
-            </Button>
-            <span className="text-sm font-medium flex-1">
-              {CATEGORIES.find((c) => c.id === selectedCategory)?.label}
-            </span>
-            {isViewingTrash && trashCount > 0 && (
-              <ConfirmDialog
-                trigger={
-                  <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive">
-                    Empty
-                  </Button>
-                }
-                title="Empty Trash"
-                description="Are you sure you want to permanently delete all items in trash? This action cannot be undone."
-                confirmLabel="Empty Trash"
-                variant="destructive"
-                onConfirm={handleEmptyTrash}
-              />
-            )}
-          </div>
-          <div className="relative">
-            <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-7 text-xs pl-7 bg-muted/30 border-border/50"
-            />
-          </div>
-        </div>
-
-        <ScrollArea className="flex-1">
-          <div className="p-2">
-            {sortedDates.length === 0 && !isCreatingNew ? (
-              <div className="text-center text-xs text-muted-foreground py-8">
-                {isViewingTrash ? "Trash is empty" : "No notes yet. Create one!"}
-              </div>
-            ) : (
-              sortedDates.map((date) => (
-                <div key={date} className="mb-3">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1 sticky top-0 bg-card/80 backdrop-blur-sm">
-                    {isViewingTrash ? `Deleted ${formatDate(date)}` : formatDate(date)}
-                  </div>
-                  {groupedEntries[date].map((entry) => (
-                    <div
-                      key={entry.id}
-                      className={cn(
-                        "w-full text-left p-2 rounded-lg transition-all mb-1 group relative",
-                        selectedEntryId === entry.id
-                          ? "bg-primary/20 border border-primary/40"
-                          : "hover:bg-muted/50 border border-transparent",
-                        entry.isDeleted && "opacity-70"
-                      )}
-                    >
-                      <button
-                        onClick={() => {
-                          setSelectedEntryId(entry.id);
-                          setIsCreatingNew(false);
-                        }}
-                        className="w-full text-left"
-                      >
-                        <div className="flex items-center gap-2">
-                          <ChevronRight className={cn(
-                            "w-3 h-3 transition-transform flex-shrink-0",
-                            selectedEntryId === entry.id && "rotate-90"
-                          )} />
-                          <span className="text-xs font-medium truncate flex-1">{entry.title}</span>
-                          {entry.isDeleted && (
-                            <Trash2 className="w-3 h-3 text-destructive flex-shrink-0" />
-                          )}
-                        </div>
-                        {entry.tradeId && !entry.isDeleted && (() => {
-                          const trade = trades.find(t => t.id === entry.tradeId);
-                          return trade ? (
-                            <div className="flex items-center gap-2 mt-1 ml-5">
-                              <Badge variant="outline" className={cn(
-                                "text-[9px]",
-                                trade.result >= 0 ? "border-primary/50 text-primary" : "border-destructive/50 text-destructive"
-                              )}>
-                                {trade.result >= 0 ? "+" : ""}${trade.result.toFixed(0)}
-                              </Badge>
-                            </div>
-                          ) : null;
-                        })()}
-                      </button>
-                      
-                      {/* Note Actions Dropdown */}
-                      {!entry.isDeleted && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreHorizontal className="w-3 h-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 bg-popover border border-border shadow-lg z-50">
-                            <DropdownMenuItem 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCopyLink(entry);
-                              }} 
-                              className="text-xs"
-                            >
-                              <Link className="w-4 h-4 mr-2" />
-                              Copy link
-                              <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+L</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDuplicateEntry(entry);
-                              }} 
-                              className="text-xs"
-                            >
-                              <Copy className="w-4 h-4 mr-2" />
-                              Duplicate
-                              <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+D</span>
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuSeparator />
-                            
-                            {/* Move to submenu */}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger className="w-full">
-                                <div className="flex items-center px-2 py-1.5 text-xs hover:bg-muted/50 rounded-sm cursor-pointer">
-                                  <FolderInput className="w-4 h-4 mr-2" />
-                                  Move to
-                                  <ChevronRight className="w-3 h-3 ml-auto" />
-                                </div>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent side="right" className="w-44 bg-popover border border-border shadow-lg z-50">
-                                {CATEGORIES.filter(c => c.id !== "all" && c.id !== "trash" && c.id !== entry.category).map((cat) => {
-                                  const Icon = cat.icon;
-                                  return (
-                                    <DropdownMenuItem
-                                      key={cat.id}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleMoveToCategory(entry, cat.id);
-                                      }}
-                                      className="text-xs"
-                                    >
-                                      <Icon className="w-4 h-4 mr-2" />
-                                      {cat.label}
-                                    </DropdownMenuItem>
-                                  );
-                                })}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                            
-                            <DropdownMenuSeparator />
-                            
-                            <DropdownMenuItem 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSaveEntry({
-                                  ...entry,
-                                  isDeleted: true,
-                                  deletedAt: new Date().toISOString(),
-                                  updatedAt: new Date().toISOString(),
-                                });
-                                if (selectedEntryId === entry.id) {
-                                  setSelectedEntryId(null);
-                                }
-                                toast.success("Note moved to trash!");
-                              }} 
-                              className="text-xs text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Move to trash
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ))
-            )}
-          </div>
-        </ScrollArea>
-      </div>
-      )}
-
-      {/* Editor */}
-      <div className="flex-1 flex overflow-hidden gap-3">
+      {/* Editor - Full width with toggle for entries panel */}
+      <div className="flex-1 flex overflow-hidden gap-3 relative">
+        {/* Toggle Arrow for Entries Panel */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleEntriesPanel}
+          className={cn(
+            "absolute right-0 top-1/2 -translate-y-1/2 z-30 h-16 w-6 p-0 rounded-l-lg rounded-r-none bg-muted/80 hover:bg-muted border border-r-0 border-border/50 transition-all",
+            isEntriesPanelOpen && "right-[18.5rem]"
+          )}
+        >
+          <ChevronLeft className={cn(
+            "w-4 h-4 transition-transform",
+            isEntriesPanelOpen && "rotate-180"
+          )} />
+        </Button>
+        
         <div className="flex-1 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
         {selectedEntry || isCreatingNew ? (
           <>
@@ -1064,222 +878,121 @@ export function NotebookView({
 
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-2 flex-1">
-                  {!isEntriesPanelOpen && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={toggleEntriesPanel}
-                      className="h-8 w-8 p-0 shrink-0"
-                    >
-                      <PanelLeftOpen className="w-4 h-4" />
-                    </Button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleFoldersPanel}
+                    className="h-8 w-8 p-0 shrink-0"
+                  >
+                    <PanelLeftOpen className="w-4 h-4" />
+                  </Button>
                   <div className="flex-1">
-                  <Input
-                    ref={titleRef}
-                    defaultValue={selectedEntry?.title || ""}
-                    placeholder="Note title..."
-                    disabled={isLocked || isSelectedEntryInTrash}
-                    className={cn(
-                      "text-lg font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0 focus:ring-0 focus:outline-none placeholder:text-muted-foreground/50",
-                      (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70"
-                    )}
-                  />
-                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground flex-wrap">
-                    <Calendar className="w-3 h-3" />
-                    <span>{selectedEntry ? formatDate(selectedEntry.date) : formatDate(new Date().toISOString().slice(0, 10))}</span>
-                    {selectedEntry && (
-                      <>
-                        <span>•</span>
-                        <span>Last updated: {new Date(selectedEntry.updatedAt).toLocaleTimeString()}</span>
-                      </>
-                    )}
-                    {linkedTrade && (
-                      <>
-                        <span>•</span>
-                        <Badge variant="outline" className="text-[10px] border-secondary/50 bg-secondary/10">
-                          <TrendingUp className="w-3 h-3 mr-1" />
-                          Trade Note
-                        </Badge>
-                      </>
-                    )}
-                    {isLocked && (
-                      <>
-                        <span>•</span>
-                        <Badge variant="outline" className="text-[10px] border-yellow-500/50 bg-yellow-500/10 text-yellow-600">
-                          <Lock className="w-3 h-3 mr-1" />
-                          Locked
-                        </Badge>
-                      </>
-                    )}
+                    <Input
+                      ref={titleRef}
+                      defaultValue={selectedEntry?.title || ""}
+                      placeholder="Note title..."
+                      disabled={isLocked || isSelectedEntryInTrash}
+                      className={cn(
+                        "text-lg font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0 focus:ring-0 focus:outline-none placeholder:text-muted-foreground/50",
+                        (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70"
+                      )}
+                    />
+                    <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground flex-wrap">
+                      <Calendar className="w-3 h-3" />
+                      <span>{selectedEntry ? formatDate(selectedEntry.date) : formatDate(new Date().toISOString().slice(0, 10))}</span>
+                      {selectedEntry && (
+                        <>
+                          <span>•</span>
+                          <span>Last updated: {new Date(selectedEntry.updatedAt).toLocaleTimeString()}</span>
+                        </>
+                      )}
+                      {linkedTrade && (
+                        <>
+                          <span>•</span>
+                          <Badge variant="outline" className="text-[10px] border-secondary/50 bg-secondary/10">
+                            <TrendingUp className="w-3 h-3 mr-1" />
+                            Trade Note
+                          </Badge>
+                        </>
+                      )}
+                      {isLocked && (
+                        <>
+                          <span>•</span>
+                          <Badge variant="outline" className="text-[10px] border-yellow-500/50 bg-yellow-500/10 text-yellow-600">
+                            <Lock className="w-3 h-3 mr-1" />
+                            Locked
+                          </Badge>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-                {/* Actions - hidden for trash items */}
-                {!isSelectedEntryInTrash && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={handleSave}
-                      disabled={isLocked}
-                      size="sm"
-                      className="bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-xs font-medium h-8"
-                    >
-                      <Save className="w-3 h-3 mr-1" />
-                      Save
+              {/* Actions - hidden for trash items */}
+              {!isSelectedEntryInTrash && (
+                <div className="flex items-center gap-2 mt-4">
+                  {/* Formatting toolbar */}
+                  <div className="flex items-center gap-1 border-r border-border/50 pr-2">
+                    <Button variant="ghost" size="sm" onClick={() => execCommand("bold")} className="w-7 h-7 p-0" disabled={isLocked}>
+                      <Bold className="w-3 h-3" />
                     </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-64 glass-strong">
-                      {/* Font Style Options */}
-                      <div className="px-2 py-2">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Font Style</div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setFontStyle('default')}
-                            className={cn(
-                              "flex-1 py-2 rounded-lg text-center transition-all border",
-                              fontStyle === 'default' 
-                                ? "bg-primary/20 border-primary/50 text-primary" 
-                                : "bg-muted/30 border-transparent hover:bg-muted/50"
-                            )}
-                          >
-                            <span className="text-lg font-sans">Ag</span>
-                            <div className="text-[9px] text-muted-foreground mt-1">Default</div>
-                          </button>
-                          <button
-                            onClick={() => setFontStyle('serif')}
-                            className={cn(
-                              "flex-1 py-2 rounded-lg text-center transition-all border",
-                              fontStyle === 'serif' 
-                                ? "bg-primary/20 border-primary/50 text-primary" 
-                                : "bg-muted/30 border-transparent hover:bg-muted/50"
-                            )}
-                          >
-                            <span className="text-lg font-serif">Ag</span>
-                            <div className="text-[9px] text-muted-foreground mt-1">Serif</div>
-                          </button>
-                          <button
-                            onClick={() => setFontStyle('mono')}
-                            className={cn(
-                              "flex-1 py-2 rounded-lg text-center transition-all border",
-                              fontStyle === 'mono' 
-                                ? "bg-primary/20 border-primary/50 text-primary" 
-                                : "bg-muted/30 border-transparent hover:bg-muted/50"
-                            )}
-                          >
-                            <span className="text-lg font-mono">Ag</span>
-                            <div className="text-[9px] text-muted-foreground mt-1">Mono</div>
-                          </button>
-                        </div>
-                      </div>
-
-                      <DropdownMenuSeparator />
-
-                      <DropdownMenuItem onClick={handleCopyContent} className="text-xs">
-                        <Copy className="w-4 h-4 mr-2" />
-                        Copy content
-                      </DropdownMenuItem>
-                      
-                      {selectedEntry && (
-                        <DropdownMenuItem onClick={handleDuplicate} className="text-xs">
-                          <FileText className="w-4 h-4 mr-2" />
-                          Duplicate
-                        </DropdownMenuItem>
-                      )}
-
-                      <DropdownMenuSeparator />
-
-                      {/* Toggle Options */}
-                      <div className="px-2 py-2 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-xs">
-                            <Type className="w-4 h-4" />
-                            Small text
-                          </div>
-                          <Switch 
-                            checked={isSmallText} 
-                            onCheckedChange={setIsSmallText}
-                            className="scale-75"
-                          />
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-xs">
-                            {isFullWidth ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                            Full width
-                          </div>
-                          <Switch 
-                            checked={isFullWidth} 
-                            onCheckedChange={setIsFullWidth}
-                            className="scale-75"
-                          />
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-xs">
-                            {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                            Lock page
-                          </div>
-                          <Switch 
-                            checked={isLocked} 
-                            onCheckedChange={setIsLocked}
-                            className="scale-75"
-                          />
-                        </div>
-                      </div>
-
-                      <DropdownMenuSeparator />
-
-                      <DropdownMenuItem onClick={handleExport} className="text-xs">
-                        <Download className="w-4 h-4 mr-2" />
-                        Export
-                      </DropdownMenuItem>
-
-                      {selectedEntry && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={handleMoveToTrash} 
-                            className="text-xs text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Move to Trash
-                          </DropdownMenuItem>
-                        </>
-                      )}
-
-                      {/* Footer Info */}
-                      <DropdownMenuSeparator />
-                      <div className="px-2 py-2 text-[10px] text-muted-foreground space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Type className="w-3 h-3" />
-                          Word count: {wordCount} words
-                        </div>
-                        {selectedEntry && (
-                          <>
-                            <div className="flex items-center gap-2">
-                              <Clock className="w-3 h-3" />
-                              Last edited: {formatDateTime(selectedEntry.updatedAt)}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Star className="w-3 h-3" />
-                              Created: {formatDateTime(selectedEntry.createdAt)}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Button variant="ghost" size="sm" onClick={() => execCommand("italic")} className="w-7 h-7 p-0" disabled={isLocked}>
+                      <Italic className="w-3 h-3" />
+                    </Button>
                   </div>
-                )}
-              </div>
+                  <div className="flex items-center gap-1 border-r border-border/50 pr-2">
+                    <Button variant="ghost" size="sm" onClick={() => execCommand("formatBlock", "h1")} className="w-7 h-7 p-0" disabled={isLocked}>
+                      <Heading1 className="w-3 h-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => execCommand("formatBlock", "h2")} className="w-7 h-7 p-0" disabled={isLocked}>
+                      <Heading2 className="w-3 h-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => execCommand("formatBlock", "h3")} className="w-7 h-7 p-0" disabled={isLocked}>
+                      <Heading3 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-1 border-r border-border/50 pr-2">
+                    <Button variant="ghost" size="sm" onClick={() => execCommand("insertUnorderedList")} className="w-7 h-7 p-0" disabled={isLocked}>
+                      <List className="w-3 h-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => execCommand("insertOrderedList")} className="w-7 h-7 p-0" disabled={isLocked}>
+                      <ListOrdered className="w-3 h-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => execCommand("formatBlock", "blockquote")} className="w-7 h-7 p-0" disabled={isLocked}>
+                      <Quote className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={isLocked}>
+                        <Type className="w-3 h-3 mr-1" />
+                        {fontStyle === 'default' ? 'Sans' : fontStyle === 'serif' ? 'Serif' : 'Mono'}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-32">
+                      <DropdownMenuItem onClick={() => setFontStyle('default')} className="text-xs">Sans Serif{fontStyle === 'default' && <span className="ml-auto text-primary">✓</span>}</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFontStyle('serif')} className="text-xs">Serif{fontStyle === 'serif' && <span className="ml-auto text-primary">✓</span>}</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFontStyle('mono')} className="text-xs">Monospace{fontStyle === 'mono' && <span className="ml-auto text-primary">✓</span>}</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button variant="ghost" size="sm" onClick={() => setIsSmallText(!isSmallText)} className="h-7 px-2 text-xs" disabled={isLocked}>
+                    {isSmallText ? "A" : "a"}
+                  </Button>
+                  <div className="flex-1" />
+                  <Button variant="ghost" size="sm" onClick={() => setIsLocked(!isLocked)} className="h-7 w-7 p-0">
+                    {isLocked ? <Lock className="w-3 h-3 text-yellow-500" /> : <Unlock className="w-3 h-3" />}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setIsFullWidth(!isFullWidth)} className="h-7 w-7 p-0">
+                    {isFullWidth ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleSave} disabled={isLocked || isSelectedEntryInTrash} className="h-7 px-3 text-xs">
+                    <Save className="w-3 h-3 mr-1" />
+                    Save
+                  </Button>
+                </div>
+              )}
             </div>
-
 
             {/* Editor with Block Menu */}
             <ScrollArea className="flex-1">
@@ -1447,6 +1160,48 @@ export function NotebookView({
                 <span className="font-medium truncate max-w-[70px]">{linkedTrade.strategy || '—'}</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Entries List Panel - Right Side */}
+        {isEntriesPanelOpen && (
+          <div className={cn(
+            "w-72 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col",
+            isEntriesPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
+          )}>
+            <div className="p-3 border-b border-border/30 space-y-2">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={toggleFoldersPanel} className="h-8 w-8 p-0">
+                  <PanelLeftOpen className="w-4 h-4" />
+                </Button>
+                <span className="text-sm font-medium flex-1">{CATEGORIES.find((c) => c.id === selectedCategory)?.label}</span>
+              </div>
+              <div className="relative">
+                <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-7 text-xs pl-7 bg-muted/30 border-border/50" />
+              </div>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2">
+                {sortedDates.length === 0 ? (
+                  <div className="text-center text-xs text-muted-foreground py-8">No notes yet</div>
+                ) : (
+                  sortedDates.map((date) => (
+                    <div key={date} className="mb-3">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1">{formatDate(date)}</div>
+                      {groupedEntries[date].map((entry) => (
+                        <button key={entry.id} onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }} className={cn("w-full text-left p-2 rounded-lg transition-all mb-1", selectedEntryId === entry.id ? "bg-primary/20 border border-primary/40" : "hover:bg-muted/50")}>
+                          <div className="flex items-center gap-2">
+                            <ChevronRight className={cn("w-3 h-3", selectedEntryId === entry.id && "rotate-90")} />
+                            <span className="text-xs font-medium truncate">{entry.title}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
           </div>
         )}
       </div>
