@@ -132,6 +132,7 @@ export function NotebookView({
   const [isFoldersPanelClosing, setIsFoldersPanelClosing] = useState(false);
   const [isAddFolderDialogOpen, setIsAddFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [folderSearchQuery, setFolderSearchQuery] = useState("");
   const [customFolders, setCustomFolders] = useState<Array<{ id: string; label: string; color?: string }>>(() => {
     const saved = localStorage.getItem('notebook-custom-folders');
     return saved ? JSON.parse(saved) : [];
@@ -571,25 +572,36 @@ export function NotebookView({
         >
           <div className="flex flex-col max-h-[70vh]">
             {/* Header */}
-            <div className="p-3 border-b border-border/30 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FolderOpen className="w-4 h-4 text-primary" />
-                <span className="font-medium text-sm">Folders</span>
+            <div className="p-3 border-b border-border/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="w-4 h-4 text-primary" />
+                  <span className="font-medium text-sm">Folders</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsAddFolderDialogOpen(true)}
+                  className="h-7 w-7 p-0"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsAddFolderDialogOpen(true)}
-                className="h-7 w-7 p-0"
-              >
-                <FolderPlus className="w-4 h-4" />
-              </Button>
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search folders..."
+                  value={folderSearchQuery}
+                  onChange={(e) => setFolderSearchQuery(e.target.value)}
+                  className="h-8 pl-7 text-xs bg-muted/50"
+                />
+              </div>
             </div>
 
             {/* Categories */}
             <ScrollArea className="flex-1 max-h-[50vh]">
               <div className="p-2 space-y-0.5">
-                {CATEGORIES.filter(c => c.id !== "trash").map((cat) => {
+                {CATEGORIES.filter(c => c.id !== "trash" && c.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).map((cat) => {
                   const Icon = cat.icon;
                   const count = cat.id === "all" 
                     ? notebookEntries.filter(e => !e.isDeleted).length 
@@ -669,12 +681,12 @@ export function NotebookView({
                 })}
 
                 {/* Custom Folders */}
-                {customFolders.length > 0 && (
+                {customFolders.filter(f => f.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).length > 0 && (
                   <>
                     <div className="text-[9px] uppercase tracking-wider text-muted-foreground px-2 pt-3 pb-1">
                       Custom
                     </div>
-                    {customFolders.map((folder) => {
+                    {customFolders.filter(f => f.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).map((folder) => {
                       const count = notebookEntries.filter((e) => e.category === folder.id && !e.isDeleted).length;
                       const markerColor = getFolderMarkerColor(folder.id);
                       
