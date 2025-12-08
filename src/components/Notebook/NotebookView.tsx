@@ -146,6 +146,7 @@ export function NotebookView({
   const [folderSearchQuery, setFolderSearchQuery] = useState("");
   const [customFolders, setCustomFolders] = useState<Array<{ id: string; label: string; color?: string }>>(() => {
     const saved = localStorage.getItem('notebook-custom-folders');
+    console.log('Loading custom folders:', saved);
     return saved ? JSON.parse(saved) : [];
   });
   const [folderMarkers, setFolderMarkers] = useState<Record<string, string>>(() => {
