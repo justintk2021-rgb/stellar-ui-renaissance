@@ -53,6 +53,8 @@ import {
   Star,
   RotateCcw,
   PanelLeftOpen,
+  Link,
+  FolderInput,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -283,6 +285,39 @@ export function NotebookView({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast.success("Note exported!");
+  };
+
+  // Copy note link to clipboard
+  const handleCopyLink = (entry: NotebookEntry) => {
+    const link = `${window.location.origin}/?note=${entry.id}`;
+    navigator.clipboard.writeText(link);
+    toast.success("Link copied to clipboard!");
+  };
+
+  // Duplicate a specific entry
+  const handleDuplicateEntry = (entry: NotebookEntry) => {
+    const duplicatedEntry: NotebookEntry = {
+      id: Date.now().toString(),
+      title: `${entry.title} (Copy)`,
+      content: entry.content,
+      category: entry.category,
+      date: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    onSaveEntry(duplicatedEntry);
+    setSelectedEntryId(duplicatedEntry.id);
+    toast.success("Note duplicated!");
+  };
+
+  // Move entry to a different category
+  const handleMoveToCategory = (entry: NotebookEntry, newCategory: string) => {
+    onSaveEntry({
+      ...entry,
+      category: newCategory,
+      updatedAt: new Date().toISOString(),
+    });
+    toast.success(`Note moved to ${CATEGORIES.find(c => c.id === newCategory)?.label || newCategory}!`);
   };
 
   const formatDate = (dateStr: string) => {
@@ -531,44 +566,141 @@ export function NotebookView({
                     {isViewingTrash ? `Deleted ${formatDate(date)}` : formatDate(date)}
                   </div>
                   {groupedEntries[date].map((entry) => (
-                    <button
+                    <div
                       key={entry.id}
-                      onClick={() => {
-                        setSelectedEntryId(entry.id);
-                        setIsCreatingNew(false);
-                      }}
                       className={cn(
-                        "w-full text-left p-2 rounded-lg transition-all mb-1",
+                        "w-full text-left p-2 rounded-lg transition-all mb-1 group relative",
                         selectedEntryId === entry.id
                           ? "bg-primary/20 border border-primary/40"
                           : "hover:bg-muted/50 border border-transparent",
                         entry.isDeleted && "opacity-70"
                       )}
                     >
-                      <div className="flex items-center gap-2">
-                        <ChevronRight className={cn(
-                          "w-3 h-3 transition-transform flex-shrink-0",
-                          selectedEntryId === entry.id && "rotate-90"
-                        )} />
-                        <span className="text-xs font-medium truncate flex-1">{entry.title}</span>
-                        {entry.isDeleted && (
-                          <Trash2 className="w-3 h-3 text-destructive flex-shrink-0" />
-                        )}
-                      </div>
-                      {entry.tradeId && !entry.isDeleted && (() => {
-                        const trade = trades.find(t => t.id === entry.tradeId);
-                        return trade ? (
-                          <div className="flex items-center gap-2 mt-1 ml-5">
-                            <Badge variant="outline" className={cn(
-                              "text-[9px]",
-                              trade.result >= 0 ? "border-primary/50 text-primary" : "border-destructive/50 text-destructive"
-                            )}>
-                              {trade.result >= 0 ? "+" : ""}${trade.result.toFixed(0)}
-                            </Badge>
-                          </div>
-                        ) : null;
-                      })()}
-                    </button>
+                      <button
+                        onClick={() => {
+                          setSelectedEntryId(entry.id);
+                          setIsCreatingNew(false);
+                        }}
+                        className="w-full text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <ChevronRight className={cn(
+                            "w-3 h-3 transition-transform flex-shrink-0",
+                            selectedEntryId === entry.id && "rotate-90"
+                          )} />
+                          <span className="text-xs font-medium truncate flex-1">{entry.title}</span>
+                          {entry.isDeleted && (
+                            <Trash2 className="w-3 h-3 text-destructive flex-shrink-0" />
+                          )}
+                        </div>
+                        {entry.tradeId && !entry.isDeleted && (() => {
+                          const trade = trades.find(t => t.id === entry.tradeId);
+                          return trade ? (
+                            <div className="flex items-center gap-2 mt-1 ml-5">
+                              <Badge variant="outline" className={cn(
+                                "text-[9px]",
+                                trade.result >= 0 ? "border-primary/50 text-primary" : "border-destructive/50 text-destructive"
+                              )}>
+                                {trade.result >= 0 ? "+" : ""}${trade.result.toFixed(0)}
+                              </Badge>
+                            </div>
+                          ) : null;
+                        })()}
+                      </button>
+                      
+                      {/* Note Actions Dropdown */}
+                      {!entry.isDeleted && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="w-3 h-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48 bg-popover border border-border shadow-lg z-50">
+                            <DropdownMenuItem 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyLink(entry);
+                              }} 
+                              className="text-xs"
+                            >
+                              <Link className="w-4 h-4 mr-2" />
+                              Copy link
+                              <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+L</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDuplicateEntry(entry);
+                              }} 
+                              className="text-xs"
+                            >
+                              <Copy className="w-4 h-4 mr-2" />
+                              Duplicate
+                              <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+D</span>
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
+                            
+                            {/* Move to submenu */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger className="w-full">
+                                <div className="flex items-center px-2 py-1.5 text-xs hover:bg-muted/50 rounded-sm cursor-pointer">
+                                  <FolderInput className="w-4 h-4 mr-2" />
+                                  Move to
+                                  <ChevronRight className="w-3 h-3 ml-auto" />
+                                </div>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent side="right" className="w-44 bg-popover border border-border shadow-lg z-50">
+                                {CATEGORIES.filter(c => c.id !== "all" && c.id !== "trash" && c.id !== entry.category).map((cat) => {
+                                  const Icon = cat.icon;
+                                  return (
+                                    <DropdownMenuItem
+                                      key={cat.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleMoveToCategory(entry, cat.id);
+                                      }}
+                                      className="text-xs"
+                                    >
+                                      <Icon className="w-4 h-4 mr-2" />
+                                      {cat.label}
+                                    </DropdownMenuItem>
+                                  );
+                                })}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                            
+                            <DropdownMenuSeparator />
+                            
+                            <DropdownMenuItem 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSaveEntry({
+                                  ...entry,
+                                  isDeleted: true,
+                                  deletedAt: new Date().toISOString(),
+                                  updatedAt: new Date().toISOString(),
+                                });
+                                if (selectedEntryId === entry.id) {
+                                  setSelectedEntryId(null);
+                                }
+                                toast.success("Note moved to trash!");
+                              }} 
+                              className="text-xs text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Move to trash
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
                   ))}
                 </div>
               ))
