@@ -34,6 +34,8 @@ import {
   Italic,
   List,
   Heading1,
+  Heading2,
+  Heading3,
   Save,
   Plus,
   FolderPlus,
@@ -64,6 +66,8 @@ import {
   PanelLeftOpen,
   Link,
   FolderInput,
+  CheckSquare,
+  ListCollapse,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -114,8 +118,13 @@ export function NotebookView({
     const saved = localStorage.getItem('notebook-custom-folders');
     return saved ? JSON.parse(saved) : [];
   });
+  const [isBlockMenuOpen, setIsBlockMenuOpen] = useState(false);
+  const [blockMenuPosition, setBlockMenuPosition] = useState({ x: 0, y: 0 });
+  const [showBlockButton, setShowBlockButton] = useState(false);
+  const [blockButtonPosition, setBlockButtonPosition] = useState({ x: 0, y: 0 });
   const editorRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
 
   // Find selected entry
   const selectedEntry = notebookEntries.find((e) => e.id === selectedEntryId);
@@ -333,6 +342,59 @@ export function NotebookView({
       updatedAt: new Date().toISOString(),
     });
     toast.success(`Note moved to ${CATEGORIES.find(c => c.id === newCategory)?.label || newCategory}!`);
+  };
+
+  // Block formatting options
+  const BLOCK_OPTIONS = [
+    { id: 'text', label: 'Text', icon: Type, command: 'formatBlock', value: 'p', shortcut: '' },
+    { id: 'h1', label: 'Heading 1', icon: Heading1, command: 'formatBlock', value: 'h1', shortcut: '#' },
+    { id: 'h2', label: 'Heading 2', icon: Heading2, command: 'formatBlock', value: 'h2', shortcut: '##' },
+    { id: 'h3', label: 'Heading 3', icon: Heading3, command: 'formatBlock', value: 'h3', shortcut: '###' },
+    { id: 'bullet', label: 'Bulleted list', icon: List, command: 'insertUnorderedList', value: '', shortcut: '-' },
+    { id: 'numbered', label: 'Numbered list', icon: ListOrdered, command: 'insertOrderedList', value: '', shortcut: '1.' },
+    { id: 'todo', label: 'To-do list', icon: CheckSquare, command: 'insertUnorderedList', value: '', shortcut: '[]' },
+    { id: 'quote', label: 'Quote', icon: Quote, command: 'formatBlock', value: 'blockquote', shortcut: '>' },
+  ];
+
+  const handleBlockFormat = (option: typeof BLOCK_OPTIONS[0]) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    if (option.value) {
+      document.execCommand(option.command, false, option.value);
+    } else {
+      document.execCommand(option.command, false);
+    }
+    setIsBlockMenuOpen(false);
+    setShowBlockButton(false);
+  };
+
+  // Handle mouse move over editor to show block button
+  const handleEditorMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isLocked || isSelectedEntryInTrash) return;
+    
+    const editorContainer = editorContainerRef.current;
+    if (!editorContainer) return;
+    
+    const rect = editorContainer.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    
+    // Show button on the left side
+    setShowBlockButton(true);
+    setBlockButtonPosition({ x: 8, y: relativeY - 12 });
+  };
+
+  const handleEditorMouseLeave = () => {
+    if (!isBlockMenuOpen) {
+      setShowBlockButton(false);
+    }
+  };
+
+  const openBlockMenu = () => {
+    const editorContainer = editorContainerRef.current;
+    if (!editorContainer) return;
+    
+    setBlockMenuPosition({ x: blockButtonPosition.x + 32, y: blockButtonPosition.y });
+    setIsBlockMenuOpen(true);
   };
 
   const formatDate = (dateStr: string) => {
@@ -1072,29 +1134,87 @@ export function NotebookView({
             </div>
 
 
-            {/* Editor */}
+            {/* Editor with Block Menu */}
             <ScrollArea className="flex-1">
-              <div
-                ref={editorRef}
-                contentEditable={!isLocked && !isSelectedEntryInTrash}
-                className={cn(
-                  "min-h-full p-4 outline-none focus:outline-none focus-visible:outline-none transition-all caret-primary",
-                  fontClasses[fontStyle],
-                  isSmallText ? "text-xs" : "text-sm",
-                  (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70",
-                  "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2",
-                  "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2",
-                  "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1",
-                  "[&_p]:mb-2",
-                  "[&_ul]:list-disc [&_ul]:ml-5 [&_ul]:mb-2",
-                  "[&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:mb-2",
-                  "[&_li]:text-foreground [&_li]:mb-1",
-                  "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2",
-                  "[&_strong]:font-semibold",
-                  "[&_em]:italic"
+              <div 
+                ref={editorContainerRef}
+                className="relative min-h-full"
+                onMouseMove={handleEditorMouseMove}
+                onMouseLeave={handleEditorMouseLeave}
+              >
+                {/* Floating Block Button */}
+                {showBlockButton && !isLocked && !isSelectedEntryInTrash && (
+                  <div
+                    className="absolute z-20 transition-all duration-150"
+                    style={{ left: blockButtonPosition.x, top: blockButtonPosition.y }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-6 h-6 p-0 opacity-40 hover:opacity-100 hover:bg-primary/10 rounded transition-all duration-200 group"
+                      onClick={openBlockMenu}
+                    >
+                      <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-transform duration-200 group-hover:rotate-90" />
+                    </Button>
+                  </div>
                 )}
-                data-placeholder="Start writing your notes..."
-              />
+
+                {/* Block Format Menu */}
+                {isBlockMenuOpen && (
+                  <div
+                    className="absolute z-50 bg-background border border-border rounded-lg shadow-xl py-2 w-56 animate-scale-in"
+                    style={{ left: blockMenuPosition.x, top: blockMenuPosition.y }}
+                    onMouseLeave={() => {
+                      setIsBlockMenuOpen(false);
+                      setShowBlockButton(false);
+                    }}
+                  >
+                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Basic blocks
+                    </div>
+                    {BLOCK_OPTIONS.map((option) => {
+                      const Icon = option.icon;
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => handleBlockFormat(option)}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/50 transition-colors text-left group"
+                        >
+                          <div className="w-8 h-8 flex items-center justify-center rounded border border-border/50 bg-background group-hover:border-primary/30 transition-colors">
+                            <Icon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                          </div>
+                          <span className="flex-1">{option.label}</span>
+                          {option.shortcut && (
+                            <span className="text-xs text-muted-foreground">{option.shortcut}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div
+                  ref={editorRef}
+                  contentEditable={!isLocked && !isSelectedEntryInTrash}
+                  className={cn(
+                    "min-h-full p-4 pl-12 outline-none focus:outline-none focus-visible:outline-none transition-all caret-primary",
+                    fontClasses[fontStyle],
+                    isSmallText ? "text-xs" : "text-sm",
+                    (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70",
+                    "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2",
+                    "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2",
+                    "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1",
+                    "[&_p]:mb-2",
+                    "[&_ul]:list-disc [&_ul]:ml-5 [&_ul]:mb-2",
+                    "[&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:mb-2",
+                    "[&_li]:text-foreground [&_li]:mb-1",
+                    "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2",
+                    "[&_strong]:font-semibold",
+                    "[&_em]:italic"
+                  )}
+                  data-placeholder="Start writing your notes..."
+                />
+              </div>
             </ScrollArea>
 
             {/* Floating Add Note Button */}
