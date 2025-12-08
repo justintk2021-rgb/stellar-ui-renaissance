@@ -625,28 +625,31 @@ export function NotebookView({
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button 
-                              className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 hover:bg-muted/50 flex items-center justify-center transition-all"
+                              className="w-6 h-6 rounded-md bg-muted/60 hover:bg-muted flex items-center justify-center transition-all border border-border/30 shadow-sm"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <div 
-                                className="w-3 h-3 rounded-full border border-border/50"
+                                className={cn(
+                                  "w-3.5 h-3.5 rounded-full border-2",
+                                  markerColor ? "border-white/50 shadow-sm" : "border-dashed border-muted-foreground/40"
+                                )}
                                 style={{ backgroundColor: markerColor || 'transparent' }}
                               />
                             </button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-32 p-2">
-                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-1">Marker</div>
-                            <div className="grid grid-cols-5 gap-1">
+                          <DropdownMenuContent align="end" className="w-36 p-2">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-1">Marker Color</div>
+                            <div className="grid grid-cols-5 gap-1.5">
                               {MARKER_COLORS.map((color) => (
                                 <button
                                   key={color.id}
                                   onClick={() => handleSetFolderMarker(cat.id, color.id)}
                                   className={cn(
-                                    "w-5 h-5 rounded-full border-2 transition-all hover:scale-110",
+                                    "w-5 h-5 rounded-full border-2 transition-all hover:scale-110 shadow-sm",
                                     folderMarkers[cat.id] === color.id 
-                                      ? "border-foreground" 
-                                      : "border-transparent hover:border-muted-foreground/50",
-                                    color.id === 'none' && "border-dashed border-muted-foreground/30"
+                                      ? "border-foreground ring-2 ring-primary/30" 
+                                      : "border-white/30 hover:border-foreground/50",
+                                    color.id === 'none' && "border-dashed border-muted-foreground/50 bg-muted/50"
                                   )}
                                   style={{ backgroundColor: color.id === 'none' ? 'transparent' : color.color }}
                                   title={color.label}
@@ -711,28 +714,31 @@ export function NotebookView({
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button 
-                                className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 hover:bg-muted/50 flex items-center justify-center transition-all"
+                                className="w-6 h-6 rounded-md bg-muted/60 hover:bg-muted flex items-center justify-center transition-all border border-border/30 shadow-sm"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div 
-                                  className="w-3 h-3 rounded-full border border-border/50"
+                                  className={cn(
+                                    "w-3.5 h-3.5 rounded-full border-2",
+                                    markerColor ? "border-white/50 shadow-sm" : "border-dashed border-muted-foreground/40"
+                                  )}
                                   style={{ backgroundColor: markerColor || 'transparent' }}
                                 />
                               </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-32 p-2">
-                              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-1">Marker</div>
-                              <div className="grid grid-cols-5 gap-1">
+                            <DropdownMenuContent align="end" className="w-36 p-2">
+                              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-1">Marker Color</div>
+                              <div className="grid grid-cols-5 gap-1.5">
                                 {MARKER_COLORS.map((color) => (
                                   <button
                                     key={color.id}
                                     onClick={() => handleSetFolderMarker(folder.id, color.id)}
                                     className={cn(
-                                      "w-5 h-5 rounded-full border-2 transition-all hover:scale-110",
+                                      "w-5 h-5 rounded-full border-2 transition-all hover:scale-110 shadow-sm",
                                       folderMarkers[folder.id] === color.id 
-                                        ? "border-foreground" 
-                                        : "border-transparent hover:border-muted-foreground/50",
-                                      color.id === 'none' && "border-dashed border-muted-foreground/30"
+                                        ? "border-foreground ring-2 ring-primary/30" 
+                                        : "border-white/30 hover:border-foreground/50",
+                                      color.id === 'none' && "border-dashed border-muted-foreground/50 bg-muted/50"
                                     )}
                                     style={{ backgroundColor: color.id === 'none' ? 'transparent' : color.color }}
                                     title={color.label}
