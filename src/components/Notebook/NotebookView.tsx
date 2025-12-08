@@ -854,14 +854,24 @@ export function NotebookView({
                   </div>
                 </div>
 
-                {/* Actions Menu - hidden for trash items */}
+                {/* Actions - hidden for trash items */}
                 {!isSelectedEntryInTrash && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleSave}
+                      disabled={isLocked}
+                      size="sm"
+                      className="bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-xs font-medium h-8"
+                    >
+                      <Save className="w-3 h-3 mr-1" />
+                      Save
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-64 glass-strong">
                       {/* Font Style Options */}
                       <div className="px-2 py-2">
@@ -1002,24 +1012,12 @@ export function NotebookView({
                         )}
                       </div>
                     </DropdownMenuContent>
-                  </DropdownMenu>
+                    </DropdownMenu>
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Save Button - hidden for trash items */}
-            {!isSelectedEntryInTrash && (
-              <div className="px-4 py-2 border-b border-border/30 flex items-center justify-end">
-                <Button
-                  onClick={handleSave}
-                  disabled={isLocked}
-                  className="bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-xs font-medium"
-                >
-                  <Save className="w-3 h-3 mr-1" />
-                  Save
-                </Button>
-              </div>
-            )}
 
             {/* Editor */}
             <ScrollArea className="flex-1">
