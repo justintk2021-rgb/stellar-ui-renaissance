@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Switch } from "@/components/ui/switch";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Bold,
   Italic,
@@ -26,6 +34,16 @@ import {
   ChevronRight,
   ListOrdered,
   Quote,
+  MoreHorizontal,
+  Copy,
+  Download,
+  Lock,
+  Unlock,
+  Type,
+  Maximize2,
+  Minimize2,
+  Clock,
+  Star,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,6 +67,8 @@ const CATEGORIES = [
   { id: "general", label: "General Notes", icon: BookOpen },
 ];
 
+type FontStyle = 'default' | 'serif' | 'mono';
+
 export function NotebookView({
   trades,
   selectedTradeId,
@@ -62,11 +82,22 @@ export function NotebookView({
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [fontStyle, setFontStyle] = useState<FontStyle>('default');
+  const [isSmallText, setIsSmallText] = useState(false);
+  const [isFullWidth, setIsFullWidth] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
   // Find selected entry
   const selectedEntry = notebookEntries.find((e) => e.id === selectedEntryId);
+
+  // Calculate word count
+  const wordCount = useMemo(() => {
+    if (!editorRef.current) return 0;
+    const text = editorRef.current.innerText || '';
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+  }, [selectedEntry?.content]);
 
   // Filter entries by category and search
   const filteredEntries = notebookEntries.filter((entry) => {
@@ -96,6 +127,7 @@ export function NotebookView({
   }, [selectedEntry, isCreatingNew]);
 
   const execCommand = (cmd: string, value?: string) => {
+    if (isLocked) return;
     editorRef.current?.focus();
     document.execCommand(cmd, false, value);
   };
@@ -134,6 +166,7 @@ export function NotebookView({
   const handleNewNote = () => {
     setIsCreatingNew(true);
     setSelectedEntryId(null);
+    setIsLocked(false);
     if (titleRef.current) titleRef.current.value = "";
     if (editorRef.current) editorRef.current.innerHTML = "";
   };
@@ -146,9 +179,60 @@ export function NotebookView({
     }
   };
 
+  const handleDuplicate = () => {
+    if (!selectedEntry || !editorRef.current) return;
+    
+    const duplicatedEntry: NotebookEntry = {
+      id: Date.now().toString(),
+      title: `${selectedEntry.title} (Copy)`,
+      content: editorRef.current.innerHTML,
+      category: selectedEntry.category,
+      date: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    onSaveEntry(duplicatedEntry);
+    setSelectedEntryId(duplicatedEntry.id);
+    toast.success("Note duplicated!");
+  };
+
+  const handleCopyContent = () => {
+    if (!editorRef.current) return;
+    const text = editorRef.current.innerText;
+    navigator.clipboard.writeText(text);
+    toast.success("Content copied to clipboard!");
+  };
+
+  const handleExport = () => {
+    if (!selectedEntry || !editorRef.current) return;
+    
+    const text = editorRef.current.innerText;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedEntry.title.replace(/[^a-z0-9]/gi, '_')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Note exported!");
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", { 
+      month: "short", 
+      day: "numeric", 
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    });
   };
 
   // Find linked trade for entry
@@ -170,10 +254,23 @@ export function NotebookView({
     winRate: trades.length > 0 ? (trades.filter(t => t.result > 0).length / trades.length) * 100 : 0,
   };
 
+  // Font style classes
+  const fontClasses = {
+    default: 'font-sans',
+    serif: 'font-serif',
+    mono: 'font-mono',
+  };
+
   return (
-    <div className="h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4">
+    <div className={cn(
+      "h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4 transition-all duration-300",
+      isFullWidth && "px-0"
+    )}>
       {/* Left Sidebar - Categories & Trade Stats */}
-      <div className="w-52 flex-shrink-0 flex flex-col gap-4">
+      <div className={cn(
+        "w-52 flex-shrink-0 flex flex-col gap-4 transition-all duration-300",
+        isFullWidth && "hidden"
+      )}>
         {/* Categories */}
         <div className="glass rounded-xl border border-border/40 overflow-hidden flex flex-col flex-1">
           <div className="p-3 border-b border-border/30">
@@ -303,7 +400,10 @@ export function NotebookView({
       </div>
 
       {/* Middle - Entries List */}
-      <div className="w-64 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
+      <div className={cn(
+        "w-64 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col transition-all duration-300",
+        isFullWidth && "hidden"
+      )}>
         <div className="p-3 border-b border-border/30 space-y-2">
           <div className="flex items-center gap-2">
             <FolderOpen className="w-4 h-4 text-muted-foreground" />
@@ -381,7 +481,7 @@ export function NotebookView({
       <div className="flex-1 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
         {selectedEntry || isCreatingNew ? (
           <>
-            {/* Header with Trade Metrics */}
+            {/* Header with Trade Metrics and Actions Menu */}
             <div className="p-4 border-b border-border/30">
               {/* Trade Metrics Banner (if linked) */}
               {linkedTrade && (
@@ -448,7 +548,11 @@ export function NotebookView({
                     ref={titleRef}
                     defaultValue={selectedEntry?.title || ""}
                     placeholder="Note title..."
-                    className="text-lg font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/50"
+                    disabled={isLocked}
+                    className={cn(
+                      "text-lg font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/50",
+                      isLocked && "cursor-not-allowed opacity-70"
+                    )}
                   />
                   <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                     <Calendar className="w-3 h-3" />
@@ -468,56 +572,232 @@ export function NotebookView({
                         </Badge>
                       </>
                     )}
+                    {isLocked && (
+                      <>
+                        <span>•</span>
+                        <Badge variant="outline" className="text-[10px] border-yellow-500/50 bg-yellow-500/10 text-yellow-600">
+                          <Lock className="w-3 h-3 mr-1" />
+                          Locked
+                        </Badge>
+                      </>
+                    )}
                   </div>
                 </div>
+
+                {/* Actions Menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64 glass-strong">
+                    {/* Font Style Options */}
+                    <div className="px-2 py-2">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Font Style</div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setFontStyle('default')}
+                          className={cn(
+                            "flex-1 py-2 rounded-lg text-center transition-all border",
+                            fontStyle === 'default' 
+                              ? "bg-primary/20 border-primary/50 text-primary" 
+                              : "bg-muted/30 border-transparent hover:bg-muted/50"
+                          )}
+                        >
+                          <span className="text-lg font-sans">Ag</span>
+                          <div className="text-[9px] text-muted-foreground mt-1">Default</div>
+                        </button>
+                        <button
+                          onClick={() => setFontStyle('serif')}
+                          className={cn(
+                            "flex-1 py-2 rounded-lg text-center transition-all border",
+                            fontStyle === 'serif' 
+                              ? "bg-primary/20 border-primary/50 text-primary" 
+                              : "bg-muted/30 border-transparent hover:bg-muted/50"
+                          )}
+                        >
+                          <span className="text-lg font-serif">Ag</span>
+                          <div className="text-[9px] text-muted-foreground mt-1">Serif</div>
+                        </button>
+                        <button
+                          onClick={() => setFontStyle('mono')}
+                          className={cn(
+                            "flex-1 py-2 rounded-lg text-center transition-all border",
+                            fontStyle === 'mono' 
+                              ? "bg-primary/20 border-primary/50 text-primary" 
+                              : "bg-muted/30 border-transparent hover:bg-muted/50"
+                          )}
+                        >
+                          <span className="text-lg font-mono">Ag</span>
+                          <div className="text-[9px] text-muted-foreground mt-1">Mono</div>
+                        </button>
+                      </div>
+                    </div>
+
+                    <DropdownMenuSeparator />
+
+                    <DropdownMenuItem onClick={handleCopyContent} className="text-xs">
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy content
+                    </DropdownMenuItem>
+                    
+                    {selectedEntry && (
+                      <DropdownMenuItem onClick={handleDuplicate} className="text-xs">
+                        <FileText className="w-4 h-4 mr-2" />
+                        Duplicate
+                      </DropdownMenuItem>
+                    )}
+
+                    <DropdownMenuSeparator />
+
+                    {/* Toggle Options */}
+                    <div className="px-2 py-2 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs">
+                          <Type className="w-4 h-4" />
+                          Small text
+                        </div>
+                        <Switch 
+                          checked={isSmallText} 
+                          onCheckedChange={setIsSmallText}
+                          className="scale-75"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs">
+                          {isFullWidth ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                          Full width
+                        </div>
+                        <Switch 
+                          checked={isFullWidth} 
+                          onCheckedChange={setIsFullWidth}
+                          className="scale-75"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs">
+                          {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                          Lock page
+                        </div>
+                        <Switch 
+                          checked={isLocked} 
+                          onCheckedChange={setIsLocked}
+                          className="scale-75"
+                        />
+                      </div>
+                    </div>
+
+                    <DropdownMenuSeparator />
+
+                    <DropdownMenuItem onClick={handleExport} className="text-xs">
+                      <Download className="w-4 h-4 mr-2" />
+                      Export
+                    </DropdownMenuItem>
+
+                    {selectedEntry && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={handleDeleteEntry} 
+                          className="text-xs text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Move to Trash
+                        </DropdownMenuItem>
+                      </>
+                    )}
+
+                    {/* Footer Info */}
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-2 text-[10px] text-muted-foreground space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Type className="w-3 h-3" />
+                        Word count: {wordCount} words
+                      </div>
+                      {selectedEntry && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-3 h-3" />
+                            Last edited: {formatDateTime(selectedEntry.updatedAt)}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Star className="w-3 h-3" />
+                            Created: {formatDateTime(selectedEntry.createdAt)}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 
             {/* Toolbar */}
             <div className="px-4 py-2 border-b border-border/30 flex items-center gap-1 flex-wrap">
-              <Button variant="outline" size="sm" onClick={() => execCommand("bold")} className="w-7 h-7 p-0">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => execCommand("bold")} 
+                className="w-7 h-7 p-0"
+                disabled={isLocked}
+              >
                 <Bold className="w-3 h-3" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => execCommand("italic")} className="w-7 h-7 p-0">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => execCommand("italic")} 
+                className="w-7 h-7 p-0"
+                disabled={isLocked}
+              >
                 <Italic className="w-3 h-3" />
               </Button>
               <div className="w-px h-5 bg-border/50 mx-1" />
-              <Button variant="outline" size="sm" onClick={() => execCommand("formatBlock", "h2")} className="w-7 h-7 p-0">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => execCommand("formatBlock", "h2")} 
+                className="w-7 h-7 p-0"
+                disabled={isLocked}
+              >
                 <Heading1 className="w-3 h-3" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => execCommand("insertUnorderedList")} className="w-7 h-7 p-0">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => execCommand("insertUnorderedList")} 
+                className="w-7 h-7 p-0"
+                disabled={isLocked}
+              >
                 <List className="w-3 h-3" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => execCommand("insertOrderedList")} className="w-7 h-7 p-0">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => execCommand("insertOrderedList")} 
+                className="w-7 h-7 p-0"
+                disabled={isLocked}
+              >
                 <ListOrdered className="w-3 h-3" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => execCommand("formatBlock", "blockquote")} className="w-7 h-7 p-0">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => execCommand("formatBlock", "blockquote")} 
+                className="w-7 h-7 p-0"
+                disabled={isLocked}
+              >
                 <Quote className="w-3 h-3" />
               </Button>
               
               <div className="flex-1" />
               
-              {selectedEntry && (
-                <ConfirmDialog
-                  trigger={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs text-destructive hover:bg-destructive/10 hover:border-destructive/50"
-                    >
-                      <Trash2 className="w-3 h-3 mr-1" />
-                      Delete
-                    </Button>
-                  }
-                  title="Delete Note"
-                  description="Are you sure you want to delete this note? This action cannot be undone."
-                  confirmLabel="Delete"
-                  variant="destructive"
-                  onConfirm={handleDeleteEntry}
-                />
-              )}
               <Button
                 onClick={handleSave}
+                disabled={isLocked}
                 className="bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-xs font-medium"
               >
                 <Save className="w-3 h-3 mr-1" />
@@ -529,18 +809,23 @@ export function NotebookView({
             <ScrollArea className="flex-1">
               <div
                 ref={editorRef}
-                contentEditable
-                className="min-h-full p-4 text-sm focus:outline-none
-                  [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2
-                  [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2
-                  [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1
-                  [&_p]:mb-2
-                  [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:mb-2
-                  [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:mb-2
-                  [&_li]:text-foreground [&_li]:mb-1
-                  [&_blockquote]:border-l-4 [&_blockquote]:border-primary/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2
-                  [&_strong]:font-semibold
-                  [&_em]:italic"
+                contentEditable={!isLocked}
+                className={cn(
+                  "min-h-full p-4 focus:outline-none transition-all",
+                  fontClasses[fontStyle],
+                  isSmallText ? "text-xs" : "text-sm",
+                  isLocked && "cursor-not-allowed opacity-70",
+                  "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2",
+                  "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2",
+                  "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1",
+                  "[&_p]:mb-2",
+                  "[&_ul]:list-disc [&_ul]:ml-5 [&_ul]:mb-2",
+                  "[&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:mb-2",
+                  "[&_li]:text-foreground [&_li]:mb-1",
+                  "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2",
+                  "[&_strong]:font-semibold",
+                  "[&_em]:italic"
+                )}
                 data-placeholder="Start writing your notes..."
               />
             </ScrollArea>
