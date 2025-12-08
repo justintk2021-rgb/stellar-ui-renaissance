@@ -42,11 +42,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             ref={combinedRef}
             {...props}
           />
-          <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-px opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
             <button
               type="button"
               onClick={handleIncrement}
-              className="w-5 h-3.5 flex items-center justify-center bg-muted/50 hover:bg-primary/20 rounded text-muted-foreground hover:text-primary transition-all"
+              className="w-4 h-3 flex items-center justify-center hover:bg-primary/20 rounded-sm text-muted-foreground hover:text-primary transition-all"
               tabIndex={-1}
             >
               <ChevronUp className="w-3 h-3" />
@@ -54,7 +54,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             <button
               type="button"
               onClick={handleDecrement}
-              className="w-5 h-3.5 flex items-center justify-center bg-muted/50 hover:bg-primary/20 rounded text-muted-foreground hover:text-primary transition-all"
+              className="w-4 h-3 flex items-center justify-center hover:bg-primary/20 rounded-sm text-muted-foreground hover:text-primary transition-all"
               tabIndex={-1}
             >
               <ChevronDown className="w-3 h-3" />
