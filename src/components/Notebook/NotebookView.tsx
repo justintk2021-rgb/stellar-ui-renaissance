@@ -1221,14 +1221,14 @@ export function NotebookView({
                 {/* Block Format Menu */}
                 {isBlockMenuOpen && (
                   <div
-                    className="absolute z-50 bg-background border border-border rounded-lg shadow-xl py-2 w-56 animate-scale-in"
+                    className="absolute z-50 bg-background border border-border rounded-lg shadow-xl py-1 w-48 max-h-64 overflow-y-auto animate-scale-in"
                     style={{ left: blockMenuPosition.x, top: blockMenuPosition.y }}
                     onMouseLeave={() => {
                       setIsBlockMenuOpen(false);
                       setShowBlockButton(false);
                     }}
                   >
-                    <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <div className="px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
                       Basic blocks
                     </div>
                     {BLOCK_OPTIONS.map((option) => {
@@ -1237,10 +1237,10 @@ export function NotebookView({
                         <button
                           key={option.id}
                           onClick={() => handleBlockFormat(option)}
-                          className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/50 transition-colors text-left group"
+                          className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted/50 transition-colors text-left group"
                         >
-                          <div className="w-8 h-8 flex items-center justify-center rounded border border-border/50 bg-background group-hover:border-primary/30 transition-colors">
-                            <Icon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                          <div className="w-6 h-6 flex items-center justify-center rounded border border-border/50 bg-background group-hover:border-primary/30 transition-colors">
+                            <Icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
                           </div>
                           <span className="flex-1">{option.label}</span>
                         </button>
