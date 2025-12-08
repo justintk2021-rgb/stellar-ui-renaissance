@@ -973,54 +973,37 @@ export function NotebookView({
               {/* Actions - hidden for trash items */}
               {!isSelectedEntryInTrash && (
                 <div className="flex items-center gap-2 mt-4">
-                  {/* Formatting toolbar */}
-                  <div className="flex items-center gap-1 border-r border-border/50 pr-2">
-                    <Button variant="ghost" size="sm" onClick={() => execCommand("bold")} className="w-7 h-7 p-0" disabled={isLocked}>
-                      <Bold className="w-3 h-3" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => execCommand("italic")} className="w-7 h-7 p-0" disabled={isLocked}>
-                      <Italic className="w-3 h-3" />
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-1 border-r border-border/50 pr-2">
-                    <Button variant="ghost" size="sm" onClick={() => execCommand("formatBlock", "h1")} className="w-7 h-7 p-0" disabled={isLocked}>
-                      <Heading1 className="w-3 h-3" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => execCommand("formatBlock", "h2")} className="w-7 h-7 p-0" disabled={isLocked}>
-                      <Heading2 className="w-3 h-3" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => execCommand("formatBlock", "h3")} className="w-7 h-7 p-0" disabled={isLocked}>
-                      <Heading3 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-1 border-r border-border/50 pr-2">
-                    <Button variant="ghost" size="sm" onClick={() => execCommand("insertUnorderedList")} className="w-7 h-7 p-0" disabled={isLocked}>
-                      <List className="w-3 h-3" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => execCommand("insertOrderedList")} className="w-7 h-7 p-0" disabled={isLocked}>
-                      <ListOrdered className="w-3 h-3" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => execCommand("formatBlock", "blockquote")} className="w-7 h-7 p-0" disabled={isLocked}>
-                      <Quote className="w-3 h-3" />
-                    </Button>
-                  </div>
+                  <div className="flex-1" />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={isLocked}>
-                        <Type className="w-3 h-3 mr-1" />
-                        {fontStyle === 'default' ? 'Sans' : fontStyle === 'serif' ? 'Serif' : 'Mono'}
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                        <MoreHorizontal className="w-4 h-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-32">
-                      <DropdownMenuItem onClick={() => setFontStyle('default')} className="text-xs">Sans Serif{fontStyle === 'default' && <span className="ml-auto text-primary">✓</span>}</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setFontStyle('serif')} className="text-xs">Serif{fontStyle === 'serif' && <span className="ml-auto text-primary">✓</span>}</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setFontStyle('mono')} className="text-xs">Monospace{fontStyle === 'mono' && <span className="ml-auto text-primary">✓</span>}</DropdownMenuItem>
+                    <DropdownMenuContent align="end" className="w-48 bg-background border border-border z-50">
+                      <DropdownMenuItem onClick={handleDuplicate} className="text-xs">
+                        <Copy className="w-3 h-3 mr-2" />
+                        Duplicate
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setFontStyle('default')} className="text-xs">
+                        <Type className="w-3 h-3 mr-2" />
+                        Sans Serif {fontStyle === 'default' && <span className="ml-auto text-primary">✓</span>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFontStyle('serif')} className="text-xs">
+                        <Type className="w-3 h-3 mr-2" />
+                        Serif {fontStyle === 'serif' && <span className="ml-auto text-primary">✓</span>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFontStyle('mono')} className="text-xs">
+                        <Type className="w-3 h-3 mr-2" />
+                        Monospace {fontStyle === 'mono' && <span className="ml-auto text-primary">✓</span>}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setIsSmallText(!isSmallText)} className="text-xs">
+                        {isSmallText ? "A" : "a"} {isSmallText ? "Large Text" : "Small Text"}
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Button variant="ghost" size="sm" onClick={() => setIsSmallText(!isSmallText)} className="h-7 px-2 text-xs" disabled={isLocked}>
-                    {isSmallText ? "A" : "a"}
-                  </Button>
-                  <div className="flex-1" />
                   <Button variant="ghost" size="sm" onClick={() => setIsLocked(!isLocked)} className="h-7 w-7 p-0">
                     {isLocked ? <Lock className="w-3 h-3 text-yellow-500" /> : <Unlock className="w-3 h-3" />}
                   </Button>
