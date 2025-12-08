@@ -670,3 +670,31 @@ input[type="number"]::-webkit-outer-spin-button {
   background: hsl(var(--primary) / 0.3);
   transform: scale(0.95);
 }
+
+/* Modern Todo Checkbox Styling */
+.notebook-todo-item {
+  container-type: inline-size;
+}
+
+.notebook-todo-item .todo-checkbox-wrapper input[type="checkbox"]:checked + div {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+}
+
+.notebook-todo-item .todo-checkbox-wrapper input[type="checkbox"]:checked + div svg {
+  opacity: 1;
+}
+
+.notebook-todo-item .todo-checkbox-wrapper div svg {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.notebook-todo-item .todo-checkbox-wrapper:hover div {
+  border-color: hsl(var(--primary));
+  transform: scale(1.05);
+}
+
+.notebook-todo-item .todo-checkbox-wrapper div {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}

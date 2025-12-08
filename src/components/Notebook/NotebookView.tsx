@@ -406,10 +406,21 @@ export function NotebookView({
       document.execCommand('insertHTML', false, '<details class="my-2"><summary class="cursor-pointer font-medium">Toggle title</summary><div class="pl-4 pt-2">Toggle content...</div></details>');
     } else if (option.id === 'todo') {
       const todoHTML = `
-        <div class="notebook-todo-item flex items-start gap-2 my-1 group" contenteditable="false">
-          <input type="checkbox" class="mt-1 w-4 h-4 rounded border-2 border-primary/50 accent-primary cursor-pointer" onchange="this.nextElementSibling.classList.toggle('line-through', this.checked); this.nextElementSibling.classList.toggle('text-muted-foreground', this.checked);" />
-          <span contenteditable="true" class="flex-1 outline-none transition-all">New task</span>
-          <button onclick="this.closest('.notebook-todo-item').remove();" class="w-5 h-5 rounded opacity-0 group-hover:opacity-100 bg-destructive/20 hover:bg-destructive/40 flex items-center justify-center text-[10px] text-destructive transition-all" title="Delete">✕</button>
+        <div class="notebook-todo-item flex items-center gap-3 my-2 py-2 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all group" contenteditable="false">
+          <label class="todo-checkbox-wrapper relative flex items-center justify-center w-5 h-5 cursor-pointer">
+            <input type="checkbox" class="peer sr-only" onchange="const text = this.closest('.notebook-todo-item').querySelector('.todo-text'); text.classList.toggle('line-through', this.checked); text.classList.toggle('text-muted-foreground', this.checked);" />
+            <div class="w-5 h-5 rounded-md border-2 border-primary/40 peer-checked:border-primary peer-checked:bg-primary transition-all duration-200 flex items-center justify-center">
+              <svg class="w-3 h-3 text-primary-foreground opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          </label>
+          <span contenteditable="true" class="todo-text flex-1 outline-none transition-all duration-200 text-sm">New task</span>
+          <button onclick="this.closest('.notebook-todo-item').remove();" class="w-6 h-6 rounded-md opacity-0 group-hover:opacity-100 bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center text-destructive transition-all duration-150" title="Delete">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       `;
       document.execCommand('insertHTML', false, todoHTML);
