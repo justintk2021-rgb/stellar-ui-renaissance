@@ -545,37 +545,32 @@ export function NotebookView({
       "h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4 transition-all duration-300",
       isFullWidth && "px-0"
     )}>
-      {/* Folders Sheet */}
-      <Sheet open={isFoldersPanelOpen} onOpenChange={setIsFoldersPanelOpen}>
-        <SheetContent side="left" className="w-80 p-0 border-none bg-background">
-          <div className="flex flex-col h-full">
-            <SheetHeader className="p-4 border-b border-border/30">
-              <SheetTitle className="flex items-center gap-2">
-                <FolderOpen className="w-5 h-5 text-primary" />
-                Folders
-              </SheetTitle>
-              <SheetDescription className="sr-only">
-                Navigate between note categories and folders
-              </SheetDescription>
-            </SheetHeader>
-
-            {/* Add Folder Button */}
-            <div className="p-4">
+      {/* Folders Popup Overlay */}
+      {isFoldersPanelOpen && (
+        <div 
+          className="absolute left-4 top-4 z-50 w-72 bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl animate-scale-in overflow-hidden"
+          onMouseLeave={() => setIsFoldersPanelOpen(false)}
+        >
+          <div className="flex flex-col max-h-[70vh]">
+            {/* Header */}
+            <div className="p-3 border-b border-border/30 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FolderOpen className="w-4 h-4 text-primary" />
+                <span className="font-medium text-sm">Folders</span>
+              </div>
               <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setIsAddFolderDialogOpen(true)}
-                className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-sm font-medium"
+                className="h-7 w-7 p-0"
               >
-                <FolderPlus className="w-4 h-4 mr-2" />
-                Add Folder
+                <FolderPlus className="w-4 h-4" />
               </Button>
             </div>
 
             {/* Categories */}
-            <ScrollArea className="flex-1 px-2">
-              <div className="space-y-1 pb-4 px-2 pr-3">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-2">
-                  Categories
-                </div>
+            <ScrollArea className="flex-1 max-h-[50vh]">
+              <div className="p-2 space-y-0.5">
                 {CATEGORIES.filter(c => c.id !== "trash").map((cat) => {
                   const Icon = cat.icon;
                   const count = cat.id === "all" 
@@ -584,11 +579,11 @@ export function NotebookView({
                   const markerColor = getFolderMarkerColor(cat.id);
                   
                   return (
-                    <div key={cat.id} className="relative group/folder flex items-center">
+                    <div key={cat.id} className="relative group/folder flex items-center gap-1">
                       {/* Color Marker */}
                       {markerColor && (
                         <div 
-                          className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-full transition-all"
+                          className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full"
                           style={{ backgroundColor: markerColor }}
                         />
                       )}
@@ -600,24 +595,16 @@ export function NotebookView({
                           setIsFoldersPanelOpen(false);
                         }}
                         className={cn(
-                          "flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group",
-                          markerColor && "pl-4",
+                          "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
+                          markerColor && "pl-3",
                           selectedCategory === cat.id
-                            ? "bg-primary/20 text-primary border border-primary/30 shadow-sm"
-                            : "text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/20 hover:translate-x-1 hover:shadow-sm border border-transparent"
+                            ? "bg-primary/20 text-primary"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         )}
                       >
-                        <Icon className={cn(
-                          "w-4 h-4 transition-transform duration-200",
-                          selectedCategory !== cat.id && "group-hover:scale-110"
-                        )} />
-                        <span className="flex-1 text-left">{cat.label}</span>
-                        <Badge variant="secondary" className={cn(
-                          "text-[10px] px-1.5 py-0 transition-colors duration-200",
-                          selectedCategory !== cat.id && "group-hover:bg-primary/20 group-hover:text-primary"
-                        )}>
-                          {count}
-                        </Badge>
+                        <Icon className="w-3.5 h-3.5" />
+                        <span className="flex-1 text-left truncate">{cat.label}</span>
+                        <span className="text-[10px] text-muted-foreground">{count}</span>
                       </button>
                       
                       {/* Marker Color Picker */}
@@ -625,12 +612,12 @@ export function NotebookView({
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button 
-                              className="w-7 h-7 rounded-lg opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-accent flex items-center justify-center transition-all border border-border shadow-md"
+                              className="w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-accent flex items-center justify-center transition-all border border-border shadow-sm"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <div 
                                 className={cn(
-                                  "w-4 h-4 rounded-full border-2 shadow-sm",
+                                  "w-3 h-3 rounded-full border",
                                   markerColor ? "border-white/60" : "border-dashed border-foreground/40 bg-muted"
                                 )}
                                 style={{ backgroundColor: markerColor || undefined }}
@@ -665,20 +652,19 @@ export function NotebookView({
 
                 {/* Custom Folders */}
                 {customFolders.length > 0 && (
-                  <div className="pt-4 mt-4 border-t border-border/30">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-2">
-                      Custom Folders
+                  <>
+                    <div className="text-[9px] uppercase tracking-wider text-muted-foreground px-2 pt-3 pb-1">
+                      Custom
                     </div>
                     {customFolders.map((folder) => {
                       const count = notebookEntries.filter((e) => e.category === folder.id && !e.isDeleted).length;
                       const markerColor = getFolderMarkerColor(folder.id);
                       
                       return (
-                        <div key={folder.id} className="relative group/folder flex items-center">
-                          {/* Color Marker */}
+                        <div key={folder.id} className="relative group/folder flex items-center gap-1">
                           {markerColor && (
                             <div 
-                              className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-full transition-all"
+                              className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full"
                               style={{ backgroundColor: markerColor }}
                             />
                           )}
@@ -690,36 +676,27 @@ export function NotebookView({
                               setIsFoldersPanelOpen(false);
                             }}
                             className={cn(
-                              "flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group",
-                              markerColor && "pl-4",
+                              "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
+                              markerColor && "pl-3",
                               selectedCategory === folder.id
-                                ? "bg-primary/20 text-primary border border-primary/30 shadow-sm"
-                                : "text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/20 hover:translate-x-1 hover:shadow-sm border border-transparent"
+                                ? "bg-primary/20 text-primary"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
                             )}
                           >
-                            <FolderOpen className={cn(
-                              "w-4 h-4 transition-transform duration-200",
-                              selectedCategory !== folder.id && "group-hover:scale-110"
-                            )} />
-                            <span className="flex-1 text-left">{folder.label}</span>
-                            <Badge variant="secondary" className={cn(
-                              "text-[10px] px-1.5 py-0 transition-colors duration-200",
-                              selectedCategory !== folder.id && "group-hover:bg-primary/20 group-hover:text-primary"
-                            )}>
-                              {count}
-                            </Badge>
+                            <FolderOpen className="w-3.5 h-3.5" />
+                            <span className="flex-1 text-left truncate">{folder.label}</span>
+                            <span className="text-[10px] text-muted-foreground">{count}</span>
                           </button>
                           
-                          {/* Marker Color Picker */}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button 
-                                className="w-7 h-7 rounded-lg opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-accent flex items-center justify-center transition-all border border-border shadow-md"
+                                className="w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-accent flex items-center justify-center transition-all border border-border shadow-sm"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div 
                                   className={cn(
-                                    "w-4 h-4 rounded-full border-2 shadow-sm",
+                                    "w-3 h-3 rounded-full border",
                                     markerColor ? "border-white/60" : "border-dashed border-foreground/40 bg-muted"
                                   )}
                                   style={{ backgroundColor: markerColor || undefined }}
@@ -750,14 +727,11 @@ export function NotebookView({
                         </div>
                       );
                     })}
-                  </div>
+                  </>
                 )}
 
-                {/* Trash - separated */}
-                <div className="pt-4 mt-4 border-t border-border/30">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-2">
-                    System
-                  </div>
+                {/* Trash */}
+                <div className="pt-2 mt-2 border-t border-border/30">
                   <button
                     onClick={() => {
                       setSelectedCategory("trash");
@@ -766,67 +740,24 @@ export function NotebookView({
                       setIsFoldersPanelOpen(false);
                     }}
                     className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group",
+                      "w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
                       selectedCategory === "trash"
-                        ? "bg-destructive/20 text-destructive border border-destructive/30 shadow-sm"
-                        : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 hover:translate-x-1 hover:shadow-sm border border-transparent"
+                        ? "bg-destructive/20 text-destructive"
+                        : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     )}
                   >
-                    <Trash2 className={cn(
-                      "w-4 h-4 transition-transform duration-200",
-                      trashCount > 0 && "text-destructive",
-                      selectedCategory !== "trash" && "group-hover:scale-110"
-                    )} />
+                    <Trash2 className="w-3.5 h-3.5" />
                     <span className="flex-1 text-left">Trash</span>
                     {trashCount > 0 && (
-                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                        {trashCount}
-                      </Badge>
+                      <span className="text-[10px] text-destructive">{trashCount}</span>
                     )}
                   </button>
                 </div>
               </div>
             </ScrollArea>
-
-            {/* Trade Stats Footer */}
-            <div className="p-4 border-t border-border/30 bg-muted/20">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-                <TrendingUp className="w-3 h-3" />
-                <span>Trading Summary</span>
-              </div>
-              <div className={cn(
-                "p-3 rounded-lg border text-center mb-3",
-                overallStats.netPnL >= 0 
-                  ? "bg-primary/10 border-primary/30" 
-                  : "bg-destructive/10 border-destructive/30"
-              )}>
-                <div className="text-[10px] uppercase text-muted-foreground">Net P&L</div>
-                <div className={cn(
-                  "text-xl font-bold font-mono",
-                  overallStats.netPnL >= 0 ? "text-primary" : "text-destructive"
-                )}>
-                  {overallStats.netPnL >= 0 ? "+" : ""}${overallStats.netPnL.toFixed(2)}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                <div className="p-2 rounded-lg bg-background border border-border/30">
-                  <div className="text-muted-foreground">Trades</div>
-                  <div className="font-bold text-sm">{overallStats.totalTrades}</div>
-                </div>
-                <div className="p-2 rounded-lg bg-background border border-border/30">
-                  <div className="text-muted-foreground">Win Rate</div>
-                  <div className={cn(
-                    "font-bold text-sm",
-                    overallStats.winRate >= 50 ? "text-primary" : "text-destructive"
-                  )}>
-                    {overallStats.winRate.toFixed(0)}%
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </div>
+      )}
 
       {/* Entries List */}
       <div className={cn(
