@@ -1184,9 +1184,6 @@ export function NotebookView({
                             <Icon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                           </div>
                           <span className="flex-1">{option.label}</span>
-                          {option.shortcut && (
-                            <span className="text-xs text-muted-foreground">{option.shortcut}</span>
-                          )}
                         </button>
                       );
                     })}
