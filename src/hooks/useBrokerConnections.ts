@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export interface BrokerConnection {
   id: string;
@@ -56,12 +56,19 @@ export interface BrokerTrade {
   journal_trade_id: string | null;
 }
 
+export interface ConnectResult {
+  success?: boolean;
+  error?: string;
+  requiresAccountId?: boolean;
+  message?: string;
+  connection?: BrokerConnection;
+}
+
 export function useBrokerConnections() {
   const [connections, setConnections] = useState<BrokerConnection[]>([]);
   const [positions, setPositions] = useState<BrokerPosition[]>([]);
   const [trades, setTrades] = useState<BrokerTrade[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   const fetchConnections = useCallback(async () => {
     try {
@@ -118,11 +125,15 @@ export function useBrokerConnections() {
     brokerName: string,
     server: string,
     login: string,
-    password: string
-  ) => {
+    password: string,
+    metaapiAccountId?: string
+  ): Promise<ConnectResult> => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      if (!session) {
+        toast.error('Please sign in to connect a broker');
+        return { error: 'Not authenticated' };
+      }
 
       const response = await supabase.functions.invoke('sync-metaapi-trades', {
         body: {
@@ -132,34 +143,39 @@ export function useBrokerConnections() {
           server,
           login,
           password,
+          metaapiAccountId,
         },
       });
 
+      // Handle function invocation error
       if (response.error) {
-        throw new Error(response.error.message || 'Connection failed');
+        const errorMsg = response.error.message || 'Connection failed';
+        toast.error(errorMsg);
+        return { error: errorMsg };
       }
 
-      const result = response.data;
+      const result = response.data as ConnectResult;
+      
+      // Check if MetaAPI Account ID is required
+      if (result.requiresAccountId) {
+        return result; // Don't show toast, let UI handle it
+      }
+
+      // Check for other errors
       if (result.error) {
-        throw new Error(result.error);
+        toast.error(result.error);
+        return result;
       }
 
-      toast({
-        title: 'Broker Connected',
-        description: result.message || 'Your broker account is being connected.',
-      });
-
+      // Success
+      toast.success(result.message || 'Broker connected successfully!');
       await fetchConnections();
       return result;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to connect to broker';
       console.error('Error connecting broker:', error);
-      toast({
-        title: 'Connection Failed',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-      throw error;
+      toast.error(errorMessage);
+      return { error: errorMessage };
     }
   };
 
@@ -178,25 +194,27 @@ export function useBrokerConnections() {
     }
   };
 
-  const refreshPositions = async (connectionId: string) => {
+  const refreshPositions = async (connectionId: string, password?: string) => {
     try {
       const response = await supabase.functions.invoke('sync-metaapi-trades', {
-        body: { action: 'positions', connectionId },
+        body: { action: 'positions', connectionId, password },
       });
 
       if (response.error) throw response.error;
       
       await fetchPositions(connectionId);
+      toast.success('Positions refreshed');
       return response.data;
     } catch (error) {
       console.error('Error refreshing positions:', error);
+      toast.error('Failed to refresh positions');
     }
   };
 
-  const syncTrades = async (connectionId: string, tradingAccountId?: string) => {
+  const syncTrades = async (connectionId: string, tradingAccountId?: string, password?: string) => {
     try {
       const response = await supabase.functions.invoke('sync-metaapi-trades', {
-        body: { action: 'sync-trades', connectionId, tradingAccountId },
+        body: { action: 'sync-trades', connectionId, tradingAccountId, password },
       });
 
       if (response.error) throw response.error;
@@ -204,21 +222,13 @@ export function useBrokerConnections() {
       const result = response.data;
       if (result.error) throw new Error(result.error);
 
-      toast({
-        title: 'Trades Synced',
-        description: `Imported ${result.newTradesImported} new trades.`,
-      });
-
+      toast.success(`Imported ${result.newTradesImported} new trades`);
       await fetchTrades(connectionId);
       return result;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sync trades';
       console.error('Error syncing trades:', error);
-      toast({
-        title: 'Sync Failed',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast.error(errorMessage);
     }
   };
 
@@ -230,51 +240,31 @@ export function useBrokerConnections() {
 
       if (response.error) throw response.error;
 
-      toast({
-        title: 'Broker Disconnected',
-        description: 'Your broker account has been disconnected.',
-      });
-
+      toast.success('Broker disconnected');
       await fetchConnections();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to disconnect broker';
       console.error('Error disconnecting:', error);
-      toast({
-        title: 'Disconnect Failed',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast.error(errorMessage);
     }
   };
 
   useEffect(() => {
     fetchConnections();
 
-    // Subscribe to real-time updates
     const channel = supabase
       .channel('broker-updates')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'broker_positions' },
-        () => {
-          if (connections.length > 0) {
-            connections.forEach(c => fetchPositions(c.id));
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
         { event: '*', schema: 'public', table: 'broker_connections' },
-        () => {
-          fetchConnections();
-        }
+        () => fetchConnections()
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchConnections, fetchPositions, connections.length]);
+  }, [fetchConnections]);
 
   return {
     connections,
