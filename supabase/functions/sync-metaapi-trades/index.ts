@@ -6,20 +6,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface MetaApiTrade {
-  id: string;
+interface MetaStatsTrade {
+  _id: string;
+  positionId: string;
   type: string;
-  time: string;
   symbol: string;
   volume: number;
   profit: number;
-  swap: number;
-  commission: number;
-  comment?: string;
-  openTime?: string;
-  closeTime?: string;
-  openPrice?: number;
-  closePrice?: number;
+  success: string;
+  openTime: string;
+  closeTime: string;
+  openPrice: number;
+  closePrice: number;
+  pips?: number;
+  durationInMinutes?: number;
+  gain?: number;
+  swap?: number;
+  commission?: number;
 }
 
 serve(async (req) => {
@@ -147,16 +150,17 @@ serve(async (req) => {
         });
       }
 
-      // Fetch closed trades from MetaAPI (last 90 days)
+      // Fetch closed trades from MetaStats API (last 90 days)
       const startTime = new Date();
       startTime.setDate(startTime.getDate() - 90);
       
-      console.log('Fetching trades from:', startTime.toISOString());
+      console.log('Fetching trades from MetaStats API for account:', connection.account_id);
       
       let tradesResponse;
       try {
+        // Use MetaStats API for historical trades
         tradesResponse = await fetch(
-          `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${connection.account_id}/history-deals/time/${startTime.toISOString()}/${new Date().toISOString()}`,
+          `https://metastats-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${connection.account_id}/historical-trades/${startTime.toISOString()}/${new Date().toISOString()}`,
           {
             headers: {
               'auth-token': metaApiToken,
@@ -164,11 +168,11 @@ serve(async (req) => {
           }
         );
       } catch (fetchError) {
-        console.error('MetaAPI trades fetch error:', fetchError);
+        console.error('MetaStats fetch error:', fetchError);
         const errorMessage = String(fetchError);
         if (errorMessage.includes('certificate') || errorMessage.includes('Expired')) {
           return new Response(JSON.stringify({ 
-            error: 'MetaAPI service is temporarily unavailable due to a certificate issue on their end. Please try again later.' 
+            error: 'MetaAPI service is temporarily unavailable due to a certificate issue. Please try again later.' 
           }), {
             status: 503,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -182,20 +186,31 @@ serve(async (req) => {
 
       if (!tradesResponse.ok) {
         const errorText = await tradesResponse.text();
-        console.error('MetaAPI trades fetch error:', errorText);
-        return new Response(JSON.stringify({ error: 'Failed to fetch trades from MetaAPI' }), {
+        console.error('MetaStats trades fetch error:', errorText);
+        
+        // If MetaStats fails, the account may need to be deployed first
+        if (tradesResponse.status === 404) {
+          return new Response(JSON.stringify({ 
+            error: 'Account not found in MetaStats. The account may need to deploy/connect first in MetaAPI dashboard before syncing trades.' 
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        return new Response(JSON.stringify({ error: 'Failed to fetch trades. Please ensure your MetaAPI account is deployed and connected.' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
       const tradesData = await tradesResponse.json();
-      console.log(`Fetched ${tradesData.length || 0} deals from MetaAPI`);
+      const trades = tradesData.trades || tradesData || [];
+      console.log(`Fetched ${trades.length} trades from MetaStats`);
 
-      // Filter for closed trades (DEAL_TYPE_BUY and DEAL_TYPE_SELL with profit set)
-      const closedTrades = (tradesData || []).filter((deal: MetaApiTrade) => 
-        (deal.type === 'DEAL_TYPE_BUY' || deal.type === 'DEAL_TYPE_SELL') && 
-        deal.profit !== undefined && deal.profit !== null
+      // Filter for completed trades
+      const closedTrades = trades.filter((trade: MetaStatsTrade) => 
+        trade.closeTime && trade.profit !== undefined
       );
 
       console.log(`Processing ${closedTrades.length} closed trades`);
@@ -216,11 +231,11 @@ serve(async (req) => {
 
       // Prepare new trades for insertion
       const newTrades = closedTrades
-        .filter((trade: MetaApiTrade) => !existingMetaIds.has(trade.id))
-        .map((trade: MetaApiTrade) => {
+        .filter((trade: MetaStatsTrade) => !existingMetaIds.has(trade._id || trade.positionId))
+        .map((trade: MetaStatsTrade) => {
           const totalProfit = (trade.profit || 0) + (trade.swap || 0) + (trade.commission || 0);
           const direction = trade.type === 'DEAL_TYPE_BUY' ? 'long' : 'short';
-          const tradeDate = new Date(trade.time);
+          const tradeDate = new Date(trade.closeTime || trade.openTime);
           
           return {
             user_id: user.id,
@@ -231,7 +246,7 @@ serve(async (req) => {
             result: totalProfit,
             session: getSession(tradeDate),
             strategy: 'Synced from MT4/MT5',
-            notes: `MetaAPI ID: ${trade.id}\nVolume: ${trade.volume}\nSwap: ${trade.swap}\nCommission: ${trade.commission}`,
+            notes: `MetaAPI ID: ${trade._id || trade.positionId}\nVolume: ${trade.volume}\nOpen: ${trade.openPrice}\nClose: ${trade.closePrice}${trade.pips ? `\nPips: ${trade.pips}` : ''}`,
           };
         });
 
