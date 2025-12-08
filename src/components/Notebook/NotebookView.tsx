@@ -817,21 +817,60 @@ export function NotebookView({
 
       {/* Editor - Full width with toggle for entries panel */}
       <div className="flex-1 flex overflow-hidden gap-3 relative">
-        {/* Toggle Arrow for Entries Panel */}
-        <Button
-          variant="ghost"
-          size="sm"
+        {/* Entries List Panel - Left Side */}
+        {isEntriesPanelOpen && (
+          <div className={cn(
+            "w-72 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col",
+            isEntriesPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
+          )}>
+            <div className="p-3 border-b border-border/30 space-y-2">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={toggleFoldersPanel} className="h-8 w-8 p-0">
+                  <PanelLeftOpen className="w-4 h-4" />
+                </Button>
+                <span className="text-sm font-medium flex-1">{CATEGORIES.find((c) => c.id === selectedCategory)?.label}</span>
+              </div>
+              <div className="relative">
+                <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-7 text-xs pl-7 bg-muted/30 border-border/50" />
+              </div>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2">
+                {sortedDates.length === 0 ? (
+                  <div className="text-center text-xs text-muted-foreground py-8">No notes yet</div>
+                ) : (
+                  sortedDates.map((date) => (
+                    <div key={date} className="mb-3">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1">{formatDate(date)}</div>
+                      {groupedEntries[date].map((entry) => (
+                        <button key={entry.id} onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }} className={cn("w-full text-left p-2 rounded-lg transition-all mb-1", selectedEntryId === entry.id ? "bg-primary/20 border border-primary/40" : "hover:bg-muted/50")}>
+                          <div className="flex items-center gap-2">
+                            <ChevronRight className={cn("w-3 h-3", selectedEntryId === entry.id && "rotate-90")} />
+                            <span className="text-xs font-medium truncate">{entry.title}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
+        {/* Bookmark Tab Toggle */}
+        <button
           onClick={toggleEntriesPanel}
           className={cn(
-            "absolute right-0 top-1/2 -translate-y-1/2 z-30 h-16 w-6 p-0 rounded-l-lg rounded-r-none bg-muted/80 hover:bg-muted border border-r-0 border-border/50 transition-all",
-            isEntriesPanelOpen && "right-[18.5rem]"
+            "absolute top-8 z-30 bookmark-tab",
+            isEntriesPanelOpen ? "left-[17.5rem]" : "left-0"
           )}
         >
-          <ChevronLeft className={cn(
-            "w-4 h-4 transition-transform",
-            isEntriesPanelOpen && "rotate-180"
-          )} />
-        </Button>
+          <div className="bookmark-tab-inner">
+            <FileText className="w-3.5 h-3.5" />
+          </div>
+        </button>
         
         <div className="flex-1 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
         {selectedEntry || isCreatingNew ? (
@@ -1163,47 +1202,6 @@ export function NotebookView({
           </div>
         )}
 
-        {/* Entries List Panel - Right Side */}
-        {isEntriesPanelOpen && (
-          <div className={cn(
-            "w-72 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col",
-            isEntriesPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
-          )}>
-            <div className="p-3 border-b border-border/30 space-y-2">
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={toggleFoldersPanel} className="h-8 w-8 p-0">
-                  <PanelLeftOpen className="w-4 h-4" />
-                </Button>
-                <span className="text-sm font-medium flex-1">{CATEGORIES.find((c) => c.id === selectedCategory)?.label}</span>
-              </div>
-              <div className="relative">
-                <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-7 text-xs pl-7 bg-muted/30 border-border/50" />
-              </div>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-2">
-                {sortedDates.length === 0 ? (
-                  <div className="text-center text-xs text-muted-foreground py-8">No notes yet</div>
-                ) : (
-                  sortedDates.map((date) => (
-                    <div key={date} className="mb-3">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1">{formatDate(date)}</div>
-                      {groupedEntries[date].map((entry) => (
-                        <button key={entry.id} onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }} className={cn("w-full text-left p-2 rounded-lg transition-all mb-1", selectedEntryId === entry.id ? "bg-primary/20 border border-primary/40" : "hover:bg-muted/50")}>
-                          <div className="flex items-center gap-2">
-                            <ChevronRight className={cn("w-3 h-3", selectedEntryId === entry.id && "rotate-90")} />
-                            <span className="text-xs font-medium truncate">{entry.title}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-        )}
       </div>
 
       {/* Add Folder Dialog */}
