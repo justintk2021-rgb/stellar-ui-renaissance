@@ -28,6 +28,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import {
   Bold,
@@ -1258,11 +1261,27 @@ export function NotebookView({
                         Duplicate
                         <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+D</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={toggleFoldersPanel} className="text-xs">
-                        <FolderInput className="w-3.5 h-3.5 mr-2" />
-                        Move to
-                        <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+⇧+P</span>
-                      </DropdownMenuItem>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger className="text-xs">
+                          <FolderInput className="w-3.5 h-3.5 mr-2" />
+                          Move to
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="w-48">
+                          {CATEGORIES.filter(c => c.id !== "all" && c.id !== "trash" && c.id !== selectedEntry?.category).map((cat) => {
+                            const Icon = cat.icon;
+                            return (
+                              <DropdownMenuItem
+                                key={cat.id}
+                                onClick={() => selectedEntry && handleMoveToCategory(selectedEntry, cat.id)}
+                                className="text-xs"
+                              >
+                                <Icon className="w-3.5 h-3.5 mr-2" />
+                                {cat.label}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
                       <DropdownMenuItem onClick={handleMoveToTrash} className="text-xs text-destructive">
                         <Trash2 className="w-3.5 h-3.5 mr-2" />
                         Move to Trash
