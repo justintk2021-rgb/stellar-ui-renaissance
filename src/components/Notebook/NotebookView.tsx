@@ -127,6 +127,8 @@ export function NotebookView({
   const [blockMenuPosition, setBlockMenuPosition] = useState({ x: 0, y: 0 });
   const [showBlockButton, setShowBlockButton] = useState(false);
   const [blockButtonPosition, setBlockButtonPosition] = useState({ x: 0, y: 0 });
+  const [showTableControls, setShowTableControls] = useState(false);
+  const [selectedTable, setSelectedTable] = useState<HTMLTableElement | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -373,7 +375,29 @@ export function NotebookView({
     if (option.id === 'divider') {
       document.execCommand('insertHTML', false, '<hr class="my-4 border-border" />');
     } else if (option.id === 'table') {
-      document.execCommand('insertHTML', false, '<table class="w-full border-collapse my-2"><tr><td class="border border-border p-2">Cell 1</td><td class="border border-border p-2">Cell 2</td></tr><tr><td class="border border-border p-2">Cell 3</td><td class="border border-border p-2">Cell 4</td></tr></table>');
+      const tableHTML = `
+        <div class="notebook-table-wrapper my-4 relative group" contenteditable="false">
+          <table class="notebook-table w-full border-separate border-spacing-0 rounded-xl overflow-hidden bg-muted/30">
+            <tbody>
+              <tr>
+                <td class="p-3 border border-border/50 first:rounded-tl-xl" contenteditable="true">Cell 1</td>
+                <td class="p-3 border border-border/50 last:rounded-tr-xl" contenteditable="true">Cell 2</td>
+              </tr>
+              <tr>
+                <td class="p-3 border border-border/50 first:rounded-bl-xl" contenteditable="true">Cell 3</td>
+                <td class="p-3 border border-border/50 last:rounded-br-xl" contenteditable="true">Cell 4</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="notebook-table-controls absolute -right-8 top-0 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onclick="this.closest('.notebook-table-wrapper').querySelector('table tbody').insertAdjacentHTML('beforeend', '<tr>' + Array(this.closest('.notebook-table-wrapper').querySelector('tr').cells.length).fill('<td class=\\'p-3 border border-border/50\\' contenteditable=\\'true\\'>New</td>').join('') + '</tr>')" class="w-6 h-6 rounded bg-primary/20 hover:bg-primary/40 flex items-center justify-center text-xs text-primary transition-colors" title="Add row">+R</button>
+            <button onclick="this.closest('.notebook-table-wrapper').querySelectorAll('tr').forEach(r => r.insertAdjacentHTML('beforeend', '<td class=\\'p-3 border border-border/50\\' contenteditable=\\'true\\'>New</td>'))" class="w-6 h-6 rounded bg-primary/20 hover:bg-primary/40 flex items-center justify-center text-xs text-primary transition-colors" title="Add column">+C</button>
+            <button onclick="const rows = this.closest('.notebook-table-wrapper').querySelectorAll('tr'); if(rows.length > 1) rows[rows.length-1].remove();" class="w-6 h-6 rounded bg-destructive/20 hover:bg-destructive/40 flex items-center justify-center text-xs text-destructive transition-colors" title="Remove row">-R</button>
+            <button onclick="this.closest('.notebook-table-wrapper').querySelectorAll('tr').forEach(r => { if(r.cells.length > 1) r.deleteCell(-1); });" class="w-6 h-6 rounded bg-destructive/20 hover:bg-destructive/40 flex items-center justify-center text-xs text-destructive transition-colors" title="Remove column">-C</button>
+          </div>
+        </div>
+      `;
+      document.execCommand('insertHTML', false, tableHTML);
     } else if (option.id === 'callout') {
       document.execCommand('insertHTML', false, '<div class="bg-primary/10 border-l-4 border-primary p-3 my-2 rounded-r">Type your callout here...</div>');
     } else if (option.id === 'toggle') {
@@ -1218,7 +1242,7 @@ export function NotebookView({
                   ref={editorRef}
                   contentEditable={!isLocked && !isSelectedEntryInTrash}
                   className={cn(
-                    "min-h-full p-4 pl-12 outline-none focus:outline-none focus-visible:outline-none transition-all caret-primary",
+                    "min-h-full p-4 pl-12 pr-12 outline-none focus:outline-none focus-visible:outline-none transition-all caret-primary",
                     fontClasses[fontStyle],
                     isSmallText ? "text-xs" : "text-sm",
                     (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70",
@@ -1231,7 +1255,11 @@ export function NotebookView({
                     "[&_li]:text-foreground [&_li]:mb-1",
                     "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2",
                     "[&_strong]:font-semibold",
-                    "[&_em]:italic"
+                    "[&_em]:italic",
+                    "[&_.notebook-table-wrapper]:relative",
+                    "[&_.notebook-table]:rounded-xl [&_.notebook-table]:overflow-hidden",
+                    "[&_.notebook-table_td]:bg-background/50 [&_.notebook-table_td]:hover:bg-muted/50 [&_.notebook-table_td]:transition-colors",
+                    "[&_.notebook-table_td:focus]:outline-none [&_.notebook-table_td:focus]:ring-2 [&_.notebook-table_td:focus]:ring-primary/30 [&_.notebook-table_td:focus]:ring-inset"
                   )}
                   data-placeholder="Start writing your notes..."
                 />
