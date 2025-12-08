@@ -553,6 +553,21 @@
   animation: scale-in 0.3s ease-out;
 }
 
+@keyframes folder-popup {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+.animate-folder-popup {
+  animation: folder-popup 0.2s ease-out forwards;
+}
+
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
 }
