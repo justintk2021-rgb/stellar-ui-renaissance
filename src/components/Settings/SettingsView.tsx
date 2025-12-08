@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { BrokerManagement } from "./BrokerManagement";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string {
@@ -912,19 +913,11 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
           </div>
           <div>
             <h2 className="text-lg font-semibold text-foreground">Broker Management</h2>
-            <p className="text-sm text-muted-foreground">Connect and manage your broker accounts</p>
+            <p className="text-sm text-muted-foreground">Connect your MT4/MT5 accounts via MetaAPI</p>
           </div>
         </div>
 
-        <div className="flex flex-col items-center justify-center py-8 space-y-3">
-          <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center">
-            <Link2 className="w-8 h-8 text-muted-foreground/50" />
-          </div>
-          <p className="text-lg font-medium text-muted-foreground">Coming Soon</p>
-          <p className="text-sm text-muted-foreground/70 text-center max-w-xs">
-            Broker integration is currently in development. Stay tuned for automatic trade syncing!
-          </p>
-        </div>
+        <BrokerManagement userId={userProfile?.user_id} />
       </section>
 
       {/* About */}
