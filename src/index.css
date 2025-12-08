@@ -619,57 +619,56 @@
 
 /* Bookmark Tab Styles */
 .bookmark-tab {
-  transition: left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.bookmark-tab-inner {
-  position: relative;
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 48px;
-  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8));
+  gap: 6px;
+  padding: 10px 16px 10px 20px;
+  background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
-  border-radius: 0 8px 8px 0;
-  box-shadow: 2px 2px 8px hsl(var(--primary) / 0.3);
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border-radius: 0 12px 12px 0;
+  box-shadow: 
+    4px 0 12px hsl(var(--primary) / 0.25),
+    inset 0 1px 0 hsl(var(--primary-foreground) / 0.1);
   cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: none;
+  outline: none;
 }
 
-.bookmark-tab-inner::before {
+.bookmark-tab::before {
   content: '';
   position: absolute;
-  bottom: -8px;
   left: 0;
-  width: 0;
-  height: 0;
-  border-left: 14px solid hsl(var(--primary) / 0.6);
-  border-right: 14px solid hsl(var(--primary) / 0.6);
-  border-bottom: 8px solid transparent;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: hsl(var(--primary-foreground) / 0.2);
+  border-radius: 0 2px 2px 0;
 }
 
-.bookmark-tab:hover .bookmark-tab-inner {
-  width: 34px;
-  box-shadow: 3px 3px 12px hsl(var(--primary) / 0.4);
-  transform: translateX(2px);
+.bookmark-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
-.bookmark-tab:active .bookmark-tab-inner {
-  transform: scale(0.95);
+.bookmark-tab:hover {
+  left: -8px;
+  padding-right: 20px;
+  box-shadow: 
+    6px 0 20px hsl(var(--primary) / 0.35),
+    inset 0 1px 0 hsl(var(--primary-foreground) / 0.15);
 }
 
-@keyframes bookmark-pulse {
-  0%, 100% {
-    box-shadow: 2px 2px 8px hsl(var(--primary) / 0.3);
-  }
-  50% {
-    box-shadow: 2px 2px 16px hsl(var(--primary) / 0.5);
-  }
-}
-
-.bookmark-tab-inner:hover {
-  animation: bookmark-pulse 1.5s ease-in-out infinite;
+.bookmark-tab:active {
+  transform: translateY(-50%) scale(0.98);
 }
 
 .animate-pulse-glow {
