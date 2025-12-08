@@ -1203,17 +1203,20 @@ export function NotebookView({
                           className="scale-75"
                         />
                       </div>
-                      <div className="flex items-center justify-between px-2 py-1.5">
-                        <div className="flex items-center gap-2 text-xs">
+                      <DropdownMenuItem 
+                        onClick={() => setIsFullWidth(true)} 
+                        className="flex items-center justify-between text-xs"
+                      >
+                        <div className="flex items-center gap-2">
                           <Maximize2 className="w-3.5 h-3.5" />
                           Full width
                         </div>
                         <Switch 
                           checked={isFullWidth} 
-                          onCheckedChange={setIsFullWidth}
-                          className="scale-75"
+                          onCheckedChange={() => setIsFullWidth(true)}
+                          className="scale-75 pointer-events-none"
                         />
-                      </div>
+                      </DropdownMenuItem>
                       <div className="flex items-center justify-between px-2 py-1.5">
                         <div className="flex items-center gap-2 text-xs">
                           <Lock className="w-3.5 h-3.5" />
