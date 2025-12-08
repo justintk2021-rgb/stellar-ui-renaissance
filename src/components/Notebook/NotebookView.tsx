@@ -1007,67 +1007,9 @@ export function NotebookView({
               </div>
             </div>
 
-            {/* Toolbar - hidden for trash items */}
+            {/* Save Button - hidden for trash items */}
             {!isSelectedEntryInTrash && (
-              <div className="px-4 py-2 border-b border-border/30 flex items-center gap-1 flex-wrap">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => execCommand("bold")} 
-                  className="w-7 h-7 p-0"
-                  disabled={isLocked}
-                >
-                  <Bold className="w-3 h-3" />
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => execCommand("italic")} 
-                  className="w-7 h-7 p-0"
-                  disabled={isLocked}
-                >
-                  <Italic className="w-3 h-3" />
-                </Button>
-                <div className="w-px h-5 bg-border/50 mx-1" />
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => execCommand("formatBlock", "h2")} 
-                  className="w-7 h-7 p-0"
-                  disabled={isLocked}
-                >
-                  <Heading1 className="w-3 h-3" />
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => execCommand("insertUnorderedList")} 
-                  className="w-7 h-7 p-0"
-                  disabled={isLocked}
-                >
-                  <List className="w-3 h-3" />
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => execCommand("insertOrderedList")} 
-                  className="w-7 h-7 p-0"
-                  disabled={isLocked}
-                >
-                  <ListOrdered className="w-3 h-3" />
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => execCommand("formatBlock", "blockquote")} 
-                  className="w-7 h-7 p-0"
-                  disabled={isLocked}
-                >
-                  <Quote className="w-3 h-3" />
-                </Button>
-                
-                <div className="flex-1" />
-                
+              <div className="px-4 py-2 border-b border-border/30 flex items-center justify-end">
                 <Button
                   onClick={handleSave}
                   disabled={isLocked}
