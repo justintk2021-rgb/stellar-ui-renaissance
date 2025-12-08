@@ -570,9 +570,9 @@ export function NotebookView({
             isFoldersPanelClosing ? "animate-folder-popup-out" : "animate-folder-popup"
           )}
         >
-          <div className="flex flex-col max-h-[70vh]">
+          <div className="flex flex-col h-[400px]">
             {/* Header */}
-            <div className="p-3 border-b border-border/30 space-y-2">
+            <div className="p-3 border-b border-border/30 space-y-2 shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FolderOpen className="w-4 h-4 text-primary" />
@@ -599,7 +599,7 @@ export function NotebookView({
             </div>
 
             {/* Categories */}
-            <ScrollArea className="flex-1 max-h-[50vh]">
+            <ScrollArea className="flex-1 overflow-hidden">
               <div className="p-2 space-y-0.5">
                 {CATEGORIES.filter(c => c.id !== "trash" && c.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).map((cat) => {
                   const Icon = cat.icon;
