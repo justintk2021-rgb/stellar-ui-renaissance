@@ -8,6 +8,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Switch } from "@/components/ui/switch";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -28,6 +35,7 @@ import {
   Heading1,
   Save,
   Plus,
+  FolderPlus,
   FolderOpen,
   FileText,
   BookOpen,
@@ -99,6 +107,8 @@ export function NotebookView({
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [isFoldersPanelOpen, setIsFoldersPanelOpen] = useState(false);
+  const [isAddFolderDialogOpen, setIsAddFolderDialogOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
   const editorRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -377,17 +387,14 @@ export function NotebookView({
               </SheetDescription>
             </SheetHeader>
 
-            {/* New Note Button */}
+            {/* Add Folder Button */}
             <div className="p-4">
               <Button
-                onClick={() => {
-                  handleNewNote();
-                  setIsFoldersPanelOpen(false);
-                }}
+                onClick={() => setIsAddFolderDialogOpen(true)}
                 className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90 text-sm font-medium"
               >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Note
+                <FolderPlus className="w-4 h-4 mr-2" />
+                Add Folder
               </Button>
             </div>
 
@@ -1071,6 +1078,57 @@ export function NotebookView({
           </div>
         )}
       </div>
+
+      {/* Add Folder Dialog */}
+      <Dialog open={isAddFolderDialogOpen} onOpenChange={setIsAddFolderDialogOpen}>
+        <DialogContent className="sm:max-w-md glass-strong">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Create New Folder</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              placeholder="Enter folder name..."
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              className="w-full"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newFolderName.trim()) {
+                  toast.success(`Folder "${newFolderName}" created!`);
+                  setNewFolderName("");
+                  setIsAddFolderDialogOpen(false);
+                }
+              }}
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNewFolderName("");
+                setIsAddFolderDialogOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (newFolderName.trim()) {
+                  toast.success(`Folder "${newFolderName}" created!`);
+                  setNewFolderName("");
+                  setIsAddFolderDialogOpen(false);
+                } else {
+                  toast.error("Please enter a folder name");
+                }
+              }}
+              className="bg-gradient-to-r from-primary to-secondary text-primary-foreground"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
