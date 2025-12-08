@@ -245,6 +245,28 @@ export function NotebookView({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullWidth]);
 
+  // Auto-save in fullscreen mode (every 30 seconds)
+  useEffect(() => {
+    if (!isFullWidth || !selectedEntry || isLocked) return;
+
+    const autoSaveInterval = setInterval(() => {
+      if (fullscreenEditorRef.current && fullscreenTitleRef.current) {
+        const content = fullscreenEditorRef.current.innerHTML;
+        const title = fullscreenTitleRef.current.value || "Untitled Note";
+        
+        onSaveEntry({
+          ...selectedEntry,
+          title,
+          content,
+          updatedAt: new Date().toISOString(),
+        });
+        toast.success("Auto-saved", { duration: 1500 });
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(autoSaveInterval);
+  }, [isFullWidth, selectedEntry, isLocked, onSaveEntry]);
+
   const closeFoldersPanel = () => {
     setIsFoldersPanelClosing(true);
     setTimeout(() => {
