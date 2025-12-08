@@ -840,6 +840,9 @@ export function NotebookView({
                   <PanelLeftOpen className="w-4 h-4" />
                 </Button>
                 <span className="text-sm font-medium flex-1">{CATEGORIES.find((c) => c.id === selectedCategory)?.label}</span>
+                <Button variant="ghost" size="sm" onClick={closeEntriesPanel} className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive">
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
               </div>
               <div className="relative">
                 <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
