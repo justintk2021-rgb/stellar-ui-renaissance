@@ -592,9 +592,15 @@ export function NotebookView({
     <>
     {/* Fullscreen Overlay */}
     {isFullWidth && selectedEntry && (
-      <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-xl flex items-center justify-center p-6 animate-fade-in">
+      <div 
+        className="fixed inset-0 z-50 bg-background/80 backdrop-blur-xl flex items-center justify-center p-6 animate-fade-in"
+        onClick={() => setIsFullWidth(false)}
+      >
         {/* Fullscreen Container */}
-        <div className="w-full max-w-5xl h-full max-h-[calc(100vh-48px)] bg-background/95 rounded-3xl border border-border/50 shadow-2xl flex flex-col overflow-hidden">
+        <div 
+          className="w-full max-w-5xl h-full max-h-[calc(100vh-48px)] bg-background/95 rounded-3xl border border-border/50 shadow-2xl flex flex-col overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Fullscreen Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 bg-muted/20">
             <div className="flex items-center gap-4">
