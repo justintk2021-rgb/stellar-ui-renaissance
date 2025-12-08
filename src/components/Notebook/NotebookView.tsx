@@ -129,6 +129,7 @@ export function NotebookView({
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [isFoldersPanelOpen, setIsFoldersPanelOpen] = useState(false);
+  const [isFoldersPanelClosing, setIsFoldersPanelClosing] = useState(false);
   const [isAddFolderDialogOpen, setIsAddFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [customFolders, setCustomFolders] = useState<Array<{ id: string; label: string; color?: string }>>(() => {
@@ -199,6 +200,21 @@ export function NotebookView({
     }
   }, [selectedEntry, isCreatingNew]);
 
+  const closeFoldersPanel = () => {
+    setIsFoldersPanelClosing(true);
+    setTimeout(() => {
+      setIsFoldersPanelOpen(false);
+      setIsFoldersPanelClosing(false);
+    }, 200);
+  };
+
+  const toggleFoldersPanel = () => {
+    if (isFoldersPanelOpen) {
+      closeFoldersPanel();
+    } else {
+      setIsFoldersPanelOpen(true);
+    }
+  };
 
   const execCommand = (cmd: string, value?: string) => {
     if (isLocked) return;
@@ -548,7 +564,10 @@ export function NotebookView({
       {/* Folders Popup Overlay */}
       {isFoldersPanelOpen && (
         <div 
-          className="fixed left-4 top-1/2 z-50 w-72 bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl overflow-hidden animate-folder-popup"
+          className={cn(
+            "fixed left-4 top-1/2 z-50 w-72 bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl overflow-hidden",
+            isFoldersPanelClosing ? "animate-folder-popup-out" : "animate-folder-popup"
+          )}
         >
           <div className="flex flex-col max-h-[70vh]">
             {/* Header */}
@@ -591,7 +610,7 @@ export function NotebookView({
                           setSelectedCategory(cat.id);
                           setSelectedEntryId(null);
                           setIsCreatingNew(false);
-                          setIsFoldersPanelOpen(false);
+                          closeFoldersPanel();
                         }}
                         className={cn(
                           "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
@@ -672,7 +691,7 @@ export function NotebookView({
                               setSelectedCategory(folder.id);
                               setSelectedEntryId(null);
                               setIsCreatingNew(false);
-                              setIsFoldersPanelOpen(false);
+                              closeFoldersPanel();
                             }}
                             className={cn(
                               "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
@@ -736,7 +755,7 @@ export function NotebookView({
                       setSelectedCategory("trash");
                       setSelectedEntryId(null);
                       setIsCreatingNew(false);
-                      setIsFoldersPanelOpen(false);
+                      closeFoldersPanel();
                     }}
                     className={cn(
                       "w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
@@ -768,7 +787,7 @@ export function NotebookView({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setIsFoldersPanelOpen(!isFoldersPanelOpen)}
+              onClick={toggleFoldersPanel}
               className="h-8 w-8 p-0"
             >
               <PanelLeftOpen className="w-4 h-4" />
