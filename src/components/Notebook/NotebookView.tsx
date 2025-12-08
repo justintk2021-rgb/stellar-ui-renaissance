@@ -12,6 +12,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -109,6 +110,10 @@ export function NotebookView({
   const [isFoldersPanelOpen, setIsFoldersPanelOpen] = useState(false);
   const [isAddFolderDialogOpen, setIsAddFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [customFolders, setCustomFolders] = useState<Array<{ id: string; label: string }>>(() => {
+    const saved = localStorage.getItem('notebook-custom-folders');
+    return saved ? JSON.parse(saved) : [];
+  });
   const editorRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -440,6 +445,47 @@ export function NotebookView({
                     </button>
                   );
                 })}
+
+                {/* Custom Folders */}
+                {customFolders.length > 0 && (
+                  <div className="pt-4 mt-4 border-t border-border/30">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-2">
+                      Custom Folders
+                    </div>
+                    {customFolders.map((folder) => {
+                      const count = notebookEntries.filter((e) => e.category === folder.id && !e.isDeleted).length;
+                      return (
+                        <button
+                          key={folder.id}
+                          onClick={() => {
+                            setSelectedCategory(folder.id);
+                            setSelectedEntryId(null);
+                            setIsCreatingNew(false);
+                            setIsFoldersPanelOpen(false);
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group",
+                            selectedCategory === folder.id
+                              ? "bg-primary/20 text-primary border border-primary/30 shadow-sm"
+                              : "text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/20 hover:translate-x-1 hover:shadow-sm border border-transparent"
+                          )}
+                        >
+                          <FolderOpen className={cn(
+                            "w-4 h-4 transition-transform duration-200",
+                            selectedCategory !== folder.id && "group-hover:scale-110"
+                          )} />
+                          <span className="flex-1 text-left">{folder.label}</span>
+                          <Badge variant="secondary" className={cn(
+                            "text-[10px] px-1.5 py-0 transition-colors duration-200",
+                            selectedCategory !== folder.id && "group-hover:bg-primary/20 group-hover:text-primary"
+                          )}>
+                            {count}
+                          </Badge>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Trash - separated */}
                 <div className="pt-4 mt-4 border-t border-border/30">
@@ -1084,6 +1130,9 @@ export function NotebookView({
         <DialogContent className="sm:max-w-md glass-strong">
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold">Create New Folder</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Enter a name for your new folder to organize your notes.
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Input
@@ -1094,6 +1143,11 @@ export function NotebookView({
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && newFolderName.trim()) {
+                  const folderId = `custom-${Date.now()}`;
+                  const newFolder = { id: folderId, label: newFolderName.trim() };
+                  const updatedFolders = [...customFolders, newFolder];
+                  setCustomFolders(updatedFolders);
+                  localStorage.setItem('notebook-custom-folders', JSON.stringify(updatedFolders));
                   toast.success(`Folder "${newFolderName}" created!`);
                   setNewFolderName("");
                   setIsAddFolderDialogOpen(false);
@@ -1114,6 +1168,11 @@ export function NotebookView({
             <Button
               onClick={() => {
                 if (newFolderName.trim()) {
+                  const folderId = `custom-${Date.now()}`;
+                  const newFolder = { id: folderId, label: newFolderName.trim() };
+                  const updatedFolders = [...customFolders, newFolder];
+                  setCustomFolders(updatedFolders);
+                  localStorage.setItem('notebook-custom-folders', JSON.stringify(updatedFolders));
                   toast.success(`Folder "${newFolderName}" created!`);
                   setNewFolderName("");
                   setIsAddFolderDialogOpen(false);
