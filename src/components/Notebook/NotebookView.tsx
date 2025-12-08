@@ -374,15 +374,21 @@ export function NotebookView({
                         setIsFoldersPanelOpen(false);
                       }}
                       className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group",
                         selectedCategory === cat.id
-                          ? "bg-primary/20 text-primary border border-primary/30"
-                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
+                          ? "bg-primary/20 text-primary border border-primary/30 shadow-sm"
+                          : "text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/20 hover:translate-x-1 hover:shadow-sm border border-transparent"
                       )}
                     >
-                      <Icon className="w-4 h-4" />
+                      <Icon className={cn(
+                        "w-4 h-4 transition-transform duration-200",
+                        selectedCategory !== cat.id && "group-hover:scale-110"
+                      )} />
                       <span className="flex-1 text-left">{cat.label}</span>
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      <Badge variant="secondary" className={cn(
+                        "text-[10px] px-1.5 py-0 transition-colors duration-200",
+                        selectedCategory !== cat.id && "group-hover:bg-primary/20 group-hover:text-primary"
+                      )}>
                         {count}
                       </Badge>
                     </button>
@@ -402,13 +408,17 @@ export function NotebookView({
                       setIsFoldersPanelOpen(false);
                     }}
                     className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group",
                       selectedCategory === "trash"
-                        ? "bg-destructive/20 text-destructive border border-destructive/30"
-                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
+                        ? "bg-destructive/20 text-destructive border border-destructive/30 shadow-sm"
+                        : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 hover:translate-x-1 hover:shadow-sm border border-transparent"
                     )}
                   >
-                    <Trash2 className={cn("w-4 h-4", trashCount > 0 && "text-destructive")} />
+                    <Trash2 className={cn(
+                      "w-4 h-4 transition-transform duration-200",
+                      trashCount > 0 && "text-destructive",
+                      selectedCategory !== "trash" && "group-hover:scale-110"
+                    )} />
                     <span className="flex-1 text-left">Trash</span>
                     {trashCount > 0 && (
                       <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
