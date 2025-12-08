@@ -895,68 +895,7 @@ export function NotebookView({
       </div>
 
       {/* Editor */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Trade Metrics Sidebar (if linked) */}
-        {linkedTrade && !isSelectedEntryInTrash && (
-          <div className={cn(
-            "w-48 flex-shrink-0 p-4 border-r border-border/30 flex flex-col gap-4",
-            linkedTrade.result >= 0 
-              ? "bg-primary/5" 
-              : "bg-destructive/5"
-          )}>
-            <div className="flex flex-col items-center text-center">
-              <div className={cn(
-                "w-14 h-14 rounded-xl flex items-center justify-center mb-2",
-                linkedTrade.result >= 0 ? "bg-primary/20" : "bg-destructive/20"
-              )}>
-                <TrendingUp className={cn(
-                  "w-7 h-7",
-                  linkedTrade.result >= 0 ? "text-primary" : "text-destructive"
-                )} />
-              </div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Result</div>
-              <div className={cn(
-                "text-2xl font-bold font-mono",
-                linkedTrade.result >= 0 ? "text-primary" : "text-destructive"
-              )}>
-                {linkedTrade.result >= 0 ? "+" : ""}${linkedTrade.result.toFixed(2)}
-              </div>
-            </div>
-            
-            <div className="h-px bg-border/50" />
-            
-            <div className="space-y-3">
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Pair</div>
-                <div className="text-sm font-semibold">{linkedTrade.pair}</div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Direction</div>
-                <Badge variant="outline" className={cn(
-                  "text-xs",
-                  linkedTrade.direction === 'Long' 
-                    ? "border-primary/50 text-primary" 
-                    : "border-destructive/50 text-destructive"
-                )}>
-                  {linkedTrade.direction}
-                </Badge>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Session</div>
-                <div className="text-sm font-medium">{linkedTrade.session || 'N/A'}</div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Strategy</div>
-                <div className="text-sm font-medium">{linkedTrade.strategy || 'N/A'}</div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Date</div>
-                <div className="text-sm font-medium">{linkedTrade.date}</div>
-              </div>
-            </div>
-          </div>
-        )}
-        
+      <div className="flex-1 flex overflow-hidden gap-3">
         <div className="flex-1 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
         {selectedEntry || isCreatingNew ? (
           <>
@@ -1318,6 +1257,63 @@ export function NotebookView({
           </div>
         )}
         </div>
+        
+        {/* Trade Metrics Panel - Right Side */}
+        {linkedTrade && !isSelectedEntryInTrash && (
+          <div className={cn(
+            "w-44 flex-shrink-0 glass rounded-xl border border-border/40 p-3 h-fit",
+            linkedTrade.result >= 0 
+              ? "bg-primary/5" 
+              : "bg-destructive/5"
+          )}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center",
+                linkedTrade.result >= 0 ? "bg-primary/20" : "bg-destructive/20"
+              )}>
+                <TrendingUp className={cn(
+                  "w-4 h-4",
+                  linkedTrade.result >= 0 ? "text-primary" : "text-destructive"
+                )} />
+              </div>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Result</div>
+                <div className={cn(
+                  "text-lg font-bold font-mono leading-tight",
+                  linkedTrade.result >= 0 ? "text-primary" : "text-destructive"
+                )}>
+                  {linkedTrade.result >= 0 ? "+" : ""}${linkedTrade.result.toFixed(0)}
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Pair</span>
+                <span className="font-medium">{linkedTrade.pair}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Direction</span>
+                <Badge variant="outline" className={cn(
+                  "text-[10px] px-1.5 py-0",
+                  linkedTrade.direction === 'Long' 
+                    ? "border-primary/50 text-primary" 
+                    : "border-destructive/50 text-destructive"
+                )}>
+                  {linkedTrade.direction}
+                </Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Session</span>
+                <span className="font-medium">{linkedTrade.session || '—'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Strategy</span>
+                <span className="font-medium truncate max-w-[70px]">{linkedTrade.strategy || '—'}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add Folder Dialog */}
