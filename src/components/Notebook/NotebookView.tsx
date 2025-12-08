@@ -204,6 +204,18 @@ export function NotebookView({
     }
   }, [selectedEntry, isCreatingNew]);
 
+  // Handle Escape key to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullWidth) {
+        setIsFullWidth(false);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullWidth]);
+
   const closeFoldersPanel = () => {
     setIsFoldersPanelClosing(true);
     setTimeout(() => {
@@ -580,77 +592,128 @@ export function NotebookView({
     <>
     {/* Fullscreen Overlay */}
     {isFullWidth && selectedEntry && (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col">
-        {/* Fullscreen Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border/30">
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setIsFullWidth(false)}
-              className="h-8 w-8 p-0"
-            >
-              <Minimize2 className="w-4 h-4" />
-            </Button>
-            <Input
-              ref={titleRef}
-              defaultValue={selectedEntry?.title || ""}
-              placeholder="Note title..."
-              disabled={isLocked}
-              className="text-xl font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 w-auto max-w-md"
-            />
+      <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-xl flex items-center justify-center p-6 animate-fade-in">
+        {/* Fullscreen Container */}
+        <div className="w-full max-w-5xl h-full max-h-[calc(100vh-48px)] bg-background/95 rounded-3xl border border-border/50 shadow-2xl flex flex-col overflow-hidden">
+          {/* Fullscreen Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 bg-muted/20">
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setIsFullWidth(false)}
+                className="h-9 w-9 p-0 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors"
+              >
+                <Minimize2 className="w-4 h-4" />
+              </Button>
+              <div className="h-6 w-px bg-border/50" />
+              <Input
+                ref={titleRef}
+                defaultValue={selectedEntry?.title || ""}
+                placeholder="Note title..."
+                disabled={isLocked}
+                className="text-xl font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 w-auto max-w-lg"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              {isLocked && (
+                <Badge variant="outline" className="text-[10px] border-yellow-500/50 bg-yellow-500/10 text-yellow-600 rounded-lg">
+                  <Lock className="w-3 h-3 mr-1" />
+                  Locked
+                </Badge>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-xl">
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52 bg-background border border-border z-50 rounded-xl p-2">
+                  {/* Font Style Selector */}
+                  <div className="flex items-center justify-center gap-2 mb-2 p-1">
+                    <button 
+                      onClick={() => setFontStyle('default')}
+                      className={cn(
+                        "flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors",
+                        fontStyle === 'default' ? "bg-primary/20 text-primary" : "hover:bg-muted"
+                      )}
+                    >
+                      <span className="text-base font-sans">Ag</span>
+                      <span className="text-[9px] text-muted-foreground">Default</span>
+                    </button>
+                    <button 
+                      onClick={() => setFontStyle('serif')}
+                      className={cn(
+                        "flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors",
+                        fontStyle === 'serif' ? "bg-primary/20 text-primary" : "hover:bg-muted"
+                      )}
+                    >
+                      <span className="text-base font-serif">Ag</span>
+                      <span className="text-[9px] text-muted-foreground">Serif</span>
+                    </button>
+                    <button 
+                      onClick={() => setFontStyle('mono')}
+                      className={cn(
+                        "flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors",
+                        fontStyle === 'mono' ? "bg-primary/20 text-primary" : "hover:bg-muted"
+                      )}
+                    >
+                      <span className="text-base font-mono">Ag</span>
+                      <span className="text-[9px] text-muted-foreground">Mono</span>
+                    </button>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <div className="flex items-center justify-between px-2 py-2 rounded-lg hover:bg-muted/50">
+                    <div className="flex items-center gap-2 text-xs">
+                      <Type className="w-3.5 h-3.5" />
+                      Small text
+                    </div>
+                    <Switch checked={isSmallText} onCheckedChange={setIsSmallText} className="scale-75" />
+                  </div>
+                  <div className="flex items-center justify-between px-2 py-2 rounded-lg hover:bg-muted/50">
+                    <div className="flex items-center gap-2 text-xs">
+                      <Lock className="w-3.5 h-3.5" />
+                      Lock page
+                    </div>
+                    <Switch checked={isLocked} onCheckedChange={setIsLocked} className="scale-75" />
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={handleSave} 
+                disabled={isLocked} 
+                className="h-9 px-5 text-xs rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/20"
+              >
+                <Save className="w-3.5 h-3.5 mr-1.5" />
+                Save
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <MoreHorizontal className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-background border border-border z-50">
-                <DropdownMenuItem onClick={() => setFontStyle('default')} className="text-xs">
-                  Sans Serif {fontStyle === 'default' && <span className="ml-auto text-primary">✓</span>}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFontStyle('serif')} className="text-xs">
-                  Serif {fontStyle === 'serif' && <span className="ml-auto text-primary">✓</span>}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFontStyle('mono')} className="text-xs">
-                  Monospace {fontStyle === 'mono' && <span className="ml-auto text-primary">✓</span>}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <div className="flex items-center justify-between px-2 py-1.5">
-                  <span className="text-xs">Small text</span>
-                  <Switch checked={isSmallText} onCheckedChange={setIsSmallText} className="scale-75" />
-                </div>
-                <div className="flex items-center justify-between px-2 py-1.5">
-                  <span className="text-xs">Lock page</span>
-                  <Switch checked={isLocked} onCheckedChange={setIsLocked} className="scale-75" />
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="outline" size="sm" onClick={handleSave} disabled={isLocked} className="h-8 px-4 text-xs">
-              <Save className="w-3 h-3 mr-1" />
-              Save
-            </Button>
+          {/* Fullscreen Editor */}
+          <ScrollArea className="flex-1 bg-gradient-to-b from-transparent to-muted/5">
+            <div className="max-w-3xl mx-auto px-12 py-10">
+              <div
+                ref={editorRef}
+                contentEditable={!isLocked}
+                className={cn(
+                  "min-h-[calc(100vh-280px)] outline-none focus:outline-none caret-primary",
+                  fontClasses[fontStyle],
+                  isSmallText ? "text-sm" : "text-base",
+                  "leading-relaxed",
+                  isLocked && "cursor-not-allowed opacity-70"
+                )}
+                suppressContentEditableWarning
+              />
+            </div>
+          </ScrollArea>
+          {/* Fullscreen Footer */}
+          <div className="px-6 py-3 border-t border-border/30 bg-muted/10 flex items-center justify-between text-xs text-muted-foreground">
+            <span>Press Esc to exit fullscreen</span>
+            <span>{selectedEntry.date}</span>
           </div>
         </div>
-        {/* Fullscreen Editor */}
-        <ScrollArea className="flex-1">
-          <div className="max-w-4xl mx-auto px-8 py-6">
-            <div
-              ref={editorRef}
-              contentEditable={!isLocked}
-              className={cn(
-                "min-h-[calc(100vh-120px)] outline-none focus:outline-none caret-primary",
-                fontClasses[fontStyle],
-                isSmallText ? "text-sm" : "text-base",
-                "leading-relaxed"
-              )}
-              
-              suppressContentEditableWarning
-            />
-          </div>
-        </ScrollArea>
       </div>
     )}
     
