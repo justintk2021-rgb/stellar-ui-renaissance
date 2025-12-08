@@ -23,7 +23,7 @@ import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
-import { Menu, X, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 
@@ -87,61 +87,13 @@ const Index = () => {
   const [customColor, setCustomColor] = useLocalStorage<string>('atp_custom_color', '#10b981');
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>('atp_sidebar_collapsed', false);
-  
-  // Draggable hamburger menu state
-  const [menuPosition, setMenuPosition] = useLocalStorage<{ x: number; y: number }>('atp_menu_position', { x: 16, y: 16 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [hasDragged, setHasDragged] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [showMenuHint, setShowMenuHint] = useState(false);
 
-  // Handle drag start for hamburger menu
-  const handleMenuDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    setDragOffset({ x: clientX - menuPosition.x, y: clientY - menuPosition.y });
-    setIsDragging(true);
-    setHasDragged(false);
-  }, [menuPosition]);
-
-  // Handle drag move
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleMove = (e: MouseEvent | TouchEvent) => {
-      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-      const newX = Math.max(0, Math.min(window.innerWidth - 56, clientX - dragOffset.x));
-      const newY = Math.max(0, Math.min(window.innerHeight - 56, clientY - dragOffset.y));
-      setMenuPosition({ x: newX, y: newY });
-      setHasDragged(true);
-    };
-
-    const handleEnd = () => {
-      setIsDragging(false);
-    };
-
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleEnd);
-    window.addEventListener('touchmove', handleMove);
-    window.addEventListener('touchend', handleEnd);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleEnd);
-      window.removeEventListener('touchmove', handleMove);
-      window.removeEventListener('touchend', handleEnd);
-    };
-  }, [isDragging, dragOffset, setMenuPosition]);
-
-  // Close sidebar when clicking outside or changing page
+  // Close sidebar when changing page
   const handlePageChange = useCallback((page: string) => {
     setCurrentPage(page);
-    setSidebarOpen(false);
-  }, []);
+    setSidebarCollapsed(true);
+  }, [setSidebarCollapsed]);
 
   // Fetch user profile
   const fetchProfile = useCallback(async (userId: string) => {
@@ -374,7 +326,7 @@ const Index = () => {
     return null;
   }
 
-  // Chart page uses full-width layout with hamburger menu
+  // Chart page uses full-width layout
   const isChartPage = currentPage === 'chart';
 
   return (
@@ -384,117 +336,20 @@ const Index = () => {
         <meta name="description" content="Track your trades, analyze performance, and keep detailed notes with NSYNC Journal - your personal trading journal." />
       </Helmet>
 
-      {/* Overlay for sidebar on chart page */}
-      {isChartPage && sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 animate-fade-in"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Slide-out sidebar for chart page - from left, vertically centered */}
-      {isChartPage && (
-        <>
-          {/* Backdrop */}
-          {sidebarOpen && (
-            <div 
-              className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40"
-              onClick={() => setSidebarOpen(false)}
-            />
-          )}
-          <div className={cn(
-            "fixed top-1/2 left-4 -translate-y-1/2 z-50 transition-all duration-300 ease-in-out",
-            sidebarOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-full pointer-events-none"
-          )}>
-            <div className="relative">
-              <button 
-                onClick={() => setSidebarOpen(false)}
-                className="absolute -right-3 -top-3 w-8 h-8 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted transition-colors z-10"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <Sidebar currentPage={currentPage} onPageChange={handlePageChange} />
-            </div>
-          </div>
-        </>
-      )}
+      {/* Global Sidebar - works for all pages */}
+      <Sidebar 
+        currentPage={currentPage} 
+        onPageChange={handlePageChange} 
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
 
       <div className={cn(
-        "min-h-screen flex flex-col gap-4 p-4 pb-24 transition-all duration-300",
-        isChartPage ? "lg:p-4" : "lg:flex-row lg:p-5 lg:pb-5",
-        !isChartPage && !sidebarCollapsed ? "lg:max-w-[1400px] mx-auto" : "w-full"
+        "min-h-screen flex flex-col gap-4 p-4 pb-24 transition-all duration-300 w-full",
+        !isChartPage && "lg:p-5 lg:pb-5"
       )}>
-        {/* Desktop Sidebar - hidden on chart page, sticky on scroll */}
+        {/* Mobile Header */}
         {!isChartPage && (
-          <div className={cn(
-            "hidden lg:block sticky top-5 h-fit transition-all duration-300",
-            sidebarCollapsed && "absolute left-5 z-30"
-          )}>
-            <Sidebar 
-              currentPage={currentPage} 
-              onPageChange={setCurrentPage} 
-              isCollapsed={sidebarCollapsed}
-              onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-            />
-          </div>
-        )}
-
-        {/* Mobile Header - or controls on chart page */}
-        {isChartPage ? (
-          <>
-            {/* Double-click hint message */}
-            {showMenuHint && (
-              <div className="fixed top-2 left-1/2 -translate-x-1/2 z-20 animate-fade-in">
-                <span className="text-xs text-muted-foreground bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border/30">
-                  Double-click to open menu
-                </span>
-              </div>
-            )}
-            {/* Draggable Hamburger menu */}
-            <div 
-              className="fixed z-10 cursor-grab active:cursor-grabbing"
-              style={{ 
-                top: menuPosition.y, 
-                left: menuPosition.x,
-                touchAction: 'none'
-              }}
-            >
-              <button 
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  handleMenuDragStart(e);
-                }}
-                onTouchStart={(e) => {
-                  handleMenuDragStart(e);
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!hasDragged) {
-                    setShowMenuHint(true);
-                    setTimeout(() => setShowMenuHint(false), 2000);
-                  }
-                }}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  if (!hasDragged) setSidebarOpen(true);
-                  setShowMenuHint(false);
-                }}
-                className="w-14 h-14 rounded-2xl glass-strong hover:bg-muted/50 flex items-center justify-center transition-colors shadow-lg border border-border/30"
-              >
-                <Menu className="w-6 h-6" />
-              </button>
-            </div>
-            {/* Theme switch - bottom center */}
-            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 glass-strong rounded-xl px-3 py-2 shadow-lg">
-              <Sun className="w-4 h-4 text-muted-foreground" />
-              <Switch
-                checked={theme === 'dark'}
-                onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-              />
-              <Moon className="w-4 h-4 text-muted-foreground" />
-            </div>
-          </>
-        ) : (
           <div className="lg:hidden glass-strong rounded-2xl p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center glow-primary">
               <svg className="w-5 h-5 text-primary-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -506,6 +361,18 @@ const Index = () => {
               <h1 className="text-base font-bold gradient-text">NSYNC JOURNAL</h1>
               <p className="text-[10px] text-muted-foreground">Personal Journal</p>
             </div>
+          </div>
+        )}
+
+        {/* Theme switch for chart page - bottom center */}
+        {isChartPage && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 glass-strong rounded-xl px-3 py-2 shadow-lg">
+            <Sun className="w-4 h-4 text-muted-foreground" />
+            <Switch
+              checked={theme === 'dark'}
+              onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+            />
+            <Moon className="w-4 h-4 text-muted-foreground" />
           </div>
         )}
 
