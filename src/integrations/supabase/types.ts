@@ -44,6 +44,47 @@ export type Database = {
         }
         Relationships: []
       }
+      broker_sync_status: {
+        Row: {
+          broker_connection_id: string
+          created_at: string
+          id: string
+          last_error: string | null
+          last_sync_at: string | null
+          sync_status: string | null
+          trades_synced: number | null
+          updated_at: string
+        }
+        Insert: {
+          broker_connection_id: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          sync_status?: string | null
+          trades_synced?: number | null
+          updated_at?: string
+        }
+        Update: {
+          broker_connection_id?: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          sync_status?: string | null
+          trades_synced?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broker_sync_status_broker_connection_id_fkey"
+            columns: ["broker_connection_id"]
+            isOneToOne: false
+            referencedRelation: "broker_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklists: {
         Row: {
           created_at: string
