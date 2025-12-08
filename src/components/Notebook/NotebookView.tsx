@@ -1268,7 +1268,7 @@ export function NotebookView({
                           Move to
                         </DropdownMenuSubTrigger>
                         <DropdownMenuPortal>
-                          <DropdownMenuSubContent className="w-48 z-[100]">
+                          <DropdownMenuSubContent className="w-48 z-[100] max-h-64 overflow-y-auto">
                             {CATEGORIES.filter(c => c.id !== "all" && c.id !== "trash" && c.id !== selectedEntry?.category).map((cat) => {
                               const Icon = cat.icon;
                               return (
@@ -1282,6 +1282,21 @@ export function NotebookView({
                                 </DropdownMenuItem>
                               );
                             })}
+                            {customFolders.length > 0 && (
+                              <>
+                                <DropdownMenuSeparator />
+                                {customFolders.filter(f => f.id !== selectedEntry?.category).map((folder) => (
+                                  <DropdownMenuItem
+                                    key={folder.id}
+                                    onClick={() => selectedEntry && handleMoveToCategory(selectedEntry, folder.id)}
+                                    className="text-xs"
+                                  >
+                                    <FolderOpen className="w-3.5 h-3.5 mr-2" style={{ color: folder.color || 'currentColor' }} />
+                                    {folder.label}
+                                  </DropdownMenuItem>
+                                ))}
+                              </>
+                            )}
                           </DropdownMenuSubContent>
                         </DropdownMenuPortal>
                       </DropdownMenuSub>
