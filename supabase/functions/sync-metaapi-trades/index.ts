@@ -309,21 +309,66 @@ serve(async (req) => {
           console.log(`Using existing MetaAPI account: ${metaapiAccountId}`);
           
           // Verify the account exists
-          const verifyResponse = await fetch(
-            `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${metaapiAccountId}`,
-            {
-              headers: { 'auth-token': metaApiToken },
-            }
-          );
+          let accountData;
+          try {
+            const verifyResponse = await fetch(
+              `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${metaapiAccountId}`,
+              {
+                headers: { 'auth-token': metaApiToken },
+              }
+            );
 
-          if (!verifyResponse.ok) {
-            return new Response(JSON.stringify({ error: 'Invalid MetaAPI Account ID. Please check and try again.' }), {
-              status: 400,
+            if (!verifyResponse.ok) {
+              const errorText = await verifyResponse.text();
+              console.error('MetaAPI verify account error:', verifyResponse.status, errorText);
+              return new Response(JSON.stringify({ 
+                error: 'Invalid MetaAPI Account ID or account not found. Please check the ID and try again.',
+                details: errorText
+              }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+
+            accountData = await verifyResponse.json();
+          } catch (fetchError) {
+            console.error('MetaAPI verify fetch error:', fetchError);
+            // SSL or network error - but account ID might be valid, try to proceed
+            // Save connection anyway with basic info
+            const { data: connection, error: insertError } = await supabase
+              .from('broker_connections')
+              .insert({
+                user_id: user.id,
+                platform: platform,
+                broker_name: brokerName || platform.toUpperCase(),
+                server: server || 'MetaAPI',
+                login: login || metaapiAccountId.substring(0, 8),
+                metaapi_account_id: metaapiAccountId,
+                connection_status: 'connecting',
+                account_balance: null,
+                account_equity: null,
+                last_connected_at: new Date().toISOString(),
+                last_error: 'Account verification failed due to temporary server issue. Try syncing later.',
+              })
+              .select()
+              .single();
+
+            if (insertError) {
+              console.error('Error saving connection:', insertError);
+              return new Response(JSON.stringify({ error: 'Failed to save connection' }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+
+            return new Response(JSON.stringify({ 
+              success: true, 
+              connection,
+              message: 'Connection saved! Verification pending - MetaAPI may have temporary issues.',
+            }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
           }
-
-          const accountData = await verifyResponse.json();
           
           // Get account metrics
           let balance = null;
