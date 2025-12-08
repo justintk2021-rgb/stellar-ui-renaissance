@@ -86,6 +86,18 @@ interface NotebookViewProps {
   onDeleteEntry: (id: string) => void;
 }
 
+const MARKER_COLORS = [
+  { id: 'none', label: 'None', color: 'transparent' },
+  { id: 'red', label: 'Red', color: 'hsl(0, 84%, 60%)' },
+  { id: 'orange', label: 'Orange', color: 'hsl(25, 95%, 53%)' },
+  { id: 'yellow', label: 'Yellow', color: 'hsl(48, 96%, 53%)' },
+  { id: 'green', label: 'Green', color: 'hsl(142, 71%, 45%)' },
+  { id: 'blue', label: 'Blue', color: 'hsl(217, 91%, 60%)' },
+  { id: 'purple', label: 'Purple', color: 'hsl(262, 83%, 58%)' },
+  { id: 'pink', label: 'Pink', color: 'hsl(330, 81%, 60%)' },
+  { id: 'cyan', label: 'Cyan', color: 'hsl(186, 94%, 41%)' },
+];
+
 const CATEGORIES = [
   { id: "all", label: "All Notes", icon: FileText },
   { id: "trade-notes", label: "Trade Notes", icon: TrendingUp },
@@ -119,9 +131,13 @@ export function NotebookView({
   const [isFoldersPanelOpen, setIsFoldersPanelOpen] = useState(false);
   const [isAddFolderDialogOpen, setIsAddFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [customFolders, setCustomFolders] = useState<Array<{ id: string; label: string }>>(() => {
+  const [customFolders, setCustomFolders] = useState<Array<{ id: string; label: string; color?: string }>>(() => {
     const saved = localStorage.getItem('notebook-custom-folders');
     return saved ? JSON.parse(saved) : [];
+  });
+  const [folderMarkers, setFolderMarkers] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('notebook-folder-markers');
+    return saved ? JSON.parse(saved) : {};
   });
   const [isBlockMenuOpen, setIsBlockMenuOpen] = useState(false);
   const [blockMenuPosition, setBlockMenuPosition] = useState({ x: 0, y: 0 });
@@ -351,6 +367,25 @@ export function NotebookView({
     toast.success(`Note moved to ${CATEGORIES.find(c => c.id === newCategory)?.label || newCategory}!`);
   };
 
+  // Update folder marker color
+  const handleSetFolderMarker = (folderId: string, colorId: string) => {
+    const newMarkers = { ...folderMarkers };
+    if (colorId === 'none') {
+      delete newMarkers[folderId];
+    } else {
+      newMarkers[folderId] = colorId;
+    }
+    setFolderMarkers(newMarkers);
+    localStorage.setItem('notebook-folder-markers', JSON.stringify(newMarkers));
+  };
+
+  // Get marker color for a folder
+  const getFolderMarkerColor = (folderId: string) => {
+    const markerId = folderMarkers[folderId];
+    if (!markerId) return null;
+    return MARKER_COLORS.find(m => m.id === markerId)?.color || null;
+  };
+
   // Block formatting options
   const BLOCK_OPTIONS = [
     { id: 'text', label: 'Text', icon: Type, command: 'formatBlock', value: 'p' },
@@ -546,35 +581,82 @@ export function NotebookView({
                   const count = cat.id === "all" 
                     ? notebookEntries.filter(e => !e.isDeleted).length 
                     : notebookEntries.filter((e) => e.category === cat.id && !e.isDeleted).length;
+                  const markerColor = getFolderMarkerColor(cat.id);
                   
                   return (
-                    <button
-                      key={cat.id}
-                      onClick={() => {
-                        setSelectedCategory(cat.id);
-                        setSelectedEntryId(null);
-                        setIsCreatingNew(false);
-                        setIsFoldersPanelOpen(false);
-                      }}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group",
-                        selectedCategory === cat.id
-                          ? "bg-primary/20 text-primary border border-primary/30 shadow-sm"
-                          : "text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/20 hover:translate-x-1 hover:shadow-sm border border-transparent"
+                    <div key={cat.id} className="relative group/folder flex items-center">
+                      {/* Color Marker */}
+                      {markerColor && (
+                        <div 
+                          className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-full transition-all"
+                          style={{ backgroundColor: markerColor }}
+                        />
                       )}
-                    >
-                      <Icon className={cn(
-                        "w-4 h-4 transition-transform duration-200",
-                        selectedCategory !== cat.id && "group-hover:scale-110"
-                      )} />
-                      <span className="flex-1 text-left">{cat.label}</span>
-                      <Badge variant="secondary" className={cn(
-                        "text-[10px] px-1.5 py-0 transition-colors duration-200",
-                        selectedCategory !== cat.id && "group-hover:bg-primary/20 group-hover:text-primary"
-                      )}>
-                        {count}
-                      </Badge>
-                    </button>
+                      <button
+                        onClick={() => {
+                          setSelectedCategory(cat.id);
+                          setSelectedEntryId(null);
+                          setIsCreatingNew(false);
+                          setIsFoldersPanelOpen(false);
+                        }}
+                        className={cn(
+                          "flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group",
+                          markerColor && "pl-4",
+                          selectedCategory === cat.id
+                            ? "bg-primary/20 text-primary border border-primary/30 shadow-sm"
+                            : "text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/20 hover:translate-x-1 hover:shadow-sm border border-transparent"
+                        )}
+                      >
+                        <Icon className={cn(
+                          "w-4 h-4 transition-transform duration-200",
+                          selectedCategory !== cat.id && "group-hover:scale-110"
+                        )} />
+                        <span className="flex-1 text-left">{cat.label}</span>
+                        <Badge variant="secondary" className={cn(
+                          "text-[10px] px-1.5 py-0 transition-colors duration-200",
+                          selectedCategory !== cat.id && "group-hover:bg-primary/20 group-hover:text-primary"
+                        )}>
+                          {count}
+                        </Badge>
+                      </button>
+                      
+                      {/* Marker Color Picker */}
+                      {cat.id !== "all" && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button 
+                              className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 hover:bg-muted/50 flex items-center justify-center transition-all"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div 
+                                className="w-3 h-3 rounded-full border border-border/50"
+                                style={{ backgroundColor: markerColor || 'transparent' }}
+                              />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-32 p-2">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-1">Marker</div>
+                            <div className="grid grid-cols-5 gap-1">
+                              {MARKER_COLORS.map((color) => (
+                                <button
+                                  key={color.id}
+                                  onClick={() => handleSetFolderMarker(cat.id, color.id)}
+                                  className={cn(
+                                    "w-5 h-5 rounded-full border-2 transition-all hover:scale-110",
+                                    folderMarkers[cat.id] === color.id 
+                                      ? "border-foreground" 
+                                      : "border-transparent hover:border-muted-foreground/50",
+                                    color.id === 'none' && "border-dashed border-muted-foreground/30"
+                                  )}
+                                  style={{ backgroundColor: color.id === 'none' ? 'transparent' : color.color }}
+                                  title={color.label}
+                                />
+                              ))}
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
                   );
                 })}
 
@@ -586,34 +668,80 @@ export function NotebookView({
                     </div>
                     {customFolders.map((folder) => {
                       const count = notebookEntries.filter((e) => e.category === folder.id && !e.isDeleted).length;
+                      const markerColor = getFolderMarkerColor(folder.id);
+                      
                       return (
-                        <button
-                          key={folder.id}
-                          onClick={() => {
-                            setSelectedCategory(folder.id);
-                            setSelectedEntryId(null);
-                            setIsCreatingNew(false);
-                            setIsFoldersPanelOpen(false);
-                          }}
-                          className={cn(
-                            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group",
-                            selectedCategory === folder.id
-                              ? "bg-primary/20 text-primary border border-primary/30 shadow-sm"
-                              : "text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/20 hover:translate-x-1 hover:shadow-sm border border-transparent"
+                        <div key={folder.id} className="relative group/folder flex items-center">
+                          {/* Color Marker */}
+                          {markerColor && (
+                            <div 
+                              className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-full transition-all"
+                              style={{ backgroundColor: markerColor }}
+                            />
                           )}
-                        >
-                          <FolderOpen className={cn(
-                            "w-4 h-4 transition-transform duration-200",
-                            selectedCategory !== folder.id && "group-hover:scale-110"
-                          )} />
-                          <span className="flex-1 text-left">{folder.label}</span>
-                          <Badge variant="secondary" className={cn(
-                            "text-[10px] px-1.5 py-0 transition-colors duration-200",
-                            selectedCategory !== folder.id && "group-hover:bg-primary/20 group-hover:text-primary"
-                          )}>
-                            {count}
-                          </Badge>
-                        </button>
+                          <button
+                            onClick={() => {
+                              setSelectedCategory(folder.id);
+                              setSelectedEntryId(null);
+                              setIsCreatingNew(false);
+                              setIsFoldersPanelOpen(false);
+                            }}
+                            className={cn(
+                              "flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group",
+                              markerColor && "pl-4",
+                              selectedCategory === folder.id
+                                ? "bg-primary/20 text-primary border border-primary/30 shadow-sm"
+                                : "text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/20 hover:translate-x-1 hover:shadow-sm border border-transparent"
+                            )}
+                          >
+                            <FolderOpen className={cn(
+                              "w-4 h-4 transition-transform duration-200",
+                              selectedCategory !== folder.id && "group-hover:scale-110"
+                            )} />
+                            <span className="flex-1 text-left">{folder.label}</span>
+                            <Badge variant="secondary" className={cn(
+                              "text-[10px] px-1.5 py-0 transition-colors duration-200",
+                              selectedCategory !== folder.id && "group-hover:bg-primary/20 group-hover:text-primary"
+                            )}>
+                              {count}
+                            </Badge>
+                          </button>
+                          
+                          {/* Marker Color Picker */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button 
+                                className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 hover:bg-muted/50 flex items-center justify-center transition-all"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div 
+                                  className="w-3 h-3 rounded-full border border-border/50"
+                                  style={{ backgroundColor: markerColor || 'transparent' }}
+                                />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-32 p-2">
+                              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-1">Marker</div>
+                              <div className="grid grid-cols-5 gap-1">
+                                {MARKER_COLORS.map((color) => (
+                                  <button
+                                    key={color.id}
+                                    onClick={() => handleSetFolderMarker(folder.id, color.id)}
+                                    className={cn(
+                                      "w-5 h-5 rounded-full border-2 transition-all hover:scale-110",
+                                      folderMarkers[folder.id] === color.id 
+                                        ? "border-foreground" 
+                                        : "border-transparent hover:border-muted-foreground/50",
+                                      color.id === 'none' && "border-dashed border-muted-foreground/30"
+                                    )}
+                                    style={{ backgroundColor: color.id === 'none' ? 'transparent' : color.color }}
+                                    title={color.label}
+                                  />
+                                ))}
+                              </div>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       );
                     })}
                   </div>
