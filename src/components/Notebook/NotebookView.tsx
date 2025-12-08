@@ -564,12 +564,18 @@ export function NotebookView({
     )}>
       {/* Folders Popup Overlay */}
       {isFoldersPanelOpen && (
-        <div 
-          className={cn(
-            "fixed left-4 top-1/2 z-50 w-72 bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl overflow-hidden",
-            isFoldersPanelClosing ? "animate-folder-popup-out" : "animate-folder-popup"
-          )}
-        >
+        <>
+          {/* Backdrop to catch outside clicks */}
+          <div 
+            className="fixed inset-0 z-40"
+            onClick={closeFoldersPanel}
+          />
+          <div 
+            className={cn(
+              "fixed left-4 top-1/2 z-50 w-72 bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl overflow-hidden",
+              isFoldersPanelClosing ? "animate-folder-popup-out" : "animate-folder-popup"
+            )}
+          >
           <div className="flex flex-col h-[400px]">
             {/* Header */}
             <div className="p-3 border-b border-border/30 space-y-2 shrink-0">
@@ -787,6 +793,7 @@ export function NotebookView({
             </ScrollArea>
           </div>
         </div>
+        </>
       )}
 
       {/* Entries List */}
