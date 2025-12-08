@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { TrendingUp, Mail, Lock, User } from "lucide-react";
+import { TrendingUp, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
@@ -23,6 +23,7 @@ export function AuthPage() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -326,17 +327,25 @@ export function AuthPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={(e) => {
                     setFormData({ ...formData, password: e.target.value });
                     if (errors.password) setErrors({ ...errors, password: '' });
                   }}
-                  className={`pl-10 bg-background/50 border-border/50 focus:border-primary/50 ${errors.password ? 'border-destructive' : ''}`}
+                  className={`pl-10 pr-10 bg-background/50 border-border/50 focus:border-primary/50 ${errors.password ? 'border-destructive' : ''}`}
                   disabled={isLoading}
                   maxLength={128}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
               {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
               {!isLogin && <p className="text-xs text-muted-foreground">Minimum 8 characters</p>}
