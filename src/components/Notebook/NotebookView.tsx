@@ -74,6 +74,9 @@ import {
   Table,
   Minus,
   ExternalLink,
+  Languages,
+  Undo2,
+  SpellCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -435,6 +438,34 @@ export function NotebookView({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast.success("Note exported!");
+  };
+
+  // Undo action
+  const handleUndo = () => {
+    document.execCommand('undo', false);
+    toast.success("Undo applied");
+  };
+
+  // Translation (opens browser translate - placeholder for now)
+  const handleTranslate = () => {
+    if (!editorRef.current) return;
+    const selectedText = window.getSelection()?.toString();
+    if (selectedText) {
+      const url = `https://translate.google.com/?sl=auto&tl=en&text=${encodeURIComponent(selectedText)}`;
+      window.open(url, '_blank');
+    } else {
+      toast.info("Select text to translate");
+    }
+  };
+
+  // Spell check toggle
+  const handleSpellCheck = () => {
+    if (editorRef.current) {
+      const currentSpellcheck = editorRef.current.spellcheck;
+      editorRef.current.spellcheck = !currentSpellcheck;
+      editorRef.current.focus();
+      toast.success(currentSpellcheck ? "Spell check disabled" : "Spell check enabled");
+    }
   };
 
   // Copy note link to clipboard
@@ -1273,6 +1304,20 @@ export function NotebookView({
                           className="scale-75"
                         />
                       </div>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleUndo} className="text-xs">
+                        <Undo2 className="w-3.5 h-3.5 mr-2" />
+                        Undo
+                        <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+Z</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleTranslate} className="text-xs">
+                        <Languages className="w-3.5 h-3.5 mr-2" />
+                        Translate
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleSpellCheck} className="text-xs">
+                        <SpellCheck className="w-3.5 h-3.5 mr-2" />
+                        Spell Check
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={handleExport} className="text-xs">
                         <Download className="w-3.5 h-3.5 mr-2" />
