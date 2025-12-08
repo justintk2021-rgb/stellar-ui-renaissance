@@ -553,19 +553,34 @@
   animation: scale-in 0.3s ease-out;
 }
 
-@keyframes folder-popup {
+@keyframes folder-popup-in {
   from {
     opacity: 0;
-    transform: translateY(-50%) scale(0.95);
+    transform: translateY(-50%) translateX(-20px) scale(0.9);
   }
   to {
     opacity: 1;
-    transform: translateY(-50%) scale(1);
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
+}
+
+@keyframes folder-popup-out {
+  from {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-20px) scale(0.9);
   }
 }
 
 .animate-folder-popup {
-  animation: folder-popup 0.2s ease-out forwards;
+  animation: folder-popup-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-folder-popup-out {
+  animation: folder-popup-out 0.2s ease-in forwards;
 }
 
 .animate-pulse-glow {
