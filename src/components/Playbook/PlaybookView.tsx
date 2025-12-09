@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
+import { motion, AnimatePresence, Reorder } from "framer-motion";
+import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -468,97 +468,110 @@ export function PlaybookView() {
                 No items yet. Add your first item below.
               </motion.div>
             ) : (
-              <AnimatePresence mode="popLayout">
-                {selectedChecklist.items.map((item: ChecklistItem) => (
-                  <motion.div 
-                    key={item.id}
-                    layout
-                    initial={{ opacity: 0, x: -20, scale: 0.95 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    exit={{ opacity: 0, x: 20, scale: 0.95, height: 0, marginBottom: 0, padding: 0 }}
-                    transition={{ 
-                      type: "spring",
-                      stiffness: 500,
-                      damping: 30,
-                      opacity: { duration: 0.2 }
-                    }}
-                    className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg transition-colors duration-200",
-                      item.checked 
-                        ? "bg-primary/10" 
-                        : "bg-muted/30 hover:bg-muted/50"
-                    )}
-                  >
-                    <button
-                      onClick={() => toggleItem(selectedChecklist.id, item.id)}
+              <Reorder.Group 
+                axis="y" 
+                values={selectedChecklist.items} 
+                onReorder={(newItems) => updateChecklist(selectedChecklist.id, { items: newItems })}
+                className="space-y-2"
+              >
+                <AnimatePresence mode="popLayout">
+                  {selectedChecklist.items.map((item: ChecklistItem) => (
+                    <Reorder.Item
+                      key={item.id}
+                      value={item}
+                      initial={{ opacity: 0, x: -20, scale: 0.95 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      exit={{ opacity: 0, x: 20, scale: 0.95 }}
+                      whileDrag={{ 
+                        scale: 1.02, 
+                        boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+                        zIndex: 50
+                      }}
+                      transition={{ 
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 30,
+                        opacity: { duration: 0.2 }
+                      }}
                       className={cn(
-                        "w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0",
-                        item.checked
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : "border-muted-foreground/50 hover:border-primary"
+                        "flex items-center gap-3 p-3 rounded-lg transition-colors duration-200 cursor-grab active:cursor-grabbing",
+                        item.checked 
+                          ? "bg-primary/10" 
+                          : "bg-muted/30 hover:bg-muted/50"
                       )}
                     >
-                      {item.checked && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                        >
-                          <Check className="w-3 h-3" />
-                        </motion.div>
-                      )}
-                    </button>
-                    <span className={cn(
-                      "flex-1 text-sm transition-all",
-                      item.checked && "line-through text-muted-foreground"
-                    )}>
-                      {item.text}
-                    </span>
-                    
-                    {/* Percentage Editor */}
-                    {editingItemId === item.id ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={editingPercentage}
-                          onChange={(e) => setEditingPercentage(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0);
-                            } else if (e.key === 'Escape') {
-                              setEditingItemId(null);
-                            }
-                          }}
-                          onBlur={() => updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0)}
-                          className="w-16 h-7 text-xs text-center p-1"
-                          autoFocus
-                        />
-                        <span className="text-xs text-muted-foreground">%</span>
-                      </div>
-                    ) : (
+                      <GripVertical className="w-4 h-4 text-muted-foreground/50 shrink-0" />
                       <button
-                        onClick={() => startEditingPercentage(item.id, item.percentage, selectedChecklist.items.length)}
-                        className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                        title="Edit percentage weight"
+                        onClick={() => toggleItem(selectedChecklist.id, item.id)}
+                        className={cn(
+                          "w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0",
+                          item.checked
+                            ? "bg-primary border-primary text-primary-foreground"
+                            : "border-muted-foreground/50 hover:border-primary"
+                        )}
                       >
-                        <Percent className="w-3 h-3" />
-                        <span>{item.percentage ?? Math.round(100 / selectedChecklist.items.length)}%</span>
+                        {item.checked && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                          >
+                            <Check className="w-3 h-3" />
+                          </motion.div>
+                        )}
                       </button>
-                    )}
-                    
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => deleteItem(selectedChecklist.id, item.id)}
-                      className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </motion.button>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                      <span className={cn(
+                        "flex-1 text-sm transition-all",
+                        item.checked && "line-through text-muted-foreground"
+                      )}>
+                        {item.text}
+                      </span>
+                      
+                      {/* Percentage Editor */}
+                      {editingItemId === item.id ? (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={editingPercentage}
+                            onChange={(e) => setEditingPercentage(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0);
+                              } else if (e.key === 'Escape') {
+                                setEditingItemId(null);
+                              }
+                            }}
+                            onBlur={() => updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0)}
+                            className="w-16 h-7 text-xs text-center p-1"
+                            autoFocus
+                          />
+                          <span className="text-xs text-muted-foreground">%</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => startEditingPercentage(item.id, item.percentage, selectedChecklist.items.length)}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                          title="Edit percentage weight"
+                        >
+                          <Percent className="w-3 h-3" />
+                          <span>{item.percentage ?? Math.round(100 / selectedChecklist.items.length)}%</span>
+                        </button>
+                      )}
+                      
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => deleteItem(selectedChecklist.id, item.id)}
+                        className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </motion.button>
+                    </Reorder.Item>
+                  ))}
+                </AnimatePresence>
+              </Reorder.Group>
             )}
 
             {/* Add New Item */}
