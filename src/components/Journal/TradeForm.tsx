@@ -6,8 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X } from "lucide-react";
-
+import { Plus, X, ImagePlus, Trash2 } from "lucide-react";
 // Common trading pairs and assets
 const TRADING_PAIRS = [
   // Forex Majors
@@ -120,6 +119,8 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
     strategy: '',
     notes: '',
   });
+  const [chartImage, setChartImage] = useState<string | undefined>(undefined);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (editingTrade) {
@@ -132,8 +133,20 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
         strategy: editingTrade.strategy || '',
         notes: editingTrade.notes || '',
       });
+      setChartImage(editingTrade.chartImage);
     }
   }, [editingTrade]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setChartImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,6 +158,7 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
       session: formData.session,
       strategy: formData.strategy,
       notes: formData.notes,
+      chartImage: chartImage,
     });
     resetForm();
   };
@@ -159,6 +173,7 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
       strategy: '',
       notes: '',
     });
+    setChartImage(undefined);
   };
 
   return (
@@ -258,6 +273,44 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
             onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
             className="bg-muted/50 border-border/50 focus:border-primary/50 min-h-[80px] resize-none"
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">Trade Screenshot (optional)</Label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+          {chartImage ? (
+            <div className="relative rounded-lg overflow-hidden border border-border/50 bg-muted/30">
+              <img
+                src={chartImage}
+                alt="Trade chart"
+                className="w-full h-40 object-cover"
+              />
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2 h-7 w-7"
+                onClick={() => setChartImage(undefined)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full h-24 border-2 border-dashed border-border/50 rounded-lg flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:bg-muted/30 transition-colors"
+            >
+              <ImagePlus className="h-6 w-6 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Click to upload chart image</span>
+            </button>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 pt-2 border-t border-border/30">
