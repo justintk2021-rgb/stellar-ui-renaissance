@@ -81,6 +81,7 @@ import {
   Languages,
   Undo2,
   SpellCheck,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -159,6 +160,7 @@ export function NotebookView({
   const [blockButtonPosition, setBlockButtonPosition] = useState({ x: 0, y: 0 });
   const [showTableControls, setShowTableControls] = useState(false);
   const [selectedTable, setSelectedTable] = useState<HTMLTableElement | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const fullscreenEditorRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -1546,7 +1548,7 @@ export function NotebookView({
                   src={linkedTrade.chartImage}
                   alt="Trade chart"
                   className="w-full rounded-lg border border-border/30 cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => window.open(linkedTrade.chartImage, '_blank')}
+                  onClick={() => setImagePreview(linkedTrade.chartImage!)}
                 />
               </div>
             )}
@@ -1618,6 +1620,31 @@ export function NotebookView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Image Preview Modal */}
+      {imagePreview && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setImagePreview(null)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh]">
+            <img
+              src={imagePreview}
+              alt="Trade chart preview"
+              className="max-w-full max-h-[90vh] rounded-xl border border-border/50 shadow-2xl object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <Button
+              variant="secondary"
+              size="icon"
+              className="absolute top-3 right-3 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm"
+              onClick={() => setImagePreview(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
     </>
   );
