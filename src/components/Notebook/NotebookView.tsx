@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Trade, NotebookEntry } from "@/types/trade";
+import { useChecklists } from "@/hooks/useChecklists";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -129,6 +130,7 @@ export function NotebookView({
   onSaveEntry,
   onDeleteEntry,
 }: NotebookViewProps) {
+  const { checklists } = useChecklists();
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -699,7 +701,11 @@ export function NotebookView({
 
   // Find linked trade for entry
   const linkedTrade = selectedEntry?.tradeId ? trades.find((t) => t.id === selectedEntry.tradeId) : null;
-
+  
+  // Find the checklist used for the linked trade
+  const linkedChecklist = linkedTrade?.checklistId 
+    ? checklists.find(c => c.id === linkedTrade.checklistId) 
+    : null;
   // Calculate overall trade stats
   const overallStats = {
     totalTrades: trades.length,
@@ -1643,6 +1649,14 @@ export function NotebookView({
                 <span className="text-muted-foreground">Session</span>
                 <span className="font-medium">{linkedTrade.session || '—'}</span>
               </div>
+              {linkedChecklist && (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Checklist</span>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary max-w-[80px] truncate">
+                    {linkedChecklist.name}
+                  </Badge>
+                </div>
+              )}
             </div>
 
             {/* Trade Chart Image */}
