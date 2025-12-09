@@ -442,7 +442,8 @@ export function StatsGrid({ trades }: StatsGridProps) {
                       <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted)/0.3)', radius: 8 }} />
                       <Bar 
                         dataKey="value" 
-                        radius={[6, 6, 0, 0]}
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={24}
                         animationBegin={0}
                         animationDuration={800}
                         animationEasing="ease-out"
@@ -511,7 +512,8 @@ export function StatsGrid({ trades }: StatsGridProps) {
                       <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted)/0.3)', radius: 8 }} />
                       <Bar 
                         dataKey="value" 
-                        radius={[6, 6, 0, 0]}
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={24}
                         animationBegin={0}
                         animationDuration={800}
                         animationEasing="ease-out"
