@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Trade, DailyStats, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { CumulativeBarChart3D } from "./CumulativeBarChart3D";
 
 import { toast } from "sonner";
 
@@ -424,7 +424,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                   <div className="mb-3">
                     <span className="text-sm font-medium">Cumulative P&L</span>
                   </div>
-                  <DayCumulativeChart trades={selectedTrades} />
+                  <CumulativeBarChart3D trades={selectedTrades} />
                 </div>
               </div>
 
@@ -614,108 +614,6 @@ function DayCircularProgress({
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// Cumulative P&L chart for the day
-function DayCumulativeChart({ trades }: { trades: Trade[] }) {
-  const chartData = useMemo(() => {
-    if (trades.length === 0) return [];
-    
-    // Add starting point at 0
-    const data = [{ trade: 0, value: 0, pair: 'Start', result: 0 }];
-    
-    let cumulative = 0;
-    trades.forEach((trade, index) => {
-      cumulative += trade.result || 0;
-      data.push({
-        trade: index + 1,
-        value: cumulative,
-        pair: trade.pair,
-        result: trade.result,
-      });
-    });
-    
-    return data;
-  }, [trades]);
-
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      if (data.trade === 0) return null;
-      return (
-        <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
-          <p className="text-xs text-muted-foreground">Trade #{data.trade}: {data.pair}</p>
-          <p className={cn(
-            "text-xs font-medium",
-            data.result >= 0 ? "text-primary" : "text-destructive"
-          )}>
-            {data.result >= 0 ? '+' : ''}${data.result.toFixed(2)}
-          </p>
-          <p className={cn(
-            "text-sm font-bold",
-            data.value >= 0 ? "text-primary" : "text-destructive"
-          )}>
-            Total: ${data.value.toFixed(2)}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  if (trades.length === 0) {
-    return (
-      <div className="h-[140px] flex items-center justify-center text-muted-foreground text-sm">
-        No trades to display
-      </div>
-    );
-  }
-
-  const minValue = Math.min(...chartData.map(d => d.value));
-  const maxValue = Math.max(...chartData.map(d => d.value));
-  const padding = Math.max(Math.abs(maxValue - minValue) * 0.1, 10);
-
-  return (
-    <div className="h-[140px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="dayCumulativeGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/>
-              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05}/>
-            </linearGradient>
-          </defs>
-          <XAxis 
-            dataKey="trade" 
-            tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(value) => value === 0 ? '' : `#${value}`}
-          />
-          <YAxis 
-            tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
-            tickFormatter={(value) => `$${value}`}
-            tickLine={false}
-            axisLine={false}
-            width={50}
-            domain={[minValue - padding, maxValue + padding]}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <Area 
-            type="natural" 
-            dataKey="value" 
-            stroke="hsl(var(--primary))" 
-            strokeWidth={2.5}
-            fill="url(#dayCumulativeGradient)" 
-            dot={{ r: 4, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
-            activeDot={{ r: 6, fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
-            isAnimationActive={true}
-            animationDuration={800}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
     </div>
   );
 }
