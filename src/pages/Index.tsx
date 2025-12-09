@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Trade, NotebookEntry } from "@/types/trade";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useThemeTransition } from "@/hooks/useThemeTransition";
 import { useTrades } from "@/hooks/useTrades";
 import { useTradingAccounts } from "@/hooks/useTradingAccounts";
 import { useNotebookEntries } from "@/hooks/useNotebookEntries";
+import { useUserSettings, AccentColor } from "@/hooks/useUserSettings";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
@@ -15,7 +15,7 @@ import { PnLCalendar } from "@/components/Dashboard/PnLCalendar";
 import { TradeForm } from "@/components/Journal/TradeForm";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { NotebookView } from "@/components/Notebook/NotebookView";
-import { SettingsView, AccentColor } from "@/components/Settings/SettingsView";
+import { SettingsView } from "@/components/Settings/SettingsView";
 import { CustomChart } from "@/components/Chart/CustomChart";
 import { TradingAssistant } from "@/components/AI/TradingAssistant";
 import { PlaybookView } from "@/components/Playbook/PlaybookView";
@@ -92,12 +92,21 @@ const Index = () => {
     isLoading: notebookLoading 
   } = useNotebookEntries(user?.id);
   
-  const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('atp_theme', 'dark');
-  const [accentColor, setAccentColor] = useLocalStorage<AccentColor>('atp_accent_color', 'emerald');
-  const [customColor, setCustomColor] = useLocalStorage<string>('atp_custom_color', '#10b981');
+  // Use database-backed user settings (syncs across devices)
+  const { 
+    settings,
+    isInitialized: settingsInitialized,
+    setTheme,
+    setAccentColor,
+    setCustomColor,
+    setCustomGradient,
+    setSidebarCollapsed,
+  } = useUserSettings(user?.id);
+  
+  const { theme, accentColor, customColor, customGradient, sidebarCollapsed } = settings;
+  
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage<boolean>('atp_sidebar_collapsed', false);
 
   // Close sidebar when changing page
   const handlePageChange = useCallback((page: string) => {
@@ -160,6 +169,8 @@ const Index = () => {
 
   // Apply theme and accent color to document
   useEffect(() => {
+    if (!settingsInitialized) return;
+    
     document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(theme);
     
@@ -175,44 +186,36 @@ const Index = () => {
       document.documentElement.style.removeProperty('--ring');
       document.documentElement.style.removeProperty('--sidebar-primary');
       document.documentElement.style.removeProperty('--sidebar-ring');
-    } else {
-      // Apply saved custom gradient on page load
-      const savedGradient = localStorage.getItem('atp_custom_gradient');
-      if (savedGradient) {
-        try {
-          const gradient = JSON.parse(savedGradient);
-          const hexToHsl = (hex: string): string => {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            if (!result) return '158 64% 51%';
-            let r = parseInt(result[1], 16) / 255;
-            let g = parseInt(result[2], 16) / 255;
-            let b = parseInt(result[3], 16) / 255;
-            const max = Math.max(r, g, b), min = Math.min(r, g, b);
-            let h = 0, s = 0, l = (max + min) / 2;
-            if (max !== min) {
-              const d = max - min;
-              s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-              switch (max) {
-                case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-                case g: h = ((b - r) / d + 2) / 6; break;
-                case b: h = ((r - g) / d + 4) / 6; break;
-              }
-            }
-            return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-          };
-          const fromHsl = hexToHsl(gradient.from);
-          const toHsl = hexToHsl(gradient.to);
-          document.documentElement.style.setProperty('--primary', fromHsl);
-          document.documentElement.style.setProperty('--primary-glow', toHsl);
-          document.documentElement.style.setProperty('--ring', fromHsl);
-          document.documentElement.style.setProperty('--sidebar-primary', fromHsl);
-          document.documentElement.style.setProperty('--sidebar-ring', fromHsl);
-        } catch {
-          // ignore
+    } else if (customGradient) {
+      // Apply custom gradient from database
+      const hexToHsl = (hex: string): string => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        if (!result) return '158 64% 51%';
+        let r = parseInt(result[1], 16) / 255;
+        let g = parseInt(result[2], 16) / 255;
+        let b = parseInt(result[3], 16) / 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h = 0, s = 0, l = (max + min) / 2;
+        if (max !== min) {
+          const d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          switch (max) {
+            case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+            case g: h = ((b - r) / d + 2) / 6; break;
+            case b: h = ((r - g) / d + 4) / 6; break;
+          }
         }
-      }
+        return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+      };
+      const fromHsl = hexToHsl(customGradient.from);
+      const toHsl = hexToHsl(customGradient.to);
+      document.documentElement.style.setProperty('--primary', fromHsl);
+      document.documentElement.style.setProperty('--primary-glow', toHsl);
+      document.documentElement.style.setProperty('--ring', fromHsl);
+      document.documentElement.style.setProperty('--sidebar-primary', fromHsl);
+      document.documentElement.style.setProperty('--sidebar-ring', fromHsl);
     }
-  }, [theme, accentColor]);
+  }, [theme, accentColor, customGradient, settingsInitialized]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -503,6 +506,8 @@ const Index = () => {
                   onLogout={handleLogout}
                   customColor={customColor}
                   onCustomColorChange={setCustomColor}
+                  customGradient={customGradient}
+                  onCustomGradientChange={setCustomGradient}
                 />
               </div>
             )}

@@ -1,0 +1,220 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Json } from '@/integrations/supabase/types';
+
+export type AccentColor = 'emerald' | 'blue' | 'purple' | 'pink' | 'red' | 'orange' | 'yellow' | 'cyan' | 'custom';
+
+interface CustomGradient {
+  from: string;
+  to: string;
+}
+
+interface UserSettings {
+  theme: 'dark' | 'light';
+  accentColor: AccentColor;
+  customColor: string;
+  customGradient: CustomGradient | null;
+  sidebarCollapsed: boolean;
+}
+
+interface DbUserSettings {
+  id: string;
+  user_id: string;
+  theme: string;
+  accent_color: string;
+  custom_color: string | null;
+  custom_gradient: CustomGradient | null;
+  sidebar_collapsed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+const defaultSettings: UserSettings = {
+  theme: 'dark',
+  accentColor: 'emerald',
+  customColor: '#10b981',
+  customGradient: null,
+  sidebarCollapsed: false,
+};
+
+export function useUserSettings(userId: string | undefined) {
+  const [settings, setSettings] = useState<UserSettings>(defaultSettings);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch settings from database
+  const fetchSettings = useCallback(async () => {
+    if (!userId) {
+      // Load from localStorage as fallback when not logged in
+      const localTheme = localStorage.getItem('atp_theme');
+      const localAccent = localStorage.getItem('atp_accent_color');
+      const localCustomColor = localStorage.getItem('atp_custom_color');
+      const localGradient = localStorage.getItem('atp_custom_gradient');
+      const localSidebar = localStorage.getItem('atp_sidebar_collapsed');
+
+      setSettings({
+        theme: (localTheme ? JSON.parse(localTheme) : 'dark') as 'dark' | 'light',
+        accentColor: (localAccent ? JSON.parse(localAccent) : 'emerald') as AccentColor,
+        customColor: localCustomColor ? JSON.parse(localCustomColor) : '#10b981',
+        customGradient: localGradient ? JSON.parse(localGradient) : null,
+        sidebarCollapsed: localSidebar ? JSON.parse(localSidebar) : false,
+      });
+      setIsLoading(false);
+      setIsInitialized(true);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setSettings({
+          theme: data.theme as 'dark' | 'light',
+          accentColor: data.accent_color as AccentColor,
+          customColor: data.custom_color || '#10b981',
+          customGradient: data.custom_gradient as unknown as CustomGradient | null,
+          sidebarCollapsed: data.sidebar_collapsed,
+        });
+        
+        // Clear localStorage after successful fetch from DB
+        localStorage.removeItem('atp_theme');
+        localStorage.removeItem('atp_accent_color');
+        localStorage.removeItem('atp_custom_color');
+        localStorage.removeItem('atp_custom_gradient');
+        localStorage.removeItem('atp_sidebar_collapsed');
+      } else {
+        // No settings in DB, migrate from localStorage
+        await migrateFromLocalStorage();
+      }
+    } catch (error) {
+      console.error('Error fetching user settings:', error);
+    } finally {
+      setIsLoading(false);
+      setIsInitialized(true);
+    }
+  }, [userId]);
+
+  // Migrate localStorage settings to database
+  const migrateFromLocalStorage = useCallback(async () => {
+    if (!userId) return;
+
+    const localTheme = localStorage.getItem('atp_theme');
+    const localAccent = localStorage.getItem('atp_accent_color');
+    const localCustomColor = localStorage.getItem('atp_custom_color');
+    const localGradient = localStorage.getItem('atp_custom_gradient');
+    const localSidebar = localStorage.getItem('atp_sidebar_collapsed');
+
+    const migratedSettings: UserSettings = {
+      theme: (localTheme ? JSON.parse(localTheme) : 'dark') as 'dark' | 'light',
+      accentColor: (localAccent ? JSON.parse(localAccent) : 'emerald') as AccentColor,
+      customColor: localCustomColor ? JSON.parse(localCustomColor) : '#10b981',
+      customGradient: localGradient ? JSON.parse(localGradient) : null,
+      sidebarCollapsed: localSidebar ? JSON.parse(localSidebar) : false,
+    };
+
+    try {
+      const { error } = await supabase
+        .from('user_settings')
+        .insert([{
+          user_id: userId,
+          theme: migratedSettings.theme,
+          accent_color: migratedSettings.accentColor,
+          custom_color: migratedSettings.customColor,
+          custom_gradient: migratedSettings.customGradient ? JSON.parse(JSON.stringify(migratedSettings.customGradient)) : null,
+          sidebar_collapsed: migratedSettings.sidebarCollapsed,
+        }]);
+
+      if (error) throw error;
+
+      setSettings(migratedSettings);
+      
+      // Clear localStorage after successful migration
+      localStorage.removeItem('atp_theme');
+      localStorage.removeItem('atp_accent_color');
+      localStorage.removeItem('atp_custom_color');
+      localStorage.removeItem('atp_custom_gradient');
+      localStorage.removeItem('atp_sidebar_collapsed');
+    } catch (error) {
+      console.error('Error migrating settings:', error);
+      setSettings(migratedSettings);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  // Debounced save to database
+  const saveToDatabase = useCallback(async (newSettings: UserSettings) => {
+    if (!userId) return;
+
+    try {
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert([{
+          user_id: userId,
+          theme: newSettings.theme,
+          accent_color: newSettings.accentColor,
+          custom_color: newSettings.customColor,
+          custom_gradient: newSettings.customGradient ? JSON.parse(JSON.stringify(newSettings.customGradient)) : null,
+          sidebar_collapsed: newSettings.sidebarCollapsed,
+        }], {
+          onConflict: 'user_id',
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving user settings:', error);
+    }
+  }, [userId]);
+
+  // Update a single setting with debounced save
+  const updateSetting = useCallback(<K extends keyof UserSettings>(
+    key: K,
+    value: UserSettings[K]
+  ) => {
+    setSettings(prev => {
+      const newSettings = { ...prev, [key]: value };
+      
+      // Clear existing timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      
+      // Debounce save to database
+      saveTimeoutRef.current = setTimeout(() => {
+        saveToDatabase(newSettings);
+      }, 500);
+      
+      return newSettings;
+    });
+  }, [saveToDatabase]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  return {
+    settings,
+    isLoading,
+    isInitialized,
+    updateSetting,
+    setTheme: (theme: 'dark' | 'light') => updateSetting('theme', theme),
+    setAccentColor: (color: AccentColor) => updateSetting('accentColor', color),
+    setCustomColor: (color: string) => updateSetting('customColor', color),
+    setCustomGradient: (gradient: CustomGradient | null) => updateSetting('customGradient', gradient),
+    setSidebarCollapsed: (collapsed: boolean) => updateSetting('sidebarCollapsed', collapsed),
+  };
+}

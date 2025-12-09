@@ -64,6 +64,11 @@ interface SettingsPreset {
   createdAt: string;
 }
 
+interface CustomGradient {
+  from: string;
+  to: string;
+}
+
 interface SettingsViewProps {
   theme: 'dark' | 'light';
   onThemeChange: (theme: 'dark' | 'light') => void;
@@ -73,6 +78,8 @@ interface SettingsViewProps {
   onLogout: () => void;
   customColor?: string;
   onCustomColorChange?: (color: string) => void;
+  customGradient?: CustomGradient | null;
+  onCustomGradientChange?: (gradient: CustomGradient | null) => void;
 }
 
 const accentColors: { name: AccentColor; label: string; color: string; darkColor: string }[] = [
@@ -111,7 +118,18 @@ function CSVImportWrapper({ userId }: { userId?: string }) {
   return <CSVImport onImport={handleImport} />;
 }
 
-export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorChange, userProfile, onLogout, customColor, onCustomColorChange }: SettingsViewProps) {
+export function SettingsView({ 
+  theme, 
+  onThemeChange, 
+  accentColor, 
+  onAccentColorChange, 
+  userProfile, 
+  onLogout, 
+  customColor, 
+  onCustomColorChange,
+  customGradient: propCustomGradient,
+  onCustomGradientChange,
+}: SettingsViewProps) {
   const [presets, setPresets] = useState<SettingsPreset[]>([]);
   const [presetName, setPresetName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
@@ -125,52 +143,24 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
     const saved = localStorage.getItem('atp_gradient_enabled');
     return saved !== null ? JSON.parse(saved) : false;
   });
-  const [selectedGradient, setSelectedGradient] = useState<{ from: string; to: string } | null>(() => {
-    const saved = localStorage.getItem('atp_custom_gradient');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  });
-  const [customGradientFrom, setCustomGradientFrom] = useState(() => {
-    const saved = localStorage.getItem('atp_custom_gradient');
-    if (saved) {
-      try {
-        return JSON.parse(saved).from || '#10b981';
-      } catch {
-        return '#10b981';
-      }
-    }
-    return '#10b981';
-  });
-  const [customGradientTo, setCustomGradientTo] = useState(() => {
-    const saved = localStorage.getItem('atp_custom_gradient');
-    if (saved) {
-      try {
-        return JSON.parse(saved).to || '#06b6d4';
-      } catch {
-        return '#06b6d4';
-      }
-    }
-    return '#06b6d4';
-  });
+  const [selectedGradient, setSelectedGradient] = useState<{ from: string; to: string } | null>(
+    propCustomGradient || null
+  );
+  const [customGradientFrom, setCustomGradientFrom] = useState(
+    propCustomGradient?.from || '#10b981'
+  );
+  const [customGradientTo, setCustomGradientTo] = useState(
+    propCustomGradient?.to || '#06b6d4'
+  );
 
-  // Load and apply saved gradient on mount
+  // Sync with prop changes
   useEffect(() => {
-    const savedGradient = localStorage.getItem('atp_custom_gradient');
-    if (savedGradient && accentColor === 'custom') {
-      try {
-        const gradient = JSON.parse(savedGradient);
-        setSelectedGradient(gradient);
-      } catch {
-        // ignore
-      }
+    if (propCustomGradient) {
+      setSelectedGradient(propCustomGradient);
+      setCustomGradientFrom(propCustomGradient.from);
+      setCustomGradientTo(propCustomGradient.to);
     }
-  }, []);
+  }, [propCustomGradient]);
 
   // Save toggle states to localStorage
   useEffect(() => {
@@ -193,7 +183,7 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
     }
   }, [accentEnabled, gradientEnabled, accentColor, localCustomColor]);
 
-  // Apply gradient colors and save to localStorage
+  // Apply gradient colors and save to database
   useEffect(() => {
     if (gradientEnabled && selectedGradient) {
       const fromHsl = hexToHsl(selectedGradient.from);
@@ -203,7 +193,8 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
       document.documentElement.style.setProperty('--ring', fromHsl);
       document.documentElement.style.setProperty('--sidebar-primary', fromHsl);
       document.documentElement.style.setProperty('--sidebar-ring', fromHsl);
-      localStorage.setItem('atp_custom_gradient', JSON.stringify(selectedGradient));
+      // Save to database via callback
+      onCustomGradientChange?.(selectedGradient);
     } else if (!gradientEnabled && !accentEnabled) {
       // Both off - clear inline styles and use CSS class defaults
       document.documentElement.style.removeProperty('--primary');
@@ -275,7 +266,7 @@ export function SettingsView({ theme, onThemeChange, accentColor, onAccentColorC
     document.documentElement.style.removeProperty('--sidebar-ring');
     
     // Clear stored gradient and settings
-    localStorage.removeItem('atp_custom_gradient');
+    onCustomGradientChange?.(null);
     localStorage.setItem('atp_accent_enabled', 'true');
     localStorage.setItem('atp_gradient_enabled', 'false');
     setSelectedGradient(null);
