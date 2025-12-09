@@ -444,6 +444,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          accent_color: string
+          created_at: string
+          custom_color: string | null
+          custom_gradient: Json | null
+          id: string
+          sidebar_collapsed: boolean
+          theme: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accent_color?: string
+          created_at?: string
+          custom_color?: string | null
+          custom_gradient?: Json | null
+          id?: string
+          sidebar_collapsed?: boolean
+          theme?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accent_color?: string
+          created_at?: string
+          custom_color?: string | null
+          custom_gradient?: Json | null
+          id?: string
+          sidebar_collapsed?: boolean
+          theme?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
