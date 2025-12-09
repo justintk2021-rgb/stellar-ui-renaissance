@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2 } from "lucide-react";
+import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useChecklists } from "@/hooks/useChecklists";
 
+interface ChecklistItem {
+  id: string;
+  text: string;
+  checked: boolean;
+  percentage?: number;
+}
+
 export function PlaybookView() {
   const { checklists, loading, isAuthenticated, createChecklist, updateChecklist, deleteChecklist } = useChecklists();
   const [newChecklistName, setNewChecklistName] = useState("");
@@ -27,6 +34,8 @@ export function PlaybookView() {
   const [newItemTexts, setNewItemTexts] = useState<Record<string, string>>({});
   const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingPercentage, setEditingPercentage] = useState<string>("");
 
   const selectedChecklist = checklists.find(c => c.id === selectedChecklistId) || null;
 
@@ -94,10 +103,43 @@ export function PlaybookView() {
     await updateChecklist(checklistId, { items: updatedItems });
   };
 
-  const getCompletionPercentage = (items: { checked: boolean }[]) => {
+  const getCompletionPercentage = (items: ChecklistItem[]) => {
     if (items.length === 0) return 0;
-    const checked = items.filter(item => item.checked).length;
-    return Math.round((checked / items.length) * 100);
+    
+    // Check if any items have custom percentages
+    const hasCustomPercentages = items.some(item => item.percentage !== undefined);
+    
+    if (hasCustomPercentages) {
+      // Use custom percentages - sum up the percentages of checked items
+      const totalPercentage = items.reduce((sum, item) => {
+        if (item.checked) {
+          return sum + (item.percentage ?? Math.round(100 / items.length));
+        }
+        return sum;
+      }, 0);
+      return Math.min(100, Math.round(totalPercentage));
+    } else {
+      // Default equal distribution
+      const checked = items.filter(item => item.checked).length;
+      return Math.round((checked / items.length) * 100);
+    }
+  };
+
+  const updateItemPercentage = async (checklistId: string, itemId: string, percentage: number) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const clampedPercentage = Math.max(0, Math.min(100, percentage));
+    const updatedItems = checklist.items.map(item =>
+      item.id === itemId ? { ...item, percentage: clampedPercentage } : item
+    );
+    await updateChecklist(checklistId, { items: updatedItems });
+    setEditingItemId(null);
+  };
+
+  const startEditingPercentage = (itemId: string, currentPercentage: number | undefined, totalItems: number) => {
+    setEditingItemId(itemId);
+    setEditingPercentage(String(currentPercentage ?? Math.round(100 / totalItems)));
   };
 
   const resetChecklist = async (checklistId: string) => {
@@ -339,7 +381,7 @@ export function PlaybookView() {
                 No items yet. Add your first item below.
               </div>
             ) : (
-              selectedChecklist.items.map((item) => (
+              selectedChecklist.items.map((item: ChecklistItem) => (
                 <div 
                   key={item.id}
                   className={cn(
@@ -352,7 +394,7 @@ export function PlaybookView() {
                   <button
                     onClick={() => toggleItem(selectedChecklist.id, item.id)}
                     className={cn(
-                      "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
+                      "w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0",
                       item.checked
                         ? "bg-primary border-primary text-primary-foreground"
                         : "border-muted-foreground/50 hover:border-primary"
@@ -366,6 +408,40 @@ export function PlaybookView() {
                   )}>
                     {item.text}
                   </span>
+                  
+                  {/* Percentage Editor */}
+                  {editingItemId === item.id ? (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={editingPercentage}
+                        onChange={(e) => setEditingPercentage(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0);
+                          } else if (e.key === 'Escape') {
+                            setEditingItemId(null);
+                          }
+                        }}
+                        onBlur={() => updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0)}
+                        className="w-16 h-7 text-xs text-center p-1"
+                        autoFocus
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => startEditingPercentage(item.id, item.percentage, selectedChecklist.items.length)}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                      title="Edit percentage weight"
+                    >
+                      <Percent className="w-3 h-3" />
+                      <span>{item.percentage ?? Math.round(100 / selectedChecklist.items.length)}%</span>
+                    </button>
+                  )}
+                  
                   <button
                     onClick={() => deleteItem(selectedChecklist.id, item.id)}
                     className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
