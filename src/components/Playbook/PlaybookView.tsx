@@ -605,22 +605,6 @@ export function PlaybookView() {
                             <Cell fill="hsl(var(--primary))" className="drop-shadow-lg" />
                             <Cell fill="hsl(var(--destructive))" className="drop-shadow-lg" />
                           </Pie>
-                          <Tooltip 
-                            content={({ active, payload }) => {
-                              if (active && payload && payload.length) {
-                                const data = payload[0];
-                                const total = selectedMetrics.totalTrades;
-                                const percentage = ((data.value as number / total) * 100).toFixed(1);
-                                return (
-                                  <div className="bg-popover border border-border rounded-xl px-3 py-2 shadow-lg">
-                                    <div className="text-sm font-bold">{data.value} trades</div>
-                                    <div className="text-xs text-muted-foreground">{percentage}% of total</div>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            }}
-                          />
                           <Legend 
                             verticalAlign="bottom" 
                             height={36}
