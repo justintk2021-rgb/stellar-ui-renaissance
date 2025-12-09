@@ -5,6 +5,7 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useThemeTransition } from "@/hooks/useThemeTransition";
 import { useTrades } from "@/hooks/useTrades";
 import { useTradingAccounts } from "@/hooks/useTradingAccounts";
+import { useNotebookEntries } from "@/hooks/useNotebookEntries";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
@@ -83,7 +84,14 @@ const Index = () => {
   // Use the account's starting balance
   const accountStartBalance = selectedAccount?.starting_balance || 10000;
   
-  const [notebookEntries, setNotebookEntries] = useLocalStorage<NotebookEntry[]>('atp_notebook_v1', []);
+  // Use database-backed notebook entries
+  const { 
+    entries: notebookEntries, 
+    saveEntry: saveNotebookEntry, 
+    deleteEntry: deleteNotebookEntry,
+    isLoading: notebookLoading 
+  } = useNotebookEntries(user?.id);
+  
   const [theme, setTheme] = useLocalStorage<'dark' | 'light'>('atp_theme', 'dark');
   const [accentColor, setAccentColor] = useLocalStorage<AccentColor>('atp_accent_color', 'emerald');
   const [customColor, setCustomColor] = useLocalStorage<string>('atp_custom_color', '#10b981');
@@ -221,17 +229,15 @@ const Index = () => {
       const success = await updateTrade(editingTrade.id, tradeData);
       if (success) {
         // Update linked notebook entry if exists
-        setNotebookEntries(prev => prev.map(entry => {
-          if (entry.tradeId === editingTrade.id) {
-            return {
-              ...entry,
-              title: `${tradeData.pair} - ${tradeData.direction} Trade`,
-              date: tradeData.date,
-              updatedAt: new Date().toISOString(),
-            };
-          }
-          return entry;
-        }));
+        const linkedEntry = notebookEntries.find(e => e.tradeId === editingTrade.id);
+        if (linkedEntry) {
+          await saveNotebookEntry({
+            ...linkedEntry,
+            title: `${tradeData.pair} - ${tradeData.direction} Trade`,
+            date: tradeData.date,
+            updatedAt: new Date().toISOString(),
+          });
+        }
         setEditingTrade(null);
       }
     } else {
@@ -241,7 +247,7 @@ const Index = () => {
         
         // Auto-create notebook entry for this trade
         const newEntry: NotebookEntry = {
-          id: `trade-note-${newTrade.id}`,
+          id: crypto.randomUUID(),
           title: `${tradeData.pair} - ${tradeData.direction} Trade`,
           content: `<h2>📋 Trade Plan</h2>
 <ul>
@@ -268,29 +274,36 @@ const Index = () => {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        setNotebookEntries(prev => [newEntry, ...prev]);
+        await saveNotebookEntry(newEntry);
       }
     }
-  }, [editingTrade, addTrade, updateTrade, setNotebookEntries]);
+  }, [editingTrade, addTrade, updateTrade, notebookEntries, saveNotebookEntry]);
 
   const handleDeleteTrade = useCallback(async (id: string) => {
     const success = await deleteTrade(id);
     if (success) {
       // Also delete linked notebook entry
-      setNotebookEntries(prev => prev.filter(e => e.tradeId !== id));
+      const linkedEntry = notebookEntries.find(e => e.tradeId === id);
+      if (linkedEntry) {
+        await deleteNotebookEntry(linkedEntry.id);
+      }
       if (selectedTradeId === id) {
         setSelectedTradeId(trades.length > 1 ? trades.find(t => t.id !== id)?.id || null : null);
       }
     }
-  }, [selectedTradeId, trades, deleteTrade, setNotebookEntries]);
+  }, [selectedTradeId, trades, deleteTrade, notebookEntries, deleteNotebookEntry]);
 
   const handleClearAll = useCallback(async () => {
     const success = await clearAllTrades();
     if (success) {
-      setNotebookEntries(prev => prev.filter(e => !e.tradeId));
+      // Delete all trade-linked notebook entries
+      const tradeEntries = notebookEntries.filter(e => e.tradeId);
+      for (const entry of tradeEntries) {
+        await deleteNotebookEntry(entry.id);
+      }
       setSelectedTradeId(null);
     }
-  }, [clearAllTrades, setNotebookEntries]);
+  }, [clearAllTrades, notebookEntries, deleteNotebookEntry]);
 
   const handleSetBalance = useCallback(async (value: number) => {
     if (selectedAccountId) {
@@ -302,19 +315,13 @@ const Index = () => {
     await updateTrade(id, { notebook: notes });
   }, [updateTrade]);
 
-  const handleSaveEntry = useCallback((entry: NotebookEntry) => {
-    setNotebookEntries(prev => {
-      const existing = prev.find(e => e.id === entry.id);
-      if (existing) {
-        return prev.map(e => e.id === entry.id ? entry : e);
-      }
-      return [entry, ...prev];
-    });
-  }, [setNotebookEntries]);
+  const handleSaveEntry = useCallback(async (entry: NotebookEntry) => {
+    await saveNotebookEntry(entry);
+  }, [saveNotebookEntry]);
 
-  const handleDeleteEntry = useCallback((id: string) => {
-    setNotebookEntries(prev => prev.filter(e => e.id !== id));
-  }, [setNotebookEntries]);
+  const handleDeleteEntry = useCallback(async (id: string) => {
+    await deleteNotebookEntry(id);
+  }, [deleteNotebookEntry]);
 
   const handleSelectForNotebook = useCallback((id: string) => {
     setSelectedTradeId(id);
