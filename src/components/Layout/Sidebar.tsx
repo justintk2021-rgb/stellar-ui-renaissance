@@ -181,7 +181,7 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = false, onTogg
                       isDisabled
                         ? "text-muted-foreground/50"
                         : isActive 
-                          ? "text-primary animate-[pulse_12s_ease-in-out_infinite]" 
+                          ? "text-primary" 
                           : "text-muted-foreground group-hover:text-primary group-hover:scale-110 group-hover:rotate-6"
                     )} />
                     <span className="truncate">{item.label}</span>
