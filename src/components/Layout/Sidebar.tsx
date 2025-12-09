@@ -177,10 +177,12 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = false, onTogg
                     )}
                   >
                     <Icon className={cn(
-                      "w-5 h-5 transition-colors flex-shrink-0",
+                      "w-5 h-5 flex-shrink-0 transition-all duration-300",
                       isDisabled
                         ? "text-muted-foreground/50"
-                        : isActive ? "text-primary" : "text-muted-foreground group-hover:text-primary"
+                        : isActive 
+                          ? "text-primary animate-pulse" 
+                          : "text-muted-foreground group-hover:text-primary group-hover:scale-110 group-hover:rotate-6"
                     )} />
                     <span className="truncate">{item.label}</span>
                     {isDisabled && (

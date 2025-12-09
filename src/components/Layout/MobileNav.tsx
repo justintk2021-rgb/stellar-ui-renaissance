@@ -40,8 +40,12 @@ export function MobileNav({ currentPage, onPageChange }: MobileNavProps) {
               )}
             >
               <Icon className={cn(
-                "w-5 h-5 shrink-0",
-                !isDisabled && isActive && "drop-shadow-[0_0_8px_hsl(var(--primary)_/_0.5)]"
+                "w-5 h-5 shrink-0 transition-all duration-300",
+                isDisabled
+                  ? ""
+                  : isActive 
+                    ? "drop-shadow-[0_0_8px_hsl(var(--primary)_/_0.5)] scale-110" 
+                    : "group-hover:scale-110 active:scale-95"
               )} />
               <span className="text-[9px] font-medium truncate">{item.label}</span>
               {isActive && !isDisabled && (
