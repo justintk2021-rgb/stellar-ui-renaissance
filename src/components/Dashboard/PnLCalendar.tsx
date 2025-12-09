@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { Trade, DailyStats, NotebookEntry } from "@/types/trade";
+import { useChecklists } from "@/hooks/useChecklists";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, BarChart3, Clock, Crosshair, LineChart, Info, MoreVertical, FileText, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ const MONTH_NAMES = [
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSaveEntry }: PnLCalendarProps) {
+  const { checklists } = useChecklists();
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -538,46 +540,61 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 {/* Individual Trades */}
                 <div className="space-y-2">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Trade Details</span>
-                  <div className="space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar">
-                    {selectedTrades.map((trade) => (
-                      <div 
-                        key={trade.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Badge 
-                            variant="outline" 
-                            className={cn(
-                              "text-[10px]",
-                              trade.direction === 'Long' 
-                                ? "border-primary/50 text-primary" 
-                                : "border-destructive/50 text-destructive"
-                            )}
-                          >
-                            {trade.direction}
-                          </Badge>
-                          <span className="text-sm font-medium">{trade.pair}</span>
-                          <span className="text-sm font-medium">{trade.pair}</span>
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
+                    {selectedTrades.map((trade) => {
+                      const tradeChecklist = trade.checklistId 
+                        ? checklists.find(c => c.id === trade.checklistId) 
+                        : null;
+                      
+                      return (
+                        <div 
+                          key={trade.id}
+                          className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Badge 
+                                variant="outline" 
+                                className={cn(
+                                  "text-[10px]",
+                                  trade.direction === 'Long' 
+                                    ? "border-primary/50 text-primary" 
+                                    : "border-destructive/50 text-destructive"
+                                )}
+                              >
+                                {trade.direction}
+                              </Badge>
+                              <span className="text-sm font-medium">{trade.pair}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={cn(
+                                "text-sm font-bold font-mono",
+                                trade.result >= 0 ? "text-primary" : "text-destructive"
+                              )}>
+                                {trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedTradeForChart(trade)}
+                                className="h-7 px-2 text-xs"
+                              >
+                                <LineChart className="w-3 h-3 mr-1" />
+                                Chart
+                              </Button>
+                            </div>
+                          </div>
+                          {tradeChecklist && (
+                            <div className="flex items-center gap-2 pt-1 border-t border-border/20">
+                              <span className="text-[10px] text-muted-foreground">Checklist:</span>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary">
+                                {tradeChecklist.name}
+                              </Badge>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className={cn(
-                            "text-sm font-bold font-mono",
-                            trade.result >= 0 ? "text-primary" : "text-destructive"
-                          )}>
-                            {trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedTradeForChart(trade)}
-                            className="h-7 px-2 text-xs"
-                          >
-                            <LineChart className="w-3 h-3 mr-1" />
-                            Chart
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </TabsContent>
