@@ -702,10 +702,17 @@ export function PlaybookView() {
                           {selectedMetrics.totalPnL >= 0 ? "+" : ""}${selectedMetrics.totalPnL.toFixed(2)}
                         </div>
                         <div className={cn(
-                          "mt-2 text-xs font-medium",
-                          selectedMetrics.totalPnL >= 0 ? "text-primary/70" : "text-destructive/70"
+                          "mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium",
+                          selectedMetrics.totalPnL >= 0 
+                            ? "bg-primary/20 text-primary" 
+                            : "bg-destructive/20 text-destructive"
                         )}>
-                          {selectedMetrics.totalPnL >= 0 ? "📈 Profitable" : "📉 In drawdown"}
+                          {selectedMetrics.totalPnL >= 0 ? (
+                            <TrendingUp className="w-3 h-3" />
+                          ) : (
+                            <TrendingDown className="w-3 h-3" />
+                          )}
+                          {selectedMetrics.totalPnL >= 0 ? "Profitable" : "In drawdown"}
                         </div>
                       </div>
                     </div>
