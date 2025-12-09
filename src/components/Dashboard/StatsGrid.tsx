@@ -4,7 +4,7 @@ import { TrendingUp, TrendingDown, Info } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
 import { useEffect, useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { format, parseISO } from "date-fns";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -373,13 +373,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
               <div className="h-[280px]">
                 {chartData.cumulative.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData.cumulative}>
-                      <defs>
-                        <linearGradient id="colorCumulative" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
+                    <BarChart data={chartData.cumulative}>
                       <XAxis 
                         dataKey="formattedDate" 
                         tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
@@ -394,14 +388,15 @@ export function StatsGrid({ trades }: StatsGridProps) {
                         width={70}
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      <Area 
-                        type="monotone" 
-                        dataKey="value" 
-                        stroke="hsl(var(--primary))" 
-                        strokeWidth={2}
-                        fill="url(#colorCumulative)" 
-                      />
-                    </AreaChart>
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        {chartData.cumulative.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.value >= 0 ? 'hsl(var(--primary))' : 'hsl(var(--destructive))'} 
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center text-muted-foreground">
@@ -415,13 +410,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
               <div className="h-[280px]">
                 {chartData.daily.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData.daily}>
-                      <defs>
-                        <linearGradient id="colorDaily" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
+                    <BarChart data={chartData.daily}>
                       <XAxis 
                         dataKey="formattedDate" 
                         tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
@@ -436,14 +425,15 @@ export function StatsGrid({ trades }: StatsGridProps) {
                         width={70}
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      <Area 
-                        type="monotone" 
-                        dataKey="value" 
-                        stroke="hsl(var(--primary))" 
-                        strokeWidth={2}
-                        fill="url(#colorDaily)" 
-                      />
-                    </AreaChart>
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        {chartData.daily.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.value >= 0 ? 'hsl(var(--primary))' : 'hsl(var(--destructive))'} 
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center text-muted-foreground">
