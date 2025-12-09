@@ -607,8 +607,30 @@ export function PlaybookView() {
                           </Pie>
                           <Legend 
                             verticalAlign="bottom" 
-                            height={36}
-                            formatter={(value) => <span className="text-xs text-foreground font-medium">{value}</span>}
+                            height={40}
+                            content={({ payload }) => (
+                              <div className="flex items-center justify-center gap-4 mt-2">
+                                {payload?.map((entry, index) => (
+                                  <div 
+                                    key={index} 
+                                    className={cn(
+                                      "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 hover:scale-105",
+                                      entry.value === 'Wins' 
+                                        ? "bg-primary/15 text-primary" 
+                                        : "bg-destructive/15 text-destructive"
+                                    )}
+                                  >
+                                    <span 
+                                      className={cn(
+                                        "w-2.5 h-2.5 rounded-full",
+                                        entry.value === 'Wins' ? "bg-primary" : "bg-destructive"
+                                      )}
+                                    />
+                                    {entry.value}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           />
                         </PieChart>
                       </ResponsiveContainer>
