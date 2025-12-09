@@ -366,36 +366,36 @@
     @apply border-border;
   }
 
-  /* Seamless theme transition */
+  /* Seamless theme transition - GPU accelerated */
   html {
-    transition: background-color 0.3s ease, color 0.3s ease;
+    color-scheme: light dark;
+    transition: none;
   }
 
-  html.light,
-  html.dark,
-  html:root {
-    transition: background-color 0.3s ease;
+  html.light {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  /* Theme transition class - added during transition only */
+  html.theme-transition,
+  html.theme-transition *,
+  html.theme-transition *::before,
+  html.theme-transition *::after {
+    transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                fill 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                stroke 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
   }
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Outfit', system-ui, sans-serif;
-    transition: background-color 0.3s ease, color 0.3s ease;
-  }
-
-  /* Apply transition to all themed elements */
-  *,
-  *::before,
-  *::after {
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease, box-shadow 0.3s ease, fill 0.3s ease, stroke 0.3s ease;
-  }
-
-  /* Exclude elements that shouldn't transition (animations, transforms) */
-  .no-theme-transition,
-  .no-theme-transition *,
-  [data-no-transition],
-  [data-no-transition] * {
-    transition: none !important;
   }
 
   :root body {
