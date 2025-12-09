@@ -287,6 +287,7 @@ export type Database = {
         Row: {
           account_id: string | null
           chart_image: string | null
+          checklist_id: string | null
           created_at: string
           date: string
           direction: string
@@ -303,6 +304,7 @@ export type Database = {
         Insert: {
           account_id?: string | null
           chart_image?: string | null
+          checklist_id?: string | null
           created_at?: string
           date: string
           direction: string
@@ -319,6 +321,7 @@ export type Database = {
         Update: {
           account_id?: string | null
           chart_image?: string | null
+          checklist_id?: string | null
           created_at?: string
           date?: string
           direction?: string
@@ -338,6 +341,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "trading_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trades_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "checklists"
             referencedColumns: ["id"]
           },
         ]
