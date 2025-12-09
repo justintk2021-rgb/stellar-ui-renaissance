@@ -528,6 +528,38 @@ export function NotebookView({
     localStorage.setItem('notebook-folder-markers', JSON.stringify(newMarkers));
   };
 
+  // Delete custom folder
+  const handleDeleteFolder = (folderId: string) => {
+    // Move all notes in this folder to general
+    notebookEntries
+      .filter(e => e.category === folderId)
+      .forEach(entry => {
+        onSaveEntry({
+          ...entry,
+          category: 'general',
+          updatedAt: new Date().toISOString(),
+        });
+      });
+    
+    // Remove folder from list
+    const updatedFolders = customFolders.filter(f => f.id !== folderId);
+    setCustomFolders(updatedFolders);
+    localStorage.setItem('notebook-custom-folders', JSON.stringify(updatedFolders));
+    
+    // Remove folder marker if exists
+    const newMarkers = { ...folderMarkers };
+    delete newMarkers[folderId];
+    setFolderMarkers(newMarkers);
+    localStorage.setItem('notebook-folder-markers', JSON.stringify(newMarkers));
+    
+    // If currently viewing the deleted folder, switch to all
+    if (selectedCategory === folderId) {
+      setSelectedCategory('all');
+    }
+    
+    toast.success("Folder deleted!");
+  };
+
   // Get marker color for a folder
   const getFolderMarkerColor = (folderId: string) => {
     const markerId = folderMarkers[folderId];
@@ -1086,7 +1118,7 @@ export function NotebookView({
                       const count = notebookEntries.filter((e) => e.category === folder.id && !e.isDeleted).length;
                       const markerColor = getFolderMarkerColor(folder.id);
                       
-                      return (
+                        return (
                         <div key={folder.id} className="relative group/folder flex items-center gap-1">
                           {markerColor && (
                             <div 
@@ -1113,6 +1145,24 @@ export function NotebookView({
                             <span className="flex-1 text-left truncate">{folder.label}</span>
                             <span className="text-[10px] text-muted-foreground">{count}</span>
                           </button>
+                          
+                          {/* Delete Folder Button */}
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <ConfirmDialog
+                              trigger={
+                                <button 
+                                  className="w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-all border border-border shadow-sm"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              }
+                              title="Delete Folder"
+                              description={`Are you sure you want to delete "${folder.label}"? Notes in this folder will be moved to General Notes.`}
+                              confirmLabel="Delete"
+                              variant="destructive"
+                              onConfirm={() => handleDeleteFolder(folder.id)}
+                            />
+                          </div>
                           
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
