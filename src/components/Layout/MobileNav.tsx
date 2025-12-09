@@ -44,8 +44,8 @@ export function MobileNav({ currentPage, onPageChange }: MobileNavProps) {
                 isDisabled
                   ? ""
                   : isActive 
-                    ? "drop-shadow-[0_0_8px_hsl(var(--primary)_/_0.5)] scale-110" 
-                    : "group-hover:scale-110 active:scale-95"
+                    ? "drop-shadow-[0_0_8px_hsl(var(--primary)_/_0.5)] scale-110 animate-[pulse_6s_ease-in-out_infinite]" 
+                    : "active:scale-95"
               )} />
               <span className="text-[9px] font-medium truncate">{item.label}</span>
               {isActive && !isDisabled && (
