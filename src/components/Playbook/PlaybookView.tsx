@@ -48,6 +48,7 @@ export function PlaybookView() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingPercentage, setEditingPercentage] = useState<string>("");
+  const [addingItemToChecklist, setAddingItemToChecklist] = useState<string | null>(null);
   const [checklistMetrics, setChecklistMetrics] = useState<ChecklistMetrics[]>([]);
   const [metricsLoading, setMetricsLoading] = useState(false);
 
@@ -534,22 +535,59 @@ export function PlaybookView() {
             )}
 
             {/* Add New Item */}
-            <div className="flex gap-2 pt-2">
-              <Input
-                placeholder="Add new item..."
-                value={newItemTexts[selectedChecklist.id] || ""}
-                onChange={(e) => setNewItemTexts({ ...newItemTexts, [selectedChecklist.id]: e.target.value })}
-                onKeyDown={(e) => e.key === 'Enter' && addItem(selectedChecklist.id)}
-                className="bg-background/50 border-border/50 h-9 text-sm"
-              />
-              <Button 
-                size="sm" 
-                variant="secondary"
-                onClick={() => addItem(selectedChecklist.id)}
-                className="shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
+            <div className="pt-2">
+              {addingItemToChecklist === selectedChecklist.id ? (
+                <div className="flex gap-2 animate-fade-in">
+                  <Input
+                    placeholder="Add new item..."
+                    value={newItemTexts[selectedChecklist.id] || ""}
+                    onChange={(e) => setNewItemTexts({ ...newItemTexts, [selectedChecklist.id]: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        addItem(selectedChecklist.id);
+                        setAddingItemToChecklist(null);
+                      } else if (e.key === 'Escape') {
+                        setAddingItemToChecklist(null);
+                        setNewItemTexts({ ...newItemTexts, [selectedChecklist.id]: "" });
+                      }
+                    }}
+                    className="bg-background/50 border-border/50 h-9 text-sm"
+                    autoFocus
+                  />
+                  <Button 
+                    size="sm" 
+                    variant="secondary"
+                    onClick={() => {
+                      addItem(selectedChecklist.id);
+                      setAddingItemToChecklist(null);
+                    }}
+                    className="shrink-0"
+                  >
+                    <Check className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    onClick={() => {
+                      setAddingItemToChecklist(null);
+                      setNewItemTexts({ ...newItemTexts, [selectedChecklist.id]: "" });
+                    }}
+                    className="shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setAddingItemToChecklist(selectedChecklist.id)}
+                  className="w-full justify-center gap-2 text-muted-foreground hover:text-foreground border border-dashed border-border/50 hover:border-primary/50 transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Item
+                </Button>
+              )}
             </div>
           </div>
             </div>
