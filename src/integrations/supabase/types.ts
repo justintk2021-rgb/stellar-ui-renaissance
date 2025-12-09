@@ -250,6 +250,62 @@ export type Database = {
         }
         Relationships: []
       }
+      notebook_entries: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          date: string
+          deleted_at: string | null
+          folder_color: string | null
+          folder_id: string | null
+          id: string
+          is_deleted: boolean
+          title: string
+          trade_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          content?: string
+          created_at?: string
+          date: string
+          deleted_at?: string | null
+          folder_color?: string | null
+          folder_id?: string | null
+          id?: string
+          is_deleted?: boolean
+          title: string
+          trade_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          date?: string
+          deleted_at?: string | null
+          folder_color?: string | null
+          folder_id?: string | null
+          id?: string
+          is_deleted?: boolean
+          title?: string
+          trade_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notebook_entries_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
