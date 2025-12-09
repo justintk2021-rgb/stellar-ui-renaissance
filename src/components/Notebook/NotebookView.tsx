@@ -1643,10 +1643,6 @@ export function NotebookView({
                 <span className="text-muted-foreground">Session</span>
                 <span className="font-medium">{linkedTrade.session || '—'}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Strategy</span>
-                <span className="font-medium truncate max-w-[70px]">{linkedTrade.strategy || '—'}</span>
-              </div>
             </div>
 
             {/* Trade Chart Image */}

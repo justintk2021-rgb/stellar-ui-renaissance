@@ -38,7 +38,6 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         direction: t.direction as 'Long' | 'Short',
         result: Number(t.result),
         session: t.session || undefined,
-        strategy: t.strategy || undefined,
         notes: t.notes || undefined,
         notebook: t.notebook || undefined,
         chartImage: t.chart_image || undefined,
@@ -74,7 +73,6 @@ export function useTrades(userId: string | undefined, accountId: string | null =
           direction: tradeData.direction,
           result: tradeData.result,
           session: tradeData.session || null,
-          strategy: tradeData.strategy || null,
           notes: tradeData.notes || null,
           notebook: tradeData.notebook || null,
           chart_image: tradeData.chartImage || null,
@@ -92,7 +90,6 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         direction: data.direction as 'Long' | 'Short',
         result: Number(data.result),
         session: data.session || undefined,
-        strategy: data.strategy || undefined,
         notes: data.notes || undefined,
         notebook: data.notebook || undefined,
         chartImage: data.chart_image || undefined,
@@ -120,7 +117,6 @@ export function useTrades(userId: string | undefined, accountId: string | null =
       if (tradeData.direction !== undefined) updateData.direction = tradeData.direction;
       if (tradeData.result !== undefined) updateData.result = tradeData.result;
       if (tradeData.session !== undefined) updateData.session = tradeData.session || null;
-      if (tradeData.strategy !== undefined) updateData.strategy = tradeData.strategy || null;
       if (tradeData.notes !== undefined) updateData.notes = tradeData.notes || null;
       if (tradeData.notebook !== undefined) updateData.notebook = tradeData.notebook || null;
       if (tradeData.chartImage !== undefined) updateData.chart_image = tradeData.chartImage || null;
@@ -207,7 +203,6 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         direction: t.direction,
         result: t.result,
         session: t.session || null,
-        strategy: t.strategy || null,
         notes: t.notes || null,
         notebook: t.notebook || null,
         chart_image: t.chartImage || null,

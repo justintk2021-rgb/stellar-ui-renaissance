@@ -90,17 +90,14 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
 
     const pairCounts: Record<string, number> = {};
     const sessionCounts: Record<string, number> = {};
-    const strategyCounts: Record<string, number> = {};
     
     trades.forEach(t => {
       pairCounts[t.pair] = (pairCounts[t.pair] || 0) + 1;
       if (t.session) sessionCounts[t.session] = (sessionCounts[t.session] || 0) + 1;
-      if (t.strategy) strategyCounts[t.strategy] = (strategyCounts[t.strategy] || 0) + 1;
     });
 
     const topPairs = Object.entries(pairCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([p]) => p).join(", ") || "None";
     const topSessions = Object.entries(sessionCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([s]) => s).join(", ") || "None";
-    const topStrategies = Object.entries(strategyCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([s]) => s).join(", ") || "None";
 
     const recentTrades = trades.slice(0, 5).map(t => 
       `${t.date}: ${t.pair} ${t.direction} $${t.result > 0 ? '+' : ''}${t.result.toFixed(2)}`
@@ -115,7 +112,6 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
       profitFactor: profitFactor.toFixed(2),
       topPairs,
       topSessions,
-      topStrategies,
       recentTrades: recentTrades || "No recent trades"
     };
   };
@@ -223,12 +219,11 @@ export const TradingAssistant = ({ trades, onAddTrade }: TradingAssistantProps) 
           direction: data.data.direction,
           result: data.data.result,
           session: data.data.session || "",
-          strategy: data.data.strategy || "",
           notes: data.data.notes || "",
         };
         setPendingTrade(tradeData);
         
-        const assistantMessage = `I can add this trade for you:\n\n📊 **${tradeData.pair}** - ${tradeData.direction}\n📅 Date: ${tradeData.date}\n💰 Result: $${tradeData.result > 0 ? '+' : ''}${tradeData.result}\n${tradeData.session ? `⏰ Session: ${tradeData.session}\n` : ''}${tradeData.strategy ? `📈 Strategy: ${tradeData.strategy}\n` : ''}\nShould I add this trade?`;
+        const assistantMessage = `I can add this trade for you:\n\n📊 **${tradeData.pair}** - ${tradeData.direction}\n📅 Date: ${tradeData.date}\n💰 Result: $${tradeData.result > 0 ? '+' : ''}${tradeData.result}\n${tradeData.session ? `⏰ Session: ${tradeData.session}\n` : ''}\nShould I add this trade?`;
         
         setMessages(prev => [...prev, {
           role: "assistant",

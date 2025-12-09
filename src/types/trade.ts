@@ -5,7 +5,6 @@ export interface Trade {
   direction: 'Long' | 'Short';
   result: number;
   session?: string;
-  strategy?: string;
   notes?: string;
   notebook?: string;
   chartImage?: string; // Base64 image of trade chart with entry/TP/SL

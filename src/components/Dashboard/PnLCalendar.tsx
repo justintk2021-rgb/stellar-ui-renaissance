@@ -113,7 +113,6 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
       ? selectedTrades.filter(t => t.result < 0).reduce((sum, t) => sum + t.result, 0) / selectedTrades.filter(t => t.result < 0).length 
       : 0,
     sessions: [...new Set(selectedTrades.map(t => t.session).filter(Boolean))],
-    strategies: [...new Set(selectedTrades.map(t => t.strategy).filter(Boolean))],
     pairs: [...new Set(selectedTrades.map(t => t.pair).filter(Boolean))],
   } : null;
 
@@ -534,17 +533,6 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                       ))}
                     </div>
                   )}
-                  {dayMetrics.strategies.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Crosshair className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">Setups:</span>
-                      {dayMetrics.strategies.map((strategy) => (
-                        <Badge key={strategy} variant="outline" className="text-xs border-primary/50 bg-primary/10 text-primary">
-                          {strategy}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 {/* Individual Trades */}
@@ -569,9 +557,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                             {trade.direction}
                           </Badge>
                           <span className="text-sm font-medium">{trade.pair}</span>
-                          {trade.strategy && (
-                            <span className="text-xs text-muted-foreground">• {trade.strategy}</span>
-                          )}
+                          <span className="text-sm font-medium">{trade.pair}</span>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className={cn(

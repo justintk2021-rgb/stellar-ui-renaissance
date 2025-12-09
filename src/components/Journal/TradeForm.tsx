@@ -119,7 +119,6 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
     direction: 'Long' as 'Long' | 'Short',
     result: '',
     session: '',
-    strategy: '',
     notes: '',
     checklistId: '',
   });
@@ -134,7 +133,6 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
         direction: editingTrade.direction,
         result: editingTrade.result.toString(),
         session: editingTrade.session || '',
-        strategy: editingTrade.strategy || '',
         notes: editingTrade.notes || '',
         checklistId: editingTrade.checklistId || '',
       });
@@ -161,7 +159,6 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
       direction: formData.direction,
       result: parseFloat(formData.result) || 0,
       session: formData.session,
-      strategy: formData.strategy,
       notes: formData.notes,
       chartImage: chartImage,
       checklistId: formData.checklistId || undefined,
@@ -176,7 +173,6 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
       direction: 'Long',
       result: '',
       session: '',
-      strategy: '',
       notes: '',
       checklistId: '',
     });
@@ -254,18 +250,6 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
               placeholder="London, NY, Asia..."
               value={formData.session}
               onChange={(e) => setFormData(prev => ({ ...prev, session: e.target.value }))}
-              className="bg-muted/50 border-border/50 focus:border-primary/50"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="strategy" className="text-xs text-muted-foreground">Setup / Strategy</Label>
-            <Input
-              id="strategy"
-              type="text"
-              placeholder="ATP break & retest..."
-              value={formData.strategy}
-              onChange={(e) => setFormData(prev => ({ ...prev, strategy: e.target.value }))}
               className="bg-muted/50 border-border/50 focus:border-primary/50"
             />
           </div>
