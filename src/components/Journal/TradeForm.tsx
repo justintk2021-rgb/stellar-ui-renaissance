@@ -6,8 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, ImagePlus, Trash2, ClipboardList } from "lucide-react";
+import { Plus, X, ImagePlus, Trash2, ClipboardList, ChevronDown } from "lucide-react";
 import { useChecklists } from "@/hooks/useChecklists";
+import { cn } from "@/lib/utils";
 
 // Common trading pairs and assets
 const TRADING_PAIRS = [
@@ -113,6 +114,8 @@ interface TradeFormProps {
 
 export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormProps) {
   const { checklists, isAuthenticated } = useChecklists();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().slice(0, 10),
     pair: '',
@@ -124,6 +127,27 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
   });
   const [chartImage, setChartImage] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-expand when editing a trade
+  useEffect(() => {
+    if (editingTrade) {
+      setIsExpanded(true);
+    }
+  }, [editingTrade]);
+
+  // Click outside to collapse
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (formRef.current && !formRef.current.contains(event.target as Node)) {
+        if (!editingTrade) {
+          setIsExpanded(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [editingTrade]);
 
   useEffect(() => {
     if (editingTrade) {
@@ -180,21 +204,70 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
   };
 
   return (
-    <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-base font-semibold">
-            {editingTrade ? 'Edit Trade' : 'New Trade'}
-          </h3>
-          <p className="text-xs text-muted-foreground mt-1">Log each trade with quick context</p>
+    <div 
+      ref={formRef}
+      className={cn(
+        "glass rounded-2xl border border-border/40 shadow-card transition-all duration-300 ease-out overflow-hidden",
+        isExpanded 
+          ? "p-5 ring-2 ring-primary/20 shadow-glow-sm" 
+          : "p-4 hover:border-primary/30 hover:shadow-md cursor-pointer"
+      )}
+      onMouseEnter={() => !isExpanded && setIsExpanded(true)}
+    >
+      {/* Header - Always visible */}
+      <div 
+        className={cn(
+          "flex items-center justify-between transition-all duration-200",
+          isExpanded ? "mb-4" : "mb-0"
+        )}
+        onClick={() => !isExpanded && setIsExpanded(true)}
+      >
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center transition-all duration-300",
+            isExpanded ? "scale-100" : "scale-90"
+          )}>
+            <Plus className={cn(
+              "w-4 h-4 text-primary transition-transform duration-300",
+              isExpanded ? "rotate-0" : "rotate-0"
+            )} />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold">
+              {editingTrade ? 'Edit Trade' : 'New Trade'}
+            </h3>
+            {!isExpanded && (
+              <p className="text-xs text-muted-foreground mt-0.5 animate-fade-in">
+                Hover to expand • Click to add trade
+              </p>
+            )}
+            {isExpanded && (
+              <p className="text-xs text-muted-foreground mt-0.5 animate-fade-in">
+                Log each trade with quick context
+              </p>
+            )}
+          </div>
         </div>
-        <Badge variant="outline" className="border-primary/40 text-muted-foreground text-xs">
-          Journal
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="border-primary/40 text-muted-foreground text-xs">
+            Journal
+          </Badge>
+          <ChevronDown className={cn(
+            "w-4 h-4 text-muted-foreground transition-transform duration-300",
+            isExpanded ? "rotate-180" : "rotate-0"
+          )} />
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Form Content - Collapsible */}
+      <div className={cn(
+        "transition-all duration-300 ease-out",
+        isExpanded 
+          ? "max-h-[1000px] opacity-100" 
+          : "max-h-0 opacity-0 pointer-events-none"
+      )}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="date" className="text-xs text-muted-foreground">Date</Label>
             <Input
@@ -349,7 +422,8 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
             {editingTrade ? 'Update Trade' : 'Add Trade'}
           </Button>
         </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }
