@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -18,12 +18,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useChecklists } from "@/hooks/useChecklists";
+import { supabase } from "@/integrations/supabase/client";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 interface ChecklistItem {
   id: string;
   text: string;
   checked: boolean;
   percentage?: number;
+}
+
+interface ChecklistMetrics {
+  checklistId: string;
+  checklistName: string;
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  totalPnL: number;
+  winRate: number;
 }
 
 export function PlaybookView() {
@@ -36,8 +48,69 @@ export function PlaybookView() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingPercentage, setEditingPercentage] = useState<string>("");
+  const [checklistMetrics, setChecklistMetrics] = useState<ChecklistMetrics[]>([]);
+  const [metricsLoading, setMetricsLoading] = useState(false);
 
   const selectedChecklist = checklists.find(c => c.id === selectedChecklistId) || null;
+  const selectedMetrics = checklistMetrics.find(m => m.checklistId === selectedChecklistId);
+
+  // Fetch metrics for all checklists
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      if (!isAuthenticated || checklists.length === 0) return;
+      
+      setMetricsLoading(true);
+      try {
+        const { data: trades, error } = await supabase
+          .from('trades')
+          .select('checklist_id, result')
+          .not('checklist_id', 'is', null);
+        
+        if (error) throw error;
+
+        const metricsMap = new Map<string, { wins: number; losses: number; totalPnL: number }>();
+        
+        (trades || []).forEach((trade: any) => {
+          const checklistId = trade.checklist_id;
+          if (!checklistId) return;
+          
+          const existing = metricsMap.get(checklistId) || { wins: 0, losses: 0, totalPnL: 0 };
+          const result = Number(trade.result);
+          
+          if (result > 0) {
+            existing.wins++;
+          } else if (result < 0) {
+            existing.losses++;
+          }
+          existing.totalPnL += result;
+          
+          metricsMap.set(checklistId, existing);
+        });
+
+        const metrics: ChecklistMetrics[] = checklists.map(checklist => {
+          const data = metricsMap.get(checklist.id) || { wins: 0, losses: 0, totalPnL: 0 };
+          const total = data.wins + data.losses;
+          return {
+            checklistId: checklist.id,
+            checklistName: checklist.name,
+            totalTrades: total,
+            winningTrades: data.wins,
+            losingTrades: data.losses,
+            totalPnL: data.totalPnL,
+            winRate: total > 0 ? (data.wins / total) * 100 : 0,
+          };
+        });
+
+        setChecklistMetrics(metrics);
+      } catch (error) {
+        console.error('Error fetching checklist metrics:', error);
+      } finally {
+        setMetricsLoading(false);
+      }
+    };
+
+    fetchMetrics();
+  }, [isAuthenticated, checklists]);
 
   const handleCreateChecklist = async () => {
     if (!newChecklistName.trim()) return;
@@ -269,30 +342,34 @@ export function PlaybookView() {
         </DropdownMenu>
       )}
 
-      {/* Selected Checklist Display */}
-      {checklists.length === 0 ? (
-        <div className="glass rounded-xl p-12 text-center">
-          <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Checklists Yet</h3>
-          <p className="text-sm text-muted-foreground">
-            Create your first trading checklist to get started
-          </p>
-        </div>
-      ) : !selectedChecklist ? (
-        <div className="glass rounded-xl p-12 text-center">
-          <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Select a Checklist</h3>
-          <p className="text-sm text-muted-foreground">
-            Choose a checklist from the dropdown above
-          </p>
-        </div>
-      ) : (
-        <div 
-          className={cn(
-            "glass rounded-xl transition-all duration-300",
-            getCompletionPercentage(selectedChecklist.items) === 100 && selectedChecklist.items.length > 0
-              && "bg-primary/5"
-          )}
+      {/* Main Content Layout */}
+      <div className="flex gap-6">
+        {/* Left Side - Checklist */}
+        <div className="flex-1">
+          {/* Selected Checklist Display */}
+          {checklists.length === 0 ? (
+            <div className="glass rounded-xl p-12 text-center">
+              <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Checklists Yet</h3>
+              <p className="text-sm text-muted-foreground">
+                Create your first trading checklist to get started
+              </p>
+            </div>
+          ) : !selectedChecklist ? (
+            <div className="glass rounded-xl p-12 text-center">
+              <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Select a Checklist</h3>
+              <p className="text-sm text-muted-foreground">
+                Choose a checklist from the dropdown above
+              </p>
+            </div>
+          ) : (
+            <div 
+              className={cn(
+                "glass rounded-xl transition-all duration-300",
+                getCompletionPercentage(selectedChecklist.items) === 100 && selectedChecklist.items.length > 0
+                  && "bg-primary/5"
+              )}
         >
           {/* Checklist Header */}
           <div className="p-4 flex items-center justify-between">
@@ -471,8 +548,113 @@ export function PlaybookView() {
               </Button>
             </div>
           </div>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Right Side - Metrics Panel */}
+        {selectedChecklist && selectedMetrics && (
+          <div className="w-80 flex-shrink-0 space-y-4">
+            {/* Profitability Chart */}
+            <div className="glass rounded-xl p-4 border border-border/40">
+              <div className="flex items-center gap-2 mb-4">
+                <BarChart3 className="w-4 h-4 text-primary" />
+                <h3 className="font-semibold text-sm">Checklist Performance</h3>
+              </div>
+              
+              {selectedMetrics.totalTrades > 0 ? (
+                <>
+                  <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Wins', value: selectedMetrics.winningTrades, color: 'hsl(var(--primary))' },
+                            { name: 'Losses', value: selectedMetrics.losingTrades, color: 'hsl(var(--destructive))' },
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={70}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          <Cell fill="hsl(var(--primary))" />
+                          <Cell fill="hsl(var(--destructive))" />
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'hsl(var(--popover))', 
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                            fontSize: '12px'
+                          }} 
+                        />
+                        <Legend 
+                          verticalAlign="bottom" 
+                          height={36}
+                          formatter={(value) => <span className="text-xs text-foreground">{value}</span>}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div className="bg-muted/30 rounded-lg p-3 text-center">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Total Trades</div>
+                      <div className="text-lg font-bold">{selectedMetrics.totalTrades}</div>
+                    </div>
+                    <div className="bg-muted/30 rounded-lg p-3 text-center">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Win Rate</div>
+                      <div className={cn(
+                        "text-lg font-bold",
+                        selectedMetrics.winRate >= 50 ? "text-primary" : "text-destructive"
+                      )}>
+                        {selectedMetrics.winRate.toFixed(1)}%
+                      </div>
+                    </div>
+                    <div className="bg-primary/10 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <TrendingUp className="w-3 h-3 text-primary" />
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Wins</span>
+                      </div>
+                      <div className="text-lg font-bold text-primary">{selectedMetrics.winningTrades}</div>
+                    </div>
+                    <div className="bg-destructive/10 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <TrendingDown className="w-3 h-3 text-destructive" />
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Losses</span>
+                      </div>
+                      <div className="text-lg font-bold text-destructive">{selectedMetrics.losingTrades}</div>
+                    </div>
+                  </div>
+
+                  {/* Total P&L */}
+                  <div className={cn(
+                    "mt-4 p-4 rounded-lg text-center",
+                    selectedMetrics.totalPnL >= 0 ? "bg-primary/10" : "bg-destructive/10"
+                  )}>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Total P&L</div>
+                    <div className={cn(
+                      "text-2xl font-bold font-mono",
+                      selectedMetrics.totalPnL >= 0 ? "text-primary" : "text-destructive"
+                    )}>
+                      {selectedMetrics.totalPnL >= 0 ? "+" : ""}${selectedMetrics.totalPnL.toFixed(2)}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">No trades linked to this checklist yet</p>
+                  <p className="text-xs mt-1">Select this checklist when journaling trades</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

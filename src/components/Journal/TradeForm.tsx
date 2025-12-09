@@ -6,7 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, ImagePlus, Trash2 } from "lucide-react";
+import { Plus, X, ImagePlus, Trash2, ClipboardList } from "lucide-react";
+import { useChecklists } from "@/hooks/useChecklists";
+
 // Common trading pairs and assets
 const TRADING_PAIRS = [
   // Forex Majors
@@ -110,6 +112,7 @@ interface TradeFormProps {
 }
 
 export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormProps) {
+  const { checklists, isAuthenticated } = useChecklists();
   const [formData, setFormData] = useState({
     date: new Date().toISOString().slice(0, 10),
     pair: '',
@@ -118,6 +121,7 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
     session: '',
     strategy: '',
     notes: '',
+    checklistId: '',
   });
   const [chartImage, setChartImage] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -132,6 +136,7 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
         session: editingTrade.session || '',
         strategy: editingTrade.strategy || '',
         notes: editingTrade.notes || '',
+        checklistId: editingTrade.checklistId || '',
       });
       setChartImage(editingTrade.chartImage);
     }
@@ -159,6 +164,7 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
       strategy: formData.strategy,
       notes: formData.notes,
       chartImage: chartImage,
+      checklistId: formData.checklistId || undefined,
     });
     resetForm();
   };
@@ -172,6 +178,7 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
       session: '',
       strategy: '',
       notes: '',
+      checklistId: '',
     });
     setChartImage(undefined);
   };
@@ -262,6 +269,32 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
               className="bg-muted/50 border-border/50 focus:border-primary/50"
             />
           </div>
+
+          {/* Checklist Selector */}
+          {isAuthenticated && checklists.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="checklist" className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <ClipboardList className="w-3 h-3" />
+                Checklist Used
+              </Label>
+              <Select
+                value={formData.checklistId}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, checklistId: value }))}
+              >
+                <SelectTrigger className="bg-muted/50 border-border/50 focus:border-primary/50">
+                  <SelectValue placeholder="Select checklist..." />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  <SelectItem value="">None</SelectItem>
+                  {checklists.map((checklist) => (
+                    <SelectItem key={checklist.id} value={checklist.id}>
+                      {checklist.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">

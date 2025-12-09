@@ -43,6 +43,7 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         notebook: t.notebook || undefined,
         chartImage: t.chart_image || undefined,
         accountId: t.account_id || undefined,
+        checklistId: (t as any).checklist_id || undefined,
       }));
 
       setTrades(formattedTrades);
@@ -77,6 +78,7 @@ export function useTrades(userId: string | undefined, accountId: string | null =
           notes: tradeData.notes || null,
           notebook: tradeData.notebook || null,
           chart_image: tradeData.chartImage || null,
+          checklist_id: tradeData.checklistId || null,
         })
         .select()
         .single();
@@ -95,6 +97,7 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         notebook: data.notebook || undefined,
         chartImage: data.chart_image || undefined,
         accountId: data.account_id || undefined,
+        checklistId: (data as any).checklist_id || undefined,
       };
 
       setTrades(prev => [newTrade, ...prev]);
@@ -121,6 +124,7 @@ export function useTrades(userId: string | undefined, accountId: string | null =
       if (tradeData.notes !== undefined) updateData.notes = tradeData.notes || null;
       if (tradeData.notebook !== undefined) updateData.notebook = tradeData.notebook || null;
       if (tradeData.chartImage !== undefined) updateData.chart_image = tradeData.chartImage || null;
+      if (tradeData.checklistId !== undefined) updateData.checklist_id = tradeData.checklistId || null;
 
       const { error } = await supabase
         .from('trades')

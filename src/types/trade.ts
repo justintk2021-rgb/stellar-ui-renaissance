@@ -10,6 +10,7 @@ export interface Trade {
   notebook?: string;
   chartImage?: string; // Base64 image of trade chart with entry/TP/SL
   accountId?: string; // Trading account this trade belongs to
+  checklistId?: string; // Checklist used for this trade
 }
 
 export interface DailyStats {
