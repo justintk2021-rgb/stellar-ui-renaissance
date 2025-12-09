@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Trade, DailyStats, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, BarChart3, Clock, Crosshair, Info, MoreVertical, FileText, StickyNote } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,7 +20,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 import { toast } from "sonner";
 
 interface PnLCalendarProps {
@@ -373,18 +373,8 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
 
                 {/* Win Rate */}
                 <div className="p-4 rounded-xl border border-border/30 bg-muted/20">
-                  <div className="flex items-center gap-1 mb-1">
+                  <div className="mb-1">
                     <span className="text-xs text-muted-foreground">Win Rate</span>
-                    <TooltipProvider>
-                      <UITooltip>
-                        <TooltipTrigger>
-                          <Info className="w-3 h-3 text-muted-foreground/50" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-xs">Percentage of winning trades</p>
-                        </TooltipContent>
-                      </UITooltip>
-                    </TooltipProvider>
                   </div>
                   <span className={cn(
                     "text-xl font-bold font-mono",
@@ -396,18 +386,8 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
 
                 {/* Avg Win */}
                 <div className="p-4 rounded-xl border-2 border-primary/40 bg-primary/5">
-                  <div className="flex items-center gap-1 mb-1">
+                  <div className="mb-1">
                     <span className="text-xs text-muted-foreground">Avg Win</span>
-                    <TooltipProvider>
-                      <UITooltip>
-                        <TooltipTrigger>
-                          <Info className="w-3 h-3 text-muted-foreground/50" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-xs">Average winning trade amount</p>
-                        </TooltipContent>
-                      </UITooltip>
-                    </TooltipProvider>
                   </div>
                   <span className="text-xl font-bold font-mono text-primary">
                     ${dayMetrics.avgWin.toFixed(2)}
@@ -416,18 +396,8 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
 
                 {/* Avg Loss */}
                 <div className="p-4 rounded-xl border-2 border-destructive/40 bg-destructive/5">
-                  <div className="flex items-center gap-1 mb-1">
+                  <div className="mb-1">
                     <span className="text-xs text-muted-foreground">Avg Loss</span>
-                    <TooltipProvider>
-                      <UITooltip>
-                        <TooltipTrigger>
-                          <Info className="w-3 h-3 text-muted-foreground/50" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-xs">Average losing trade amount</p>
-                        </TooltipContent>
-                      </UITooltip>
-                    </TooltipProvider>
                   </div>
                   <span className="text-xl font-bold font-mono text-destructive">
                     -${Math.abs(dayMetrics.avgLoss).toFixed(2)}
@@ -439,18 +409,8 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Win Rate Circular Display */}
                 <div className="p-4 rounded-xl border border-border/30 bg-muted/10">
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="mb-3">
                     <span className="text-sm font-medium">Win/Loss Breakdown</span>
-                    <TooltipProvider>
-                      <UITooltip>
-                        <TooltipTrigger>
-                          <Info className="w-4 h-4 text-muted-foreground/50" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-xs">Distribution of wins vs losses</p>
-                        </TooltipContent>
-                      </UITooltip>
-                    </TooltipProvider>
                   </div>
                   <DayCircularProgress 
                     value={dayMetrics.winRate}
@@ -461,18 +421,8 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
 
                 {/* Cumulative P&L Chart */}
                 <div className="p-4 rounded-xl border border-border/30 bg-muted/10">
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="mb-3">
                     <span className="text-sm font-medium">Cumulative P&L</span>
-                    <TooltipProvider>
-                      <UITooltip>
-                        <TooltipTrigger>
-                          <Info className="w-4 h-4 text-muted-foreground/50" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-xs">Running total P&L throughout the day</p>
-                        </TooltipContent>
-                      </UITooltip>
-                    </TooltipProvider>
                   </div>
                   <DayCumulativeChart trades={selectedTrades} />
                 </div>
