@@ -161,6 +161,7 @@ export function NotebookView({
   const [showTableControls, setShowTableControls] = useState(false);
   const [selectedTable, setSelectedTable] = useState<HTMLTableElement | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isImagePreviewClosing, setIsImagePreviewClosing] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const fullscreenEditorRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -1624,10 +1625,29 @@ export function NotebookView({
       {/* Image Preview Modal */}
       {imagePreview && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-200"
-          onClick={() => setImagePreview(null)}
+          className={cn(
+            "fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-md transition-all duration-300",
+            isImagePreviewClosing ? "opacity-0" : "opacity-100"
+          )}
+          onClick={() => {
+            setIsImagePreviewClosing(true);
+            setTimeout(() => {
+              setImagePreview(null);
+              setIsImagePreviewClosing(false);
+            }, 300);
+          }}
         >
-          <div className="relative max-w-[90vw] max-h-[90vh]">
+          <div 
+            className={cn(
+              "relative max-w-[90vw] max-h-[90vh] transition-all duration-300 ease-out",
+              isImagePreviewClosing 
+                ? "scale-90 opacity-0 translate-y-4" 
+                : "scale-100 opacity-100 translate-y-0"
+            )}
+            style={{
+              animation: !isImagePreviewClosing ? 'imageZoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' : undefined
+            }}
+          >
             <img
               src={imagePreview}
               alt="Trade chart preview"
@@ -1637,14 +1657,34 @@ export function NotebookView({
             <Button
               variant="secondary"
               size="icon"
-              className="absolute top-3 right-3 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm"
-              onClick={() => setImagePreview(null)}
+              className="absolute top-3 right-3 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background transition-transform hover:scale-110"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsImagePreviewClosing(true);
+                setTimeout(() => {
+                  setImagePreview(null);
+                  setIsImagePreviewClosing(false);
+                }, 300);
+              }}
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes imageZoomIn {
+          0% {
+            opacity: 0;
+            transform: scale(0.8) translateY(20px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+      `}</style>
     </div>
     </>
   );
