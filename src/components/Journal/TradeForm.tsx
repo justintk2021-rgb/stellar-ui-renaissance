@@ -255,30 +255,29 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
           </div>
 
           {/* Checklist Selector */}
-          {isAuthenticated && checklists.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="checklist" className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <ClipboardList className="w-3 h-3" />
-                Checklist Used
-              </Label>
-              <Select
-                value={formData.checklistId || "none"}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, checklistId: value === "none" ? "" : value }))}
-              >
-                <SelectTrigger className="bg-muted/50 border-border/50 focus:border-primary/50">
-                  <SelectValue placeholder="Select checklist..." />
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  <SelectItem value="none">None</SelectItem>
-                  {checklists.map((checklist) => (
-                    <SelectItem key={checklist.id} value={checklist.id}>
-                      {checklist.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="space-y-2">
+            <Label htmlFor="checklist" className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <ClipboardList className="w-3 h-3" />
+              Checklist Used
+            </Label>
+            <Select
+              value={formData.checklistId || "none"}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, checklistId: value === "none" ? "" : value }))}
+              disabled={!isAuthenticated || checklists.length === 0}
+            >
+              <SelectTrigger className="bg-muted/50 border-border/50 focus:border-primary/50">
+                <SelectValue placeholder={!isAuthenticated ? "Login required" : checklists.length === 0 ? "No checklists" : "Select checklist..."} />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="none">None</SelectItem>
+                {checklists.map((checklist) => (
+                  <SelectItem key={checklist.id} value={checklist.id}>
+                    {checklist.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="space-y-2">
