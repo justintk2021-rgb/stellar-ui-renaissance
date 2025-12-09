@@ -558,103 +558,155 @@ export function PlaybookView() {
 
         {/* Right Side - Metrics Panel */}
         {selectedChecklist && selectedMetrics && (
-          <div className="w-80 flex-shrink-0 space-y-4">
+          <div className="w-80 flex-shrink-0 space-y-4 animate-fade-in">
             {/* Profitability Chart */}
-            <div className="glass rounded-xl p-4 border border-border/40">
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart3 className="w-4 h-4 text-primary" />
-                <h3 className="font-semibold text-sm">Checklist Performance</h3>
-              </div>
+            <div className="glass rounded-xl p-5 border border-border/40 relative overflow-hidden group hover:border-primary/30 transition-all duration-300 hover:shadow-glow-sm">
+              {/* Animated background gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               
-              {selectedMetrics.totalTrades > 0 ? (
-                <>
-                  <div className="h-48">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: 'Wins', value: selectedMetrics.winningTrades, color: 'hsl(var(--primary))' },
-                            { name: 'Losses', value: selectedMetrics.losingTrades, color: 'hsl(var(--destructive))' },
-                          ]}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={70}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          <Cell fill="hsl(var(--primary))" />
-                          <Cell fill="hsl(var(--destructive))" />
-                        </Pie>
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--popover))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                            fontSize: '12px'
-                          }} 
-                        />
-                        <Legend 
-                          verticalAlign="bottom" 
-                          height={36}
-                          formatter={(value) => <span className="text-xs text-foreground">{value}</span>}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                    <BarChart3 className="w-4 h-4 text-primary animate-pulse" />
                   </div>
-
-                  {/* Stats Grid */}
-                  <div className="grid grid-cols-2 gap-3 mt-4">
-                    <div className="bg-muted/30 rounded-lg p-3 text-center">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Total Trades</div>
-                      <div className="text-lg font-bold">{selectedMetrics.totalTrades}</div>
-                    </div>
-                    <div className="bg-muted/30 rounded-lg p-3 text-center">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Win Rate</div>
-                      <div className={cn(
-                        "text-lg font-bold",
-                        selectedMetrics.winRate >= 50 ? "text-primary" : "text-destructive"
-                      )}>
-                        {selectedMetrics.winRate.toFixed(1)}%
-                      </div>
-                    </div>
-                    <div className="bg-primary/10 rounded-lg p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <TrendingUp className="w-3 h-3 text-primary" />
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Wins</span>
-                      </div>
-                      <div className="text-lg font-bold text-primary">{selectedMetrics.winningTrades}</div>
-                    </div>
-                    <div className="bg-destructive/10 rounded-lg p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <TrendingDown className="w-3 h-3 text-destructive" />
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Losses</span>
-                      </div>
-                      <div className="text-lg font-bold text-destructive">{selectedMetrics.losingTrades}</div>
-                    </div>
+                  <div>
+                    <h3 className="font-semibold text-sm">Checklist Performance</h3>
+                    <p className="text-[10px] text-muted-foreground">{selectedChecklist.name}</p>
                   </div>
-
-                  {/* Total P&L */}
-                  <div className={cn(
-                    "mt-4 p-4 rounded-lg text-center",
-                    selectedMetrics.totalPnL >= 0 ? "bg-primary/10" : "bg-destructive/10"
-                  )}>
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Total P&L</div>
-                    <div className={cn(
-                      "text-2xl font-bold font-mono",
-                      selectedMetrics.totalPnL >= 0 ? "text-primary" : "text-destructive"
-                    )}>
-                      {selectedMetrics.totalPnL >= 0 ? "+" : ""}${selectedMetrics.totalPnL.toFixed(2)}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                  <p className="text-sm">No trades linked to this checklist yet</p>
-                  <p className="text-xs mt-1">Select this checklist when journaling trades</p>
                 </div>
-              )}
+                
+                {selectedMetrics.totalTrades > 0 ? (
+                  <>
+                    <div className="h-52 relative">
+                      {/* Glow effect behind chart */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className={cn(
+                          "w-24 h-24 rounded-full blur-2xl opacity-30 transition-all duration-1000",
+                          selectedMetrics.winRate >= 50 ? "bg-primary" : "bg-destructive"
+                        )} />
+                      </div>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: 'Wins', value: selectedMetrics.winningTrades, color: 'hsl(var(--primary))' },
+                              { name: 'Losses', value: selectedMetrics.losingTrades, color: 'hsl(var(--destructive))' },
+                            ]}
+                            cx="50%"
+                            cy="45%"
+                            innerRadius={45}
+                            outerRadius={75}
+                            paddingAngle={4}
+                            dataKey="value"
+                            animationBegin={0}
+                            animationDuration={800}
+                            animationEasing="ease-out"
+                          >
+                            <Cell fill="hsl(var(--primary))" className="drop-shadow-lg" />
+                            <Cell fill="hsl(var(--destructive))" className="drop-shadow-lg" />
+                          </Pie>
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--popover))', 
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '12px',
+                              fontSize: '12px',
+                              boxShadow: '0 10px 40px -10px hsl(var(--primary) / 0.3)'
+                            }} 
+                          />
+                          <Legend 
+                            verticalAlign="bottom" 
+                            height={36}
+                            formatter={(value) => <span className="text-xs text-foreground font-medium">{value}</span>}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      {/* Center text */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-18px' }}>
+                        <div className="text-center">
+                          <div className={cn(
+                            "text-2xl font-bold transition-all duration-500",
+                            selectedMetrics.winRate >= 50 ? "text-primary" : "text-destructive"
+                          )}>
+                            {selectedMetrics.winRate.toFixed(0)}%
+                          </div>
+                          <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Win Rate</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stats Grid with staggered animation */}
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                      <div className="bg-muted/30 rounded-xl p-3 text-center hover:bg-muted/50 transition-all duration-300 hover:scale-105 cursor-default animate-fade-in" style={{ animationDelay: '100ms' }}>
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Total Trades</div>
+                        <div className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                          {selectedMetrics.totalTrades}
+                        </div>
+                      </div>
+                      <div className="bg-muted/30 rounded-xl p-3 text-center hover:bg-muted/50 transition-all duration-300 hover:scale-105 cursor-default animate-fade-in" style={{ animationDelay: '150ms' }}>
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Win Rate</div>
+                        <div className={cn(
+                          "text-xl font-bold",
+                          selectedMetrics.winRate >= 50 ? "text-primary" : "text-destructive"
+                        )}>
+                          {selectedMetrics.winRate.toFixed(1)}%
+                        </div>
+                      </div>
+                      <div className="bg-primary/10 rounded-xl p-3 text-center hover:bg-primary/20 transition-all duration-300 hover:scale-105 cursor-default group/stat animate-fade-in" style={{ animationDelay: '200ms' }}>
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <TrendingUp className="w-3 h-3 text-primary group-hover/stat:animate-bounce" />
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Wins</span>
+                        </div>
+                        <div className="text-xl font-bold text-primary">{selectedMetrics.winningTrades}</div>
+                      </div>
+                      <div className="bg-destructive/10 rounded-xl p-3 text-center hover:bg-destructive/20 transition-all duration-300 hover:scale-105 cursor-default group/stat animate-fade-in" style={{ animationDelay: '250ms' }}>
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <TrendingDown className="w-3 h-3 text-destructive group-hover/stat:animate-bounce" />
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Losses</span>
+                        </div>
+                        <div className="text-xl font-bold text-destructive">{selectedMetrics.losingTrades}</div>
+                      </div>
+                    </div>
+
+                    {/* Total P&L with enhanced styling */}
+                    <div className={cn(
+                      "mt-4 p-4 rounded-xl text-center relative overflow-hidden group/pnl transition-all duration-300 hover:scale-[1.02] animate-fade-in",
+                      selectedMetrics.totalPnL >= 0 
+                        ? "bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5" 
+                        : "bg-gradient-to-br from-destructive/20 via-destructive/10 to-destructive/5"
+                    )} style={{ animationDelay: '300ms' }}>
+                      {/* Shimmer effect */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover/pnl:translate-x-[100%] transition-transform duration-700" />
+                      
+                      <div className="relative z-10">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Total P&L</div>
+                        <div className={cn(
+                          "text-3xl font-bold font-mono tracking-tight transition-all duration-300",
+                          selectedMetrics.totalPnL >= 0 ? "text-primary" : "text-destructive"
+                        )}>
+                          {selectedMetrics.totalPnL >= 0 ? "+" : ""}${selectedMetrics.totalPnL.toFixed(2)}
+                        </div>
+                        <div className={cn(
+                          "mt-2 text-xs font-medium",
+                          selectedMetrics.totalPnL >= 0 ? "text-primary/70" : "text-destructive/70"
+                        )}>
+                          {selectedMetrics.totalPnL >= 0 ? "📈 Profitable" : "📉 In drawdown"}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-10 animate-fade-in">
+                    <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto mb-4">
+                      <BarChart3 className="w-8 h-8 text-muted-foreground/50" />
+                    </div>
+                    <p className="text-sm font-medium text-muted-foreground">No trades linked yet</p>
+                    <p className="text-xs text-muted-foreground/70 mt-1 max-w-[200px] mx-auto">
+                      Select this checklist when journaling trades to track performance
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
