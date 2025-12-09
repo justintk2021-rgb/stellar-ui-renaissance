@@ -4,7 +4,8 @@ import { TrendingUp, TrendingDown, Info } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
 import { useEffect, useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts";
+import { motion } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -228,16 +229,32 @@ export function StatsGrid({ trades }: StatsGridProps) {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const isPositive = data.value >= 0;
       return (
-        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-          <p className="text-xs text-muted-foreground">{data.formattedDate}</p>
-          <p className={cn(
-            "text-sm font-bold",
-            data.value >= 0 ? "text-primary" : "text-destructive"
-          )}>
-            ${data.value.toFixed(2)}
-          </p>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, y: 5, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          className={cn(
+            "backdrop-blur-xl border rounded-xl px-4 py-3 shadow-2xl",
+            isPositive 
+              ? "bg-primary/10 border-primary/30" 
+              : "bg-destructive/10 border-destructive/30"
+          )}
+        >
+          <p className="text-xs text-muted-foreground font-medium mb-1">{data.formattedDate}</p>
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "w-2 h-2 rounded-full",
+              isPositive ? "bg-primary" : "bg-destructive"
+            )} />
+            <p className={cn(
+              "text-lg font-bold font-mono",
+              isPositive ? "text-primary" : "text-destructive"
+            )}>
+              {isPositive ? '+' : ''}${data.value.toFixed(2)}
+            </p>
+          </div>
+        </motion.div>
       );
     }
     return null;
@@ -355,30 +372,64 @@ export function StatsGrid({ trades }: StatsGridProps) {
         </div>
 
         {/* Right Column - P&L Chart */}
-        <div className="lg:col-span-2 glass rounded-xl p-5 border border-border/40">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="lg:col-span-2 glass rounded-2xl p-6 border border-border/40 shadow-lg"
+        >
           <Tabs defaultValue="cumulative" className="w-full">
-            <div className="flex items-center justify-between mb-4">
-              <TabsList className="bg-muted/50">
-                <TabsTrigger value="cumulative" className="text-xs">
-                  Daily Net Cumulative P&L
+            <div className="flex items-center justify-between mb-6">
+              <TabsList className="bg-muted/30 p-1 rounded-xl border border-border/30">
+                <TabsTrigger 
+                  value="cumulative" 
+                  className="text-xs font-medium px-4 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
+                >
+                  Cumulative P&L
                 </TabsTrigger>
-                <TabsTrigger value="daily" className="text-xs">
-                  Net Daily P&L
+                <TabsTrigger 
+                  value="daily" 
+                  className="text-xs font-medium px-4 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
+                >
+                  Daily P&L
                 </TabsTrigger>
               </TabsList>
               <InfoTooltip content="Track your profit and loss over time" />
             </div>
             
             <TabsContent value="cumulative" className="mt-0">
-              <div className="h-[280px]">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="h-[300px] rounded-xl bg-gradient-to-b from-muted/20 to-transparent p-2"
+              >
                 {chartData.cumulative.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.cumulative}>
+                    <BarChart 
+                      data={chartData.cumulative} 
+                      margin={{ top: 20, right: 20, left: 0, bottom: 10 }}
+                      barCategoryGap="20%"
+                    >
+                      <defs>
+                        <linearGradient id="barGradientPositive" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={1}/>
+                          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.6}/>
+                        </linearGradient>
+                        <linearGradient id="barGradientNegative" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.6}/>
+                          <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={1}/>
+                        </linearGradient>
+                        <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
+                          <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3"/>
+                        </filter>
+                      </defs>
                       <XAxis 
                         dataKey="formattedDate" 
                         tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                         tickLine={false}
                         axisLine={false}
+                        dy={10}
                       />
                       <YAxis 
                         tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
@@ -387,35 +438,67 @@ export function StatsGrid({ trades }: StatsGridProps) {
                         axisLine={false}
                         width={70}
                       />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                      <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="3 3" />
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted)/0.3)', radius: 8 }} />
+                      <Bar 
+                        dataKey="value" 
+                        radius={[6, 6, 0, 0]}
+                        animationBegin={0}
+                        animationDuration={800}
+                        animationEasing="ease-out"
+                        filter="url(#barShadow)"
+                      >
                         {chartData.cumulative.map((entry, index) => (
                           <Cell 
                             key={`cell-${index}`} 
-                            fill={entry.value >= 0 ? 'hsl(var(--primary))' : 'hsl(var(--destructive))'} 
+                            fill={entry.value >= 0 ? 'url(#barGradientPositive)' : 'url(#barGradientNegative)'} 
+                            className="transition-all duration-200 hover:opacity-80"
                           />
                         ))}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">
-                    No trade data to display
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+                    <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center">
+                      <TrendingUp className="w-6 h-6 opacity-50" />
+                    </div>
+                    <p className="text-sm">No trade data to display</p>
                   </div>
                 )}
-              </div>
+              </motion.div>
             </TabsContent>
             
             <TabsContent value="daily" className="mt-0">
-              <div className="h-[280px]">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="h-[300px] rounded-xl bg-gradient-to-b from-muted/20 to-transparent p-2"
+              >
                 {chartData.daily.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.daily}>
+                    <BarChart 
+                      data={chartData.daily}
+                      margin={{ top: 20, right: 20, left: 0, bottom: 10 }}
+                      barCategoryGap="20%"
+                    >
+                      <defs>
+                        <linearGradient id="dailyBarPositive" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={1}/>
+                          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.6}/>
+                        </linearGradient>
+                        <linearGradient id="dailyBarNegative" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.6}/>
+                          <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={1}/>
+                        </linearGradient>
+                      </defs>
                       <XAxis 
                         dataKey="formattedDate" 
                         tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                         tickLine={false}
                         axisLine={false}
+                        dy={10}
                       />
                       <YAxis 
                         tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
@@ -424,26 +507,38 @@ export function StatsGrid({ trades }: StatsGridProps) {
                         axisLine={false}
                         width={70}
                       />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                      <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="3 3" />
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted)/0.3)', radius: 8 }} />
+                      <Bar 
+                        dataKey="value" 
+                        radius={[6, 6, 0, 0]}
+                        animationBegin={0}
+                        animationDuration={800}
+                        animationEasing="ease-out"
+                        filter="url(#barShadow)"
+                      >
                         {chartData.daily.map((entry, index) => (
                           <Cell 
                             key={`cell-${index}`} 
-                            fill={entry.value >= 0 ? 'hsl(var(--primary))' : 'hsl(var(--destructive))'} 
+                            fill={entry.value >= 0 ? 'url(#dailyBarPositive)' : 'url(#dailyBarNegative)'} 
+                            className="transition-all duration-200 hover:opacity-80"
                           />
                         ))}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">
-                    No trade data to display
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+                    <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center">
+                      <TrendingUp className="w-6 h-6 opacity-50" />
+                    </div>
+                    <p className="text-sm">No trade data to display</p>
                   </div>
                 )}
-              </div>
+              </motion.div>
             </TabsContent>
           </Tabs>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
