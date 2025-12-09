@@ -4,7 +4,7 @@ import { TrendingUp, TrendingDown, Info } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
 import { useEffect, useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { motion } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -406,23 +406,20 @@ export function StatsGrid({ trades }: StatsGridProps) {
               >
                 {chartData.cumulative.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart 
+                    <AreaChart 
                       data={chartData.cumulative} 
                       margin={{ top: 20, right: 20, left: 0, bottom: 10 }}
-                      barCategoryGap="20%"
                     >
                       <defs>
-                        <linearGradient id="barGradientPositive" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={1}/>
-                          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.6}/>
+                        <linearGradient id="areaGradientCumulative" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/>
+                          <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity={0.15}/>
+                          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
                         </linearGradient>
-                        <linearGradient id="barGradientNegative" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.6}/>
-                          <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={1}/>
+                        <linearGradient id="lineGradientCumulative" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
+                          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={1}/>
                         </linearGradient>
-                        <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
-                          <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3"/>
-                        </filter>
                       </defs>
                       <XAxis 
                         dataKey="formattedDate" 
@@ -439,25 +436,30 @@ export function StatsGrid({ trades }: StatsGridProps) {
                         width={70}
                       />
                       <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted)/0.3)', radius: 8 }} />
-                      <Bar 
+                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                      <Area 
+                        type="monotone"
                         dataKey="value" 
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={24}
+                        stroke="url(#lineGradientCumulative)"
+                        strokeWidth={2.5}
+                        fill="url(#areaGradientCumulative)"
                         animationBegin={0}
-                        animationDuration={800}
+                        animationDuration={1000}
                         animationEasing="ease-out"
-                        filter="url(#barShadow)"
-                      >
-                        {chartData.cumulative.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={entry.value >= 0 ? 'url(#barGradientPositive)' : 'url(#barGradientNegative)'} 
-                            className="transition-all duration-200 hover:opacity-80"
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
+                        dot={{
+                          r: 4,
+                          fill: "hsl(var(--background))",
+                          stroke: "hsl(var(--primary))",
+                          strokeWidth: 2,
+                        }}
+                        activeDot={{
+                          r: 6,
+                          fill: "hsl(var(--primary))",
+                          stroke: "hsl(var(--background))",
+                          strokeWidth: 2,
+                        }}
+                      />
+                    </AreaChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
@@ -479,19 +481,19 @@ export function StatsGrid({ trades }: StatsGridProps) {
               >
                 {chartData.daily.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart 
+                    <AreaChart 
                       data={chartData.daily}
                       margin={{ top: 20, right: 20, left: 0, bottom: 10 }}
-                      barCategoryGap="20%"
                     >
                       <defs>
-                        <linearGradient id="dailyBarPositive" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={1}/>
-                          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.6}/>
+                        <linearGradient id="areaGradientDaily" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/>
+                          <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity={0.15}/>
+                          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
                         </linearGradient>
-                        <linearGradient id="dailyBarNegative" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.6}/>
-                          <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={1}/>
+                        <linearGradient id="lineGradientDaily" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
+                          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={1}/>
                         </linearGradient>
                       </defs>
                       <XAxis 
@@ -509,25 +511,30 @@ export function StatsGrid({ trades }: StatsGridProps) {
                         width={70}
                       />
                       <ReferenceLine y={0} stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted)/0.3)', radius: 8 }} />
-                      <Bar 
+                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                      <Area 
+                        type="monotone"
                         dataKey="value" 
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={24}
+                        stroke="url(#lineGradientDaily)"
+                        strokeWidth={2.5}
+                        fill="url(#areaGradientDaily)"
                         animationBegin={0}
-                        animationDuration={800}
+                        animationDuration={1000}
                         animationEasing="ease-out"
-                        filter="url(#barShadow)"
-                      >
-                        {chartData.daily.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={entry.value >= 0 ? 'url(#dailyBarPositive)' : 'url(#dailyBarNegative)'} 
-                            className="transition-all duration-200 hover:opacity-80"
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
+                        dot={{
+                          r: 4,
+                          fill: "hsl(var(--background))",
+                          stroke: "hsl(var(--primary))",
+                          strokeWidth: 2,
+                        }}
+                        activeDot={{
+                          r: 6,
+                          fill: "hsl(var(--primary))",
+                          stroke: "hsl(var(--background))",
+                          strokeWidth: 2,
+                        }}
+                      />
+                    </AreaChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
