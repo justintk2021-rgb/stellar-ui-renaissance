@@ -594,16 +594,18 @@ export function PlaybookView() {
                             ]}
                             cx="50%"
                             cy="45%"
-                            innerRadius={45}
-                            outerRadius={75}
-                            paddingAngle={4}
+                            innerRadius={60}
+                            outerRadius={72}
+                            paddingAngle={6}
                             dataKey="value"
                             animationBegin={0}
                             animationDuration={800}
                             animationEasing="ease-out"
+                            strokeWidth={0}
+                            cornerRadius={8}
                           >
-                            <Cell fill="hsl(var(--primary))" className="drop-shadow-lg" />
-                            <Cell fill="hsl(var(--destructive))" className="drop-shadow-lg" />
+                            <Cell fill="hsl(var(--primary))" />
+                            <Cell fill="hsl(var(--destructive))" />
                           </Pie>
                           <Legend 
                             verticalAlign="bottom" 
