@@ -637,7 +637,7 @@ export function PlaybookView() {
                         </PieChart>
                       </ResponsiveContainer>
                       {/* Center text */}
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-18px' }}>
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ bottom: '40px', top: '0' }}>
                         <div className="text-center">
                           <div className={cn(
                             "text-2xl font-bold transition-all duration-500",
