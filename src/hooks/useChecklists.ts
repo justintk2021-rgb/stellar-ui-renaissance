@@ -7,6 +7,7 @@ interface ChecklistItem {
   id: string;
   text: string;
   checked: boolean;
+  percentage?: number; // Custom percentage weight (defaults to equal distribution)
 }
 
 interface Checklist {
