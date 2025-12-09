@@ -116,23 +116,24 @@ export function TradeTable({ trades, onEdit, onDelete, onSelectForNotebook, onCl
                     >
                       <Pencil className="w-3 h-3" />
                     </Button>
-                    <ConfirmDialog
-                      trigger={
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-7 h-7 rounded-full border-border/50 hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      }
-                      title="Delete Trade"
-                      description="Are you sure you want to delete this trade? This action cannot be undone."
-                      confirmLabel="Delete"
-                      variant="destructive"
-                      onConfirm={() => onDelete(trade.id)}
-                    />
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <ConfirmDialog
+                        trigger={
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="w-7 h-7 rounded-full border-border/50 hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        }
+                        title="Delete Trade"
+                        description="Are you sure you want to delete this trade? This action cannot be undone."
+                        confirmLabel="Delete"
+                        variant="destructive"
+                        onConfirm={() => onDelete(trade.id)}
+                      />
+                    </div>
                   </div>
                 </div>
               );
