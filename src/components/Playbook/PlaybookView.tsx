@@ -426,10 +426,14 @@ export function PlaybookView() {
                   grade = "B";
                   gradeColor = "bg-amber-500/20 text-amber-500 border-amber-500/30";
                   gradeLabel = "B Setup";
-                } else {
+                } else if (percentage >= 60) {
                   grade = "C";
-                  gradeColor = "bg-rose-500/20 text-rose-500 border-rose-500/30";
+                  gradeColor = "bg-orange-500/20 text-orange-500 border-orange-500/30";
                   gradeLabel = "C Setup";
+                } else {
+                  grade = "D";
+                  gradeColor = "bg-rose-500/20 text-rose-500 border-rose-500/30";
+                  gradeLabel = "D Setup";
                 }
                 
                 return (
