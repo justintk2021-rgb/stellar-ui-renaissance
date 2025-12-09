@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useThemeTransition } from "@/hooks/useThemeTransition";
 import { useTrades } from "@/hooks/useTrades";
 import { useTradingAccounts } from "@/hooks/useTradingAccounts";
 import { Sidebar } from "@/components/Layout/Sidebar";
@@ -49,6 +50,7 @@ interface UserProfile {
 
 const Index = () => {
   const navigate = useNavigate();
+  const { setThemeWithTransition } = useThemeTransition();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -370,7 +372,7 @@ const Index = () => {
             <Sun className="w-4 h-4 text-muted-foreground" />
             <Switch
               checked={theme === 'dark'}
-              onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+              onCheckedChange={(checked) => setThemeWithTransition(checked ? 'dark' : 'light', setTheme)}
             />
             <Moon className="w-4 h-4 text-muted-foreground" />
           </div>
@@ -384,7 +386,7 @@ const Index = () => {
             "glass-strong rounded-2xl min-h-[calc(100vh-120px)]",
             isChartPage ? "p-4 lg:min-h-[calc(100vh-100px)]" : "p-5 lg:p-6 lg:min-h-[calc(100vh-60px)]"
           )}>
-            {!isChartPage && <TopBar title={title} subtitle={subtitle} theme={theme} onThemeChange={setTheme} />}
+            {!isChartPage && <TopBar title={title} subtitle={subtitle} theme={theme} onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)} />}
 
             {/* Dashboard Page */}
             {currentPage === 'dashboard' && (
@@ -487,7 +489,7 @@ const Index = () => {
               <div className="max-w-7xl mx-auto">
                 <SettingsView 
                   theme={theme} 
-                  onThemeChange={setTheme}
+                  onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)}
                   accentColor={accentColor}
                   onAccentColorChange={setAccentColor}
                   userProfile={userProfile}
