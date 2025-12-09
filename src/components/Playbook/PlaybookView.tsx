@@ -409,8 +409,44 @@ export function PlaybookView() {
               )}
             </div>
 
-            {/* Percentage Badge & Actions */}
+            {/* Percentage Badge & Grade */}
             <div className="flex items-center gap-3">
+              {/* Grade Badge */}
+              {selectedChecklist.items.length > 0 && (() => {
+                const percentage = getCompletionPercentage(selectedChecklist.items);
+                let grade: string;
+                let gradeColor: string;
+                let gradeLabel: string;
+                
+                if (percentage >= 90) {
+                  grade = "A";
+                  gradeColor = "bg-emerald-500/20 text-emerald-500 border-emerald-500/30";
+                  gradeLabel = "A Setup";
+                } else if (percentage >= 75) {
+                  grade = "B";
+                  gradeColor = "bg-amber-500/20 text-amber-500 border-amber-500/30";
+                  gradeLabel = "B Setup";
+                } else {
+                  grade = "C";
+                  gradeColor = "bg-rose-500/20 text-rose-500 border-rose-500/30";
+                  gradeLabel = "C Setup";
+                }
+                
+                return (
+                  <motion.div
+                    key={grade}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-xs font-bold border",
+                      gradeColor
+                    )}
+                  >
+                    {gradeLabel}
+                  </motion.div>
+                );
+              })()}
+              
               <div className="flex items-center gap-2">
                 <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
                   <div 
