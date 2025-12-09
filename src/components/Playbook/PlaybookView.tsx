@@ -278,8 +278,12 @@ export function PlaybookView() {
             <p className="text-xs text-muted-foreground">Create and manage your trading checklists</p>
           </div>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
+        <Button 
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="group relative overflow-hidden bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary transition-all duration-300 hover:scale-105 hover:shadow-glow-sm active:scale-95"
+        >
+          <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
+          <Plus className="w-4 h-4 mr-2 transition-transform duration-300 group-hover:rotate-90" />
           New Checklist
         </Button>
       </div>
