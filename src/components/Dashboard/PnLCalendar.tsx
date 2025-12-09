@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Trade, DailyStats, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, BarChart3, Clock, Crosshair, LineChart, Info, MoreVertical, FileText, StickyNote } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Target, BarChart3, Clock, Crosshair, Info, MoreVertical, FileText, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,8 +19,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { TradingViewChart } from "./TradingViewChart";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
@@ -46,7 +44,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedTradeForChart, setSelectedTradeForChart] = useState<Trade | null>(null);
+  
   const [noteDialogDate, setNoteDialogDate] = useState<string | null>(null);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
@@ -331,7 +329,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
       </Dialog>
 
       {/* Trade Details Modal */}
-      <Dialog open={!!selectedDate} onOpenChange={() => { setSelectedDate(null); setSelectedTradeForChart(null); }}>
+      <Dialog open={!!selectedDate} onOpenChange={() => setSelectedDate(null)}>
         <DialogContent className="sm:max-w-2xl glass border-border/50 bg-card/95 backdrop-blur-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="pb-4 border-b border-border/30">
             <div className="flex items-center justify-between">
@@ -345,290 +343,236 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
           </DialogHeader>
 
           {dayMetrics && (
-            <Tabs defaultValue="metrics" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-4">
-                <TabsTrigger value="metrics" className="flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4" />
-                  Metrics
-                </TabsTrigger>
-                <TabsTrigger value="chart" className="flex items-center gap-2">
-                  <LineChart className="w-4 h-4" />
-                  Chart Editor
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="metrics" className="space-y-5">
-                {/* Top Metrics Row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {/* NET P&L */}
-                  <div className={cn(
-                    "p-4 rounded-xl border",
-                    dayMetrics.netPnL >= 0 
-                      ? "bg-primary/10 border-primary/30" 
-                      : "bg-destructive/10 border-destructive/30"
-                  )}>
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className="text-xs text-muted-foreground">Net P&L</span>
-                      <TooltipProvider>
-                        <UITooltip>
-                          <TooltipTrigger>
-                            <Info className="w-3 h-3 text-muted-foreground/50" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">Total profit/loss for the day</p>
-                          </TooltipContent>
-                        </UITooltip>
-                      </TooltipProvider>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "text-xl font-bold font-mono",
-                        dayMetrics.netPnL >= 0 ? "text-primary" : "text-destructive"
-                      )}>
-                        {dayMetrics.netPnL >= 0 ? '+' : ''}${dayMetrics.netPnL.toFixed(2)}
-                      </span>
-                      {dayMetrics.netPnL >= 0 ? (
-                        <TrendingUp className="w-4 h-4 text-primary" />
-                      ) : (
-                        <TrendingDown className="w-4 h-4 text-destructive" />
-                      )}
-                    </div>
+            <div className="space-y-5">
+              {/* Top Metrics Row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* NET P&L */}
+                <div className={cn(
+                  "p-4 rounded-xl border",
+                  dayMetrics.netPnL >= 0 
+                    ? "bg-primary/10 border-primary/30" 
+                    : "bg-destructive/10 border-destructive/30"
+                )}>
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="text-xs text-muted-foreground">Net P&L</span>
+                    <TooltipProvider>
+                      <UITooltip>
+                        <TooltipTrigger>
+                          <Info className="w-3 h-3 text-muted-foreground/50" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">Total profit/loss for the day</p>
+                        </TooltipContent>
+                      </UITooltip>
+                    </TooltipProvider>
                   </div>
-
-                  {/* Win Rate */}
-                  <div className="p-4 rounded-xl border border-border/30 bg-muted/20">
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className="text-xs text-muted-foreground">Win Rate</span>
-                      <TooltipProvider>
-                        <UITooltip>
-                          <TooltipTrigger>
-                            <Info className="w-3 h-3 text-muted-foreground/50" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">Percentage of winning trades</p>
-                          </TooltipContent>
-                        </UITooltip>
-                      </TooltipProvider>
-                    </div>
+                  <div className="flex items-center gap-2">
                     <span className={cn(
                       "text-xl font-bold font-mono",
-                      dayMetrics.winRate >= 50 ? "text-primary" : "text-destructive"
+                      dayMetrics.netPnL >= 0 ? "text-primary" : "text-destructive"
                     )}>
-                      {dayMetrics.winRate.toFixed(1)}%
+                      {dayMetrics.netPnL >= 0 ? '+' : ''}${dayMetrics.netPnL.toFixed(2)}
                     </span>
-                  </div>
-
-                  {/* Avg Win */}
-                  <div className="p-4 rounded-xl border-2 border-primary/40 bg-primary/5">
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className="text-xs text-muted-foreground">Avg Win</span>
-                      <TooltipProvider>
-                        <UITooltip>
-                          <TooltipTrigger>
-                            <Info className="w-3 h-3 text-muted-foreground/50" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">Average winning trade amount</p>
-                          </TooltipContent>
-                        </UITooltip>
-                      </TooltipProvider>
-                    </div>
-                    <span className="text-xl font-bold font-mono text-primary">
-                      ${dayMetrics.avgWin.toFixed(2)}
-                    </span>
-                  </div>
-
-                  {/* Avg Loss */}
-                  <div className="p-4 rounded-xl border-2 border-destructive/40 bg-destructive/5">
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className="text-xs text-muted-foreground">Avg Loss</span>
-                      <TooltipProvider>
-                        <UITooltip>
-                          <TooltipTrigger>
-                            <Info className="w-3 h-3 text-muted-foreground/50" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">Average losing trade amount</p>
-                          </TooltipContent>
-                        </UITooltip>
-                      </TooltipProvider>
-                    </div>
-                    <span className="text-xl font-bold font-mono text-destructive">
-                      -${Math.abs(dayMetrics.avgLoss).toFixed(2)}
-                    </span>
+                    {dayMetrics.netPnL >= 0 ? (
+                      <TrendingUp className="w-4 h-4 text-primary" />
+                    ) : (
+                      <TrendingDown className="w-4 h-4 text-destructive" />
+                    )}
                   </div>
                 </div>
 
-                {/* Main Content - Win Rate Circle + Chart */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Win Rate Circular Display */}
-                  <div className="p-4 rounded-xl border border-border/30 bg-muted/10">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium">Win/Loss Breakdown</span>
-                      <TooltipProvider>
-                        <UITooltip>
-                          <TooltipTrigger>
-                            <Info className="w-4 h-4 text-muted-foreground/50" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">Distribution of wins vs losses</p>
-                          </TooltipContent>
-                        </UITooltip>
-                      </TooltipProvider>
-                    </div>
-                    <DayCircularProgress 
-                      value={dayMetrics.winRate}
-                      winners={dayMetrics.wins}
-                      losers={dayMetrics.losses}
-                    />
+                {/* Win Rate */}
+                <div className="p-4 rounded-xl border border-border/30 bg-muted/20">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="text-xs text-muted-foreground">Win Rate</span>
+                    <TooltipProvider>
+                      <UITooltip>
+                        <TooltipTrigger>
+                          <Info className="w-3 h-3 text-muted-foreground/50" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">Percentage of winning trades</p>
+                        </TooltipContent>
+                      </UITooltip>
+                    </TooltipProvider>
                   </div>
+                  <span className={cn(
+                    "text-xl font-bold font-mono",
+                    dayMetrics.winRate >= 50 ? "text-primary" : "text-destructive"
+                  )}>
+                    {dayMetrics.winRate.toFixed(1)}%
+                  </span>
+                </div>
 
-                  {/* Cumulative P&L Chart */}
-                  <div className="p-4 rounded-xl border border-border/30 bg-muted/10">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium">Cumulative P&L</span>
-                      <TooltipProvider>
-                        <UITooltip>
-                          <TooltipTrigger>
-                            <Info className="w-4 h-4 text-muted-foreground/50" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">Running total P&L throughout the day</p>
-                          </TooltipContent>
-                        </UITooltip>
-                      </TooltipProvider>
-                    </div>
-                    <DayCumulativeChart trades={selectedTrades} />
+                {/* Avg Win */}
+                <div className="p-4 rounded-xl border-2 border-primary/40 bg-primary/5">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="text-xs text-muted-foreground">Avg Win</span>
+                    <TooltipProvider>
+                      <UITooltip>
+                        <TooltipTrigger>
+                          <Info className="w-3 h-3 text-muted-foreground/50" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">Average winning trade amount</p>
+                        </TooltipContent>
+                      </UITooltip>
+                    </TooltipProvider>
                   </div>
+                  <span className="text-xl font-bold font-mono text-primary">
+                    ${dayMetrics.avgWin.toFixed(2)}
+                  </span>
                 </div>
 
-                {/* Metrics Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <MetricRow icon={BarChart3} label="Total Trades" value={dayMetrics.totalTrades.toString()} />
-                  <MetricRow label="Wins" value={dayMetrics.wins.toString()} isPositive />
-                  <MetricRow label="Losses" value={dayMetrics.losses.toString()} isNegative />
-                  <MetricRow label="Breakeven" value={dayMetrics.breakeven.toString()} />
-                  <MetricRow label="Gross Profit" value={`$${dayMetrics.grossProfit.toFixed(2)}`} isPositive />
-                  <MetricRow label="Gross Loss" value={`$${Math.abs(dayMetrics.grossLoss).toFixed(2)}`} isNegative />
-                </div>
-
-                {/* Tags Section */}
-                <div className="space-y-3">
-                  {dayMetrics.pairs.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-muted-foreground">Pairs:</span>
-                      {dayMetrics.pairs.map((pair) => (
-                        <Badge key={pair} variant="outline" className="text-xs border-secondary/50 bg-secondary/10">
-                          {pair}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                  {dayMetrics.sessions.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Clock className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">Sessions:</span>
-                      {dayMetrics.sessions.map((session) => (
-                        <Badge key={session} variant="outline" className="text-xs border-border/50">
-                          {session}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Individual Trades */}
-                <div className="space-y-2">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Trade Details</span>
-                  <div className="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
-                    {selectedTrades.map((trade) => {
-                      const tradeChecklist = trade.checklistId 
-                        ? checklists.find(c => c.id === trade.checklistId) 
-                        : null;
-                      
-                      return (
-                        <div 
-                          key={trade.id}
-                          className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-2"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <Badge 
-                                variant="outline" 
-                                className={cn(
-                                  "text-[10px]",
-                                  trade.direction === 'Long' 
-                                    ? "border-primary/50 text-primary" 
-                                    : "border-destructive/50 text-destructive"
-                                )}
-                              >
-                                {trade.direction}
-                              </Badge>
-                              <span className="text-sm font-medium">{trade.pair}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className={cn(
-                                "text-sm font-bold font-mono",
-                                trade.result >= 0 ? "text-primary" : "text-destructive"
-                              )}>
-                                {trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setSelectedTradeForChart(trade)}
-                                className="h-7 px-2 text-xs"
-                              >
-                                <LineChart className="w-3 h-3 mr-1" />
-                                Chart
-                              </Button>
-                            </div>
-                          </div>
-                          {tradeChecklist && (
-                            <div className="flex items-center gap-2 pt-1 border-t border-border/20">
-                              <span className="text-[10px] text-muted-foreground">Checklist:</span>
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary">
-                                {tradeChecklist.name}
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                {/* Avg Loss */}
+                <div className="p-4 rounded-xl border-2 border-destructive/40 bg-destructive/5">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="text-xs text-muted-foreground">Avg Loss</span>
+                    <TooltipProvider>
+                      <UITooltip>
+                        <TooltipTrigger>
+                          <Info className="w-3 h-3 text-muted-foreground/50" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">Average losing trade amount</p>
+                        </TooltipContent>
+                      </UITooltip>
+                    </TooltipProvider>
                   </div>
+                  <span className="text-xl font-bold font-mono text-destructive">
+                    -${Math.abs(dayMetrics.avgLoss).toFixed(2)}
+                  </span>
                 </div>
-              </TabsContent>
+              </div>
 
-              <TabsContent value="chart" className="space-y-4">
-                {selectedTradeForChart ? (
-                  <TradingViewChart
-                    pair={selectedTradeForChart.pair}
-                    direction={selectedTradeForChart.direction}
-                    existingImage={selectedTradeForChart.chartImage}
-                    onSaveImage={(imageDataUrl) => {
-                      if (onUpdateTrade) {
-                        onUpdateTrade(selectedTradeForChart.id, { chartImage: imageDataUrl });
-                      }
-                    }}
+              {/* Main Content - Win Rate Circle + Chart */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Win Rate Circular Display */}
+                <div className="p-4 rounded-xl border border-border/30 bg-muted/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium">Win/Loss Breakdown</span>
+                    <TooltipProvider>
+                      <UITooltip>
+                        <TooltipTrigger>
+                          <Info className="w-4 h-4 text-muted-foreground/50" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">Distribution of wins vs losses</p>
+                        </TooltipContent>
+                      </UITooltip>
+                    </TooltipProvider>
+                  </div>
+                  <DayCircularProgress 
+                    value={dayMetrics.winRate}
+                    winners={dayMetrics.wins}
+                    losers={dayMetrics.losses}
                   />
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <LineChart className="w-12 h-12 text-muted-foreground/50 mb-4" />
-                    <p className="text-sm text-muted-foreground">
-                      Select a trade from the Metrics tab to view chart
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-4"
-                      onClick={() => selectedTrades.length > 0 && setSelectedTradeForChart(selectedTrades[0])}
-                    >
-                      Select First Trade
-                    </Button>
+                </div>
+
+                {/* Cumulative P&L Chart */}
+                <div className="p-4 rounded-xl border border-border/30 bg-muted/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium">Cumulative P&L</span>
+                    <TooltipProvider>
+                      <UITooltip>
+                        <TooltipTrigger>
+                          <Info className="w-4 h-4 text-muted-foreground/50" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">Running total P&L throughout the day</p>
+                        </TooltipContent>
+                      </UITooltip>
+                    </TooltipProvider>
+                  </div>
+                  <DayCumulativeChart trades={selectedTrades} />
+                </div>
+              </div>
+
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <MetricRow icon={BarChart3} label="Total Trades" value={dayMetrics.totalTrades.toString()} />
+                <MetricRow label="Wins" value={dayMetrics.wins.toString()} isPositive />
+                <MetricRow label="Losses" value={dayMetrics.losses.toString()} isNegative />
+                <MetricRow label="Breakeven" value={dayMetrics.breakeven.toString()} />
+                <MetricRow label="Gross Profit" value={`$${dayMetrics.grossProfit.toFixed(2)}`} isPositive />
+                <MetricRow label="Gross Loss" value={`$${Math.abs(dayMetrics.grossLoss).toFixed(2)}`} isNegative />
+              </div>
+
+              {/* Tags Section */}
+              <div className="space-y-3">
+                {dayMetrics.pairs.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">Pairs:</span>
+                    {dayMetrics.pairs.map((pair) => (
+                      <Badge key={pair} variant="outline" className="text-xs border-secondary/50 bg-secondary/10">
+                        {pair}
+                      </Badge>
+                    ))}
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
+                {dayMetrics.sessions.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Clock className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Sessions:</span>
+                    {dayMetrics.sessions.map((session) => (
+                      <Badge key={session} variant="outline" className="text-xs border-border/50">
+                        {session}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Individual Trades */}
+              <div className="space-y-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Trade Details</span>
+                <div className="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
+                  {selectedTrades.map((trade) => {
+                    const tradeChecklist = trade.checklistId 
+                      ? checklists.find(c => c.id === trade.checklistId) 
+                      : null;
+                    
+                    return (
+                      <div 
+                        key={trade.id}
+                        className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Badge 
+                              variant="outline" 
+                              className={cn(
+                                "text-[10px]",
+                                trade.direction === 'Long' 
+                                  ? "border-primary/50 text-primary" 
+                                  : "border-destructive/50 text-destructive"
+                              )}
+                            >
+                              {trade.direction}
+                            </Badge>
+                            <span className="text-sm font-medium">{trade.pair}</span>
+                          </div>
+                          <span className={cn(
+                            "text-sm font-bold font-mono",
+                            trade.result >= 0 ? "text-primary" : "text-destructive"
+                          )}>
+                            {trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}
+                          </span>
+                        </div>
+                        {tradeChecklist && (
+                          <div className="flex items-center gap-2 pt-1 border-t border-border/20">
+                            <span className="text-[10px] text-muted-foreground">Checklist:</span>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary">
+                              {tradeChecklist.name}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
