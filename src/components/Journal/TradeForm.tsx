@@ -278,14 +278,14 @@ export function TradeForm({ editingTrade, onSubmit, onCancelEdit }: TradeFormPro
                 Checklist Used
               </Label>
               <Select
-                value={formData.checklistId}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, checklistId: value }))}
+                value={formData.checklistId || "none"}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, checklistId: value === "none" ? "" : value }))}
               >
                 <SelectTrigger className="bg-muted/50 border-border/50 focus:border-primary/50">
                   <SelectValue placeholder="Select checklist..." />
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {checklists.map((checklist) => (
                     <SelectItem key={checklist.id} value={checklist.id}>
                       {checklist.name}
