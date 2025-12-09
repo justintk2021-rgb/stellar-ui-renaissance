@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Settings2, Check, X } from "lucide-react";
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  Cell,
 } from "recharts";
 
 interface EquityChartProps {
@@ -178,37 +179,18 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
 
       <div className="w-full h-56 rounded-xl overflow-hidden border border-secondary/30 bg-card/50">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
+          <BarChart
             data={chartData}
             margin={{ top: 20, right: 20, left: 0, bottom: 10 }}
           >
             <defs>
-              <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="0%"
-                  stopColor={isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
-                  stopOpacity={0.4}
-                />
-                <stop
-                  offset="50%"
-                  stopColor={isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
-                  stopOpacity={0.1}
-                />
-                <stop
-                  offset="100%"
-                  stopColor={isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
-                  stopOpacity={0}
-                />
+              <linearGradient id="barGradientPositive" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={1} />
+                <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.6} />
               </linearGradient>
-              <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-                <stop
-                  offset="0%"
-                  stopColor={isPositive ? "hsl(160, 84%, 50%)" : "hsl(var(--destructive))"}
-                />
-                <stop
-                  offset="100%"
-                  stopColor={isPositive ? "hsl(var(--primary))" : "hsl(350, 89%, 60%)"}
-                />
+              <linearGradient id="barGradientNegative" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={1} />
+                <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.6} />
               </linearGradient>
             </defs>
             <XAxis
@@ -233,26 +215,19 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
               strokeDasharray="4 4"
               strokeOpacity={0.3}
             />
-            <Area
-              type="monotone"
+            <Bar
               dataKey="value"
-              stroke="url(#lineGradient)"
-              strokeWidth={2.5}
-              fill="url(#equityGradient)"
-              dot={{
-                r: 4,
-                fill: "hsl(var(--background))",
-                stroke: isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))",
-                strokeWidth: 2,
-              }}
-              activeDot={{
-                r: 6,
-                fill: isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))",
-                stroke: "hsl(var(--background))",
-                strokeWidth: 2,
-              }}
-            />
-          </AreaChart>
+              radius={[4, 4, 0, 0]}
+              maxBarSize={50}
+            >
+              {chartData.map((entry, index) => (
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={entry.value >= startBalance ? "url(#barGradientPositive)" : "url(#barGradientNegative)"}
+                />
+              ))}
+            </Bar>
+          </BarChart>
         </ResponsiveContainer>
       </div>
     </div>
