@@ -1537,6 +1537,19 @@ export function NotebookView({
                 <span className="font-medium truncate max-w-[70px]">{linkedTrade.strategy || '—'}</span>
               </div>
             </div>
+
+            {/* Trade Chart Image */}
+            {linkedTrade.chartImage && (
+              <div className="mt-3 pt-3 border-t border-border/30">
+                <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-2">Chart</div>
+                <img
+                  src={linkedTrade.chartImage}
+                  alt="Trade chart"
+                  className="w-full rounded-lg border border-border/30 cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => window.open(linkedTrade.chartImage, '_blank')}
+                />
+              </div>
+            )}
           </div>
         )}
 
