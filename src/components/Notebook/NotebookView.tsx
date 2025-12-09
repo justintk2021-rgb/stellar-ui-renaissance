@@ -797,23 +797,97 @@ export function NotebookView({
               </Button>
             </div>
           </div>
-          {/* Fullscreen Editor */}
-          <ScrollArea className="flex-1 bg-gradient-to-b from-transparent to-muted/5">
-            <div className="max-w-3xl mx-auto px-12 py-10">
-              <div
-                ref={fullscreenEditorRef}
-                contentEditable={!isLocked}
-                className={cn(
-                  "min-h-[calc(100vh-280px)] outline-none focus:outline-none caret-primary",
-                  fontClasses[fontStyle],
-                  isSmallText ? "text-sm" : "text-base",
-                  "leading-relaxed",
-                  isLocked && "cursor-not-allowed opacity-70"
-                )}
-                suppressContentEditableWarning
-              />
-            </div>
-          </ScrollArea>
+          {/* Fullscreen Editor with Trade Panel */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Editor Section */}
+            <ScrollArea className="flex-1 bg-gradient-to-b from-transparent to-muted/5">
+              <div className="max-w-3xl mx-auto px-12 py-10">
+                <div
+                  ref={fullscreenEditorRef}
+                  contentEditable={!isLocked}
+                  className={cn(
+                    "min-h-[calc(100vh-280px)] outline-none focus:outline-none caret-primary",
+                    fontClasses[fontStyle],
+                    isSmallText ? "text-sm" : "text-base",
+                    "leading-relaxed",
+                    isLocked && "cursor-not-allowed opacity-70"
+                  )}
+                  suppressContentEditableWarning
+                />
+              </div>
+            </ScrollArea>
+
+            {/* Trade Metrics Panel - Fullscreen */}
+            {linkedTrade && (
+              <div className="w-56 flex-shrink-0 border-l border-border/30 bg-muted/5 p-4 overflow-y-auto">
+                <div className={cn(
+                  "glass rounded-xl border border-border/40 p-4",
+                  linkedTrade.result >= 0 ? "bg-primary/5" : "bg-destructive/5"
+                )}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={cn(
+                      "w-10 h-10 rounded-lg flex items-center justify-center",
+                      linkedTrade.result >= 0 ? "bg-primary/20" : "bg-destructive/20"
+                    )}>
+                      <TrendingUp className={cn(
+                        "w-5 h-5",
+                        linkedTrade.result >= 0 ? "text-primary" : "text-destructive"
+                      )} />
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Result</div>
+                      <div className={cn(
+                        "text-xl font-bold font-mono leading-tight",
+                        linkedTrade.result >= 0 ? "text-primary" : "text-destructive"
+                      )}>
+                        {linkedTrade.result >= 0 ? "+" : ""}${linkedTrade.result.toFixed(0)}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2.5 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Pair</span>
+                      <span className="font-medium">{linkedTrade.pair}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Direction</span>
+                      <Badge variant="outline" className={cn(
+                        "text-[10px] px-1.5 py-0",
+                        linkedTrade.direction === 'Long' 
+                          ? "border-primary/50 text-primary" 
+                          : "border-destructive/50 text-destructive"
+                      )}>
+                        {linkedTrade.direction}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Session</span>
+                      <span className="font-medium">{linkedTrade.session || '—'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Strategy</span>
+                      <span className="font-medium truncate max-w-[80px]">{linkedTrade.strategy || '—'}</span>
+                    </div>
+                  </div>
+
+                  {/* Trade Chart Image - Fullscreen */}
+                  {linkedTrade.chartImage && (
+                    <div className="mt-4 pt-4 border-t border-border/30">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Chart</div>
+                      <img
+                        src={linkedTrade.chartImage}
+                        alt="Trade chart"
+                        className="w-full rounded-lg border border-border/30 cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => setImagePreview(linkedTrade.chartImage!)}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          
           {/* Fullscreen Footer */}
           <div className="px-6 py-3 border-t border-border/30 bg-muted/10 flex items-center justify-between text-xs text-muted-foreground">
             <span>Press Esc to exit fullscreen</span>
