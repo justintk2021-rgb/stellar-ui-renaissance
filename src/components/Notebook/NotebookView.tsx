@@ -162,8 +162,13 @@ export function NotebookView({
   const [selectedTable, setSelectedTable] = useState<HTMLTableElement | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isImagePreviewClosing, setIsImagePreviewClosing] = useState(false);
+  const [fullscreenShowBlockButton, setFullscreenShowBlockButton] = useState(false);
+  const [fullscreenBlockButtonPosition, setFullscreenBlockButtonPosition] = useState({ x: 0, y: 0 });
+  const [fullscreenBlockMenuOpen, setFullscreenBlockMenuOpen] = useState(false);
+  const [fullscreenBlockMenuPosition, setFullscreenBlockMenuPosition] = useState({ x: 0, y: 0 });
   const editorRef = useRef<HTMLDivElement>(null);
   const fullscreenEditorRef = useRef<HTMLDivElement>(null);
+  const fullscreenEditorContainerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const fullscreenTitleRef = useRef<HTMLInputElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -545,9 +550,10 @@ export function NotebookView({
     { id: 'link', label: 'Link to page', icon: ExternalLink, command: 'createLink', value: '' },
   ];
 
-  const handleBlockFormat = (option: typeof BLOCK_OPTIONS[0]) => {
-    if (!editorRef.current) return;
-    editorRef.current.focus();
+  const handleBlockFormat = (option: typeof BLOCK_OPTIONS[0], isFullscreen = false) => {
+    const targetRef = isFullscreen ? fullscreenEditorRef : editorRef;
+    if (!targetRef.current) return;
+    targetRef.current.focus();
     
     if (option.id === 'divider') {
       document.execCommand('insertHTML', false, '<hr class="my-4 border-border" />');
@@ -611,8 +617,14 @@ export function NotebookView({
     } else {
       document.execCommand(option.command, false);
     }
-    setIsBlockMenuOpen(false);
-    setShowBlockButton(false);
+    
+    if (isFullscreen) {
+      setFullscreenBlockMenuOpen(false);
+      setFullscreenShowBlockButton(false);
+    } else {
+      setIsBlockMenuOpen(false);
+      setShowBlockButton(false);
+    }
   };
 
   // Handle mouse move over editor to show block button
@@ -642,6 +654,31 @@ export function NotebookView({
     
     setBlockMenuPosition({ x: blockButtonPosition.x + 32, y: blockButtonPosition.y });
     setIsBlockMenuOpen(true);
+  };
+
+  // Fullscreen editor mouse handlers
+  const handleFullscreenEditorMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isLocked) return;
+    
+    const container = fullscreenEditorContainerRef.current;
+    if (!container) return;
+    
+    const rect = container.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    
+    setFullscreenShowBlockButton(true);
+    setFullscreenBlockButtonPosition({ x: 8, y: relativeY - 12 });
+  };
+
+  const handleFullscreenEditorMouseLeave = () => {
+    if (!fullscreenBlockMenuOpen) {
+      setFullscreenShowBlockButton(false);
+    }
+  };
+
+  const openFullscreenBlockMenu = () => {
+    setFullscreenBlockMenuPosition({ x: fullscreenBlockButtonPosition.x + 32, y: fullscreenBlockButtonPosition.y });
+    setFullscreenBlockMenuOpen(true);
   };
 
   const formatDate = (dateStr: string) => {
@@ -797,20 +834,87 @@ export function NotebookView({
               </Button>
             </div>
           </div>
-          {/* Fullscreen Editor with Trade Panel */}
+          {/* Fullscreen Editor with Block Menu */}
           <div className="flex-1 flex overflow-hidden">
             {/* Editor Section */}
             <ScrollArea className="flex-1 bg-gradient-to-b from-transparent to-muted/5">
-              <div className="max-w-3xl mx-auto px-12 py-10">
+              <div 
+                ref={fullscreenEditorContainerRef}
+                className="max-w-3xl mx-auto px-12 py-10 relative min-h-full"
+                onMouseMove={handleFullscreenEditorMouseMove}
+                onMouseLeave={handleFullscreenEditorMouseLeave}
+              >
+                {/* Floating Block Button - Fullscreen */}
+                {fullscreenShowBlockButton && !isLocked && (
+                  <div
+                    className="absolute z-20"
+                    style={{ left: fullscreenBlockButtonPosition.x, top: fullscreenBlockButtonPosition.y }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-6 h-6 p-0 opacity-30 hover:opacity-100 hover:bg-muted rounded transition-opacity duration-150"
+                      onClick={openFullscreenBlockMenu}
+                    >
+                      <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Block Format Menu - Fullscreen */}
+                {fullscreenBlockMenuOpen && (
+                  <div
+                    className="absolute z-50 bg-background border border-border rounded-lg shadow-xl py-1 w-48 max-h-64 overflow-y-auto animate-scale-in"
+                    style={{ left: fullscreenBlockMenuPosition.x, top: fullscreenBlockMenuPosition.y }}
+                    onMouseLeave={() => {
+                      setFullscreenBlockMenuOpen(false);
+                      setFullscreenShowBlockButton(false);
+                    }}
+                  >
+                    <div className="px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
+                      Basic blocks
+                    </div>
+                    {BLOCK_OPTIONS.map((option) => {
+                      const Icon = option.icon;
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => handleBlockFormat(option, true)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted/50 transition-colors text-left group"
+                        >
+                          <div className="w-6 h-6 flex items-center justify-center rounded border border-border/50 bg-background group-hover:border-primary/30 transition-colors">
+                            <Icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                          </div>
+                          <span className="flex-1">{option.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <div
                   ref={fullscreenEditorRef}
                   contentEditable={!isLocked}
                   className={cn(
-                    "min-h-[calc(100vh-280px)] outline-none focus:outline-none caret-primary",
+                    "min-h-[calc(100vh-280px)] outline-none focus:outline-none caret-primary pl-8",
                     fontClasses[fontStyle],
                     isSmallText ? "text-sm" : "text-base",
                     "leading-relaxed",
-                    isLocked && "cursor-not-allowed opacity-70"
+                    isLocked && "cursor-not-allowed opacity-70",
+                    "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2",
+                    "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2",
+                    "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1",
+                    "[&_p]:mb-2",
+                    "[&_ul]:list-disc [&_ul]:ml-5 [&_ul]:mb-2",
+                    "[&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:mb-2",
+                    "[&_li]:text-foreground [&_li]:mb-1",
+                    "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2",
+                    "[&_strong]:font-semibold",
+                    "[&_em]:italic",
+                    "[&_.notebook-table-wrapper]:relative",
+                    "[&_.notebook-table]:rounded-xl [&_.notebook-table]:overflow-hidden",
+                    "[&_.notebook-table_td]:bg-background/50 [&_.notebook-table_td]:hover:bg-muted/50 [&_.notebook-table_td]:transition-colors",
+                    "[&_.notebook-table_td:focus]:outline-none [&_.notebook-table_td:focus]:ring-2 [&_.notebook-table_td:focus]:ring-primary/30 [&_.notebook-table_td:focus]:ring-inset"
                   )}
                   suppressContentEditableWarning
                 />
