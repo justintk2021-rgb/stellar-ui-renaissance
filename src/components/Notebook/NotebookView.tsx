@@ -1276,7 +1276,11 @@ export function NotebookView({
                 <Button variant="ghost" size="sm" onClick={() => { closeEntriesPanel(); setIsFoldersPanelOpen(true); }} className="h-8 w-8 p-0">
                   <PanelLeftOpen className="w-4 h-4" />
                 </Button>
-                <span className="text-sm font-medium flex-1">{CATEGORIES.find((c) => c.id === selectedCategory)?.label}</span>
+                <span className="text-sm font-medium flex-1">
+                  {selectedCategory.startsWith("custom_") 
+                    ? customFolders.find(f => f.id === selectedCategory)?.label || "Folder"
+                    : CATEGORIES.find((c) => c.id === selectedCategory)?.label}
+                </span>
                 <Button variant="ghost" size="sm" onClick={closeEntriesPanel} className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive">
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
