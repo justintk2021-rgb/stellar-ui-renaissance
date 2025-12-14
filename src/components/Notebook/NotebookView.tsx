@@ -989,7 +989,7 @@ export function NotebookView({
       {/* Bookmark Tab Toggle - Outside */}
       {!isEntriesPanelOpen && (
         <button
-          onClick={toggleEntriesPanel}
+          onMouseEnter={() => setIsEntriesPanelOpen(true)}
           className="bookmark-tab"
         >
           <FileText className="w-4 h-4" />
