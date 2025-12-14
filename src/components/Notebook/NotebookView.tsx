@@ -986,14 +986,14 @@ export function NotebookView({
       "h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4 transition-all duration-300 relative",
       isFullWidth && "invisible"
     )}>
-      {/* Bookmark Tab Toggle - Outside */}
+      {/* Arrow Toggle at Top - Shows on Hover */}
       {!isEntriesPanelOpen && (
         <button
           onClick={toggleEntriesPanel}
-          className="bookmark-tab"
+          className="notes-arrow-trigger group"
+          title="Show Notes"
         >
-          <FileText className="w-4 h-4" />
-          <span className="bookmark-label">Notes</span>
+          <ChevronRight className="w-4 h-4 notes-arrow-icon" />
         </button>
       )}
 
