@@ -991,6 +991,7 @@ export function NotebookView({
         <button
           onMouseEnter={() => setIsEntriesPanelOpen(true)}
           className="bookmark-tab"
+          style={{ top: '60px' }}
         >
           <FileText className="w-4 h-4" />
           <span className="bookmark-label">Notes</span>
