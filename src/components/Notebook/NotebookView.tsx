@@ -986,8 +986,8 @@ export function NotebookView({
       "h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4 transition-all duration-300 relative",
       isFullWidth && "invisible"
     )}>
-      {/* Bookmark Tab Toggle - Outside */}
-      {!isEntriesPanelOpen && (
+      {/* Bookmark Tab Toggle - Notes */}
+      {!isEntriesPanelOpen && !isFoldersPanelOpen && (
         <button
           onMouseEnter={() => setIsEntriesPanelOpen(true)}
           className="bookmark-tab"
@@ -997,186 +997,100 @@ export function NotebookView({
         </button>
       )}
 
-      {/* Folders Popup Overlay */}
-      {isFoldersPanelOpen && (
-        <>
-          {/* Backdrop to catch outside clicks */}
-          <div 
-            className="fixed inset-0 z-40"
-            onClick={closeFoldersPanel}
-          />
+      {/* Bookmark Tab Toggle - Folders */}
+      {!isEntriesPanelOpen && !isFoldersPanelOpen && (
+        <button
+          onMouseEnter={() => setIsFoldersPanelOpen(true)}
+          className="bookmark-tab"
+          style={{ top: '160px' }}
+        >
+          <FolderOpen className="w-4 h-4" />
+          <span className="bookmark-label">Folders</span>
+        </button>
+      )}
+
+      {/* Editor - Full width with toggle for entries panel */}
+      <div className="flex-1 flex overflow-hidden gap-3 relative" onClick={() => (isEntriesPanelOpen || isFoldersPanelOpen) && (closeEntriesPanel(), closeFoldersPanel())}>
+        {/* Folders Panel - displayed in same location as entries panel */}
+        {isFoldersPanelOpen && !isEntriesPanelOpen && (
           <div 
             className={cn(
-              "fixed left-4 top-1/2 z-50 w-72 bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl overflow-hidden",
-              isFoldersPanelClosing ? "animate-folder-popup-out" : "animate-folder-popup"
+              "w-72 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col",
+              isFoldersPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
             )}
+            onClick={(e) => e.stopPropagation()}
+            onMouseLeave={closeFoldersPanel}
           >
-          <div className="flex flex-col h-[400px]">
-            {/* Header */}
-            <div className="p-3 border-b border-border/30 space-y-2 shrink-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FolderOpen className="w-4 h-4 text-primary" />
-                  <span className="font-medium text-sm">Folders</span>
+            <div className="flex flex-col h-[400px]">
+              {/* Header */}
+              <div className="p-3 border-b border-border/30 space-y-2 shrink-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4 text-primary" />
+                    <span className="font-medium text-sm">Folders</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsAddFolderDialogOpen(true)}
+                    className="h-7 w-7 p-0"
+                  >
+                    <FolderPlus className="w-4 h-4" />
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsAddFolderDialogOpen(true)}
-                  className="h-7 w-7 p-0"
-                >
-                  <FolderPlus className="w-4 h-4" />
-                </Button>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Search folders..."
+                    value={folderSearchQuery}
+                    onChange={(e) => setFolderSearchQuery(e.target.value)}
+                    className="h-8 pl-7 text-xs bg-muted/50"
+                  />
+                </div>
               </div>
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Search folders..."
-                  value={folderSearchQuery}
-                  onChange={(e) => setFolderSearchQuery(e.target.value)}
-                  className="h-8 pl-7 text-xs bg-muted/50"
-                />
-              </div>
-            </div>
 
-            {/* Categories */}
-            <ScrollArea className="flex-1 overflow-hidden">
-              <div className="p-2 space-y-0.5">
-                {CATEGORIES.filter(c => c.id !== "trash" && c.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).map((cat) => {
-                  const Icon = cat.icon;
-                  const count = cat.id === "all" 
-                    ? notebookEntries.filter(e => !e.isDeleted).length 
-                    : notebookEntries.filter((e) => e.category === cat.id && !e.isDeleted).length;
-                  const markerColor = getFolderMarkerColor(cat.id);
-                  
-                  return (
-                    <div key={cat.id} className="relative group/folder flex items-center gap-1">
-                      {/* Color Marker */}
-                      {markerColor && (
-                        <div 
-                          className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full"
-                          style={{ backgroundColor: markerColor }}
-                        />
-                      )}
-                      <button
-                        onClick={() => {
-                          setSelectedCategory(cat.id);
-                          setSelectedEntryId(null);
-                          setIsCreatingNew(false);
-                          closeFoldersPanel();
-                        }}
-                        className={cn(
-                          "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
-                          markerColor && "pl-3",
-                          selectedCategory === cat.id
-                            ? "bg-primary/20 text-primary"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              {/* Categories */}
+              <ScrollArea className="flex-1 overflow-hidden">
+                <div className="p-2 space-y-0.5">
+                  {CATEGORIES.filter(c => c.id !== "trash" && c.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).map((cat) => {
+                    const Icon = cat.icon;
+                    const count = cat.id === "all" 
+                      ? notebookEntries.filter(e => !e.isDeleted).length 
+                      : notebookEntries.filter((e) => e.category === cat.id && !e.isDeleted).length;
+                    const markerColor = getFolderMarkerColor(cat.id);
+                    
+                    return (
+                      <div key={cat.id} className="relative group/folder flex items-center gap-1">
+                        {/* Color Marker */}
+                        {markerColor && (
+                          <div 
+                            className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full"
+                            style={{ backgroundColor: markerColor }}
+                          />
                         )}
-                      >
-                        <Icon className="w-3.5 h-3.5" />
-                        <span className="flex-1 text-left truncate">{cat.label}</span>
-                        <span className="text-[10px] text-muted-foreground">{count}</span>
-                      </button>
-                      
-                      {/* Marker Color Picker */}
-                      {cat.id !== "all" && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button 
-                              className="w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-accent flex items-center justify-center transition-all border border-border shadow-sm"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <div 
-                                className={cn(
-                                  "w-3 h-3 rounded-full border",
-                                  markerColor ? "border-white/60" : "border-dashed border-foreground/40 bg-muted"
-                                )}
-                                style={{ backgroundColor: markerColor || undefined }}
-                              />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-36 p-2">
-                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-1">Marker Color</div>
-                            <div className="grid grid-cols-5 gap-1.5">
-                              {MARKER_COLORS.map((color) => (
-                                <button
-                                  key={color.id}
-                                  onClick={() => handleSetFolderMarker(cat.id, color.id)}
-                                  className={cn(
-                                    "w-5 h-5 rounded-full border-2 transition-all hover:scale-110 shadow-sm",
-                                    folderMarkers[cat.id] === color.id 
-                                      ? "border-foreground ring-2 ring-primary/30" 
-                                      : "border-white/30 hover:border-foreground/50",
-                                    color.id === 'none' && "border-dashed border-muted-foreground/50 bg-muted/50"
-                                  )}
-                                  style={{ backgroundColor: color.id === 'none' ? 'transparent' : color.color }}
-                                  title={color.label}
-                                />
-                              ))}
-                            </div>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* Custom Folders */}
-                {customFolders.filter(f => f.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).length > 0 && (
-                  <>
-                    <div className="text-[9px] uppercase tracking-wider text-muted-foreground px-2 pt-3 pb-1">
-                      Custom
-                    </div>
-                    {customFolders.filter(f => f.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).map((folder) => {
-                      const count = notebookEntries.filter((e) => e.category === folder.id && !e.isDeleted).length;
-                      const markerColor = getFolderMarkerColor(folder.id);
-                      
-                        return (
-                        <div key={folder.id} className="relative group/folder flex items-center gap-1">
-                          {markerColor && (
-                            <div 
-                              className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full"
-                              style={{ backgroundColor: markerColor }}
-                            />
+                        <button
+                          onClick={() => {
+                            setSelectedCategory(cat.id);
+                            setSelectedEntryId(null);
+                            setIsCreatingNew(false);
+                            closeFoldersPanel();
+                            setIsEntriesPanelOpen(true);
+                          }}
+                          className={cn(
+                            "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
+                            markerColor && "pl-3",
+                            selectedCategory === cat.id
+                              ? "bg-primary/20 text-primary"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
                           )}
-                          <button
-                            onClick={() => {
-                              setSelectedCategory(folder.id);
-                              setSelectedEntryId(null);
-                              setIsCreatingNew(false);
-                              closeFoldersPanel();
-                            }}
-                            className={cn(
-                              "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
-                              markerColor && "pl-3",
-                              selectedCategory === folder.id
-                                ? "bg-primary/20 text-primary"
-                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                            )}
-                          >
-                            <FolderOpen className="w-3.5 h-3.5" />
-                            <span className="flex-1 text-left truncate">{folder.label}</span>
-                            <span className="text-[10px] text-muted-foreground">{count}</span>
-                          </button>
-                          
-                          {/* Delete Folder Button */}
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <ConfirmDialog
-                              trigger={
-                                <button 
-                                  className="w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-all border border-border shadow-sm"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              }
-                              title="Delete Folder"
-                              description={`Are you sure you want to delete "${folder.label}"? Notes in this folder will be moved to General Notes.`}
-                              confirmLabel="Delete"
-                              variant="destructive"
-                              onConfirm={() => handleDeleteFolder(folder.id)}
-                            />
-                          </div>
-                          
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          <span className="flex-1 text-left truncate">{cat.label}</span>
+                          <span className="text-[10px] text-muted-foreground">{count}</span>
+                        </button>
+                        
+                        {/* Marker Color Picker */}
+                        {cat.id !== "all" && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button 
@@ -1198,10 +1112,10 @@ export function NotebookView({
                                 {MARKER_COLORS.map((color) => (
                                   <button
                                     key={color.id}
-                                    onClick={() => handleSetFolderMarker(folder.id, color.id)}
+                                    onClick={() => handleSetFolderMarker(cat.id, color.id)}
                                     className={cn(
                                       "w-5 h-5 rounded-full border-2 transition-all hover:scale-110 shadow-sm",
-                                      folderMarkers[folder.id] === color.id 
+                                      folderMarkers[cat.id] === color.id 
                                         ? "border-foreground ring-2 ring-primary/30" 
                                         : "border-white/30 hover:border-foreground/50",
                                       color.id === 'none' && "border-dashed border-muted-foreground/50 bg-muted/50"
@@ -1213,44 +1127,140 @@ export function NotebookView({
                               </div>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        </div>
-                      );
-                    })}
-                  </>
-                )}
+                        )}
+                      </div>
+                    );
+                  })}
 
-                {/* Trash */}
-                <div className="pt-2 mt-2 border-t border-border/30">
-                  <button
-                    onClick={() => {
-                      setSelectedCategory("trash");
-                      setSelectedEntryId(null);
-                      setIsCreatingNew(false);
-                      closeFoldersPanel();
-                    }}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
-                      selectedCategory === "trash"
-                        ? "bg-destructive/20 text-destructive"
-                        : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    )}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span className="flex-1 text-left">Trash</span>
-                    {trashCount > 0 && (
-                      <span className="text-[10px] text-destructive">{trashCount}</span>
-                    )}
-                  </button>
+                  {/* Custom Folders */}
+                  {customFolders.filter(f => f.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).length > 0 && (
+                    <>
+                      <div className="text-[9px] uppercase tracking-wider text-muted-foreground px-2 pt-3 pb-1">
+                        Custom
+                      </div>
+                      {customFolders.filter(f => f.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).map((folder) => {
+                        const count = notebookEntries.filter((e) => e.category === folder.id && !e.isDeleted).length;
+                        const markerColor = getFolderMarkerColor(folder.id);
+                        
+                          return (
+                          <div key={folder.id} className="relative group/folder flex items-center gap-1">
+                            {markerColor && (
+                              <div 
+                                className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full"
+                                style={{ backgroundColor: markerColor }}
+                              />
+                            )}
+                            <button
+                              onClick={() => {
+                                setSelectedCategory(folder.id);
+                                setSelectedEntryId(null);
+                                setIsCreatingNew(false);
+                                closeFoldersPanel();
+                                setIsEntriesPanelOpen(true);
+                              }}
+                              className={cn(
+                                "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
+                                markerColor && "pl-3",
+                                selectedCategory === folder.id
+                                  ? "bg-primary/20 text-primary"
+                                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                              )}
+                            >
+                              <FolderOpen className="w-3.5 h-3.5" />
+                              <span className="flex-1 text-left truncate">{folder.label}</span>
+                              <span className="text-[10px] text-muted-foreground">{count}</span>
+                            </button>
+                            
+                            {/* Delete Folder Button */}
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <ConfirmDialog
+                                trigger={
+                                  <button 
+                                    className="w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-all border border-border shadow-sm"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                }
+                                title="Delete Folder"
+                                description={`Are you sure you want to delete "${folder.label}"? Notes in this folder will be moved to General Notes.`}
+                                confirmLabel="Delete"
+                                variant="destructive"
+                                onConfirm={() => handleDeleteFolder(folder.id)}
+                              />
+                            </div>
+                            
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button 
+                                  className="w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-accent flex items-center justify-center transition-all border border-border shadow-sm"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <div 
+                                    className={cn(
+                                      "w-3 h-3 rounded-full border",
+                                      markerColor ? "border-white/60" : "border-dashed border-foreground/40 bg-muted"
+                                    )}
+                                    style={{ backgroundColor: markerColor || undefined }}
+                                  />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-36 p-2">
+                                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-1">Marker Color</div>
+                                <div className="grid grid-cols-5 gap-1.5">
+                                  {MARKER_COLORS.map((color) => (
+                                    <button
+                                      key={color.id}
+                                      onClick={() => handleSetFolderMarker(folder.id, color.id)}
+                                      className={cn(
+                                        "w-5 h-5 rounded-full border-2 transition-all hover:scale-110 shadow-sm",
+                                        folderMarkers[folder.id] === color.id 
+                                          ? "border-foreground ring-2 ring-primary/30" 
+                                          : "border-white/30 hover:border-foreground/50",
+                                        color.id === 'none' && "border-dashed border-muted-foreground/50 bg-muted/50"
+                                      )}
+                                      style={{ backgroundColor: color.id === 'none' ? 'transparent' : color.color }}
+                                      title={color.label}
+                                    />
+                                  ))}
+                                </div>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {/* Trash */}
+                  <div className="pt-2 mt-2 border-t border-border/30">
+                    <button
+                      onClick={() => {
+                        setSelectedCategory("trash");
+                        setSelectedEntryId(null);
+                        setIsCreatingNew(false);
+                        closeFoldersPanel();
+                        setIsEntriesPanelOpen(true);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
+                        selectedCategory === "trash"
+                          ? "bg-destructive/20 text-destructive"
+                          : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      )}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span className="flex-1 text-left">Trash</span>
+                      {trashCount > 0 && (
+                        <span className="text-[10px] text-destructive">{trashCount}</span>
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </ScrollArea>
+              </ScrollArea>
+            </div>
           </div>
-        </div>
-        </>
-      )}
+        )}
 
-      {/* Editor - Full width with toggle for entries panel */}
-      <div className="flex-1 flex overflow-hidden gap-3 relative" onClick={() => isEntriesPanelOpen && closeEntriesPanel()}>
         {/* Entries List Panel - Left Side */}
         {isEntriesPanelOpen && (
           <div 
@@ -1263,7 +1273,7 @@ export function NotebookView({
           >
             <div className="p-3 border-b border-border/30 space-y-2">
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={toggleFoldersPanel} className="h-8 w-8 p-0">
+                <Button variant="ghost" size="sm" onClick={() => { closeEntriesPanel(); setIsFoldersPanelOpen(true); }} className="h-8 w-8 p-0">
                   <PanelLeftOpen className="w-4 h-4" />
                 </Button>
                 <span className="text-sm font-medium flex-1">{CATEGORIES.find((c) => c.id === selectedCategory)?.label}</span>
