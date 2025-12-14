@@ -251,6 +251,19 @@ export function NotebookView({
     }, 200);
   };
 
+  // Auto-select notebook entry when navigating from trade log
+  useEffect(() => {
+    if (selectedTradeId) {
+      // Find the notebook entry linked to this trade
+      const linkedEntry = notebookEntries.find(e => e.tradeId === selectedTradeId && !e.isDeleted);
+      if (linkedEntry) {
+        setSelectedEntryId(linkedEntry.id);
+        setSelectedCategory(linkedEntry.category || 'trade-notes');
+        setIsCreatingNew(false);
+      }
+    }
+  }, [selectedTradeId, notebookEntries]);
+
   // Handle Escape key to exit fullscreen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
