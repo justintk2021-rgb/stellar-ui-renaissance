@@ -1250,13 +1250,16 @@ export function NotebookView({
       )}
 
       {/* Editor - Full width with toggle for entries panel */}
-      <div className="flex-1 flex overflow-hidden gap-3 relative">
+      <div className="flex-1 flex overflow-hidden gap-3 relative" onClick={() => isEntriesPanelOpen && closeEntriesPanel()}>
         {/* Entries List Panel - Left Side */}
         {isEntriesPanelOpen && (
-          <div className={cn(
-            "w-72 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col",
-            isEntriesPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
-          )}>
+          <div 
+            className={cn(
+              "w-72 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col",
+              isEntriesPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-3 border-b border-border/30 space-y-2">
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" onClick={toggleFoldersPanel} className="h-8 w-8 p-0">
