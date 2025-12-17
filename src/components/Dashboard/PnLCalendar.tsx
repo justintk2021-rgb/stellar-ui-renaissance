@@ -305,10 +305,10 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
             </div>
 
             {/* Calendar cells */}
-            <div className="grid grid-cols-7">
+            <div className="grid grid-cols-7 gap-2">
               {/* Empty cells before first day */}
               {Array.from({ length: firstDayIndex }).map((_, i) => (
-                <div key={`empty-${i}`} className="min-h-[90px] border border-border/20" />
+                <div key={`empty-${i}`} className="min-h-[90px]" />
               ))}
 
               {/* Day cells */}
@@ -325,14 +325,14 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                     key={day}
                     onClick={() => handleDayClick(dateStr, hasTrades)}
                     className={cn(
-                      "relative min-h-[90px] border border-border/20 p-2 transition-all duration-200 group",
+                      "relative min-h-[90px] rounded-xl p-2 transition-all duration-200 group border",
                       stat
                         ? stat.pnl > 0
-                          ? "bg-emerald-500/20 hover:bg-emerald-500/30 cursor-pointer"
+                          ? "bg-emerald-500/20 border-emerald-500/30 hover:bg-emerald-500/30 hover:border-emerald-500/50 cursor-pointer shadow-sm"
                           : stat.pnl < 0
-                          ? "bg-rose-500/20 hover:bg-rose-500/30 cursor-pointer"
-                          : "bg-muted/30 hover:bg-muted/50 cursor-pointer"
-                        : "hover:bg-muted/20"
+                          ? "bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/30 hover:border-rose-500/50 cursor-pointer shadow-sm"
+                          : "bg-muted/30 border-border/40 hover:bg-muted/50 cursor-pointer"
+                        : "bg-card/50 border-border/30 hover:bg-muted/20 hover:border-border/50"
                     )}
                   >
                     {/* Day number */}
