@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Trade, DailyStats, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -37,6 +37,15 @@ const MONTH_NAMES = [
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+// Format large numbers as K format
+const formatPnL = (value: number): string => {
+  const absValue = Math.abs(value);
+  if (absValue >= 1000) {
+    return `${value < 0 ? '-' : ''}$${(absValue / 1000).toFixed(2)}K`;
+  }
+  return `${value < 0 ? '-' : ''}$${absValue.toFixed(0)}`;
+};
+
 export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSaveEntry }: PnLCalendarProps) {
   const { checklists } = useChecklists();
   const [currentDate, setCurrentDate] = useState(() => {
@@ -60,13 +69,13 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
     }
   });
 
-  const dailyStats: Record<string, DailyStats> = {};
+  const dailyStats: Record<string, DailyStats & { winRate: number }> = {};
   const dailyTrades: Record<string, Trade[]> = {};
   
   trades.forEach((trade) => {
     if (!trade.date) return;
     if (!dailyStats[trade.date]) {
-      dailyStats[trade.date] = { pnl: 0, trades: 0 };
+      dailyStats[trade.date] = { pnl: 0, trades: 0, winRate: 0 };
       dailyTrades[trade.date] = [];
     }
     dailyStats[trade.date].pnl += trade.result || 0;
@@ -74,10 +83,59 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
     dailyTrades[trade.date].push(trade);
   });
 
+  // Calculate win rate for each day
+  Object.keys(dailyTrades).forEach((date) => {
+    const dayTrades = dailyTrades[date];
+    const wins = dayTrades.filter(t => t.result > 0).length;
+    dailyStats[date].winRate = dayTrades.length > 0 ? (wins / dayTrades.length) * 100 : 0;
+  });
+
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const firstDayIndex = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Calculate weekly stats
+  const weeklyStats = useMemo(() => {
+    const weeks: { pnl: number; days: number }[] = [];
+    let currentWeek = { pnl: 0, days: 0 };
+    let dayOfWeek = firstDayIndex;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const stat = dailyStats[dateStr];
+      
+      if (stat) {
+        currentWeek.pnl += stat.pnl;
+        currentWeek.days += 1;
+      }
+
+      dayOfWeek++;
+      if (dayOfWeek === 7 || day === daysInMonth) {
+        weeks.push({ ...currentWeek });
+        currentWeek = { pnl: 0, days: 0 };
+        dayOfWeek = 0;
+      }
+    }
+
+    return weeks;
+  }, [dailyStats, year, month, firstDayIndex, daysInMonth]);
+
+  // Calculate monthly stats
+  const monthlyStats = useMemo(() => {
+    let totalPnL = 0;
+    let tradingDays = 0;
+
+    Object.keys(dailyStats).forEach((dateStr) => {
+      const date = new Date(dateStr);
+      if (date.getFullYear() === year && date.getMonth() === month) {
+        totalPnL += dailyStats[dateStr].pnl;
+        tradingDays += 1;
+      }
+    });
+
+    return { totalPnL, tradingDays };
+  }, [dailyStats, year, month]);
 
   const prevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -87,6 +145,11 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
     setCurrentDate(new Date(year, month + 1, 1));
   };
 
+  const goToThisMonth = () => {
+    const now = new Date();
+    setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  };
+
   const handleDayClick = (dateStr: string, hasTrades: boolean) => {
     if (hasTrades) {
       setSelectedDate(dateStr);
@@ -94,7 +157,6 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
   };
 
   const selectedTrades = selectedDate ? dailyTrades[selectedDate] || [] : [];
-  const selectedStats = selectedDate ? dailyStats[selectedDate] : null;
 
   // Calculate metrics for selected day
   const dayMetrics = selectedTrades.length > 0 ? {
@@ -158,122 +220,209 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
     toast.success("Note saved!");
   };
 
+  // Check if current view is this month
+  const isCurrentMonth = () => {
+    const now = new Date();
+    return year === now.getFullYear() && month === now.getMonth();
+  };
+
+  // Check if a date is today
+  const isToday = (dateStr: string) => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    return dateStr === todayStr;
+  };
+
   return (
     <>
-      <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-base font-semibold">PnL Calendar</h3>
-            <p className="text-xs text-muted-foreground mt-1">Click a day with trades to view metrics</p>
+      <div className="glass rounded-2xl border border-border/40 shadow-card overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border/30">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={prevMonth}
+              className="h-8 w-8"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <span className="text-base font-semibold min-w-[140px]">
+              {MONTH_NAMES[month]} {year}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={nextMonth}
+              className="h-8 w-8"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToThisMonth}
+              className={cn(
+                "text-xs h-7",
+                isCurrentMonth() && "bg-primary/10 border-primary/30"
+              )}
+            >
+              This month
+            </Button>
           </div>
-          <Badge variant="outline" className="border-secondary/40 text-muted-foreground text-xs">
-            Calendar
-          </Badge>
-        </div>
-
-        {/* Month navigation */}
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={prevMonth}
-            className="w-8 h-8 rounded-full border-border/50 hover:border-primary/50 hover:bg-primary/10"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <span className="px-4 py-1.5 rounded-full border border-border/50 bg-muted/30 text-sm font-medium min-w-[140px] text-center">
-            {MONTH_NAMES[month]} {year}
-          </span>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={nextMonth}
-            className="w-8 h-8 rounded-full border-border/50 hover:border-primary/50 hover:bg-primary/10"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-
-        {/* Calendar grid */}
-        <div className="grid grid-cols-7 gap-2">
-          {/* Day headers */}
-          {DAY_NAMES.map((day) => (
-            <div key={day} className="text-center text-[10px] uppercase tracking-wider text-muted-foreground pb-2">
-              {day}
+          
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <span className="text-sm text-muted-foreground">Monthly stats: </span>
+              <span className={cn(
+                "font-bold font-mono",
+                monthlyStats.totalPnL >= 0 ? "text-primary" : "text-destructive"
+              )}>
+                {formatPnL(monthlyStats.totalPnL)}
+              </span>
+              <span className="text-sm text-muted-foreground ml-2">
+                {monthlyStats.tradingDays} days
+              </span>
             </div>
-          ))}
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Settings className="w-4 h-4 text-muted-foreground" />
+              </Button>
+            </div>
+          </div>
+        </div>
 
-          {/* Empty cells before first day */}
-          {Array.from({ length: firstDayIndex }).map((_, i) => (
-            <div key={`empty-${i}`} />
-          ))}
+        <div className="flex">
+          {/* Calendar Grid */}
+          <div className="flex-1 p-4">
+            {/* Day headers */}
+            <div className="grid grid-cols-7 border-b border-border/30 mb-2">
+              {DAY_NAMES.map((day) => (
+                <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
+                  {day}
+                </div>
+              ))}
+            </div>
 
-          {/* Day cells */}
-          {Array.from({ length: daysInMonth }).map((_, i) => {
-            const day = i + 1;
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const stat = dailyStats[dateStr];
-            const hasTrades = !!stat;
-            const hasNote = !!dailyNotes[dateStr]?.length;
+            {/* Calendar cells */}
+            <div className="grid grid-cols-7">
+              {/* Empty cells before first day */}
+              {Array.from({ length: firstDayIndex }).map((_, i) => (
+                <div key={`empty-${i}`} className="min-h-[90px] border border-border/20" />
+              ))}
 
-            return (
-              <div
-                key={day}
-                onClick={() => handleDayClick(dateStr, hasTrades)}
+              {/* Day cells */}
+              {Array.from({ length: daysInMonth }).map((_, i) => {
+                const day = i + 1;
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const stat = dailyStats[dateStr];
+                const hasTrades = !!stat;
+                const hasNote = !!dailyNotes[dateStr]?.length;
+                const today = isToday(dateStr);
+
+                return (
+                  <div
+                    key={day}
+                    onClick={() => handleDayClick(dateStr, hasTrades)}
+                    className={cn(
+                      "relative min-h-[90px] border border-border/20 p-2 transition-all duration-200 group",
+                      stat
+                        ? stat.pnl > 0
+                          ? "bg-emerald-500/20 hover:bg-emerald-500/30 cursor-pointer"
+                          : stat.pnl < 0
+                          ? "bg-rose-500/20 hover:bg-rose-500/30 cursor-pointer"
+                          : "bg-muted/30 hover:bg-muted/50 cursor-pointer"
+                        : "hover:bg-muted/20"
+                    )}
+                  >
+                    {/* Day number */}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={cn(
+                        "text-xs",
+                        today 
+                          ? "bg-primary text-primary-foreground w-5 h-5 rounded-full flex items-center justify-center font-medium" 
+                          : "text-muted-foreground"
+                      )}>
+                        {day}
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        {hasNote && (
+                          <StickyNote className="w-3 h-3 text-secondary" />
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <button className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-background/50 transition-all">
+                              <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem onClick={(e) => openNoteDialog(dateStr, e)}>
+                              <FileText className="w-4 h-4 mr-2" />
+                              {hasNote ? "Edit Note" : "Add Note"}
+                            </DropdownMenuItem>
+                            {hasTrades && (
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedDate(dateStr); }}>
+                                <BarChart3 className="w-4 h-4 mr-2" />
+                                View Trades
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+
+                    {/* Trade stats */}
+                    {stat && (
+                      <div className="flex flex-col items-center justify-center mt-2">
+                        <span className={cn(
+                          "text-base font-bold font-mono",
+                          stat.pnl > 0 ? "text-emerald-600 dark:text-emerald-400" : stat.pnl < 0 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"
+                        )}>
+                          {formatPnL(stat.pnl)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {stat.trades} trade{stat.trades !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {stat.winRate.toFixed(0)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Weekly Stats Sidebar */}
+          <div className="w-32 border-l border-border/30 p-3 space-y-2">
+            {weeklyStats.map((week, index) => (
+              <div 
+                key={index} 
                 className={cn(
-                  "relative min-h-[72px] rounded-xl border p-2 flex flex-col gap-1 transition-all duration-200 group",
-                  stat
-                    ? stat.pnl > 0
-                      ? "calendar-cell-positive cursor-pointer hover:scale-105 hover:shadow-lg"
-                      : stat.pnl < 0
-                      ? "calendar-cell-negative cursor-pointer hover:scale-105 hover:shadow-lg"
-                      : "calendar-cell-flat cursor-pointer hover:scale-105 hover:shadow-lg"
-                    : "border-border/30 bg-muted/20 hover:border-border/50"
+                  "p-2 rounded-lg border text-center",
+                  week.pnl > 0 
+                    ? "bg-emerald-500/10 border-emerald-500/20" 
+                    : week.pnl < 0 
+                    ? "bg-rose-500/10 border-rose-500/20"
+                    : "bg-muted/20 border-border/30"
                 )}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">{day}</span>
-                  <div className="flex items-center gap-0.5">
-                    {hasNote && (
-                      <StickyNote className="w-3 h-3 text-secondary" />
-                    )}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <button className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-background/50 transition-all">
-                          <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem onClick={(e) => openNoteDialog(dateStr, e)}>
-                          <FileText className="w-4 h-4 mr-2" />
-                          {hasNote ? "Edit Note" : "Add Note"}
-                        </DropdownMenuItem>
-                        {hasTrades && (
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedDate(dateStr); }}>
-                            <BarChart3 className="w-4 h-4 mr-2" />
-                            View Trades
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                <div className="text-[10px] text-muted-foreground mb-1">
+                  Week {index + 1}
                 </div>
-                {stat && (
-                  <>
-                    <span className={cn(
-                      "text-sm font-bold font-mono",
-                      stat.pnl > 0 ? "text-primary" : stat.pnl < 0 ? "text-destructive" : "text-muted-foreground"
-                    )}>
-                      {stat.pnl > 0 ? '+' : ''}{stat.pnl.toFixed(2)}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {stat.trades} trade{stat.trades !== 1 ? 's' : ''}
-                    </span>
-                  </>
-                )}
+                <div className={cn(
+                  "text-sm font-bold font-mono",
+                  week.pnl > 0 ? "text-emerald-600 dark:text-emerald-400" : week.pnl < 0 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"
+                )}>
+                  {formatPnL(week.pnl)}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {week.days} day{week.days !== 1 ? 's' : ''}
+                </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
       </div>
 
