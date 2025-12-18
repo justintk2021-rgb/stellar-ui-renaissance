@@ -916,9 +916,9 @@ export function SettingsView({
   };
 
   return (
-    <div className="flex gap-8 animate-fade-in min-h-[calc(100vh-200px)]">
+    <div className="flex gap-6 animate-fade-in max-w-5xl mx-auto">
       {/* Sidebar Navigation */}
-      <div className="w-64 shrink-0">
+      <div className="w-56 shrink-0">
         <div className="sticky top-6">
           <h1 className="text-2xl font-bold text-foreground mb-6">Settings</h1>
           <nav className="space-y-1">
@@ -930,34 +930,27 @@ export function SettingsView({
                   key={item.id}
                   onClick={() => setActiveSection(item.id)}
                   className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group text-left",
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-left",
                     isActive
                       ? "bg-primary/10 text-primary border border-primary/20"
                       : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <div className={cn(
-                    "w-9 h-9 rounded-lg flex items-center justify-center transition-colors",
+                    "w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0",
                     isActive ? "bg-primary/20" : "bg-muted/50 group-hover:bg-muted"
                   )}>
                     <Icon className={cn(
-                      "w-5 h-5",
+                      "w-4 h-4",
                       isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                     )} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      "text-sm font-medium truncate",
-                      isActive ? "text-primary" : ""
-                    )}>
-                      {item.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">{item.description}</p>
-                  </div>
-                  <ChevronRight className={cn(
-                    "w-4 h-4 transition-transform shrink-0",
-                    isActive ? "text-primary rotate-90" : "text-muted-foreground"
-                  )} />
+                  <span className={cn(
+                    "text-sm font-medium truncate",
+                    isActive ? "text-primary" : ""
+                  )}>
+                    {item.label}
+                  </span>
                 </button>
               );
             })}
@@ -966,9 +959,11 @@ export function SettingsView({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 glass rounded-xl p-8 overflow-hidden">
-        <ScrollArea className="h-full max-h-[calc(100vh-250px)]">
-          {renderContent()}
+      <div className="flex-1 max-w-2xl glass rounded-xl p-6 overflow-hidden">
+        <ScrollArea className="h-full max-h-[calc(100vh-200px)]">
+          <div className="pr-4">
+            {renderContent()}
+          </div>
         </ScrollArea>
       </div>
     </div>
