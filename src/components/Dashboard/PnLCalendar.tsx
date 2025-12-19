@@ -483,6 +483,17 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 </DialogTitle>
                 <p className="text-xs text-muted-foreground mt-1">Daily Trade Summary</p>
               </div>
+              {selectedDate && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => openNoteDialog(selectedDate, e)}
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <FileText className="w-3.5 h-3.5 mr-1" />
+                  {dailyNotes[selectedDate]?.length > 0 ? "Edit Note" : "Add Note"}
+                </Button>
+              )}
             </div>
           </DialogHeader>
 
@@ -636,18 +647,6 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 </div>
               )}
 
-              {/* Add Note Button when no notes exist */}
-              {selectedDate && (!dailyNotes[selectedDate] || dailyNotes[selectedDate].length === 0) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => openNoteDialog(selectedDate, e)}
-                  className="w-full"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Add Note for This Day
-                </Button>
-              )}
 
               {/* Individual Trades */}
               <div className="space-y-2">
