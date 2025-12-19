@@ -325,12 +325,12 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                     key={day}
                     onClick={() => handleDayClick(dateStr, hasTrades)}
                     className={cn(
-                      "relative min-h-[90px] rounded-xl p-2 transition-all duration-200 group border",
+                      "relative min-h-[90px] rounded-xl p-2 transition-all duration-200 group border hover:scale-[1.03] hover:-translate-y-0.5 hover:shadow-lg",
                       stat
                         ? stat.pnl > 0
-                          ? "bg-emerald-500/20 border-emerald-500/30 hover:bg-emerald-500/30 hover:border-emerald-500/50 cursor-pointer shadow-sm"
+                          ? "bg-emerald-500/20 border-emerald-500/30 hover:bg-emerald-500/30 hover:border-emerald-500/50 hover:shadow-emerald-500/20 cursor-pointer shadow-sm"
                           : stat.pnl < 0
-                          ? "bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/30 hover:border-rose-500/50 cursor-pointer shadow-sm"
+                          ? "bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/30 hover:border-rose-500/50 hover:shadow-rose-500/20 cursor-pointer shadow-sm"
                           : "bg-muted/30 border-border/40 hover:bg-muted/50 cursor-pointer"
                         : "bg-card/50 border-border/30 hover:bg-muted/20 hover:border-border/50"
                     )}
