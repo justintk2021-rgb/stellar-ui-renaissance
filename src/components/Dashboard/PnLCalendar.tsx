@@ -345,30 +345,25 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                       )}>
                         {day}
                       </span>
-                      <div className="flex items-center gap-0.5">
-                        {hasNote && (
-                          <StickyNote className="w-3 h-3 text-secondary" />
-                        )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <button className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-background/50 transition-all">
-                              <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem onClick={(e) => openNoteDialog(dateStr, e)}>
-                              <FileText className="w-4 h-4 mr-2" />
-                              {hasNote ? "Edit Note" : "Add Note"}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <button className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-background/50 transition-all">
+                            <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem onClick={(e) => openNoteDialog(dateStr, e)}>
+                            <FileText className="w-4 h-4 mr-2" />
+                            {hasNote ? "Edit Note" : "Add Note"}
+                          </DropdownMenuItem>
+                          {hasTrades && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedDate(dateStr); }}>
+                              <BarChart3 className="w-4 h-4 mr-2" />
+                              View Trades
                             </DropdownMenuItem>
-                            {hasTrades && (
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedDate(dateStr); }}>
-                                <BarChart3 className="w-4 h-4 mr-2" />
-                                View Trades
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
 
                     {/* Trade stats */}
@@ -611,6 +606,48 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                   </div>
                 )}
               </div>
+
+              {/* Notes Section */}
+              {selectedDate && dailyNotes[selectedDate]?.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => openNoteDialog(selectedDate, e)}
+                      className="h-7 text-xs"
+                    >
+                      <FileText className="w-3 h-3 mr-1" />
+                      Edit Note
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
+                    {dailyNotes[selectedDate].map((note) => (
+                      <div 
+                        key={note.id}
+                        className="p-3 rounded-lg bg-secondary/10 border border-secondary/30"
+                      >
+                        <h4 className="text-sm font-medium mb-1">{note.title}</h4>
+                        <p className="text-xs text-muted-foreground line-clamp-3">{note.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add Note Button when no notes exist */}
+              {selectedDate && (!dailyNotes[selectedDate] || dailyNotes[selectedDate].length === 0) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => openNoteDialog(selectedDate, e)}
+                  className="w-full"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Add Note for This Day
+                </Button>
+              )}
 
               {/* Individual Trades */}
               <div className="space-y-2">
