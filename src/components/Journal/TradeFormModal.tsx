@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -192,7 +193,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
     onClose();
   };
 
-  return (
+  const modalContent = (
     <AnimatePresence>
       {isOpen && (
         <>
@@ -202,7 +203,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md"
+            className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-md"
             onClick={handleClose}
           />
 
@@ -212,9 +213,9 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2"
+            className="fixed inset-0 z-[101] flex items-center justify-center p-4"
           >
-            <div className="glass rounded-2xl border border-border/40 shadow-2xl p-6 mx-4">
+            <div className="w-full max-w-lg bg-card rounded-2xl border border-border/40 shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -269,7 +270,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
                       <SelectTrigger className="bg-muted/50 border-border/50 focus:border-primary/50">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-[200]">
                         <SelectItem value="Long">Long</SelectItem>
                         <SelectItem value="Short">Short</SelectItem>
                       </SelectContent>
@@ -316,7 +317,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
                       <SelectTrigger className="bg-muted/50 border-border/50 focus:border-primary/50">
                         <SelectValue placeholder={!isAuthenticated ? "Login required" : checklists.length === 0 ? "No checklists" : "Select checklist..."} />
                       </SelectTrigger>
-                      <SelectContent className="bg-popover">
+                      <SelectContent className="z-[200] bg-popover">
                         <SelectItem value="none">None</SelectItem>
                         {checklists.map((checklist) => (
                           <SelectItem key={checklist.id} value={checklist.id}>
@@ -401,4 +402,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
       )}
     </AnimatePresence>
   );
+
+  // Use portal to render at document body level
+  return createPortal(modalContent, document.body);
 }
