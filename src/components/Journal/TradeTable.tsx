@@ -54,10 +54,10 @@ export function TradeTable({ trades, onEdit, onDelete, onSelectForNotebook, onCl
         </div>
 
         {/* Body */}
-        <div className="max-h-[320px] overflow-y-auto custom-scrollbar">
+        <div className="max-h-[calc(100vh-320px)] min-h-[400px] overflow-y-auto custom-scrollbar">
           {trades.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              No trades yet. Add one using the form.
+            <div className="px-4 py-16 text-center text-sm text-muted-foreground">
+              No trades yet. Click "Add New Trade" to log your first trade.
             </div>
           ) : (
             trades.map((trade, index) => {

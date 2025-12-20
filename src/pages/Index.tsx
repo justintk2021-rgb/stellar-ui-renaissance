@@ -12,7 +12,7 @@ import { TopBar } from "@/components/Layout/TopBar";
 import { StatsGrid } from "@/components/Dashboard/StatsGrid";
 import { EquityChart } from "@/components/Dashboard/EquityChart";
 import { PnLCalendar } from "@/components/Dashboard/PnLCalendar";
-import { TradeForm } from "@/components/Journal/TradeForm";
+import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { NotebookView } from "@/components/Notebook/NotebookView";
 import { SettingsView } from "@/components/Settings/SettingsView";
@@ -105,6 +105,7 @@ const Index = () => {
   const { theme, accentColor, customColor, customGradient, sidebarCollapsed } = settings;
   
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
+  const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
 
   // Close sidebar when changing page
@@ -431,34 +432,54 @@ const Index = () => {
             {/* Journal Page */}
             {currentPage === 'journal' && (
               <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
-                {/* Account Selector for Journal */}
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-muted-foreground">Trading Account:</span>
-                  <AccountSelector
-                    accounts={accounts}
-                    selectedAccount={selectedAccount}
-                    onSelectAccount={setSelectedAccountId}
-                    onAddAccount={addAccount}
-                    onUpdateAccount={updateAccount}
-                    onDeleteAccount={deleteAccount}
-                    onSetDefault={setDefaultAccount}
-                  />
+                {/* Header with Account Selector and Add Trade Button */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-muted-foreground">Trading Account:</span>
+                    <AccountSelector
+                      accounts={accounts}
+                      selectedAccount={selectedAccount}
+                      onSelectAccount={setSelectedAccountId}
+                      onAddAccount={addAccount}
+                      onUpdateAccount={updateAccount}
+                      onDeleteAccount={deleteAccount}
+                      onSetDefault={setDefaultAccount}
+                    />
+                  </div>
+                  <button
+                    onClick={() => setIsTradeFormOpen(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground font-medium text-sm shadow-glow-sm hover:opacity-90 transition-opacity"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    Add New Trade
+                  </button>
                 </div>
                 
-                <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.4fr] gap-6">
-                  <TradeForm
-                    editingTrade={editingTrade}
-                    onSubmit={handleAddTrade}
-                    onCancelEdit={() => setEditingTrade(null)}
-                  />
-                  <TradeTable
-                    trades={trades}
-                    onEdit={setEditingTrade}
-                    onDelete={handleDeleteTrade}
-                    onSelectForNotebook={handleSelectForNotebook}
-                    onClearAll={handleClearAll}
-                  />
-                </div>
+                {/* Trade Table - Full Width */}
+                <TradeTable
+                  trades={trades}
+                  onEdit={(trade) => {
+                    setEditingTrade(trade);
+                    setIsTradeFormOpen(true);
+                  }}
+                  onDelete={handleDeleteTrade}
+                  onSelectForNotebook={handleSelectForNotebook}
+                  onClearAll={handleClearAll}
+                />
+
+                {/* Trade Form Modal */}
+                <TradeFormModal
+                  isOpen={isTradeFormOpen}
+                  onClose={() => {
+                    setIsTradeFormOpen(false);
+                    setEditingTrade(null);
+                  }}
+                  editingTrade={editingTrade}
+                  onSubmit={handleAddTrade}
+                  onCancelEdit={() => setEditingTrade(null)}
+                />
               </div>
             )}
 
