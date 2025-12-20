@@ -25,9 +25,8 @@ import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
-import { Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Switch } from "@/components/ui/switch";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
@@ -378,13 +377,11 @@ const Index = () => {
 
         {/* Theme switch for chart page - bottom center */}
         {isChartPage && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 glass-strong rounded-xl px-3 py-2 shadow-lg">
-            <Sun className="w-4 h-4 text-muted-foreground" />
-            <Switch
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-10">
+            <ThemeToggle
               checked={theme === 'dark'}
               onCheckedChange={(checked) => setThemeWithTransition(checked ? 'dark' : 'light', setTheme)}
             />
-            <Moon className="w-4 h-4 text-muted-foreground" />
           </div>
         )}
 
