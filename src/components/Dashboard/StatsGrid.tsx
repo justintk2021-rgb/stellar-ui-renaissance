@@ -8,6 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceL
 import { motion } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { WinRatioCard } from "./WinRatioCard";
 
 interface StatsGridProps {
   trades: Trade[];
@@ -340,36 +341,8 @@ export function StatsGrid({ trades }: StatsGridProps) {
 
       {/* Main Content Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left Column - Win Rate Cards */}
-        <div className="space-y-4">
-          {/* Winning % By Trades */}
-          <div className="glass rounded-xl p-5 border border-border/40">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-medium">Winning % By Trades</span>
-              <InfoTooltip content="Percentage of winning trades out of total trades" />
-            </div>
-            <LargeCircularProgress 
-              value={winRate}
-              winners={stats.wins}
-              losers={stats.losses}
-              label="WINRATE"
-            />
-          </div>
-
-          {/* Winning % By Days */}
-          <div className="glass rounded-xl p-5 border border-border/40">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-medium">Winning % By Days</span>
-              <InfoTooltip content="Percentage of profitable trading days" />
-            </div>
-            <LargeCircularProgress 
-              value={dayWinRate}
-              winners={profitableDays}
-              losers={losingDays}
-              label="WINRATE"
-            />
-          </div>
-        </div>
+        {/* Left Column - Win Ratio Card */}
+        <WinRatioCard trades={trades} />
 
         {/* Right Column - P&L Chart */}
         <motion.div 
