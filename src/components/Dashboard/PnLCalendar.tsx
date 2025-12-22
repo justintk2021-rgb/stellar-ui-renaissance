@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Trade, DailyStats, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote, Settings } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote, Settings, X, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Link2, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -421,52 +421,91 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
         </div>
       </div>
 
-      {/* Note Dialog */}
+      {/* Note Dialog - Styled like reference image */}
       <Dialog open={!!noteDialogDate} onOpenChange={() => { setNoteDialogDate(null); setNoteTitle(""); setNoteContent(""); }}>
-        <DialogContent className="sm:max-w-md glass border-border/50 bg-card/95 backdrop-blur-xl">
-          <DialogHeader className="pb-4 border-b border-border/30">
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary" />
-              {noteDialogDate && formatDate(noteDialogDate)}
-            </DialogTitle>
-            <p className="text-xs text-muted-foreground mt-1">Add a note for this day</p>
-          </DialogHeader>
-          
-          <div className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Title</label>
-              <Input
-                value={noteTitle}
-                onChange={(e) => setNoteTitle(e.target.value)}
-                placeholder="Note title..."
-                className="bg-background/50 border-border/50"
-              />
+        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden border-0 bg-transparent shadow-2xl">
+          <div className="relative rounded-2xl overflow-hidden backdrop-blur-xl bg-background/80 border border-border/50">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border/30">
+              <h2 className="text-xl font-bold text-foreground">Notes</h2>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => { setNoteDialogDate(null); setNoteTitle(""); setNoteContent(""); }}
+                  className="h-9 px-4 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Discard
+                </Button>
+                <Button 
+                  size="sm"
+                  onClick={saveNote}
+                  disabled={!noteContent.trim()}
+                  className="h-9 px-4 text-sm bg-primary hover:bg-primary/90"
+                >
+                  Save & Close
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => { setNoteDialogDate(null); setNoteTitle(""); setNoteContent(""); }}
+                  className="h-9 w-9 rounded-full"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Content</label>
+
+            {/* Formatting Toolbar */}
+            <div className="flex items-center gap-1 px-6 py-3 border-b border-border/20 bg-muted/20">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
+                <Bold className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
+                <Italic className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
+                <Underline className="w-4 h-4" />
+              </Button>
+              <div className="w-px h-5 bg-border/50 mx-2" />
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
+                <AlignLeft className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
+                <AlignCenter className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
+                <AlignRight className="w-4 h-4" />
+              </Button>
+              <div className="w-px h-5 bg-border/50 mx-2" />
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
+                <Link2 className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
+                <Quote className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Content Area */}
+            <div className="p-6 space-y-4">
+              {/* Title Input */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</label>
+                <Input
+                  value={noteTitle}
+                  onChange={(e) => setNoteTitle(e.target.value)}
+                  placeholder="Enter note title..."
+                  className="bg-transparent border-0 border-b border-border/30 rounded-none px-0 text-lg font-semibold placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary"
+                />
+              </div>
+              
+              {/* Content Textarea */}
               <Textarea
                 value={noteContent}
                 onChange={(e) => setNoteContent(e.target.value)}
                 placeholder="Write your thoughts, observations, market analysis..."
-                className="min-h-[150px] bg-background/50 border-border/50 resize-none"
+                className="min-h-[280px] bg-transparent border-0 resize-none text-sm leading-relaxed placeholder:text-muted-foreground/50 focus-visible:ring-0"
               />
-            </div>
-            
-            <div className="flex gap-2 pt-2">
-              <Button 
-                onClick={saveNote}
-                className="flex-1"
-                disabled={!noteContent.trim()}
-              >
-                Save Note
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => { setNoteDialogDate(null); setNoteTitle(""); setNoteContent(""); }}
-              >
-                Cancel
-              </Button>
             </div>
           </div>
         </DialogContent>
@@ -491,7 +530,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                   className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                 >
                   <FileText className="w-3.5 h-3.5 mr-1" />
-                  {dailyNotes[selectedDate]?.length > 0 ? "Edit Note" : "Add Note"}
+                  View Notes
                 </Button>
               )}
             </div>
@@ -618,34 +657,6 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 )}
               </div>
 
-              {/* Notes Section */}
-              {selectedDate && dailyNotes[selectedDate]?.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => openNoteDialog(selectedDate, e)}
-                      className="h-7 text-xs"
-                    >
-                      <FileText className="w-3 h-3 mr-1" />
-                      Edit Note
-                    </Button>
-                  </div>
-                  <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
-                    {dailyNotes[selectedDate].map((note) => (
-                      <div 
-                        key={note.id}
-                        className="p-3 rounded-lg bg-secondary/10 border border-secondary/30"
-                      >
-                        <h4 className="text-sm font-medium mb-1">{note.title}</h4>
-                        <p className="text-xs text-muted-foreground line-clamp-3">{note.content}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
 
               {/* Individual Trades */}
