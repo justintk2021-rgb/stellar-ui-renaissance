@@ -1,8 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { Trade, DailyStats, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote, Settings, X, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Link2, Quote } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote, Settings, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Link2, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -17,9 +17,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { toast } from "sonner";
 
@@ -57,6 +57,19 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
   const [noteDialogDate, setNoteDialogDate] = useState<string | null>(null);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
+  const contentEditableRef = useRef<HTMLDivElement>(null);
+
+  // Text formatting function
+  const applyFormat = useCallback((command: string, value?: string) => {
+    document.execCommand(command, false, value);
+    contentEditableRef.current?.focus();
+  }, []);
+
+  const handleContentChange = useCallback(() => {
+    if (contentEditableRef.current) {
+      setNoteContent(contentEditableRef.current.innerHTML);
+    }
+  }, []);
 
   // Get daily notes (non-trade linked entries by date)
   const dailyNotes: Record<string, NotebookEntry[]> = {};
@@ -421,93 +434,140 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
         </div>
       </div>
 
-      {/* Note Dialog - Styled like reference image */}
+      {/* Note Dialog - Styled like reference image with animation */}
       <Dialog open={!!noteDialogDate} onOpenChange={() => { setNoteDialogDate(null); setNoteTitle(""); setNoteContent(""); }}>
-        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden border-0 bg-transparent shadow-2xl">
-          <div className="relative rounded-2xl overflow-hidden backdrop-blur-xl bg-background/80 border border-border/50">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/30">
-              <h2 className="text-xl font-bold text-foreground">Notes</h2>
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => { setNoteDialogDate(null); setNoteTitle(""); setNoteContent(""); }}
-                  className="h-9 px-4 text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Discard
-                </Button>
-                <Button 
-                  size="sm"
-                  onClick={saveNote}
-                  disabled={!noteContent.trim()}
-                  className="h-9 px-4 text-sm bg-primary hover:bg-primary/90"
-                >
-                  Save & Close
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => { setNoteDialogDate(null); setNoteTitle(""); setNoteContent(""); }}
-                  className="h-9 w-9 rounded-full"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden">
+          <AnimatePresence>
+            {noteDialogDate && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="relative rounded-2xl overflow-hidden backdrop-blur-xl bg-background/95 border border-border/50"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border/30">
+                  <h2 className="text-xl font-bold text-foreground">Notes</h2>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => { setNoteDialogDate(null); setNoteTitle(""); setNoteContent(""); }}
+                      className="h-9 px-4 text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      Discard
+                    </Button>
+                    <Button 
+                      size="sm"
+                      onClick={saveNote}
+                      disabled={!noteContent.trim() && !contentEditableRef.current?.innerText.trim()}
+                      className="h-9 px-4 text-sm bg-primary hover:bg-primary/90"
+                    >
+                      Save & Close
+                    </Button>
+                  </div>
+                </div>
 
-            {/* Formatting Toolbar */}
-            <div className="flex items-center gap-1 px-6 py-3 border-b border-border/20 bg-muted/20">
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                <Bold className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                <Italic className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                <Underline className="w-4 h-4" />
-              </Button>
-              <div className="w-px h-5 bg-border/50 mx-2" />
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                <AlignLeft className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                <AlignCenter className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                <AlignRight className="w-4 h-4" />
-              </Button>
-              <div className="w-px h-5 bg-border/50 mx-2" />
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                <Link2 className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                <Quote className="w-4 h-4" />
-              </Button>
-            </div>
+                {/* Formatting Toolbar */}
+                <div className="flex items-center gap-1 px-6 py-3 border-b border-border/20 bg-muted/20">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-md"
+                    onClick={() => applyFormat('bold')}
+                  >
+                    <Bold className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-md"
+                    onClick={() => applyFormat('italic')}
+                  >
+                    <Italic className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-md"
+                    onClick={() => applyFormat('underline')}
+                  >
+                    <Underline className="w-4 h-4" />
+                  </Button>
+                  <div className="w-px h-5 bg-border/50 mx-2" />
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-md"
+                    onClick={() => applyFormat('justifyLeft')}
+                  >
+                    <AlignLeft className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-md"
+                    onClick={() => applyFormat('justifyCenter')}
+                  >
+                    <AlignCenter className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-md"
+                    onClick={() => applyFormat('justifyRight')}
+                  >
+                    <AlignRight className="w-4 h-4" />
+                  </Button>
+                  <div className="w-px h-5 bg-border/50 mx-2" />
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-md"
+                    onClick={() => {
+                      const url = prompt('Enter URL:');
+                      if (url) applyFormat('createLink', url);
+                    }}
+                  >
+                    <Link2 className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-md"
+                    onClick={() => applyFormat('formatBlock', 'blockquote')}
+                  >
+                    <Quote className="w-4 h-4" />
+                  </Button>
+                </div>
 
-            {/* Content Area */}
-            <div className="p-6 space-y-4">
-              {/* Title Input */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</label>
-                <Input
-                  value={noteTitle}
-                  onChange={(e) => setNoteTitle(e.target.value)}
-                  placeholder="Enter note title..."
-                  className="bg-transparent border-0 border-b border-border/30 rounded-none px-0 text-lg font-semibold placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary"
-                />
-              </div>
-              
-              {/* Content Textarea */}
-              <Textarea
-                value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
-                placeholder="Write your thoughts, observations, market analysis..."
-                className="min-h-[280px] bg-transparent border-0 resize-none text-sm leading-relaxed placeholder:text-muted-foreground/50 focus-visible:ring-0"
-              />
-            </div>
-          </div>
+                {/* Content Area */}
+                <div className="p-6 space-y-4">
+                  {/* Title Input */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</label>
+                    <Input
+                      value={noteTitle}
+                      onChange={(e) => setNoteTitle(e.target.value)}
+                      placeholder="Enter note title..."
+                      className="bg-transparent border-0 border-b border-border/30 rounded-none px-0 text-lg font-semibold placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary"
+                    />
+                  </div>
+                  
+                  {/* Content Editable Area */}
+                  <div
+                    ref={contentEditableRef}
+                    contentEditable
+                    onInput={handleContentChange}
+                    dangerouslySetInnerHTML={{ __html: noteContent }}
+                    className="min-h-[280px] bg-transparent text-sm leading-relaxed focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/50"
+                    data-placeholder="Write your thoughts, observations, market analysis..."
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </DialogContent>
       </Dialog>
 
