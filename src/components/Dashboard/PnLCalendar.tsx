@@ -30,6 +30,11 @@ interface PnLCalendarProps {
   onSaveEntry?: (entry: NotebookEntry) => void;
 }
 
+// Get notebook entry for a specific trade
+const getTradeNotebookEntry = (notebookEntries: NotebookEntry[], tradeId: string): NotebookEntry | undefined => {
+  return notebookEntries.find(e => e.tradeId === tradeId && !e.isDeleted);
+};
+
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
@@ -54,6 +59,9 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
   });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   
+  // Note dialog state - can be for daily note or trade note
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [noteDialogTradeId, setNoteDialogTradeId] = useState<string | null>(null);
   const [noteDialogDate, setNoteDialogDate] = useState<string | null>(null);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
@@ -196,7 +204,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const openNoteDialog = (dateStr: string, e: React.MouseEvent) => {
+  const openDailyNoteDialog = (dateStr: string, e: React.MouseEvent) => {
     e.stopPropagation();
     // Check if there's an existing note for this date
     const existingNote = dailyNotes[dateStr]?.[0];
@@ -207,30 +215,88 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
       setNoteTitle(`Daily Note - ${formatDate(dateStr)}`);
       setNoteContent("");
     }
+    setNoteDialogTradeId(null);
     setNoteDialogDate(dateStr);
+    setNoteDialogOpen(true);
+  };
+
+  const openTradeNoteDialog = (trade: Trade, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const existingEntry = getTradeNotebookEntry(notebookEntries, trade.id);
+    if (existingEntry) {
+      setNoteTitle(existingEntry.title);
+      setNoteContent(existingEntry.content);
+    } else {
+      setNoteTitle(`${trade.pair} - ${trade.direction} Trade`);
+      setNoteContent(`<h2>📋 Trade Plan</h2>
+<ul>
+  <li>Why did I take this trade?</li>
+  <li>What was my setup/strategy?</li>
+</ul>
+
+<h2>⚙️ Execution</h2>
+<ul>
+  <li>Entry point and reasoning</li>
+  <li>Trade management</li>
+  <li>Exit point</li>
+</ul>
+
+<h2>🧠 Post-Trade Review</h2>
+<ul>
+  <li>What went well?</li>
+  <li>What could be improved?</li>
+  <li>Key lessons learned</li>
+</ul>`);
+    }
+    setNoteDialogTradeId(trade.id);
+    setNoteDialogDate(trade.date);
+    setNoteDialogOpen(true);
   };
 
   const saveNote = () => {
-    if (!noteDialogDate || !onSaveEntry) return;
+    if (!onSaveEntry) return;
     
-    const existingNote = dailyNotes[noteDialogDate]?.[0];
     const now = new Date().toISOString();
     
-    const entry: NotebookEntry = {
-      id: existingNote?.id || `daily-note-${noteDialogDate}-${Date.now()}`,
-      title: noteTitle || `Daily Note - ${formatDate(noteDialogDate)}`,
-      content: noteContent,
-      category: "daily-journal",
-      date: noteDialogDate,
-      createdAt: existingNote?.createdAt || now,
-      updatedAt: now,
-    };
+    if (noteDialogTradeId) {
+      // Save trade-linked note
+      const existingEntry = getTradeNotebookEntry(notebookEntries, noteDialogTradeId);
+      const entry: NotebookEntry = {
+        id: existingEntry?.id || crypto.randomUUID(),
+        title: noteTitle,
+        content: noteContent,
+        category: "trade-notes",
+        date: noteDialogDate || new Date().toISOString().split('T')[0],
+        tradeId: noteDialogTradeId,
+        createdAt: existingEntry?.createdAt || now,
+        updatedAt: now,
+      };
+      onSaveEntry(entry);
+    } else if (noteDialogDate) {
+      // Save daily note
+      const existingNote = dailyNotes[noteDialogDate]?.[0];
+      const entry: NotebookEntry = {
+        id: existingNote?.id || `daily-note-${noteDialogDate}-${Date.now()}`,
+        title: noteTitle || `Daily Note - ${formatDate(noteDialogDate)}`,
+        content: noteContent,
+        category: "daily-journal",
+        date: noteDialogDate,
+        createdAt: existingNote?.createdAt || now,
+        updatedAt: now,
+      };
+      onSaveEntry(entry);
+    }
     
-    onSaveEntry(entry);
+    closeNoteDialog();
+    toast.success("Note saved!");
+  };
+
+  const closeNoteDialog = () => {
+    setNoteDialogOpen(false);
+    setNoteDialogTradeId(null);
     setNoteDialogDate(null);
     setNoteTitle("");
     setNoteContent("");
-    toast.success("Note saved!");
   };
 
   // Check if current view is this month
@@ -365,7 +431,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40">
-                          <DropdownMenuItem onClick={(e) => openNoteDialog(dateStr, e)}>
+                          <DropdownMenuItem onClick={(e) => openDailyNoteDialog(dateStr, e)}>
                             <FileText className="w-4 h-4 mr-2" />
                             {hasNote ? "Edit Note" : "Add Note"}
                           </DropdownMenuItem>
@@ -435,10 +501,10 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
       </div>
 
       {/* Note Dialog - Styled like reference image with animation */}
-      <Dialog open={!!noteDialogDate} onOpenChange={() => { setNoteDialogDate(null); setNoteTitle(""); setNoteContent(""); }}>
+      <Dialog open={noteDialogOpen} onOpenChange={(open) => !open && closeNoteDialog()}>
         <DialogContent className="sm:max-w-2xl p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden">
           <AnimatePresence>
-            {noteDialogDate && (
+            {noteDialogOpen && (
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -448,12 +514,14 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
               >
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border/30">
-                  <h2 className="text-xl font-bold text-foreground">Notes</h2>
+                  <h2 className="text-xl font-bold text-foreground">
+                    {noteDialogTradeId ? "Trade Notes" : "Daily Notes"}
+                  </h2>
                   <div className="flex items-center gap-2">
                     <Button 
                       variant="ghost" 
                       size="sm"
-                      onClick={() => { setNoteDialogDate(null); setNoteTitle(""); setNoteContent(""); }}
+                      onClick={closeNoteDialog}
                       className="h-9 px-4 text-sm text-muted-foreground hover:text-foreground"
                     >
                       Discard
@@ -586,11 +654,11 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={(e) => openNoteDialog(selectedDate, e)}
+                  onClick={(e) => openDailyNoteDialog(selectedDate, e)}
                   className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                 >
-                  <FileText className="w-3.5 h-3.5 mr-1" />
-                  View Notes
+                  <StickyNote className="w-3.5 h-3.5 mr-1" />
+                  Daily Notes
                 </Button>
               )}
             </div>
@@ -718,7 +786,6 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
               </div>
 
 
-
               {/* Individual Trades */}
               <div className="space-y-2">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Trade Details</span>
@@ -727,6 +794,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                     const tradeChecklist = trade.checklistId 
                       ? checklists.find(c => c.id === trade.checklistId) 
                       : null;
+                    const hasTradeNote = !!getTradeNotebookEntry(notebookEntries, trade.id);
                     
                     return (
                       <div 
@@ -748,12 +816,23 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                             </Badge>
                             <span className="text-sm font-medium">{trade.pair}</span>
                           </div>
-                          <span className={cn(
-                            "text-sm font-bold font-mono",
-                            trade.result >= 0 ? "text-primary" : "text-destructive"
-                          )}>
-                            {trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => openTradeNoteDialog(trade, e)}
+                              className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                            >
+                              <FileText className="w-3 h-3 mr-1" />
+                              {hasTradeNote ? "View Notes" : "Add Notes"}
+                            </Button>
+                            <span className={cn(
+                              "text-sm font-bold font-mono",
+                              trade.result >= 0 ? "text-primary" : "text-destructive"
+                            )}>
+                              {trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}
+                            </span>
+                          </div>
                         </div>
                         {tradeChecklist && (
                           <div className="flex items-center gap-2 pt-1 border-t border-border/20">
