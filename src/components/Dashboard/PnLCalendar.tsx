@@ -224,9 +224,15 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
     e.stopPropagation();
     const existingEntry = getTradeNotebookEntry(notebookEntries, trade.id);
     if (existingEntry) {
+      // Use notebook entry if it exists
       setNoteTitle(existingEntry.title);
       setNoteContent(existingEntry.content);
+    } else if (trade.notes) {
+      // Fall back to trade.notes field if no notebook entry exists
+      setNoteTitle(`${trade.pair} - ${trade.direction} Trade`);
+      setNoteContent(`<p>${trade.notes}</p>`);
     } else {
+      // Default template for new notes
       setNoteTitle(`${trade.pair} - ${trade.direction} Trade`);
       setNoteContent(`<h2>📋 Trade Plan</h2>
 <ul>
