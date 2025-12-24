@@ -253,13 +253,20 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
     setNoteDialogOpen(true);
   };
 
+  // Extract plain text from HTML content for syncing to trade.notes
+  const extractPlainText = (html: string): string => {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.textContent || div.innerText || '';
+  };
+
   const saveNote = () => {
     if (!onSaveEntry) return;
     
     const now = new Date().toISOString();
     
     if (noteDialogTradeId) {
-      // Save trade-linked note
+      // Save trade-linked note to notebook
       const existingEntry = getTradeNotebookEntry(notebookEntries, noteDialogTradeId);
       const entry: NotebookEntry = {
         id: existingEntry?.id || crypto.randomUUID(),
@@ -272,6 +279,12 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
         updatedAt: now,
       };
       onSaveEntry(entry);
+      
+      // Also sync plain text to trade.notes for display in TradeTable
+      if (onUpdateTrade) {
+        const plainText = extractPlainText(noteContent);
+        onUpdateTrade(noteDialogTradeId, { notes: plainText.slice(0, 500) });
+      }
     } else if (noteDialogDate) {
       // Save daily note
       const existingNote = dailyNotes[noteDialogDate]?.[0];

@@ -1,4 +1,4 @@
-import { Trade } from "@/types/trade";
+import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,13 +7,30 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface TradeTableProps {
   trades: Trade[];
+  notebookEntries?: NotebookEntry[];
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
   onSelectForNotebook: (id: string) => void;
   onClearAll?: () => void;
 }
 
-export function TradeTable({ trades, onEdit, onDelete, onSelectForNotebook, onClearAll }: TradeTableProps) {
+// Helper to extract plain text from HTML
+const extractPlainText = (html: string): string => {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent || div.innerText || '';
+};
+
+// Get notebook entry for a trade
+const getTradeNote = (entries: NotebookEntry[], tradeId: string): string => {
+  const entry = entries.find(e => e.tradeId === tradeId && !e.isDeleted);
+  if (entry) {
+    return extractPlainText(entry.content);
+  }
+  return '';
+};
+
+export function TradeTable({ trades, notebookEntries = [], onEdit, onDelete, onSelectForNotebook, onClearAll }: TradeTableProps) {
   return (
     <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
       <div className="flex items-center justify-between mb-4">
@@ -105,7 +122,11 @@ export function TradeTable({ trades, onEdit, onDelete, onSelectForNotebook, onCl
                   </div>
                   <div className="text-sm text-muted-foreground truncate col-span-2 md:col-span-1">
                     <span className="md:hidden text-[10px] uppercase tracking-wider text-muted-foreground mr-2">Notes</span>
-                    {trade.notes || <span className="italic text-muted-foreground/50">No notes</span>}
+                    {(() => {
+                      const notebookNote = getTradeNote(notebookEntries, trade.id);
+                      const displayNote = notebookNote || trade.notes;
+                      return displayNote ? displayNote : <span className="italic text-muted-foreground/50">No notes</span>;
+                    })()}
                   </div>
                   <div className="flex justify-end gap-1 col-span-2 md:col-span-1 mt-2 md:mt-0">
                     <Button

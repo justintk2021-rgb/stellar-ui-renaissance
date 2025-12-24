@@ -460,6 +460,7 @@ const Index = () => {
                 {/* Trade Table - Full Width */}
                 <TradeTable
                   trades={trades}
+                  notebookEntries={notebookEntries}
                   onEdit={(trade) => {
                     setEditingTrade(trade);
                     setIsTradeFormOpen(true);
