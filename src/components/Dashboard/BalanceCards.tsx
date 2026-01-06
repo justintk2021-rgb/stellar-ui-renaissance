@@ -2,7 +2,7 @@ import { useMemo, useState, useRef, useEffect } from "react";
 import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Settings2, Check, X, MoreHorizontal } from "lucide-react";
+import { Check, X, MoreHorizontal, Target } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
 import {
   AreaChart,
@@ -13,7 +13,9 @@ import {
 interface BalanceCardsProps {
   trades: Trade[];
   startBalance: number;
+  goalBalance: number | null;
   onSetBalance: (balance: number) => void;
+  onSetGoalBalance: (balance: number) => void;
 }
 
 interface AnimatedValueProps {
@@ -76,10 +78,13 @@ function Sparkline({ data, isPositive, height = 40 }: SparklineProps) {
   );
 }
 
-export function BalanceCards({ trades, startBalance, onSetBalance }: BalanceCardsProps) {
+export function BalanceCards({ trades, startBalance, goalBalance, onSetBalance, onSetGoalBalance }: BalanceCardsProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [editValue, setEditValue] = useState(startBalance.toString());
+  const [editGoalValue, setEditGoalValue] = useState((goalBalance || 0).toString());
   const inputRef = useRef<HTMLInputElement>(null);
+  const goalInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isEditing) {
@@ -88,11 +93,24 @@ export function BalanceCards({ trades, startBalance, onSetBalance }: BalanceCard
   }, [startBalance, isEditing]);
 
   useEffect(() => {
+    if (!isEditingGoal) {
+      setEditGoalValue((goalBalance || 0).toString());
+    }
+  }, [goalBalance, isEditingGoal]);
+
+  useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
   }, [isEditing]);
+
+  useEffect(() => {
+    if (isEditingGoal && goalInputRef.current) {
+      goalInputRef.current.focus();
+      goalInputRef.current.select();
+    }
+  }, [isEditingGoal]);
 
   const handleStartEdit = () => {
     setEditValue(startBalance.toString());
@@ -115,6 +133,30 @@ export function BalanceCards({ trades, startBalance, onSetBalance }: BalanceCard
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleConfirm();
     if (e.key === "Escape") handleCancel();
+  };
+
+  // Goal balance handlers
+  const handleStartEditGoal = () => {
+    setEditGoalValue((goalBalance || 0).toString());
+    setIsEditingGoal(true);
+  };
+
+  const handleConfirmGoal = () => {
+    const value = parseFloat(editGoalValue);
+    if (!isNaN(value) && value >= 0) {
+      onSetGoalBalance(value);
+    }
+    setIsEditingGoal(false);
+  };
+
+  const handleCancelGoal = () => {
+    setEditGoalValue((goalBalance || 0).toString());
+    setIsEditingGoal(false);
+  };
+
+  const handleKeyDownGoal = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleConfirmGoal();
+    if (e.key === "Escape") handleCancelGoal();
   };
 
   const { currentBalance, balanceChange, balancePercent, profit, profitPercent, fees, highestBalance, sparklineData } = useMemo(() => {
@@ -264,34 +306,88 @@ export function BalanceCards({ trades, startBalance, onSetBalance }: BalanceCard
         </div>
       </div>
 
-      {/* Fees Card */}
+      {/* Goal Balance Card */}
       <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
         <div className="flex items-center justify-between mb-4">
-          <span className="text-sm text-muted-foreground">Fees</span>
+          <span className="text-sm text-muted-foreground">Goal Balance</span>
+          <div className="flex items-center gap-2">
+            <Target className="w-4 h-4 text-primary" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              onClick={handleStartEditGoal}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
         
         <div className="space-y-3">
           <div className="flex items-baseline gap-2">
-            <AnimatedValue 
-              value={fees} 
-              prefix="$" 
-              className="text-2xl font-bold font-mono"
-            />
+            {isEditingGoal ? (
+              <div className="flex items-center gap-1">
+                <span className="text-2xl font-bold font-mono">$</span>
+                <Input
+                  ref={goalInputRef}
+                  type="number"
+                  value={editGoalValue}
+                  onChange={(e) => setEditGoalValue(e.target.value)}
+                  onKeyDown={handleKeyDownGoal}
+                  className="w-32 h-8 text-2xl font-bold font-mono px-2 py-0 bg-background/50 border-primary/50"
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-primary hover:bg-primary/20"
+                  onClick={handleConfirmGoal}
+                >
+                  <Check className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
+                  onClick={handleCancelGoal}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <AnimatedValue 
+                  value={goalBalance || 0} 
+                  prefix="$" 
+                  className="text-2xl font-bold font-mono"
+                />
+                {goalBalance && goalBalance > 0 && (
+                  <span className={`text-xs font-medium ${currentBalance >= goalBalance ? 'text-primary' : 'text-muted-foreground'}`}>
+                    {currentBalance >= goalBalance ? '✓ Reached' : `${(((goalBalance - currentBalance) / goalBalance) * 100).toFixed(1)}% away`}
+                  </span>
+                )}
+              </>
+            )}
           </div>
           
           <div>
-            <div className="text-xs text-muted-foreground mb-0.5">Last transaction</div>
-            <span className="text-sm font-semibold font-mono text-destructive">
-              {trades.length > 0 ? (
-                <AnimatedValue 
-                  value={Math.abs(trades[trades.length - 1]?.result || 0) * 0.01} 
-                  prefix="-$" 
-                  className="text-sm font-semibold font-mono text-destructive"
-                />
-              ) : (
-                "$0.00"
-              )}
-            </span>
+            <div className="text-xs text-muted-foreground mb-0.5">Progress</div>
+            {goalBalance && goalBalance > 0 ? (
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-primary rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, (currentBalance / goalBalance) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-sm font-semibold font-mono">
+                  {Math.min(100, (currentBalance / goalBalance) * 100).toFixed(0)}%
+                </span>
+              </div>
+            ) : (
+              <span className="text-sm font-semibold font-mono text-muted-foreground">
+                Set a goal to track progress
+              </span>
+            )}
           </div>
         </div>
       </div>

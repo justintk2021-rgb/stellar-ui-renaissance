@@ -314,6 +314,12 @@ const Index = () => {
     }
   }, [selectedAccountId, updateAccount]);
 
+  const handleSetGoalBalance = useCallback(async (value: number) => {
+    if (selectedAccountId) {
+      await updateAccount(selectedAccountId, { goal_balance: value });
+    }
+  }, [selectedAccountId, updateAccount]);
+
   const handleSaveNotes = useCallback(async (id: string, notes: string) => {
     await updateTrade(id, { notebook: notes });
   }, [updateTrade]);
@@ -415,7 +421,9 @@ const Index = () => {
                 <BalanceCards
                   trades={trades}
                   startBalance={accountStartBalance}
+                  goalBalance={selectedAccount?.goal_balance || null}
                   onSetBalance={handleSetBalance}
+                  onSetGoalBalance={handleSetGoalBalance}
                 />
                 <StatsGrid trades={trades} />
                 <PnLCalendar 

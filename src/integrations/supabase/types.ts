@@ -413,6 +413,7 @@ export type Database = {
           broker: string | null
           created_at: string
           currency: string
+          goal_balance: number | null
           id: string
           is_default: boolean
           name: string
@@ -424,6 +425,7 @@ export type Database = {
           broker?: string | null
           created_at?: string
           currency?: string
+          goal_balance?: number | null
           id?: string
           is_default?: boolean
           name: string
@@ -435,6 +437,7 @@ export type Database = {
           broker?: string | null
           created_at?: string
           currency?: string
+          goal_balance?: number | null
           id?: string
           is_default?: boolean
           name?: string
