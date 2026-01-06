@@ -1,9 +1,17 @@
+import { useState } from "react";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, ChevronRight, FileText } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface TradeTableProps {
   trades: Trade[];
@@ -22,122 +30,242 @@ const extractPlainText = (html: string): string => {
 };
 
 // Get notebook entry for a trade
-const getTradeNote = (entries: NotebookEntry[], tradeId: string): string => {
-  const entry = entries.find(e => e.tradeId === tradeId && !e.isDeleted);
+const getTradeNote = (entries: NotebookEntry[], tradeId: string): NotebookEntry | undefined => {
+  return entries.find(e => e.tradeId === tradeId && !e.isDeleted);
+};
+
+// Get notebook entry content as plain text
+const getTradeNoteText = (entries: NotebookEntry[], tradeId: string): string => {
+  const entry = getTradeNote(entries, tradeId);
   if (entry) {
     return extractPlainText(entry.content);
   }
   return '';
 };
 
-export function TradeTable({ trades, notebookEntries = [], onEdit, onDelete, onSelectForNotebook, onClearAll }: TradeTableProps) {
+// Group trades by date
+const groupTradesByDate = (trades: Trade[]) => {
+  const groups: Record<string, Trade[]> = {};
+  trades.forEach(trade => {
+    const date = trade.date || 'Unknown';
+    if (!groups[date]) {
+      groups[date] = [];
+    }
+    groups[date].push(trade);
+  });
+  return groups;
+};
+
+// Calculate metrics for a group of trades
+const calculateGroupMetrics = (trades: Trade[]) => {
+  const totalTrades = trades.length;
+  const winners = trades.filter(t => (t.result || 0) > 0).length;
+  const losers = trades.filter(t => (t.result || 0) < 0).length;
+  const winRate = totalTrades > 0 ? (winners / totalTrades) * 100 : 0;
+  
+  const grossPnL = trades.reduce((sum, t) => sum + (t.result || 0), 0);
+  const totalWins = trades.filter(t => (t.result || 0) > 0).reduce((sum, t) => sum + (t.result || 0), 0);
+  const totalLosses = Math.abs(trades.filter(t => (t.result || 0) < 0).reduce((sum, t) => sum + (t.result || 0), 0));
+  const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? Infinity : 0;
+  
+  return {
+    totalTrades,
+    winners,
+    losers,
+    winRate,
+    grossPnL,
+    profitFactor,
+  };
+};
+
+// Format date for display
+const formatDate = (dateStr: string) => {
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+};
+
+interface TradeRowGroupProps {
+  date: string;
+  trades: Trade[];
+  notebookEntries: NotebookEntry[];
+  onEdit: (trade: Trade) => void;
+  onDelete: (id: string) => void;
+  onViewNotes: (trade: Trade) => void;
+}
+
+function TradeRowGroup({ date, trades, notebookEntries, onEdit, onDelete, onViewNotes }: TradeRowGroupProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const metrics = calculateGroupMetrics(trades);
+  const isProfit = metrics.grossPnL >= 0;
+
   return (
-    <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-base font-semibold">Trade Log</h3>
-          <p className="text-xs text-muted-foreground mt-1">Click a row to view notes</p>
+    <div className="border-b border-border/20">
+      {/* Collapsed Header Row */}
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={cn(
+          "flex items-center gap-4 px-4 py-3 cursor-pointer transition-all duration-200",
+          "hover:bg-primary/5",
+          isExpanded && "bg-muted/20"
+        )}
+      >
+        <motion.div
+          animate={{ rotate: isExpanded ? 90 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </motion.div>
+        
+        <div className="flex-1 flex items-center gap-6 flex-wrap">
+          <span className="text-sm font-medium min-w-[160px]">{formatDate(date)}</span>
+          <span className={cn(
+            "text-sm font-bold font-mono",
+            isProfit ? "text-primary" : "text-destructive"
+          )}>
+            Net P&L {isProfit ? '+' : ''}{metrics.grossPnL.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          {trades.length > 0 && onClearAll && (
-            <ConfirmDialog
-              trigger={
-                <Button variant="outline" size="sm" className="text-xs border-destructive/30 text-destructive hover:bg-destructive/10">
-                  Clear All
-                </Button>
-              }
-              title="Delete All Trades"
-              description="This will permanently delete all your trades. This action cannot be undone."
-              confirmLabel="Delete All"
-              variant="destructive"
-              onConfirm={onClearAll}
-            />
+
+        {/* Quick Actions for first trade */}
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          {trades.length === 1 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onViewNotes(trades[0])}
+              className="h-7 px-3 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+            >
+              <FileText className="w-3 h-3" />
+              View Note
+            </Button>
           )}
-          <Badge variant="outline" className="border-secondary/40 text-muted-foreground text-xs">
-            History
-          </Badge>
         </div>
       </div>
 
-      <div className="rounded-xl border border-secondary/30 overflow-hidden bg-card">
-        {/* Header */}
-        <div className="hidden md:grid grid-cols-[80px_100px_70px_90px_1fr_80px] gap-2 px-4 py-3 bg-muted/30 border-b border-secondary/30">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Date</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Pair</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Side</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">P/L</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Notes</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground text-right">Actions</div>
-        </div>
+      {/* Expanded Content */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            {/* Metrics Bar */}
+            <div className="px-4 py-4 bg-muted/10 border-t border-border/20">
+              <div className="flex items-start gap-8 flex-wrap">
+                {/* Mini Chart Placeholder */}
+                <div className="w-32 h-16 bg-gradient-to-t from-primary/20 to-transparent rounded-lg flex items-end justify-center overflow-hidden">
+                  <div className="w-full h-full flex items-end gap-0.5 px-2 pb-1">
+                    {trades.map((trade, i) => {
+                      const height = Math.min(Math.abs(trade.result || 0) / (Math.max(...trades.map(t => Math.abs(t.result || 0))) || 1) * 100, 100);
+                      return (
+                        <div
+                          key={i}
+                          className={cn(
+                            "flex-1 rounded-t-sm min-w-1",
+                            (trade.result || 0) >= 0 ? "bg-primary/60" : "bg-destructive/60"
+                          )}
+                          style={{ height: `${Math.max(height, 10)}%` }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
 
-        {/* Body */}
-        <div className="max-h-[calc(100vh-320px)] min-h-[400px] overflow-y-auto custom-scrollbar">
-          {trades.length === 0 ? (
-            <div className="px-4 py-16 text-center text-sm text-muted-foreground">
-              No trades yet. Click "Add New Trade" to log your first trade.
+                {/* Metrics Grid */}
+                <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-2">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Trades</div>
+                    <div className="text-lg font-bold">{metrics.totalTrades}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Winners</div>
+                    <div className="text-lg font-bold text-primary">{metrics.winners}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Losers</div>
+                    <div className="text-lg font-bold text-destructive">{metrics.losers}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Win Rate</div>
+                    <div className="text-lg font-bold">{metrics.winRate.toFixed(1)}%</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Gross P&L</div>
+                    <div className={cn("text-lg font-bold font-mono", isProfit ? "text-primary" : "text-destructive")}>
+                      ${Math.abs(metrics.grossPnL).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Profit Factor</div>
+                    <div className="text-lg font-bold">
+                      {metrics.profitFactor === Infinity ? '∞' : metrics.profitFactor.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          ) : (
-            trades.map((trade, index) => {
-              const pl = trade.result || 0;
-              const isProfit = pl >= 0;
 
-              return (
-                <div
-                  key={trade.id}
-                  onClick={() => onSelectForNotebook(trade.id)}
-                  className={cn(
-                    "grid grid-cols-2 md:grid-cols-[80px_100px_70px_90px_1fr_80px] gap-2 px-4 py-3 cursor-pointer transition-all duration-200 border-b border-border/20",
-                    index % 2 === 0 ? "bg-card/50" : "bg-muted/10",
-                    "hover:bg-primary/5"
-                  )}
-                >
-                  <div className="text-sm">
-                    <span className="md:hidden text-[10px] uppercase tracking-wider text-muted-foreground mr-2">Date</span>
-                    {trade.date || '-'}
-                  </div>
-                  <div className="text-sm font-medium">
-                    <span className="md:hidden text-[10px] uppercase tracking-wider text-muted-foreground mr-2">Pair</span>
-                    {trade.pair || '-'}
-                  </div>
-                  <div className="text-sm">
-                    <span className="md:hidden text-[10px] uppercase tracking-wider text-muted-foreground mr-2">Side</span>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-[10px] px-2 py-0",
-                        trade.direction === 'Long'
-                          ? "border-primary/50 text-primary"
-                          : "border-destructive/50 text-destructive"
+            {/* Individual Trades */}
+            <div className="divide-y divide-border/10">
+              {trades.map((trade) => {
+                const pl = trade.result || 0;
+                const tradeIsProfit = pl >= 0;
+
+                return (
+                  <div
+                    key={trade.id}
+                    className="grid grid-cols-[1fr_80px_100px_auto] gap-4 px-4 py-2.5 pl-10 bg-card/30 hover:bg-muted/10 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium">{trade.pair || '-'}</span>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px] px-2 py-0",
+                          trade.direction === 'Long'
+                            ? "border-primary/50 text-primary"
+                            : "border-destructive/50 text-destructive"
+                        )}
+                      >
+                        {trade.direction}
+                      </Badge>
+                      {trade.session && (
+                        <span className="text-xs text-muted-foreground">{trade.session}</span>
                       )}
-                    >
-                      {trade.direction}
-                    </Badge>
-                  </div>
-                  <div className={cn(
-                    "text-sm font-bold font-mono",
-                    isProfit ? "text-primary" : "text-destructive"
-                  )}>
-                    <span className="md:hidden text-[10px] uppercase tracking-wider text-muted-foreground mr-2">P/L</span>
-                    {isProfit ? '+' : ''}{pl.toFixed(2)}
-                  </div>
-                  <div className="text-sm text-muted-foreground truncate col-span-2 md:col-span-1">
-                    <span className="md:hidden text-[10px] uppercase tracking-wider text-muted-foreground mr-2">Notes</span>
-                    {(() => {
-                      const notebookNote = getTradeNote(notebookEntries, trade.id);
-                      const displayNote = notebookNote || trade.notes;
-                      return displayNote ? displayNote : <span className="italic text-muted-foreground/50">No notes</span>;
-                    })()}
-                  </div>
-                  <div className="flex justify-end gap-1 col-span-2 md:col-span-1 mt-2 md:mt-0">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={(e) => { e.stopPropagation(); onEdit(trade); }}
-                      className="w-7 h-7 rounded-full border-border/50 hover:border-primary/50 hover:bg-primary/10"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </Button>
+                    </div>
+                    <div className={cn(
+                      "text-sm font-bold font-mono",
+                      tradeIsProfit ? "text-primary" : "text-destructive"
+                    )}>
+                      {tradeIsProfit ? '+' : ''}{pl.toFixed(2)}
+                    </div>
                     <div onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onViewNotes(trade)}
+                        className="h-7 px-3 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                      >
+                        <FileText className="w-3 h-3" />
+                        View Note
+                      </Button>
+                    </div>
+                    <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => onEdit(trade)}
+                        className="w-7 h-7 rounded-full border-border/50 hover:border-primary/50 hover:bg-primary/10"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </Button>
                       <ConfirmDialog
                         trigger={
                           <Button
@@ -156,12 +284,127 @@ export function TradeTable({ trades, notebookEntries = [], onEdit, onDelete, onS
                       />
                     </div>
                   </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export function TradeTable({ trades, notebookEntries = [], onEdit, onDelete, onSelectForNotebook, onClearAll }: TradeTableProps) {
+  const [notesModalOpen, setNotesModalOpen] = useState(false);
+  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+
+  const groupedTrades = groupTradesByDate(trades);
+  const sortedDates = Object.keys(groupedTrades).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+  const handleViewNotes = (trade: Trade) => {
+    setSelectedTrade(trade);
+    setNotesModalOpen(true);
+  };
+
+  const selectedTradeNote = selectedTrade 
+    ? getTradeNote(notebookEntries, selectedTrade.id)
+    : null;
+  const selectedTradeNoteText = selectedTrade
+    ? (selectedTradeNote ? extractPlainText(selectedTradeNote.content) : selectedTrade.notes || '')
+    : '';
+
+  return (
+    <>
+      <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-semibold">Trade Log</h3>
+            <p className="text-xs text-muted-foreground mt-1">Click a row to expand details</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {trades.length > 0 && onClearAll && (
+              <ConfirmDialog
+                trigger={
+                  <Button variant="outline" size="sm" className="text-xs border-destructive/30 text-destructive hover:bg-destructive/10">
+                    Clear All
+                  </Button>
+                }
+                title="Delete All Trades"
+                description="This will permanently delete all your trades. This action cannot be undone."
+                confirmLabel="Delete All"
+                variant="destructive"
+                onConfirm={onClearAll}
+              />
+            )}
+            <Badge variant="outline" className="border-secondary/40 text-muted-foreground text-xs">
+              History
+            </Badge>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-secondary/30 overflow-hidden bg-card">
+          {/* Body */}
+          <div className="max-h-[calc(100vh-320px)] min-h-[400px] overflow-y-auto custom-scrollbar">
+            {trades.length === 0 ? (
+              <div className="px-4 py-16 text-center text-sm text-muted-foreground">
+                No trades yet. Click "Add New Trade" to log your first trade.
+              </div>
+            ) : (
+              sortedDates.map((date) => (
+                <TradeRowGroup
+                  key={date}
+                  date={date}
+                  trades={groupedTrades[date]}
+                  notebookEntries={notebookEntries}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onViewNotes={handleViewNotes}
+                />
+              ))
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Notes Modal */}
+      <Dialog open={notesModalOpen} onOpenChange={setNotesModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Trade Notes - {selectedTrade?.pair} ({selectedTrade?.date})
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto mt-4">
+            {selectedTradeNote ? (
+              <div 
+                className="prose prose-sm dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: selectedTradeNote.content }}
+              />
+            ) : selectedTrade?.notes ? (
+              <p className="text-sm text-foreground whitespace-pre-wrap">{selectedTrade.notes}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">No notes for this trade.</p>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border/40 flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (selectedTrade) {
+                  onSelectForNotebook(selectedTrade.id);
+                  setNotesModalOpen(false);
+                }
+              }}
+            >
+              Edit in Notebook
+            </Button>
+            <Button onClick={() => setNotesModalOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
