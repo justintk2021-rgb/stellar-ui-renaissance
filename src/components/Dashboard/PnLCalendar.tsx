@@ -411,10 +411,10 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
             </div>
 
             {/* Calendar cells */}
-            <div className="grid grid-cols-7 gap-2">
+            <div key={`${year}-${month}`} className="grid grid-cols-7 gap-2">
               {/* Empty cells before first day */}
               {Array.from({ length: firstDayIndex }).map((_, i) => (
-                <div key={`empty-${i}`} className="min-h-[90px]" />
+                <div key={`empty-${year}-${month}-${i}`} className="min-h-[90px]" />
               ))}
 
               {/* Day cells */}
@@ -428,7 +428,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
 
                 return (
                   <div
-                    key={day}
+                    key={dateStr}
                     onClick={() => handleDayClick(dateStr, hasTrades)}
                     className={cn(
                       "relative min-h-[90px] rounded-xl p-2 transition-all duration-200 group border hover:scale-[1.03] hover:-translate-y-0.5 hover:shadow-lg",
