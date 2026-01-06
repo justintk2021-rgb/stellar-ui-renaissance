@@ -1,3 +1,10 @@
+export interface ChecklistItemState {
+  id: string;
+  text: string;
+  checked: boolean;
+  percentage?: number;
+}
+
 export interface Trade {
   id: string;
   date: string;
@@ -10,6 +17,7 @@ export interface Trade {
   chartImage?: string; // Base64 image of trade chart with entry/TP/SL
   accountId?: string; // Trading account this trade belongs to
   checklistId?: string; // Checklist used for this trade
+  checklistState?: ChecklistItemState[]; // State of checklist items at trade time
 }
 
 export interface DailyStats {

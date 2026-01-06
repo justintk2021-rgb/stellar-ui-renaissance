@@ -344,6 +344,7 @@ export type Database = {
           account_id: string | null
           chart_image: string | null
           checklist_id: string | null
+          checklist_state: Json | null
           created_at: string
           date: string
           direction: string
@@ -361,6 +362,7 @@ export type Database = {
           account_id?: string | null
           chart_image?: string | null
           checklist_id?: string | null
+          checklist_state?: Json | null
           created_at?: string
           date: string
           direction: string
@@ -378,6 +380,7 @@ export type Database = {
           account_id?: string | null
           chart_image?: string | null
           checklist_id?: string | null
+          checklist_state?: Json | null
           created_at?: string
           date?: string
           direction?: string
