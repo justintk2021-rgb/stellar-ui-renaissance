@@ -3,14 +3,22 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 
+interface DayPnL {
+  date: string;
+  pnl: number;
+}
+
 interface MiniCalendarProps {
   selectedDate?: Date;
   onSelectDate?: (date: Date) => void;
-  tradeDates?: string[];
+  dayPnLs?: DayPnL[];
 }
 
-export function MiniCalendar({ selectedDate, onSelectDate, tradeDates = [] }: MiniCalendarProps) {
+export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [] }: MiniCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  // Create a map for quick lookup
+  const pnlMap = new Map(dayPnLs.map(d => [d.date, d.pnl]));
 
   const renderHeader = () => {
     return (
@@ -64,7 +72,10 @@ export function MiniCalendar({ selectedDate, onSelectDate, tradeDates = [] }: Mi
       for (let i = 0; i < 7; i++) {
         const cloneDay = day;
         const dateStr = format(day, "yyyy-MM-dd");
-        const hasTrade = tradeDates.includes(dateStr);
+        const dayPnL = pnlMap.get(dateStr);
+        const hasTrade = dayPnL !== undefined;
+        const isWinning = hasTrade && dayPnL > 0;
+        const isLosing = hasTrade && dayPnL < 0;
         const isSelected = selectedDate && isSameDay(day, selectedDate);
         const isCurrentMonth = isSameMonth(day, monthStart);
         const isToday = isSameDay(day, new Date());
@@ -76,15 +87,22 @@ export function MiniCalendar({ selectedDate, onSelectDate, tradeDates = [] }: Mi
             className={cn(
               "relative aspect-square flex items-center justify-center text-xs rounded-md transition-all",
               !isCurrentMonth && "text-muted-foreground/40",
-              isCurrentMonth && "text-foreground hover:bg-muted",
-              isToday && !isSelected && "bg-muted font-semibold",
+              isCurrentMonth && !hasTrade && "text-foreground hover:bg-muted",
+              isToday && !isSelected && !hasTrade && "bg-muted font-semibold",
               isSelected && "bg-primary text-primary-foreground font-semibold",
-              hasTrade && !isSelected && "bg-primary/20 text-primary font-medium"
+              isWinning && !isSelected && "bg-emerald-500/20 text-emerald-500 font-medium",
+              isLosing && !isSelected && "bg-red-500/20 text-red-500 font-medium",
+              hasTrade && dayPnL === 0 && !isSelected && "bg-muted text-muted-foreground font-medium"
             )}
           >
             {format(day, "d")}
             {hasTrade && !isSelected && (
-              <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
+              <span className={cn(
+                "absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full",
+                isWinning && "bg-emerald-500",
+                isLosing && "bg-red-500",
+                dayPnL === 0 && "bg-muted-foreground"
+              )} />
             )}
           </button>
         );
@@ -101,7 +119,7 @@ export function MiniCalendar({ selectedDate, onSelectDate, tradeDates = [] }: Mi
   };
 
   return (
-    <div className="p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
+    <div className="p-4 rounded-xl bg-card/50 backdrop-blur-sm">
       {renderHeader()}
       {renderDays()}
       {renderCells()}

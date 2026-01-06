@@ -492,7 +492,13 @@ const Index = () => {
                   {/* Mini Calendar Sidebar */}
                   <div className="hidden lg:block w-64 flex-shrink-0">
                     <MiniCalendar 
-                      tradeDates={trades.map(t => t.date)}
+                      dayPnLs={(() => {
+                        const pnlByDate: Record<string, number> = {};
+                        trades.forEach(t => {
+                          pnlByDate[t.date] = (pnlByDate[t.date] || 0) + (t.result || 0);
+                        });
+                        return Object.entries(pnlByDate).map(([date, pnl]) => ({ date, pnl }));
+                      })()}
                     />
                   </div>
                 </div>
