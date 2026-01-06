@@ -3,7 +3,7 @@ import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, Trophy, Target } from "lucide-react";
+import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, Trophy, Target, ClipboardCheck } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
@@ -13,9 +13,17 @@ import {
 } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
 
+interface Checklist {
+  id: string;
+  name: string;
+  items: { id: string; text: string; checked: boolean; percentage?: number }[];
+  createdAt: string;
+}
+
 interface TradeTableProps {
   trades: Trade[];
   notebookEntries?: NotebookEntry[];
+  checklists?: Checklist[];
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
   onSelectForNotebook: (id: string) => void;
@@ -242,13 +250,14 @@ interface TradeRowGroupProps {
   date: string;
   trades: Trade[];
   notebookEntries: NotebookEntry[];
+  checklists: Checklist[];
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
   onViewNotes: (trade: Trade) => void;
   index: number;
 }
 
-function TradeRowGroup({ date, trades, notebookEntries, onEdit, onDelete, onViewNotes, index }: TradeRowGroupProps) {
+function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDelete, onViewNotes, index }: TradeRowGroupProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const metrics = calculateGroupMetrics(trades);
   const isProfit = metrics.grossPnL >= 0;
@@ -393,6 +402,9 @@ function TradeRowGroup({ date, trades, notebookEntries, onEdit, onDelete, onView
               {trades.map((trade, tradeIndex) => {
                 const pl = trade.result || 0;
                 const tradeIsProfit = pl >= 0;
+                const checklist = trade.checklistId 
+                  ? checklists.find(c => c.id === trade.checklistId)
+                  : null;
 
                 return (
                   <motion.div
@@ -403,7 +415,7 @@ function TradeRowGroup({ date, trades, notebookEntries, onEdit, onDelete, onView
                     whileHover={{ backgroundColor: "hsl(var(--muted) / 0.3)" }}
                     className="grid grid-cols-[1fr_80px_100px_auto] gap-4 px-5 py-3 pl-12 bg-card/20 transition-colors duration-200"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <motion.span 
                         className="text-sm font-semibold"
                         whileHover={{ scale: 1.02 }}
@@ -425,6 +437,15 @@ function TradeRowGroup({ date, trades, notebookEntries, onEdit, onDelete, onView
                         <span className="text-xs text-muted-foreground bg-muted/30 px-2 py-0.5 rounded-md">
                           {trade.session}
                         </span>
+                      )}
+                      {checklist && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] px-2 py-0.5 font-medium bg-primary/10 text-primary gap-1"
+                        >
+                          <ClipboardCheck className="w-3 h-3" />
+                          {checklist.name}
+                        </Badge>
                       )}
                     </div>
                     <div className={cn(
@@ -487,7 +508,7 @@ function TradeRowGroup({ date, trades, notebookEntries, onEdit, onDelete, onView
   );
 }
 
-export function TradeTable({ trades, notebookEntries = [], onEdit, onDelete, onSelectForNotebook, onClearAll }: TradeTableProps) {
+export function TradeTable({ trades, notebookEntries = [], checklists = [], onEdit, onDelete, onSelectForNotebook, onClearAll }: TradeTableProps) {
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
 
@@ -561,6 +582,7 @@ export function TradeTable({ trades, notebookEntries = [], onEdit, onDelete, onS
                   date={date}
                   trades={groupedTrades[date]}
                   notebookEntries={notebookEntries}
+                  checklists={checklists}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onViewNotes={handleViewNotes}
