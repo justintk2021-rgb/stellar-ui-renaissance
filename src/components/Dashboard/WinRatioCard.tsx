@@ -169,7 +169,7 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
               cx={size / 2}
               cy={size / 2}
               r={radius}
-              stroke="hsl(var(--primary))"
+              stroke={animatedValue > 75 ? "hsl(142 76% 46%)" : "hsl(var(--primary))"}
               strokeWidth={strokeWidth}
               fill="none"
               strokeLinecap="round"
@@ -177,9 +177,11 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
               strokeDashoffset={strokeDashoffset}
               className="transition-all duration-1000 ease-out"
               style={{
-                filter: animatedValue > 50 
-                  ? "drop-shadow(0 0 12px hsl(var(--primary) / 0.6)) drop-shadow(0 0 24px hsl(var(--primary) / 0.4))" 
-                  : "drop-shadow(0 0 6px hsl(var(--primary) / 0.3))",
+                filter: animatedValue > 75
+                  ? "drop-shadow(0 0 12px hsl(142 76% 46% / 0.6)) drop-shadow(0 0 24px hsl(142 76% 46% / 0.4))"
+                  : animatedValue > 50 
+                    ? "drop-shadow(0 0 12px hsl(var(--primary) / 0.6)) drop-shadow(0 0 24px hsl(var(--primary) / 0.4))" 
+                    : "drop-shadow(0 0 6px hsl(var(--primary) / 0.3))",
               }}
             />
           </svg>
