@@ -8,6 +8,7 @@ export interface TradingAccount {
   name: string;
   broker: string | null;
   starting_balance: number;
+  goal_balance: number | null;
   currency: string;
   is_default: boolean;
   created_at: string;
@@ -46,12 +47,13 @@ export function useTradingAccounts(userId: string | undefined) {
 
       if (error) throw error;
 
-      const formattedAccounts: TradingAccount[] = (data || []).map((a) => ({
+      const formattedAccounts: TradingAccount[] = (data || []).map((a: any) => ({
         id: a.id,
         user_id: a.user_id,
         name: a.name,
         broker: a.broker,
         starting_balance: Number(a.starting_balance),
+        goal_balance: a.goal_balance ? Number(a.goal_balance) : null,
         currency: a.currency,
         is_default: a.is_default,
         created_at: a.created_at,
@@ -105,6 +107,7 @@ export function useTradingAccounts(userId: string | undefined) {
         name: data.name,
         broker: data.broker,
         starting_balance: Number(data.starting_balance),
+        goal_balance: (data as any).goal_balance ? Number((data as any).goal_balance) : null,
         currency: data.currency,
         is_default: data.is_default,
         created_at: data.created_at,
@@ -130,6 +133,7 @@ export function useTradingAccounts(userId: string | undefined) {
       if (accountData.name !== undefined) updateData.name = accountData.name;
       if (accountData.broker !== undefined) updateData.broker = accountData.broker;
       if (accountData.starting_balance !== undefined) updateData.starting_balance = accountData.starting_balance;
+      if (accountData.goal_balance !== undefined) updateData.goal_balance = accountData.goal_balance;
       if (accountData.currency !== undefined) updateData.currency = accountData.currency;
 
       const { error } = await supabase
