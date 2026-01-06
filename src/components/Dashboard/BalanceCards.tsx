@@ -208,17 +208,7 @@ export function BalanceCards({ trades, startBalance, goalBalance, onSetBalance, 
       <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm text-muted-foreground">Balance</span>
-          <div className="flex items-center gap-2">
-            <Sparkline data={sparklineData} isPositive={isPositive} />
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
-              onClick={handleStartEdit}
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
-          </div>
+          <Sparkline data={sparklineData} isPositive={isPositive} />
         </div>
         
         <div className="space-y-3">
