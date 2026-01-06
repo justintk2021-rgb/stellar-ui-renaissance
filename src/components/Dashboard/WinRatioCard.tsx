@@ -139,7 +139,6 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="glass rounded-xl p-5 border border-border/40"
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
