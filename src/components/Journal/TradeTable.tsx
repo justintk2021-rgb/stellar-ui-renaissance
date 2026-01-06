@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -255,10 +255,11 @@ interface TradeRowGroupProps {
   onDelete: (id: string) => void;
   onViewNotes: (trade: Trade) => void;
   index: number;
+  isExpanded: boolean;
+  onToggle: () => void;
 }
 
-function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDelete, onViewNotes, index }: TradeRowGroupProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDelete, onViewNotes, index, isExpanded, onToggle }: TradeRowGroupProps) {
   const metrics = calculateGroupMetrics(trades);
   const isProfit = metrics.grossPnL >= 0;
 
@@ -271,7 +272,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
     >
       {/* Collapsed Header Row */}
       <motion.div
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={(e) => { e.stopPropagation(); onToggle(); }}
         whileHover={{ backgroundColor: "hsl(var(--primary) / 0.05)" }}
         whileTap={{ scale: 0.995 }}
         className={cn(
@@ -511,9 +512,32 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
 export function TradeTable({ trades, notebookEntries = [], checklists = [], onEdit, onDelete, onSelectForNotebook, onClearAll }: TradeTableProps) {
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const groupedTrades = groupTradesByDate(trades);
   const sortedDates = Object.keys(groupedTrades).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+  // Collapse when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setExpandedDate(null);
+      }
+    };
+
+    if (expandedDate) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [expandedDate]);
+
+  const handleCollapseAll = () => {
+    setExpandedDate(null);
+  };
 
   const handleViewNotes = (trade: Trade) => {
     setSelectedTrade(trade);
@@ -527,6 +551,7 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
   return (
     <>
       <motion.div 
+        ref={containerRef}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
@@ -587,6 +612,8 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                   onDelete={onDelete}
                   onViewNotes={handleViewNotes}
                   index={index}
+                  isExpanded={expandedDate === date}
+                  onToggle={() => setExpandedDate(expandedDate === date ? null : date)}
                 />
               ))
             )}
