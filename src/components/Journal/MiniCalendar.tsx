@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface DayPnL {
   date: string;
@@ -16,24 +17,44 @@ interface MiniCalendarProps {
 
 export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [] }: MiniCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [direction, setDirection] = useState(0);
 
   // Create a map for quick lookup
   const pnlMap = new Map(dayPnLs.map(d => [d.date, d.pnl]));
+
+  const handlePrevMonth = () => {
+    setDirection(-1);
+    setCurrentMonth(subMonths(currentMonth, 1));
+  };
+
+  const handleNextMonth = () => {
+    setDirection(1);
+    setCurrentMonth(addMonths(currentMonth, 1));
+  };
 
   const renderHeader = () => {
     return (
       <div className="flex items-center justify-between mb-4">
         <button
-          onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+          onClick={handlePrevMonth}
           className="p-1.5 rounded-lg hover:bg-muted transition-colors"
         >
           <ChevronLeft className="h-4 w-4 text-muted-foreground" />
         </button>
-        <span className="text-sm font-medium">
-          {format(currentMonth, "MMMM yyyy")}
-        </span>
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={format(currentMonth, "yyyy-MM")}
+            initial={{ opacity: 0, y: direction * 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: direction * -10 }}
+            transition={{ duration: 0.2 }}
+            className="text-sm font-medium"
+          >
+            {format(currentMonth, "MMMM yyyy")}
+          </motion.span>
+        </AnimatePresence>
         <button
-          onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+          onClick={handleNextMonth}
           className="p-1.5 rounded-lg hover:bg-muted transition-colors"
         >
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -115,14 +136,42 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [] }: MiniC
       );
       days = [];
     }
-    return <div className="space-y-1">{rows}</div>;
+    return rows;
+  };
+
+  const slideVariants = {
+    enter: (dir: number) => ({
+      x: dir > 0 ? 20 : -20,
+      opacity: 0,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+    },
+    exit: (dir: number) => ({
+      x: dir > 0 ? -20 : 20,
+      opacity: 0,
+    }),
   };
 
   return (
-    <div className="p-4 rounded-xl bg-card/50 backdrop-blur-sm">
+    <div className="p-4 rounded-xl bg-card/50 backdrop-blur-sm overflow-hidden">
       {renderHeader()}
       {renderDays()}
-      {renderCells()}
+      <AnimatePresence mode="wait" custom={direction}>
+        <motion.div
+          key={format(currentMonth, "yyyy-MM")}
+          custom={direction}
+          variants={slideVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="space-y-1"
+        >
+          {renderCells()}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
