@@ -21,7 +21,7 @@ function AnimatedPercentage({ value }: { value: number }) {
   });
 
   return (
-    <span className="text-3xl font-bold text-primary">
+    <span className="text-4xl font-bold text-primary">
       {formattedValue}%
     </span>
   );
@@ -119,8 +119,8 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
   }, [currentStats.winRate]);
 
   // Circular progress values
-  const size = 140;
-  const strokeWidth = 12;
+  const size = 180;
+  const strokeWidth = 14;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.min(Math.max(animatedValue, 0), 100);
@@ -139,6 +139,7 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
+      className="flex flex-col h-full"
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
@@ -166,7 +167,7 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex items-center gap-6 mb-4">
+      <div className="flex items-center justify-center gap-8 mb-6 flex-1">
         {/* Circular Progress */}
         <div className="relative" style={{ width: size, height: size }}>
           <svg className="transform -rotate-90" width={size} height={size}>
