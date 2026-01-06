@@ -719,7 +719,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
               >
                 <FileText className="w-3.5 h-3.5 mr-1" />
-                View Notes ({selectedTrades.filter(t => getTradeNotebookEntry(notebookEntries, t.id)).length}/{selectedTrades.length})
+                View Notes
               </Button>
             )}
             </div>
