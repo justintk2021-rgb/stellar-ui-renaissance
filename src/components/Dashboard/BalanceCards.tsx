@@ -284,15 +284,6 @@ export function BalanceCards({ trades, startBalance, goalBalance, onSetBalance, 
               +{profitPercent.toFixed(2)}%
             </span>
           </div>
-          
-          <div>
-            <div className="text-xs text-muted-foreground mb-0.5">Fees</div>
-            <AnimatedValue 
-              value={-fees} 
-              prefix="-$" 
-              className="text-sm font-semibold font-mono text-destructive"
-            />
-          </div>
         </div>
       </div>
 
