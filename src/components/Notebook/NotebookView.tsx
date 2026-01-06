@@ -1269,7 +1269,6 @@ export function NotebookView({
               isEntriesPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
             )}
             onClick={(e) => e.stopPropagation()}
-            onMouseLeave={closeEntriesPanel}
           >
             <div className="p-3 border-b border-border/30 space-y-2">
               <div className="flex items-center gap-2">
