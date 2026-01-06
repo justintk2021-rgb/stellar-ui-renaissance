@@ -6,6 +6,7 @@ import { useTrades } from "@/hooks/useTrades";
 import { useTradingAccounts } from "@/hooks/useTradingAccounts";
 import { useNotebookEntries } from "@/hooks/useNotebookEntries";
 import { useUserSettings, AccentColor } from "@/hooks/useUserSettings";
+import { useChecklists } from "@/hooks/useChecklists";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
@@ -90,6 +91,9 @@ const Index = () => {
     deleteEntry: deleteNotebookEntry,
     isLoading: notebookLoading 
   } = useNotebookEntries(user?.id);
+  
+  // Use database-backed checklists
+  const { checklists } = useChecklists();
   
   // Use database-backed user settings (syncs across devices)
   const { 
@@ -470,6 +474,7 @@ const Index = () => {
                 <TradeTable
                   trades={trades}
                   notebookEntries={notebookEntries}
+                  checklists={checklists}
                   onEdit={(trade) => {
                     setEditingTrade(trade);
                     setIsTradeFormOpen(true);
