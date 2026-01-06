@@ -15,6 +15,7 @@ import { BalanceCards } from "@/components/Dashboard/BalanceCards";
 import { PnLCalendar } from "@/components/Dashboard/PnLCalendar";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { TradeTable } from "@/components/Journal/TradeTable";
+import { MiniCalendar } from "@/components/Journal/MiniCalendar";
 import { NotebookView } from "@/components/Notebook/NotebookView";
 import { SettingsView } from "@/components/Settings/SettingsView";
 import { CustomChart } from "@/components/Chart/CustomChart";
@@ -470,19 +471,31 @@ const Index = () => {
                   </button>
                 </div>
                 
-                {/* Trade Table - Full Width */}
-                <TradeTable
-                  trades={trades}
-                  notebookEntries={notebookEntries}
-                  checklists={checklists}
-                  onEdit={(trade) => {
-                    setEditingTrade(trade);
-                    setIsTradeFormOpen(true);
-                  }}
-                  onDelete={handleDeleteTrade}
-                  onSelectForNotebook={handleSelectForNotebook}
-                  onClearAll={handleClearAll}
-                />
+                {/* Main Content with Calendar Sidebar */}
+                <div className="flex gap-6">
+                  {/* Trade Table */}
+                  <div className="flex-1 min-w-0">
+                    <TradeTable
+                      trades={trades}
+                      notebookEntries={notebookEntries}
+                      checklists={checklists}
+                      onEdit={(trade) => {
+                        setEditingTrade(trade);
+                        setIsTradeFormOpen(true);
+                      }}
+                      onDelete={handleDeleteTrade}
+                      onSelectForNotebook={handleSelectForNotebook}
+                      onClearAll={handleClearAll}
+                    />
+                  </div>
+                  
+                  {/* Mini Calendar Sidebar */}
+                  <div className="hidden lg:block w-64 flex-shrink-0">
+                    <MiniCalendar 
+                      tradeDates={trades.map(t => t.date)}
+                    />
+                  </div>
+                </div>
 
                 {/* Trade Form Modal */}
                 <TradeFormModal
