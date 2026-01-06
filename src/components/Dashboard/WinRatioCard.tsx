@@ -191,13 +191,6 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
               className="transition-all duration-1000 ease-out"
-              style={{
-                filter: animatedValue > 75
-                  ? "drop-shadow(0 0 12px hsl(142 76% 46% / 0.6)) drop-shadow(0 0 24px hsl(142 76% 46% / 0.4))"
-                  : animatedValue > 50 
-                    ? "drop-shadow(0 0 12px hsl(var(--primary) / 0.6)) drop-shadow(0 0 24px hsl(var(--primary) / 0.4))" 
-                    : "drop-shadow(0 0 6px hsl(var(--primary) / 0.3))",
-              }}
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
