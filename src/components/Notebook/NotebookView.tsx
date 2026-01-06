@@ -1346,9 +1346,25 @@ export function NotebookView({
         
         <div className="flex-1 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
         {selectedEntry || isCreatingNew ? (
-          <>
+          <motion.div
+            key={selectedEntry?.id || 'new-note'}
+            initial={{ opacity: 0, x: 30, scale: 0.98 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{ 
+              duration: 0.4, 
+              ease: [0.25, 0.46, 0.45, 0.94],
+              opacity: { duration: 0.3 },
+              scale: { duration: 0.35 }
+            }}
+            className="flex flex-col flex-1 overflow-hidden"
+          >
             {/* Header */}
-            <div className="p-4 border-b border-border/30">
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="p-4 border-b border-border/30"
+            >
               {/* Trash Banner */}
               {isSelectedEntryInTrash && (
                 <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/30 flex items-center justify-between">
@@ -1596,7 +1612,7 @@ export function NotebookView({
                   </Button>
                 </div>
               )}
-            </div>
+            </motion.div>
 
             {/* Editor with Block Menu */}
             <ScrollArea className="flex-1">
@@ -1691,7 +1707,7 @@ export function NotebookView({
                 <Plus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
               </Button>
             )}
-          </>
+          </motion.div>
         ) : (
           <motion.div 
             className="flex-1 flex flex-col overflow-hidden"
