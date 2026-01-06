@@ -219,7 +219,7 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
       </div>
 
       {/* Period Tabs */}
-      <div className="flex items-center gap-1 mb-4 bg-muted/30 rounded-lg p-1">
+      <div className="flex items-center gap-1 mb-4">
         {periods.map((period) => (
           <button
             key={period}
@@ -227,7 +227,7 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
             className={cn(
               "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 capitalize",
               selectedPeriod === period
-                ? "bg-background text-foreground shadow-sm"
+                ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
