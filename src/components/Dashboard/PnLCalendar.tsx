@@ -713,7 +713,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                   className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                 >
                   <StickyNote className="w-3.5 h-3.5 mr-1" />
-                  Daily Notes
+                  View Notes
                 </Button>
               )}
             </div>
