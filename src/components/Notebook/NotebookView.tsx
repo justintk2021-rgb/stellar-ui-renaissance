@@ -1020,7 +1020,6 @@ export function NotebookView({
               isFoldersPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
             )}
             onClick={(e) => e.stopPropagation()}
-            onMouseLeave={() => !isColorPickerOpen && closeFoldersPanel()}
           >
             <div className="flex flex-col h-[400px]">
               {/* Header */}
