@@ -10,7 +10,7 @@ import { Sidebar } from "@/components/Layout/Sidebar";
 import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
 import { StatsGrid } from "@/components/Dashboard/StatsGrid";
-import { EquityChart } from "@/components/Dashboard/EquityChart";
+import { BalanceCards } from "@/components/Dashboard/BalanceCards";
 import { PnLCalendar } from "@/components/Dashboard/PnLCalendar";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { TradeTable } from "@/components/Journal/TradeTable";
@@ -412,7 +412,7 @@ const Index = () => {
                   />
                 </div>
                 
-                <EquityChart
+                <BalanceCards
                   trades={trades}
                   startBalance={accountStartBalance}
                   onSetBalance={handleSetBalance}
