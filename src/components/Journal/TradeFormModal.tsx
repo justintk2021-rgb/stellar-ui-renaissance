@@ -113,12 +113,13 @@ interface TradeFormModalProps {
   editingTrade: Trade | null;
   onSubmit: (trade: Omit<Trade, 'id'>) => void;
   onCancelEdit: () => void;
+  initialDate?: string; // Optional initial date for the trade
 }
 
-export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCancelEdit }: TradeFormModalProps) {
+export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCancelEdit, initialDate }: TradeFormModalProps) {
   const { checklists, isAuthenticated } = useChecklists();
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().slice(0, 10),
+    date: initialDate || new Date().toISOString().slice(0, 10),
     pair: '',
     direction: 'Long' as 'Long' | 'Short',
     result: '',
@@ -145,6 +146,13 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
       resetForm();
     }
   }, [editingTrade, isOpen]);
+
+  // Update date when initialDate changes (e.g., opening from calendar)
+  useEffect(() => {
+    if (!editingTrade && initialDate) {
+      setFormData(prev => ({ ...prev, date: initialDate }));
+    }
+  }, [initialDate, editingTrade]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -175,7 +183,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
 
   const resetForm = () => {
     setFormData({
-      date: new Date().toISOString().slice(0, 10),
+      date: initialDate || new Date().toISOString().slice(0, 10),
       pair: '',
       direction: 'Long',
       result: '',

@@ -2,7 +2,8 @@ import { useState, useMemo, useRef, useCallback } from "react";
 import { Trade, DailyStats, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote, Settings, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Link2, Quote } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote, Settings, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Link2, Quote, Plus } from "lucide-react";
+import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -28,6 +29,7 @@ interface PnLCalendarProps {
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void;
   notebookEntries?: NotebookEntry[];
   onSaveEntry?: (entry: NotebookEntry) => void;
+  onAddTrade?: (trade: Omit<Trade, 'id'>) => void;
 }
 
 // Get notebook entry for a specific trade
@@ -51,7 +53,7 @@ const formatPnL = (value: number): string => {
   return `${value < 0 ? '-' : ''}$${absValue.toFixed(0)}`;
 };
 
-export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSaveEntry }: PnLCalendarProps) {
+export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSaveEntry, onAddTrade }: PnLCalendarProps) {
   const { checklists } = useChecklists();
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
@@ -67,6 +69,10 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
   const contentEditableRef = useRef<HTMLDivElement>(null);
+  
+  // Trade form modal state
+  const [tradeFormOpen, setTradeFormOpen] = useState(false);
+  const [tradeFormDate, setTradeFormDate] = useState<string | null>(null);
 
   // Text formatting function
   const applyFormat = useCallback((command: string, value?: string) => {
@@ -470,7 +476,15 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                               <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
                             </button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              setTradeFormDate(dateStr);
+                              setTradeFormOpen(true);
+                            }}>
+                              <Plus className="w-4 h-4 mr-2" />
+                              Journal Trade
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={(e) => openDailyNoteDialog(dateStr, e)}>
                               <FileText className="w-4 h-4 mr-2" />
                               {hasNote ? "Edit Note" : "Add Note"}
@@ -892,6 +906,32 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Trade Form Modal - Same UI as Journal page */}
+      <TradeFormModal 
+        isOpen={tradeFormOpen}
+        onClose={() => {
+          setTradeFormOpen(false);
+          setTradeFormDate(null);
+        }}
+        editingTrade={null}
+        onSubmit={(tradeData) => {
+          if (onAddTrade) {
+            // Use the selected date from the calendar
+            onAddTrade({
+              ...tradeData,
+              date: tradeFormDate || tradeData.date,
+            });
+          }
+          setTradeFormOpen(false);
+          setTradeFormDate(null);
+        }}
+        onCancelEdit={() => {
+          setTradeFormOpen(false);
+          setTradeFormDate(null);
+        }}
+        initialDate={tradeFormDate || undefined}
+      />
     </>
   );
 }

@@ -425,6 +425,7 @@ const Index = () => {
                   }}
                   notebookEntries={notebookEntries}
                   onSaveEntry={handleSaveEntry}
+                  onAddTrade={handleAddTrade}
                 />
               </div>
             )}
