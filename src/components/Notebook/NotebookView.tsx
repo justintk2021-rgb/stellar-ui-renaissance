@@ -1731,14 +1731,80 @@ export function NotebookView({
                 <span className="font-medium">{linkedTrade.session || '—'}</span>
               </div>
               {linkedChecklist && (
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Checklist</span>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary max-w-[80px] truncate">
-                    {linkedChecklist.name}
-                  </Badge>
-                </div>
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Checklist</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary max-w-[80px] truncate">
+                      {linkedChecklist.name}
+                    </Badge>
+                  </div>
+                  
+                  {/* Checklist Grade */}
+                  {linkedTrade.checklistState && linkedTrade.checklistState.length > 0 && (() => {
+                    const state = linkedTrade.checklistState;
+                    const hasCustomPercentages = state.some((item: any) => item.percentage !== undefined);
+                    let percentage: number;
+                    
+                    if (hasCustomPercentages) {
+                      percentage = state
+                        .filter((item: any) => item.checked)
+                        .reduce((sum: number, item: any) => sum + (item.percentage || 0), 0);
+                    } else {
+                      const checkedCount = state.filter((item: any) => item.checked).length;
+                      percentage = (checkedCount / state.length) * 100;
+                    }
+                    
+                    const getGrade = (p: number) => {
+                      if (p >= 90) return { grade: "A Setup", color: "text-emerald-500", bgColor: "bg-emerald-500/20" };
+                      if (p >= 75) return { grade: "B Setup", color: "text-blue-500", bgColor: "bg-blue-500/20" };
+                      if (p >= 60) return { grade: "C Setup", color: "text-yellow-500", bgColor: "bg-yellow-500/20" };
+                      return { grade: "D Setup", color: "text-red-500", bgColor: "bg-red-500/20" };
+                    };
+                    
+                    const { grade, color, bgColor } = getGrade(percentage);
+                    
+                    return (
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Grade</span>
+                        <Badge className={cn("text-[10px] px-1.5 py-0 border-0", bgColor, color)}>
+                          {grade}
+                        </Badge>
+                      </div>
+                    );
+                  })()}
+                </>
               )}
             </div>
+            
+            {/* Checklist Details */}
+            {linkedTrade.checklistState && linkedTrade.checklistState.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border/30">
+                <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-2">Checklist Items</div>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {linkedTrade.checklistState.map((item: any, index: number) => (
+                    <div 
+                      key={item.id || index}
+                      className={cn(
+                        "flex items-center gap-1.5 text-[10px]",
+                        item.checked ? "text-muted-foreground" : "text-foreground"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-3 h-3 rounded-sm border flex items-center justify-center shrink-0",
+                        item.checked 
+                          ? "bg-primary/20 border-primary/50" 
+                          : "border-border"
+                      )}>
+                        {item.checked && (
+                          <CheckSquare className="w-2 h-2 text-primary" />
+                        )}
+                      </div>
+                      <span className={cn(item.checked && "line-through")}>{item.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Trade Chart Image */}
             {linkedTrade.chartImage && (

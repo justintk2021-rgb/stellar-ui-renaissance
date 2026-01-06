@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Trade } from "@/types/trade";
+import { Trade, ChecklistItemState } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, X, ImagePlus, Trash2, ClipboardList } from "lucide-react";
+import { Plus, X, ImagePlus, Trash2, ClipboardList, Award } from "lucide-react";
 import { useChecklists } from "@/hooks/useChecklists";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { ChecklistPopup } from "./ChecklistPopup";
+import { Badge } from "@/components/ui/badge";
 
 // Common trading pairs and assets
 const TRADING_PAIRS = [
@@ -128,7 +130,32 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
     checklistId: '',
   });
   const [chartImage, setChartImage] = useState<string | undefined>(undefined);
+  const [checklistState, setChecklistState] = useState<ChecklistItemState[] | undefined>(undefined);
+  const [showChecklistPopup, setShowChecklistPopup] = useState(false);
+  const [pendingChecklistId, setPendingChecklistId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper to get grade from checklist state
+  const getGradeFromState = (state?: ChecklistItemState[]): { grade: string; color: string } | null => {
+    if (!state || state.length === 0) return null;
+    
+    const hasCustomPercentages = state.some(item => item.percentage !== undefined);
+    let percentage: number;
+    
+    if (hasCustomPercentages) {
+      percentage = state
+        .filter(item => item.checked)
+        .reduce((sum, item) => sum + (item.percentage || 0), 0);
+    } else {
+      const checkedCount = state.filter(item => item.checked).length;
+      percentage = (checkedCount / state.length) * 100;
+    }
+    
+    if (percentage >= 90) return { grade: "A Setup", color: "text-emerald-500" };
+    if (percentage >= 75) return { grade: "B Setup", color: "text-blue-500" };
+    if (percentage >= 60) return { grade: "C Setup", color: "text-yellow-500" };
+    return { grade: "D Setup", color: "text-red-500" };
+  };
 
   useEffect(() => {
     if (editingTrade) {
@@ -142,6 +169,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
         checklistId: editingTrade.checklistId || '',
       });
       setChartImage(editingTrade.chartImage);
+      setChecklistState(editingTrade.checklistState);
     } else {
       resetForm();
     }
@@ -176,6 +204,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
       notes: formData.notes,
       chartImage: chartImage,
       checklistId: formData.checklistId || undefined,
+      checklistState: checklistState,
     });
     resetForm();
     onClose();
@@ -192,7 +221,32 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
       checklistId: '',
     });
     setChartImage(undefined);
+    setChecklistState(undefined);
   };
+
+  // Handle checklist selection - opens popup
+  const handleChecklistSelect = (checklistId: string) => {
+    if (checklistId === "none") {
+      setFormData(prev => ({ ...prev, checklistId: "" }));
+      setChecklistState(undefined);
+      return;
+    }
+    
+    setPendingChecklistId(checklistId);
+    setShowChecklistPopup(true);
+  };
+
+  // Handle checklist popup confirmation
+  const handleChecklistConfirm = (items: ChecklistItemState[]) => {
+    if (pendingChecklistId) {
+      setFormData(prev => ({ ...prev, checklistId: pendingChecklistId }));
+      setChecklistState(items);
+      setPendingChecklistId(null);
+    }
+  };
+
+  const selectedChecklist = checklists.find(c => c.id === (pendingChecklistId || formData.checklistId));
+  const currentGrade = getGradeFromState(checklistState);
 
   const handleClose = () => {
     if (editingTrade) {
@@ -312,28 +366,51 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
                   </div>
 
                   {/* Checklist Selector */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 col-span-2">
                     <Label htmlFor="checklist" className="text-xs text-muted-foreground flex items-center gap-1.5">
                       <ClipboardList className="w-3 h-3" />
                       Checklist Used
                     </Label>
-                    <Select
-                      value={formData.checklistId || "none"}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, checklistId: value === "none" ? "" : value }))}
-                      disabled={!isAuthenticated || checklists.length === 0}
-                    >
-                      <SelectTrigger className="bg-muted/50 border-border/50 focus:border-primary/50">
-                        <SelectValue placeholder={!isAuthenticated ? "Login required" : checklists.length === 0 ? "No checklists" : "Select checklist..."} />
-                      </SelectTrigger>
-                      <SelectContent className="z-[200] bg-popover">
-                        <SelectItem value="none">None</SelectItem>
-                        {checklists.map((checklist) => (
-                          <SelectItem key={checklist.id} value={checklist.id}>
-                            {checklist.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={formData.checklistId || "none"}
+                        onValueChange={handleChecklistSelect}
+                        disabled={!isAuthenticated || checklists.length === 0}
+                      >
+                        <SelectTrigger className="bg-muted/50 border-border/50 focus:border-primary/50 flex-1">
+                          <SelectValue placeholder={!isAuthenticated ? "Login required" : checklists.length === 0 ? "No checklists" : "Select checklist..."} />
+                        </SelectTrigger>
+                        <SelectContent className="z-[200] bg-popover">
+                          <SelectItem value="none">None</SelectItem>
+                          {checklists.map((checklist) => (
+                            <SelectItem key={checklist.id} value={checklist.id}>
+                              {checklist.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {formData.checklistId && currentGrade && (
+                        <Badge className={cn("shrink-0 gap-1", currentGrade.color, "bg-muted/50 border-border/50")}>
+                          <Award className="w-3 h-3" />
+                          {currentGrade.grade}
+                        </Badge>
+                      )}
+                    </div>
+                    {formData.checklistId && checklistState && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setPendingChecklistId(formData.checklistId);
+                          setShowChecklistPopup(true);
+                        }}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        <ClipboardList className="w-3 h-3 mr-1" />
+                        Edit checklist ({checklistState.filter(i => i.checked).length}/{checklistState.length} checked)
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -412,5 +489,23 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
   );
 
   // Use portal to render at document body level
-  return createPortal(modalContent, document.body);
+  return (
+    <>
+      {createPortal(modalContent, document.body)}
+      
+      {/* Checklist Popup */}
+      {selectedChecklist && (
+        <ChecklistPopup
+          isOpen={showChecklistPopup}
+          onClose={() => {
+            setShowChecklistPopup(false);
+            setPendingChecklistId(null);
+          }}
+          checklist={selectedChecklist}
+          onConfirm={handleChecklistConfirm}
+          initialState={formData.checklistId === pendingChecklistId ? checklistState : undefined}
+        />
+      )}
+    </>
+  );
 }

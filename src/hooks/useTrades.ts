@@ -31,7 +31,7 @@ export function useTrades(userId: string | undefined, accountId: string | null =
 
       if (error) throw error;
 
-      const formattedTrades: Trade[] = (data || []).map((t) => ({
+      const formattedTrades: Trade[] = (data || []).map((t: any) => ({
         id: t.id,
         date: t.date,
         pair: t.pair,
@@ -42,7 +42,8 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         notebook: t.notebook || undefined,
         chartImage: t.chart_image || undefined,
         accountId: t.account_id || undefined,
-        checklistId: (t as any).checklist_id || undefined,
+        checklistId: t.checklist_id || undefined,
+        checklistState: t.checklist_state || undefined,
       }));
 
       setTrades(formattedTrades);
@@ -77,7 +78,8 @@ export function useTrades(userId: string | undefined, accountId: string | null =
           notebook: tradeData.notebook || null,
           chart_image: tradeData.chartImage || null,
           checklist_id: tradeData.checklistId || null,
-        })
+          checklist_state: tradeData.checklistState as any || null,
+        } as any)
         .select()
         .single();
 
@@ -95,6 +97,7 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         chartImage: data.chart_image || undefined,
         accountId: data.account_id || undefined,
         checklistId: (data as any).checklist_id || undefined,
+        checklistState: (data as any).checklist_state || undefined,
       };
 
       setTrades(prev => [newTrade, ...prev]);
@@ -121,10 +124,11 @@ export function useTrades(userId: string | undefined, accountId: string | null =
       if (tradeData.notebook !== undefined) updateData.notebook = tradeData.notebook || null;
       if (tradeData.chartImage !== undefined) updateData.chart_image = tradeData.chartImage || null;
       if (tradeData.checklistId !== undefined) updateData.checklist_id = tradeData.checklistId || null;
+      if (tradeData.checklistState !== undefined) updateData.checklist_state = tradeData.checklistState || null;
 
       const { error } = await supabase
         .from('trades')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id)
         .eq('user_id', userId);
 
