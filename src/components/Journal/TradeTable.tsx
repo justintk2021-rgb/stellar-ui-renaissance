@@ -161,54 +161,68 @@ function TradeRowGroup({ date, trades, notebookEntries, onEdit, onDelete, onView
               <div className="flex items-start gap-8 flex-wrap">
                 {/* Mini Line Chart */}
                 <div className="w-36 h-16 bg-muted/20 rounded-lg overflow-hidden p-2">
-                  <svg viewBox="0 0 100 50" className="w-full h-full" preserveAspectRatio="none">
-                    {/* Area fill */}
-                    {(() => {
-                      const cumulative = trades.reduce<number[]>((acc, trade, i) => {
-                        const prev = i > 0 ? acc[i - 1] : 0;
-                        acc.push(prev + (trade.result || 0));
-                        return acc;
-                      }, []);
-                      const maxVal = Math.max(...cumulative.map(Math.abs), 1);
-                      const minVal = Math.min(...cumulative, 0);
-                      const range = Math.max(maxVal - minVal, 1);
-                      const baseline = 50 - (minVal / range) * -50;
-                      
-                      const points = cumulative.map((val, i) => {
-                        const x = trades.length > 1 ? (i / (trades.length - 1)) * 100 : 50;
-                        const y = 50 - ((val - minVal) / range) * 45;
-                        return `${x},${y}`;
-                      }).join(' ');
-                      
-                      const areaPath = `M0,${baseline} L${points} L100,${baseline} Z`;
-                      const linePath = `M${points}`;
-                      const finalValue = cumulative[cumulative.length - 1] || 0;
-                      const isPositive = finalValue >= 0;
-                      
-                      return (
-                        <>
-                          <defs>
-                            <linearGradient id={`gradient-${trades[0]?.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                              <stop offset="0%" stopColor={isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))"} stopOpacity="0.3" />
-                              <stop offset="100%" stopColor={isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))"} stopOpacity="0.05" />
-                            </linearGradient>
-                          </defs>
-                          <path
-                            d={areaPath}
-                            fill={`url(#gradient-${trades[0]?.id})`}
-                          />
-                          <polyline
-                            points={points}
-                            fill="none"
-                            stroke={isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </>
-                      );
-                    })()}
-                  </svg>
+                  {trades.length === 1 ? (
+                    // Single trade - show a simple bar indicator
+                    <div className="w-full h-full flex items-end justify-center">
+                      <div 
+                        className={cn(
+                          "w-8 rounded-t-md transition-all",
+                          (trades[0].result || 0) >= 0 ? "bg-primary/60" : "bg-destructive/60"
+                        )}
+                        style={{ height: '70%' }}
+                      />
+                    </div>
+                  ) : (
+                    // Multiple trades - show line chart
+                    <svg viewBox="0 0 100 50" className="w-full h-full" preserveAspectRatio="none">
+                      {(() => {
+                        const cumulative = trades.reduce<number[]>((acc, trade, i) => {
+                          const prev = i > 0 ? acc[i - 1] : 0;
+                          acc.push(prev + (trade.result || 0));
+                          return acc;
+                        }, []);
+                        const maxVal = Math.max(...cumulative.map(Math.abs), 1);
+                        const minVal = Math.min(...cumulative, 0);
+                        const range = Math.max(maxVal - minVal, 1);
+                        const baseline = 50 - (minVal / range) * -50;
+                        
+                        // Add starting point at 0
+                        const allPoints = [0, ...cumulative];
+                        const points = allPoints.map((val, i) => {
+                          const x = (i / (allPoints.length - 1)) * 100;
+                          const y = 50 - ((val - minVal) / range) * 45;
+                          return `${x},${y}`;
+                        }).join(' ');
+                        
+                        const areaPath = `M0,${baseline} L${points} L100,${baseline} Z`;
+                        const finalValue = cumulative[cumulative.length - 1] || 0;
+                        const isPositive = finalValue >= 0;
+                        
+                        return (
+                          <>
+                            <defs>
+                              <linearGradient id={`gradient-${trades[0]?.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stopColor={isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))"} stopOpacity="0.3" />
+                                <stop offset="100%" stopColor={isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))"} stopOpacity="0.05" />
+                              </linearGradient>
+                            </defs>
+                            <path
+                              d={areaPath}
+                              fill={`url(#gradient-${trades[0]?.id})`}
+                            />
+                            <polyline
+                              points={points}
+                              fill="none"
+                              stroke={isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </>
+                        );
+                      })()}
+                    </svg>
+                  )}
                 </div>
 
                 {/* Metrics Grid */}
