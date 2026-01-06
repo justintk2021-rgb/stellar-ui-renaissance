@@ -83,8 +83,12 @@ import {
   Undo2,
   SpellCheck,
   X,
+  LayoutGrid,
+  LayoutList,
+  Pin,
 } from "lucide-react";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface NotebookViewProps {
   trades: Trade[];
@@ -169,6 +173,10 @@ export function NotebookView({
   const [fullscreenBlockMenuOpen, setFullscreenBlockMenuOpen] = useState(false);
   const [fullscreenBlockMenuPosition, setFullscreenBlockMenuPosition] = useState({ x: 0, y: 0 });
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    const saved = localStorage.getItem('notebook-view-mode');
+    return (saved === 'list' ? 'list' : 'grid') as 'grid' | 'list';
+  });
   const editorRef = useRef<HTMLDivElement>(null);
   const fullscreenEditorRef = useRef<HTMLDivElement>(null);
   const fullscreenEditorContainerRef = useRef<HTMLDivElement>(null);
@@ -542,7 +550,29 @@ export function NotebookView({
     localStorage.setItem('notebook-folder-markers', JSON.stringify(newMarkers));
   };
 
-  // Delete custom folder
+  // Toggle view mode
+  const toggleViewMode = () => {
+    const newMode = viewMode === 'grid' ? 'list' : 'grid';
+    setViewMode(newMode);
+    localStorage.setItem('notebook-view-mode', newMode);
+  };
+
+  // Note card colors based on category
+  const getNoteCardColor = (category: string, index: number) => {
+    const colors = [
+      { bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-200 dark:border-blue-800/50', accent: 'bg-blue-400' },
+      { bg: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-200 dark:border-green-800/50', accent: 'bg-green-400' },
+      { bg: 'bg-yellow-100 dark:bg-yellow-900/30', border: 'border-yellow-200 dark:border-yellow-800/50', accent: 'bg-yellow-400' },
+      { bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-200 dark:border-red-800/50', accent: 'bg-red-400' },
+      { bg: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-200 dark:border-purple-800/50', accent: 'bg-purple-400' },
+      { bg: 'bg-pink-100 dark:bg-pink-900/30', border: 'border-pink-200 dark:border-pink-800/50', accent: 'bg-pink-400' },
+      { bg: 'bg-cyan-100 dark:bg-cyan-900/30', border: 'border-cyan-200 dark:border-cyan-800/50', accent: 'bg-cyan-400' },
+      { bg: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-200 dark:border-orange-800/50', accent: 'bg-orange-400' },
+    ];
+    return colors[index % colors.length];
+  };
+
+
   const handleDeleteFolder = (folderId: string) => {
     // Move all notes in this folder to general
     notebookEntries
@@ -1663,19 +1693,186 @@ export function NotebookView({
             )}
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
-            <BookOpen className="w-12 h-12 mb-4 opacity-30" />
-            <p className="text-sm">{isViewingTrash ? "Select a note to view" : "Select a note or create a new one"}</p>
-            {!isViewingTrash && (
-              <Button
-                onClick={handleNewNote}
-                variant="outline"
-                className="mt-4 text-xs"
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* All Notes Header */}
+            <div className="p-6 pb-4">
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="flex items-center justify-between"
               >
-                <Plus className="w-3 h-3 mr-1" />
-                Create Note
-              </Button>
-            )}
+                <div>
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                    All Notes
+                  </h1>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {notebookEntries.filter(e => !e.isDeleted).length} notes
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* View Toggle */}
+                  <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50">
+                    <button
+                      onClick={() => { setViewMode('grid'); localStorage.setItem('notebook-view-mode', 'grid'); }}
+                      className={cn(
+                        "p-2 rounded-md transition-all",
+                        viewMode === 'grid' 
+                          ? "bg-background shadow-sm text-foreground" 
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => { setViewMode('list'); localStorage.setItem('notebook-view-mode', 'list'); }}
+                      className={cn(
+                        "p-2 rounded-md transition-all",
+                        viewMode === 'list' 
+                          ? "bg-background shadow-sm text-foreground" 
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <LayoutList className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <Button
+                    onClick={handleNewNote}
+                    className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-md hover:shadow-lg transition-all"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Note
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Notes Grid/List */}
+            <ScrollArea className="flex-1 px-6 pb-6">
+              {notebookEntries.filter(e => !e.isDeleted).length === 0 ? (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center justify-center py-20 text-muted-foreground"
+                >
+                  <BookOpen className="w-16 h-16 mb-4 opacity-20" />
+                  <p className="text-lg font-medium">No notes yet</p>
+                  <p className="text-sm mt-1">Create your first note to get started</p>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                  className={cn(
+                    viewMode === 'grid' 
+                      ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
+                      : "flex flex-col gap-3"
+                  )}
+                >
+                  <AnimatePresence mode="popLayout">
+                    {notebookEntries
+                      .filter(e => !e.isDeleted)
+                      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                      .map((entry, index) => {
+                        const colors = getNoteCardColor(entry.category, index);
+                        const plainText = entry.content.replace(/<[^>]*>/g, '').slice(0, 150);
+                        
+                        return (
+                          <motion.button
+                            key={entry.id}
+                            layout
+                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ 
+                              duration: 0.3, 
+                              delay: index * 0.03,
+                              layout: { duration: 0.2 }
+                            }}
+                            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                            onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
+                            className={cn(
+                              "text-left rounded-xl border transition-all overflow-hidden group",
+                              colors.bg,
+                              colors.border,
+                              viewMode === 'grid' 
+                                ? "p-4 min-h-[180px] flex flex-col" 
+                                : "p-4 flex items-start gap-4"
+                            )}
+                          >
+                            {/* Color accent bar */}
+                            <div className={cn(
+                              "absolute top-0 left-0 w-1 h-full rounded-l-xl",
+                              colors.accent
+                            )} />
+                            
+                            {viewMode === 'grid' ? (
+                              <>
+                                {/* Header */}
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Calendar className="w-3 h-3" />
+                                    <span>{new Date(entry.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                                  </div>
+                                  <Pin className="w-3.5 h-3.5 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                                
+                                {/* Title */}
+                                <h3 className="font-semibold text-foreground mb-2 line-clamp-2">
+                                  {entry.title || 'Untitled'}
+                                </h3>
+                                
+                                {/* Content Preview */}
+                                <p className="text-sm text-muted-foreground line-clamp-4 flex-1">
+                                  {plainText || 'No content...'}
+                                </p>
+                                
+                                {/* Footer */}
+                                <div className="flex items-center gap-2 mt-3 pt-2 border-t border-current/10">
+                                  {entry.tradeId && (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50">
+                                      <TrendingUp className="w-2.5 h-2.5 mr-1" />
+                                      Trade
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50 capitalize">
+                                    {entry.category.replace('-', ' ')}
+                                  </Badge>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                {/* List View */}
+                                <div className={cn("w-2 h-12 rounded-full shrink-0", colors.accent)} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h3 className="font-semibold text-foreground truncate">
+                                      {entry.title || 'Untitled'}
+                                    </h3>
+                                    {entry.tradeId && (
+                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50 shrink-0">
+                                        <TrendingUp className="w-2.5 h-2.5 mr-1" />
+                                        Trade
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground line-clamp-1">
+                                    {plainText || 'No content...'}
+                                  </p>
+                                </div>
+                                <div className="text-xs text-muted-foreground shrink-0">
+                                  {new Date(entry.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
+                                </div>
+                              </>
+                            )}
+                          </motion.button>
+                        );
+                      })}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+            </ScrollArea>
           </div>
         )}
         </div>
