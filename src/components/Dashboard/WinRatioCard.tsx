@@ -11,7 +11,7 @@ interface WinRatioCardProps {
   trades: Trade[];
 }
 
-type TimePeriod = "year" | "month" | "week" | "day";
+type TimePeriod = "all" | "year" | "month" | "week" | "day";
 
 function AnimatedPercentage({ value }: { value: number }) {
   const { formattedValue } = useCountUp({
@@ -31,11 +31,26 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("month");
   const [animatedValue, setAnimatedValue] = useState(0);
 
-  const periods: TimePeriod[] = ["year", "month", "week", "day"];
+  const periods: TimePeriod[] = ["all", "year", "month", "week", "day"];
 
   const { currentStats, previousStats } = useMemo(() => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // For "all", we don't filter by date
+    if (selectedPeriod === "all") {
+      const calculateStats = (filteredTrades: Trade[]) => {
+        const wins = filteredTrades.filter((t) => t.result > 0).length;
+        const losses = filteredTrades.filter((t) => t.result < 0).length;
+        const total = filteredTrades.length;
+        const winRate = total > 0 ? (wins / total) * 100 : 0;
+        return { wins, losses, total, winRate };
+      };
+      return {
+        currentStats: calculateStats(trades),
+        previousStats: { wins: 0, losses: 0, total: 0, winRate: 0 },
+      };
+    }
 
     let currentStart: Date;
     let currentEnd: Date;
@@ -112,6 +127,7 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   const periodLabels: Record<TimePeriod, string> = {
+    all: "all time",
     year: "past year",
     month: "past month",
     week: "past week",
