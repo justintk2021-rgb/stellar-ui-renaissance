@@ -168,6 +168,7 @@ export function NotebookView({
   const [fullscreenBlockButtonPosition, setFullscreenBlockButtonPosition] = useState({ x: 0, y: 0 });
   const [fullscreenBlockMenuOpen, setFullscreenBlockMenuOpen] = useState(false);
   const [fullscreenBlockMenuPosition, setFullscreenBlockMenuPosition] = useState({ x: 0, y: 0 });
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const fullscreenEditorRef = useRef<HTMLDivElement>(null);
   const fullscreenEditorContainerRef = useRef<HTMLDivElement>(null);
@@ -1019,7 +1020,7 @@ export function NotebookView({
               isFoldersPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
             )}
             onClick={(e) => e.stopPropagation()}
-            onMouseLeave={closeFoldersPanel}
+            onMouseLeave={() => !isColorPickerOpen && closeFoldersPanel()}
           >
             <div className="flex flex-col h-[400px]">
               {/* Header */}
@@ -1091,7 +1092,7 @@ export function NotebookView({
                         
                         {/* Marker Color Picker */}
                         {cat.id !== "all" && (
-                          <DropdownMenu>
+                          <DropdownMenu onOpenChange={setIsColorPickerOpen}>
                             <DropdownMenuTrigger asChild>
                               <button 
                                 className="w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-accent flex items-center justify-center transition-all border border-border shadow-sm"
@@ -1106,7 +1107,7 @@ export function NotebookView({
                                 />
                               </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-36 p-2">
+                            <DropdownMenuContent align="end" className="w-36 p-2 bg-popover border border-border z-50">
                               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-1">Marker Color</div>
                               <div className="grid grid-cols-5 gap-1.5">
                                 {MARKER_COLORS.map((color) => (
@@ -1189,7 +1190,7 @@ export function NotebookView({
                               />
                             </div>
                             
-                            <DropdownMenu>
+                            <DropdownMenu onOpenChange={setIsColorPickerOpen}>
                               <DropdownMenuTrigger asChild>
                                 <button 
                                   className="w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-accent flex items-center justify-center transition-all border border-border shadow-sm"
@@ -1204,7 +1205,7 @@ export function NotebookView({
                                   />
                                 </button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-36 p-2">
+                              <DropdownMenuContent align="end" className="w-36 p-2 bg-popover border border-border z-50">
                                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-1">Marker Color</div>
                                 <div className="grid grid-cols-5 gap-1.5">
                                   {MARKER_COLORS.map((color) => (
