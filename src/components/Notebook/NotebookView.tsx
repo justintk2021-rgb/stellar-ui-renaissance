@@ -1693,57 +1693,83 @@ export function NotebookView({
             )}
           </>
         ) : (
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <motion.div 
+            className="flex-1 flex flex-col overflow-hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
             {/* All Notes Header */}
             <div className="p-6 pb-4">
               <motion.div 
-                initial={{ opacity: 0, y: -10 }}
+                initial={{ opacity: 0, y: -15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
                 className="flex items-center justify-between"
               >
                 <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  <motion.h1 
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent"
+                  >
                     All Notes
-                  </h1>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  </motion.h1>
+                  <motion.p 
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    className="text-sm text-muted-foreground mt-1"
+                  >
                     {notebookEntries.filter(e => !e.isDeleted).length} notes
-                  </p>
+                  </motion.p>
                 </div>
-                <div className="flex items-center gap-3">
+                <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  className="flex items-center gap-3"
+                >
                   {/* View Toggle */}
                   <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50">
-                    <button
+                    <motion.button
                       onClick={() => { setViewMode('grid'); localStorage.setItem('notebook-view-mode', 'grid'); }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       className={cn(
-                        "p-2 rounded-md transition-all",
+                        "p-2 rounded-md transition-all duration-200",
                         viewMode === 'grid' 
                           ? "bg-background shadow-sm text-foreground" 
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
                       <LayoutGrid className="w-4 h-4" />
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button
                       onClick={() => { setViewMode('list'); localStorage.setItem('notebook-view-mode', 'list'); }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       className={cn(
-                        "p-2 rounded-md transition-all",
+                        "p-2 rounded-md transition-all duration-200",
                         viewMode === 'list' 
                           ? "bg-background shadow-sm text-foreground" 
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
                       <LayoutList className="w-4 h-4" />
-                    </button>
+                    </motion.button>
                   </div>
-                  <Button
-                    onClick={handleNewNote}
-                    className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-md hover:shadow-lg transition-all"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Note
-                  </Button>
-                </div>
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                    <Button
+                      onClick={handleNewNote}
+                      className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-300"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      New Note
+                    </Button>
+                  </motion.div>
+                </motion.div>
               </motion.div>
             </div>
 
@@ -1751,16 +1777,35 @@ export function NotebookView({
             <ScrollArea className="flex-1 px-6 pb-6">
               {notebookEntries.filter(e => !e.isDeleted).length === 0 ? (
                 <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
                   className="flex flex-col items-center justify-center py-20 text-muted-foreground"
                 >
-                  <BookOpen className="w-16 h-16 mb-4 opacity-20" />
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 0.2 }}
+                    transition={{ duration: 0.8, delay: 0.2 }}
+                  >
+                    <BookOpen className="w-16 h-16 mb-4" />
+                  </motion.div>
                   <p className="text-lg font-medium">No notes yet</p>
                   <p className="text-sm mt-1">Create your first note to get started</p>
                 </motion.div>
               ) : (
-                <div 
+                <motion.div 
+                  initial="hidden"
+                  animate="visible"
+                  variants={{
+                    hidden: { opacity: 0 },
+                    visible: {
+                      opacity: 1,
+                      transition: {
+                        staggerChildren: 0.04,
+                        delayChildren: 0.1
+                      }
+                    }
+                  }}
                   className={cn(
                     viewMode === 'grid' 
                       ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
@@ -1778,17 +1823,37 @@ export function NotebookView({
                       return (
                         <motion.button
                           key={entry.id}
-                          initial={{ opacity: 0, y: 15 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ 
-                            duration: 0.25, 
-                            delay: Math.min(index * 0.03, 0.3),
-                            ease: "easeOut"
+                          variants={{
+                            hidden: { 
+                              opacity: 0, 
+                              y: 20,
+                              scale: 0.95
+                            },
+                            visible: { 
+                              opacity: 1, 
+                              y: 0,
+                              scale: 1,
+                              transition: {
+                                type: "spring",
+                                stiffness: 300,
+                                damping: 24
+                              }
+                            }
                           }}
-                          whileHover={{ y: -3, transition: { duration: 0.15 } }}
+                          whileHover={{ 
+                            y: -4, 
+                            scale: 1.02,
+                            boxShadow: "0 12px 24px -8px rgba(0,0,0,0.15)",
+                            transition: { 
+                              type: "spring", 
+                              stiffness: 400, 
+                              damping: 20 
+                            } 
+                          }}
+                          whileTap={{ scale: 0.98 }}
                           onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
                           className={cn(
-                            "text-left rounded-xl border transition-shadow overflow-hidden group relative",
+                            "text-left rounded-xl border transition-colors overflow-hidden group relative",
                             viewMode === 'grid' 
                               ? "p-4 min-h-[180px] flex flex-col" 
                               : "p-4 flex items-start gap-4"
@@ -1799,9 +1864,12 @@ export function NotebookView({
                           }}
                         >
                           {/* Color accent bar */}
-                          <div 
+                          <motion.div 
                             className="absolute top-0 left-0 w-1 h-full rounded-l-xl"
                             style={{ backgroundColor: colors.accent }}
+                            initial={{ scaleY: 0 }}
+                            animate={{ scaleY: 1 }}
+                            transition={{ duration: 0.4, delay: index * 0.02, ease: [0.25, 0.46, 0.45, 0.94] }}
                           />
                           
                           {viewMode === 'grid' ? (
@@ -1812,7 +1880,13 @@ export function NotebookView({
                                   <Calendar className="w-3 h-3" />
                                   <span>{new Date(entry.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                                 </div>
-                                <Pin className="w-3.5 h-3.5 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  whileHover={{ opacity: 1, scale: 1 }}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                >
+                                  <Pin className="w-3.5 h-3.5 text-muted-foreground/50" />
+                                </motion.div>
                               </div>
                               
                               {/* Title */}
@@ -1841,9 +1915,12 @@ export function NotebookView({
                           ) : (
                             <>
                               {/* List View */}
-                              <div 
+                              <motion.div 
                                 className="w-2 h-12 rounded-full shrink-0"
                                 style={{ backgroundColor: colors.accent }}
+                                initial={{ scaleY: 0 }}
+                                animate={{ scaleY: 1 }}
+                                transition={{ duration: 0.3, delay: index * 0.02 }}
                               />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
@@ -1869,10 +1946,10 @@ export function NotebookView({
                         </motion.button>
                       );
                     })}
-                </div>
+                </motion.div>
               )}
             </ScrollArea>
-          </div>
+          </motion.div>
         )}
         </div>
         
