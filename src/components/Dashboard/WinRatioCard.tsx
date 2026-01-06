@@ -177,7 +177,9 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
               strokeDashoffset={strokeDashoffset}
               className="transition-all duration-1000 ease-out"
               style={{
-                filter: "drop-shadow(0 0 8px hsl(var(--primary) / 0.4))",
+                filter: animatedValue > 50 
+                  ? "drop-shadow(0 0 12px hsl(var(--primary) / 0.6)) drop-shadow(0 0 24px hsl(var(--primary) / 0.4))" 
+                  : "drop-shadow(0 0 6px hsl(var(--primary) / 0.3))",
               }}
             />
           </svg>
