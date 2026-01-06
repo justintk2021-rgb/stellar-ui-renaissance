@@ -557,17 +557,17 @@ export function NotebookView({
     localStorage.setItem('notebook-view-mode', newMode);
   };
 
-  // Note card colors based on category
+  // Note card colors based on category - using inline styles for HSL colors
   const getNoteCardColor = (category: string, index: number) => {
     const colors = [
-      { bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-200 dark:border-blue-800/50', accent: 'bg-blue-400' },
-      { bg: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-200 dark:border-green-800/50', accent: 'bg-green-400' },
-      { bg: 'bg-yellow-100 dark:bg-yellow-900/30', border: 'border-yellow-200 dark:border-yellow-800/50', accent: 'bg-yellow-400' },
-      { bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-200 dark:border-red-800/50', accent: 'bg-red-400' },
-      { bg: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-200 dark:border-purple-800/50', accent: 'bg-purple-400' },
-      { bg: 'bg-pink-100 dark:bg-pink-900/30', border: 'border-pink-200 dark:border-pink-800/50', accent: 'bg-pink-400' },
-      { bg: 'bg-cyan-100 dark:bg-cyan-900/30', border: 'border-cyan-200 dark:border-cyan-800/50', accent: 'bg-cyan-400' },
-      { bg: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-200 dark:border-orange-800/50', accent: 'bg-orange-400' },
+      { bg: 'hsl(210, 100%, 95%)', bgDark: 'hsl(210, 50%, 15%)', border: 'hsl(210, 80%, 85%)', borderDark: 'hsl(210, 40%, 25%)', accent: 'hsl(210, 80%, 55%)' },
+      { bg: 'hsl(142, 70%, 92%)', bgDark: 'hsl(142, 40%, 12%)', border: 'hsl(142, 60%, 80%)', borderDark: 'hsl(142, 30%, 22%)', accent: 'hsl(142, 70%, 45%)' },
+      { bg: 'hsl(48, 95%, 90%)', bgDark: 'hsl(48, 50%, 12%)', border: 'hsl(48, 80%, 80%)', borderDark: 'hsl(48, 40%, 22%)', accent: 'hsl(48, 95%, 50%)' },
+      { bg: 'hsl(0, 85%, 93%)', bgDark: 'hsl(0, 40%, 14%)', border: 'hsl(0, 70%, 85%)', borderDark: 'hsl(0, 30%, 24%)', accent: 'hsl(0, 75%, 55%)' },
+      { bg: 'hsl(262, 80%, 93%)', bgDark: 'hsl(262, 40%, 14%)', border: 'hsl(262, 60%, 85%)', borderDark: 'hsl(262, 30%, 24%)', accent: 'hsl(262, 70%, 55%)' },
+      { bg: 'hsl(330, 80%, 93%)', bgDark: 'hsl(330, 40%, 14%)', border: 'hsl(330, 60%, 85%)', borderDark: 'hsl(330, 30%, 24%)', accent: 'hsl(330, 70%, 55%)' },
+      { bg: 'hsl(186, 80%, 90%)', bgDark: 'hsl(186, 40%, 12%)', border: 'hsl(186, 60%, 80%)', borderDark: 'hsl(186, 30%, 22%)', accent: 'hsl(186, 70%, 45%)' },
+      { bg: 'hsl(25, 90%, 92%)', bgDark: 'hsl(25, 50%, 14%)', border: 'hsl(25, 70%, 82%)', borderDark: 'hsl(25, 35%, 24%)', accent: 'hsl(25, 85%, 50%)' },
     ];
     return colors[index % colors.length];
   };
@@ -1760,117 +1760,116 @@ export function NotebookView({
                   <p className="text-sm mt-1">Create your first note to get started</p>
                 </motion.div>
               ) : (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}
+                <div 
                   className={cn(
                     viewMode === 'grid' 
                       ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
                       : "flex flex-col gap-3"
                   )}
                 >
-                  <AnimatePresence mode="popLayout">
-                    {notebookEntries
-                      .filter(e => !e.isDeleted)
-                      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-                      .map((entry, index) => {
-                        const colors = getNoteCardColor(entry.category, index);
-                        const plainText = entry.content.replace(/<[^>]*>/g, '').slice(0, 150);
-                        
-                        return (
-                          <motion.button
-                            key={entry.id}
-                            layout
-                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ 
-                              duration: 0.3, 
-                              delay: index * 0.03,
-                              layout: { duration: 0.2 }
-                            }}
-                            whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                            onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
-                            className={cn(
-                              "text-left rounded-xl border transition-all overflow-hidden group",
-                              colors.bg,
-                              colors.border,
-                              viewMode === 'grid' 
-                                ? "p-4 min-h-[180px] flex flex-col" 
-                                : "p-4 flex items-start gap-4"
-                            )}
-                          >
-                            {/* Color accent bar */}
-                            <div className={cn(
-                              "absolute top-0 left-0 w-1 h-full rounded-l-xl",
-                              colors.accent
-                            )} />
-                            
-                            {viewMode === 'grid' ? (
-                              <>
-                                {/* Header */}
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Calendar className="w-3 h-3" />
-                                    <span>{new Date(entry.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                                  </div>
-                                  <Pin className="w-3.5 h-3.5 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  {notebookEntries
+                    .filter(e => !e.isDeleted)
+                    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                    .map((entry, index) => {
+                      const colors = getNoteCardColor(entry.category, index);
+                      const plainText = entry.content.replace(/<[^>]*>/g, '').slice(0, 150);
+                      const isDark = document.documentElement.classList.contains('dark');
+                      
+                      return (
+                        <motion.button
+                          key={entry.id}
+                          initial={{ opacity: 0, y: 15 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ 
+                            duration: 0.25, 
+                            delay: Math.min(index * 0.03, 0.3),
+                            ease: "easeOut"
+                          }}
+                          whileHover={{ y: -3, transition: { duration: 0.15 } }}
+                          onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
+                          className={cn(
+                            "text-left rounded-xl border transition-shadow overflow-hidden group relative",
+                            viewMode === 'grid' 
+                              ? "p-4 min-h-[180px] flex flex-col" 
+                              : "p-4 flex items-start gap-4"
+                          )}
+                          style={{
+                            backgroundColor: isDark ? colors.bgDark : colors.bg,
+                            borderColor: isDark ? colors.borderDark : colors.border,
+                          }}
+                        >
+                          {/* Color accent bar */}
+                          <div 
+                            className="absolute top-0 left-0 w-1 h-full rounded-l-xl"
+                            style={{ backgroundColor: colors.accent }}
+                          />
+                          
+                          {viewMode === 'grid' ? (
+                            <>
+                              {/* Header */}
+                              <div className="flex items-center justify-between mb-2 pl-2">
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <Calendar className="w-3 h-3" />
+                                  <span>{new Date(entry.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                                 </div>
-                                
-                                {/* Title */}
-                                <h3 className="font-semibold text-foreground mb-2 line-clamp-2">
-                                  {entry.title || 'Untitled'}
-                                </h3>
-                                
-                                {/* Content Preview */}
-                                <p className="text-sm text-muted-foreground line-clamp-4 flex-1">
-                                  {plainText || 'No content...'}
-                                </p>
-                                
-                                {/* Footer */}
-                                <div className="flex items-center gap-2 mt-3 pt-2 border-t border-current/10">
+                                <Pin className="w-3.5 h-3.5 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                              
+                              {/* Title */}
+                              <h3 className="font-semibold text-foreground mb-2 line-clamp-2 pl-2">
+                                {entry.title || 'Untitled'}
+                              </h3>
+                              
+                              {/* Content Preview */}
+                              <p className="text-sm text-muted-foreground line-clamp-4 flex-1 pl-2">
+                                {plainText || 'No content...'}
+                              </p>
+                              
+                              {/* Footer */}
+                              <div className="flex items-center gap-2 mt-3 pt-2 border-t border-foreground/10 pl-2">
+                                {entry.tradeId && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50">
+                                    <TrendingUp className="w-2.5 h-2.5 mr-1" />
+                                    Trade
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50 capitalize">
+                                  {entry.category.replace('-', ' ')}
+                                </Badge>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {/* List View */}
+                              <div 
+                                className="w-2 h-12 rounded-full shrink-0"
+                                style={{ backgroundColor: colors.accent }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h3 className="font-semibold text-foreground truncate">
+                                    {entry.title || 'Untitled'}
+                                  </h3>
                                   {entry.tradeId && (
-                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50">
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50 shrink-0">
                                       <TrendingUp className="w-2.5 h-2.5 mr-1" />
                                       Trade
                                     </Badge>
                                   )}
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50 capitalize">
-                                    {entry.category.replace('-', ' ')}
-                                  </Badge>
                                 </div>
-                              </>
-                            ) : (
-                              <>
-                                {/* List View */}
-                                <div className={cn("w-2 h-12 rounded-full shrink-0", colors.accent)} />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <h3 className="font-semibold text-foreground truncate">
-                                      {entry.title || 'Untitled'}
-                                    </h3>
-                                    {entry.tradeId && (
-                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50 shrink-0">
-                                        <TrendingUp className="w-2.5 h-2.5 mr-1" />
-                                        Trade
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <p className="text-sm text-muted-foreground line-clamp-1">
-                                    {plainText || 'No content...'}
-                                  </p>
-                                </div>
-                                <div className="text-xs text-muted-foreground shrink-0">
-                                  {new Date(entry.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
-                                </div>
-                              </>
-                            )}
-                          </motion.button>
-                        );
-                      })}
-                  </AnimatePresence>
-                </motion.div>
+                                <p className="text-sm text-muted-foreground line-clamp-1">
+                                  {plainText || 'No content...'}
+                                </p>
+                              </div>
+                              <div className="text-xs text-muted-foreground shrink-0">
+                                {new Date(entry.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
+                              </div>
+                            </>
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                </div>
               )}
             </ScrollArea>
           </div>
