@@ -557,7 +557,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
 
       {/* Note Dialog - Styled like reference image with animation */}
       <Dialog open={noteDialogOpen} onOpenChange={(open) => !open && closeNoteDialog()}>
-        <DialogContent className="sm:max-w-2xl h-[85vh] p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden">
+        <DialogContent className="sm:max-w-2xl h-[85vh] p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden flex flex-col">
           <AnimatePresence>
             {noteDialogOpen && (
               <motion.div 
@@ -565,7 +565,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 10 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="relative rounded-2xl backdrop-blur-xl bg-background/95 border border-border/50 h-full flex flex-col"
+                className="relative rounded-2xl backdrop-blur-xl bg-background/95 border border-border/50 flex-1 flex flex-col overflow-hidden"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 shrink-0">
