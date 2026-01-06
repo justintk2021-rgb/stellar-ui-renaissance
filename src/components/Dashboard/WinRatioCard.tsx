@@ -104,8 +104,8 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
   }, [currentStats.winRate]);
 
   // Circular progress values
-  const size = 120;
-  const strokeWidth = 10;
+  const size = 140;
+  const strokeWidth = 12;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.min(Math.max(animatedValue, 0), 100);
