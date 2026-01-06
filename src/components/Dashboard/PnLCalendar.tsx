@@ -80,36 +80,44 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
   }, []);
 
   // Get daily notes (non-trade linked entries by date)
-  const dailyNotes: Record<string, NotebookEntry[]> = {};
-  notebookEntries.forEach((entry) => {
-    if (!entry.tradeId && entry.date) {
-      if (!dailyNotes[entry.date]) {
-        dailyNotes[entry.date] = [];
+  const dailyNotes = useMemo(() => {
+    const notes: Record<string, NotebookEntry[]> = {};
+    notebookEntries.forEach((entry) => {
+      if (!entry.tradeId && entry.date) {
+        if (!notes[entry.date]) {
+          notes[entry.date] = [];
+        }
+        notes[entry.date].push(entry);
       }
-      dailyNotes[entry.date].push(entry);
-    }
-  });
+    });
+    return notes;
+  }, [notebookEntries]);
 
-  const dailyStats: Record<string, DailyStats & { winRate: number }> = {};
-  const dailyTrades: Record<string, Trade[]> = {};
-  
-  trades.forEach((trade) => {
-    if (!trade.date) return;
-    if (!dailyStats[trade.date]) {
-      dailyStats[trade.date] = { pnl: 0, trades: 0, winRate: 0 };
-      dailyTrades[trade.date] = [];
-    }
-    dailyStats[trade.date].pnl += trade.result || 0;
-    dailyStats[trade.date].trades += 1;
-    dailyTrades[trade.date].push(trade);
-  });
+  // Calculate daily stats and trades - memoized to prevent glitches on month switch
+  const { dailyStats, dailyTrades } = useMemo(() => {
+    const stats: Record<string, DailyStats & { winRate: number }> = {};
+    const tradesMap: Record<string, Trade[]> = {};
+    
+    trades.forEach((trade) => {
+      if (!trade.date) return;
+      if (!stats[trade.date]) {
+        stats[trade.date] = { pnl: 0, trades: 0, winRate: 0 };
+        tradesMap[trade.date] = [];
+      }
+      stats[trade.date].pnl += trade.result || 0;
+      stats[trade.date].trades += 1;
+      tradesMap[trade.date].push(trade);
+    });
 
-  // Calculate win rate for each day
-  Object.keys(dailyTrades).forEach((date) => {
-    const dayTrades = dailyTrades[date];
-    const wins = dayTrades.filter(t => t.result > 0).length;
-    dailyStats[date].winRate = dayTrades.length > 0 ? (wins / dayTrades.length) * 100 : 0;
-  });
+    // Calculate win rate for each day
+    Object.keys(tradesMap).forEach((date) => {
+      const dayTrades = tradesMap[date];
+      const wins = dayTrades.filter(t => t.result > 0).length;
+      stats[date].winRate = dayTrades.length > 0 ? (wins / dayTrades.length) * 100 : 0;
+    });
+
+    return { dailyStats: stats, dailyTrades: tradesMap };
+  }, [trades]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
