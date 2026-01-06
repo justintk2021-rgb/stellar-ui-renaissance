@@ -557,7 +557,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
 
       {/* Note Dialog - Styled like reference image with animation */}
       <Dialog open={noteDialogOpen} onOpenChange={(open) => !open && closeNoteDialog()}>
-        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] p-0 overflow-hidden border-0 bg-transparent shadow-2xl [&>button]:hidden">
           <AnimatePresence>
             {noteDialogOpen && (
               <motion.div 
@@ -565,7 +565,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 10 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="relative rounded-2xl overflow-hidden backdrop-blur-xl bg-background/95 border border-border/50"
+                className="relative rounded-2xl overflow-hidden backdrop-blur-xl bg-background/95 border border-border/50 max-h-[85vh] flex flex-col"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border/30">
@@ -666,7 +666,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 </div>
 
                 {/* Content Area */}
-                <div className="p-6 space-y-4">
+                <div className="p-6 space-y-4 flex-1 overflow-y-auto">
                   {/* Title Input */}
                   <div className="space-y-2">
                     <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</label>
@@ -684,7 +684,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                     contentEditable
                     onInput={handleContentChange}
                     dangerouslySetInnerHTML={{ __html: noteContent }}
-                    className="min-h-[280px] bg-transparent text-sm leading-relaxed focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/50"
+                    className="min-h-[200px] bg-transparent text-sm leading-relaxed focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/50"
                     data-placeholder="Write your thoughts, observations, market analysis..."
                   />
                 </div>
