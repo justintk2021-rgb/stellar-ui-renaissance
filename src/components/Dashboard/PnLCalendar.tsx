@@ -705,17 +705,23 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 </DialogTitle>
                 <p className="text-xs text-muted-foreground mt-1">Daily Trade Summary</p>
               </div>
-              {selectedDate && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => openDailyNoteDialog(selectedDate, e)}
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <StickyNote className="w-3.5 h-3.5 mr-1" />
-                  View Notes
-                </Button>
-              )}
+            {selectedDate && selectedTrades.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Open the first trade's notes dialog
+                  if (selectedTrades.length > 0) {
+                    openTradeNoteDialog(selectedTrades[0], e);
+                  }
+                }}
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <FileText className="w-3.5 h-3.5 mr-1" />
+                View Notes ({selectedTrades.filter(t => getTradeNotebookEntry(notebookEntries, t.id)).length}/{selectedTrades.length})
+              </Button>
+            )}
             </div>
           </DialogHeader>
 
