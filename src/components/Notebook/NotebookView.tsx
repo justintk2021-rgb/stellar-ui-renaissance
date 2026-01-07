@@ -37,6 +37,7 @@ import {
 import {
   Bold,
   Italic,
+  Underline,
   List,
   Heading1,
   Heading2,
@@ -86,6 +87,10 @@ import {
   LayoutGrid,
   LayoutList,
   Pin,
+  Share2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -807,209 +812,271 @@ export function NotebookView({
     {(isFullWidth || isFullWidthClosing) && selectedEntry && (
       <div 
         className={cn(
-          "fixed inset-0 z-50 bg-background/80 backdrop-blur-xl flex items-center justify-center p-6 transition-all duration-200",
-          isFullWidthClosing ? "opacity-0" : "opacity-100 animate-fade-in"
+          "fixed inset-0 z-50 bg-background/60 backdrop-blur-2xl flex items-center justify-center p-4 md:p-8 transition-all duration-300",
+          isFullWidthClosing ? "opacity-0" : "opacity-100"
         )}
         onClick={closeFullscreen}
       >
-        {/* Fullscreen Container */}
-        <div 
-          className={cn(
-            "w-full max-w-5xl h-full max-h-[calc(100vh-48px)] bg-background/95 rounded-3xl border border-border/50 shadow-2xl flex flex-col overflow-hidden transition-all duration-200",
-            isFullWidthClosing ? "scale-95 opacity-0" : "scale-100 opacity-100"
-          )}
+        {/* Fullscreen Container - Glass morphism card */}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ 
+            opacity: isFullWidthClosing ? 0 : 1, 
+            scale: isFullWidthClosing ? 0.95 : 1, 
+            y: isFullWidthClosing ? 20 : 0 
+          }}
+          transition={{ 
+            duration: 0.35, 
+            ease: [0.25, 0.46, 0.45, 0.94],
+            scale: { type: "spring", stiffness: 300, damping: 25 }
+          }}
+          className="w-full max-w-4xl h-[90vh] glass-strong rounded-3xl shadow-2xl flex flex-col overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Fullscreen Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 bg-muted/20">
-            <div className="flex items-center gap-4">
+          {/* Header */}
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.3 }}
+            className="flex items-center justify-between px-6 py-4 border-b border-border/20"
+          >
+            <h2 className="text-xl font-semibold tracking-tight">Notes</h2>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-9 w-9 p-0 rounded-xl hover:bg-muted/50"
+              >
+                <Share2 className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  closeFullscreen();
+                }}
+                className="h-9 px-4 rounded-xl text-sm hover:bg-muted/50"
+              >
+                Discard
+              </Button>
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => {
+                  handleSave();
+                  closeFullscreen();
+                }}
+                disabled={isLocked} 
+                className="h-9 px-5 rounded-xl text-sm bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+              >
+                Save & Close
+              </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={closeFullscreen}
-                className="h-9 w-9 p-0 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-colors"
+                className="h-9 w-9 p-0 rounded-xl hover:bg-destructive/10 hover:text-destructive ml-1"
               >
-                <Minimize2 className="w-4 h-4" />
+                <X className="w-4 h-4" />
               </Button>
-              <div className="h-6 w-px bg-border/50" />
-              <Input
-                ref={fullscreenTitleRef}
-                defaultValue={selectedEntry?.title || ""}
-                placeholder="Note title..."
+            </div>
+          </motion.div>
+
+          {/* Formatting Toolbar */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15, duration: 0.3 }}
+            className="flex items-center justify-center gap-1 px-6 py-3 border-b border-border/10"
+          >
+            <div className="flex items-center gap-1 bg-muted/30 rounded-xl p-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('bold')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
                 disabled={isLocked}
-                className="text-xl font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 w-auto max-w-lg"
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              {isLocked && (
-                <Badge variant="outline" className="text-[10px] border-yellow-500/50 bg-yellow-500/10 text-yellow-600 rounded-lg">
-                  <Lock className="w-3 h-3 mr-1" />
-                  Locked
-                </Badge>
-              )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-xl">
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52 bg-background border border-border z-50 rounded-xl p-2">
-                  {/* Font Style Selector */}
-                  <div className="flex items-center justify-center gap-2 mb-2 p-1">
-                    <button 
-                      onClick={() => setFontStyle('default')}
-                      className={cn(
-                        "flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors",
-                        fontStyle === 'default' ? "bg-primary/20 text-primary" : "hover:bg-muted"
-                      )}
-                    >
-                      <span className="text-base font-sans">Ag</span>
-                      <span className="text-[9px] text-muted-foreground">Default</span>
-                    </button>
-                    <button 
-                      onClick={() => setFontStyle('serif')}
-                      className={cn(
-                        "flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors",
-                        fontStyle === 'serif' ? "bg-primary/20 text-primary" : "hover:bg-muted"
-                      )}
-                    >
-                      <span className="text-base font-serif">Ag</span>
-                      <span className="text-[9px] text-muted-foreground">Serif</span>
-                    </button>
-                    <button 
-                      onClick={() => setFontStyle('mono')}
-                      className={cn(
-                        "flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors",
-                        fontStyle === 'mono' ? "bg-primary/20 text-primary" : "hover:bg-muted"
-                      )}
-                    >
-                      <span className="text-base font-mono">Ag</span>
-                      <span className="text-[9px] text-muted-foreground">Mono</span>
-                    </button>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <div className="flex items-center justify-between px-2 py-2 rounded-lg hover:bg-muted/50">
-                    <div className="flex items-center gap-2 text-xs">
-                      <Type className="w-3.5 h-3.5" />
-                      Small text
-                    </div>
-                    <Switch checked={isSmallText} onCheckedChange={setIsSmallText} className="scale-75" />
-                  </div>
-                  <div className="flex items-center justify-between px-2 py-2 rounded-lg hover:bg-muted/50">
-                    <div className="flex items-center gap-2 text-xs">
-                      <Lock className="w-3.5 h-3.5" />
-                      Lock page
-                    </div>
-                    <Switch checked={isLocked} onCheckedChange={setIsLocked} className="scale-75" />
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button 
-                variant="default" 
-                size="sm" 
-                onClick={handleSave} 
-                disabled={isLocked} 
-                className="h-9 px-5 text-xs rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/20"
               >
-                <Save className="w-3.5 h-3.5 mr-1.5" />
-                Save
+                <Bold className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('italic')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <Italic className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('underline')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <Underline className="w-4 h-4" />
+              </Button>
+              
+              <div className="w-px h-5 bg-border/50 mx-1" />
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('justifyLeft')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <AlignLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('justifyCenter')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <AlignCenter className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('justifyRight')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <AlignRight className="w-4 h-4" />
+              </Button>
+              
+              <div className="w-px h-5 bg-border/50 mx-1" />
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const url = prompt('Enter URL:');
+                  if (url) document.execCommand('createLink', false, url);
+                }}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <Link className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('formatBlock', false, 'blockquote')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <Quote className="w-4 h-4" />
               </Button>
             </div>
-          </div>
-          {/* Fullscreen Editor with Block Menu */}
-          <div className="flex-1 flex overflow-hidden">
-            {/* Editor Section */}
-            <ScrollArea className="flex-1 bg-gradient-to-b from-transparent to-muted/5">
-              <div 
-                ref={fullscreenEditorContainerRef}
-                className="max-w-3xl mx-auto px-12 py-10 relative min-h-full"
-                onMouseMove={handleFullscreenEditorMouseMove}
-                onMouseLeave={handleFullscreenEditorMouseLeave}
-              >
-                {/* Floating Block Button - Fullscreen */}
-                {fullscreenShowBlockButton && !isLocked && (
-                  <div
-                    className="absolute z-20"
-                    style={{ left: fullscreenBlockButtonPosition.x, top: fullscreenBlockButtonPosition.y }}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-6 h-6 p-0 opacity-30 hover:opacity-100 hover:bg-muted rounded transition-opacity duration-150"
-                      onClick={openFullscreenBlockMenu}
-                    >
-                      <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                    </Button>
-                  </div>
-                )}
+          </motion.div>
 
-                {/* Block Format Menu - Fullscreen */}
-                {fullscreenBlockMenuOpen && (
-                  <div
-                    className="absolute z-50 bg-background border border-border rounded-lg shadow-xl py-1 w-48 max-h-64 overflow-y-auto animate-scale-in"
-                    style={{ left: fullscreenBlockMenuPosition.x, top: fullscreenBlockMenuPosition.y }}
-                    onMouseLeave={() => {
-                      setFullscreenBlockMenuOpen(false);
-                      setFullscreenShowBlockButton(false);
-                    }}
-                  >
-                    <div className="px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
-                      Basic blocks
-                    </div>
-                    {BLOCK_OPTIONS.map((option) => {
-                      const Icon = option.icon;
-                      return (
-                        <button
-                          key={option.id}
-                          onClick={() => handleBlockFormat(option, true)}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted/50 transition-colors text-left group"
-                        >
-                          <div className="w-6 h-6 flex items-center justify-center rounded border border-border/50 bg-background group-hover:border-primary/30 transition-colors">
-                            <Icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-                          </div>
-                          <span className="flex-1">{option.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div
-                  ref={fullscreenEditorRef}
-                  contentEditable={!isLocked}
-                  className={cn(
-                    "min-h-[calc(100vh-280px)] outline-none focus:outline-none caret-primary pl-8",
-                    fontClasses[fontStyle],
-                    isSmallText ? "text-sm" : "text-base",
-                    "leading-relaxed",
-                    isLocked && "cursor-not-allowed opacity-70",
-                    "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2",
-                    "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2",
-                    "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1",
-                    "[&_p]:mb-2",
-                    "[&_ul]:list-disc [&_ul]:ml-5 [&_ul]:mb-2",
-                    "[&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:mb-2",
-                    "[&_li]:text-foreground [&_li]:mb-1",
-                    "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2",
-                    "[&_strong]:font-semibold",
-                    "[&_em]:italic",
-                    "[&_.notebook-table-wrapper]:relative",
-                    "[&_.notebook-table]:rounded-xl [&_.notebook-table]:overflow-hidden",
-                    "[&_.notebook-table_td]:bg-background/50 [&_.notebook-table_td]:hover:bg-muted/50 [&_.notebook-table_td]:transition-colors",
-                    "[&_.notebook-table_td:focus]:outline-none [&_.notebook-table_td:focus]:ring-2 [&_.notebook-table_td:focus]:ring-primary/30 [&_.notebook-table_td:focus]:ring-inset"
-                  )}
-                  suppressContentEditableWarning
+          {/* Content Area */}
+          <ScrollArea className="flex-1">
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.4 }}
+              ref={fullscreenEditorContainerRef}
+              className="max-w-3xl mx-auto px-8 md:px-12 py-8"
+              onMouseMove={handleFullscreenEditorMouseMove}
+              onMouseLeave={handleFullscreenEditorMouseLeave}
+            >
+              {/* Title Section */}
+              <div className="mb-6">
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium">
+                  Title
+                </span>
+                <Input
+                  ref={fullscreenTitleRef}
+                  defaultValue={selectedEntry?.title || ""}
+                  placeholder="Untitled"
+                  disabled={isLocked}
+                  className="text-xl font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 mt-1"
                 />
               </div>
-            </ScrollArea>
-          </div>
-          
-          {/* Fullscreen Footer */}
-          <div className="px-6 py-3 border-t border-border/30 bg-muted/10 flex items-center justify-between text-xs text-muted-foreground">
-            <span>Press Esc to exit fullscreen</span>
-            <span>{selectedEntry.date}</span>
-          </div>
-        </div>
+
+              {/* Floating Block Button - Fullscreen */}
+              {fullscreenShowBlockButton && !isLocked && (
+                <div
+                  className="absolute z-20"
+                  style={{ left: fullscreenBlockButtonPosition.x, top: fullscreenBlockButtonPosition.y }}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-6 h-6 p-0 opacity-30 hover:opacity-100 hover:bg-muted rounded transition-opacity duration-150"
+                    onClick={openFullscreenBlockMenu}
+                  >
+                    <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                  </Button>
+                </div>
+              )}
+
+              {/* Block Format Menu - Fullscreen */}
+              {fullscreenBlockMenuOpen && (
+                <div
+                  className="absolute z-50 bg-background border border-border rounded-xl shadow-xl py-1 w-48 max-h-64 overflow-y-auto animate-scale-in"
+                  style={{ left: fullscreenBlockMenuPosition.x, top: fullscreenBlockMenuPosition.y }}
+                  onMouseLeave={() => {
+                    setFullscreenBlockMenuOpen(false);
+                    setFullscreenShowBlockButton(false);
+                  }}
+                >
+                  <div className="px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
+                    Basic blocks
+                  </div>
+                  {BLOCK_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => handleBlockFormat(option, true)}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted/50 transition-colors text-left group"
+                      >
+                        <div className="w-6 h-6 flex items-center justify-center rounded border border-border/50 bg-background group-hover:border-primary/30 transition-colors">
+                          <Icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                        </div>
+                        <span className="flex-1">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Editor Content */}
+              <div
+                ref={fullscreenEditorRef}
+                contentEditable={!isLocked}
+                className={cn(
+                  "min-h-[calc(100vh-400px)] outline-none focus:outline-none caret-primary",
+                  fontClasses[fontStyle],
+                  isSmallText ? "text-sm leading-relaxed" : "text-base leading-loose",
+                  isLocked && "cursor-not-allowed opacity-70",
+                  "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-3",
+                  "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2",
+                  "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2",
+                  "[&_p]:mb-3 [&_p]:text-foreground/90",
+                  "[&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-3 [&_ul]:space-y-1",
+                  "[&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-3 [&_ol]:space-y-1",
+                  "[&_li]:text-foreground/90 [&_li]:pl-1",
+                  "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/60 [&_blockquote]:pl-4 [&_blockquote]:py-1 [&_blockquote]:italic [&_blockquote]:text-foreground/80 [&_blockquote]:my-4 [&_blockquote]:bg-primary/5 [&_blockquote]:rounded-r-lg",
+                  "[&_strong]:font-semibold [&_strong]:text-foreground",
+                  "[&_em]:italic",
+                  "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:hover:text-primary/80",
+                  "[&_.notebook-table-wrapper]:relative",
+                  "[&_.notebook-table]:rounded-xl [&_.notebook-table]:overflow-hidden",
+                  "[&_.notebook-table_td]:bg-background/50 [&_.notebook-table_td]:hover:bg-muted/50 [&_.notebook-table_td]:transition-colors",
+                  "[&_.notebook-table_td:focus]:outline-none [&_.notebook-table_td:focus]:ring-2 [&_.notebook-table_td:focus]:ring-primary/30 [&_.notebook-table_td:focus]:ring-inset"
+                )}
+                suppressContentEditableWarning
+              />
+            </motion.div>
+          </ScrollArea>
+        </motion.div>
       </div>
     )}
     
