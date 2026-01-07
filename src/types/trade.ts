@@ -3,6 +3,7 @@ export interface ChecklistChildState {
   id: string;
   text: string;
   checked: boolean;
+  percentage?: number;
   children?: ChecklistChildState[];
 }
 
@@ -11,6 +12,7 @@ export interface ChecklistSubItemState {
   id: string;
   text: string;
   checked: boolean;
+  percentage?: number;
   children?: ChecklistChildState[];
 }
 
