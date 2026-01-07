@@ -1689,6 +1689,49 @@ export function NotebookView({
                 transition={{ delay: 0.15, duration: 0.3 }}
                 className="flex items-center gap-1 px-4 py-2 border-b border-border/20 bg-muted/10"
               >
+                {/* Font Selector */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 rounded hover:bg-muted text-xs gap-1"
+                      disabled={isLocked}
+                    >
+                      <span className={cn(
+                        fontStyle === 'default' && 'font-sans',
+                        fontStyle === 'serif' && 'font-serif',
+                        fontStyle === 'mono' && 'font-mono'
+                      )}>
+                        {fontStyle === 'default' ? 'Sans Serif' : fontStyle === 'serif' ? 'Serif' : 'Mono'}
+                      </span>
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-36 bg-background border border-border z-50">
+                    <DropdownMenuItem 
+                      onClick={() => setFontStyle('default')}
+                      className={cn("text-xs font-sans", fontStyle === 'default' && "bg-primary/10")}
+                    >
+                      Sans Serif
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setFontStyle('serif')}
+                      className={cn("text-xs font-serif", fontStyle === 'serif' && "bg-primary/10")}
+                    >
+                      Serif
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setFontStyle('mono')}
+                      className={cn("text-xs font-mono", fontStyle === 'mono' && "bg-primary/10")}
+                    >
+                      Monospace
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <div className="w-px h-5 bg-border/50 mx-1" />
+                
                 <div className="flex items-center gap-0.5">
                   <Button
                     variant="ghost"
