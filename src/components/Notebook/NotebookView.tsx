@@ -1014,7 +1014,7 @@ export function NotebookView({
     )}
     
     <div className={cn(
-      "h-[calc(100vh-80px)] flex gap-0 transition-all duration-300 relative",
+      "h-[calc(100vh-200px)] flex gap-4 transition-all duration-300 relative",
       isFullWidth && "invisible"
     )}>
       {/* Bookmark Tab Toggle - Notes */}
