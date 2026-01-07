@@ -320,21 +320,21 @@ export function PlaybookView() {
     }));
   };
 
-  // Check if a category (main item) is complete - all its sub-items are checked
-  const isCategoryComplete = (item: ChecklistItem): boolean => {
+  // Check if a category has at least one sub-item checked (unlocks next category)
+  const isCategoryStarted = (item: ChecklistItem): boolean => {
     if (!item.subItems || item.subItems.length === 0) return item.checked;
-    return item.subItems.every(sub => sub.checked);
+    return item.subItems.some(sub => sub.checked);
   };
 
   // Get the index of the current unlocked category for conditional checklists
-  // A category is unlocked if all previous categories are complete
+  // A category is unlocked if at least one item in previous category is checked
   const getUnlockedCategoryIndex = (items: ChecklistItem[]): number => {
     for (let i = 0; i < items.length; i++) {
-      if (!isCategoryComplete(items[i])) {
+      if (!isCategoryStarted(items[i])) {
         return i;
       }
     }
-    return items.length; // All complete
+    return items.length; // All started
   };
 
   // Check if a category is accessible (unlocked)
@@ -343,9 +343,9 @@ export function PlaybookView() {
     return categoryIndex <= unlockedIndex;
   };
 
-  // Count completed categories
-  const getCompletedCategoriesCount = (items: ChecklistItem[]): number => {
-    return items.filter(item => isCategoryComplete(item)).length;
+  // Count started categories (at least 1 sub-item checked)
+  const getStartedCategoriesCount = (items: ChecklistItem[]): number => {
+    return items.filter(item => isCategoryStarted(item)).length;
   };
 
   const addChildToSubItem = async (
@@ -1122,14 +1122,14 @@ export function PlaybookView() {
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-4 pb-3 border-b border-border/30">
                   <span>Category Progress</span>
                   <span className="font-medium">
-                    {getCompletedCategoriesCount(selectedChecklist.items)} / {selectedChecklist.items.length} categories
+                    {getStartedCategoriesCount(selectedChecklist.items)} / {selectedChecklist.items.length} categories
                   </span>
                 </div>
                 
                 <AnimatePresence mode="popLayout">
                   {selectedChecklist.items.map((item: ChecklistItem, categoryIndex: number) => {
                     const isUnlocked = isCategoryUnlocked(selectedChecklist.items, categoryIndex);
-                    const isComplete = isCategoryComplete(item);
+                    const isStarted = isCategoryStarted(item);
                     const isCurrentCategory = categoryIndex === getUnlockedCategoryIndex(selectedChecklist.items);
                     const hasSubItems = item.subItems && item.subItems.length > 0;
                     const isExpanded = expandedItems.has(item.id) || isCurrentCategory;
@@ -1158,7 +1158,7 @@ export function PlaybookView() {
                         <motion.div
                           className={cn(
                             "relative flex items-center gap-3 p-4 rounded-xl transition-all duration-300",
-                            isComplete
+                            isStarted
                               ? "bg-gradient-to-r from-primary/15 to-primary/5 border border-primary/30"
                               : isCurrentCategory
                                 ? "bg-gradient-to-r from-amber-500/15 to-amber-500/5 border border-amber-500/30"
@@ -1166,12 +1166,12 @@ export function PlaybookView() {
                                   ? "bg-muted/40 hover:bg-muted/60 border border-border/30"
                                   : "bg-muted/20 border border-border/20 cursor-not-allowed"
                           )}
-                          whileHover={isUnlocked && !isComplete ? { scale: 1.01 } : {}}
+                          whileHover={isUnlocked && !isStarted ? { scale: 1.01 } : {}}
                         >
                           {/* Category Number / Status Icon */}
                           <div className={cn(
                             "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm transition-all duration-300 shrink-0",
-                            isComplete
+                            isStarted
                               ? "bg-primary text-primary-foreground"
                               : isCurrentCategory
                                 ? "bg-amber-500/20 text-amber-500 border-2 border-amber-500/50"
@@ -1179,7 +1179,7 @@ export function PlaybookView() {
                                   ? "bg-muted-foreground/20 text-muted-foreground"
                                   : "bg-muted-foreground/10 text-muted-foreground/40"
                           )}>
-                            {isComplete ? (
+                            {isStarted ? (
                               <motion.div
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
@@ -1199,12 +1199,12 @@ export function PlaybookView() {
                             <div className="flex items-center gap-2">
                               <span className={cn(
                                 "font-semibold text-base transition-all",
-                                isComplete && "text-primary",
+                                isStarted && "text-primary",
                                 !isUnlocked && "text-muted-foreground/50"
                               )}>
                                 {item.text}
                               </span>
-                              {isCurrentCategory && !isComplete && (
+                              {isCurrentCategory && !isStarted && (
                                 <motion.span
                                   initial={{ opacity: 0, scale: 0.8 }}
                                   animate={{ opacity: 1, scale: 1 }}
@@ -1223,7 +1223,7 @@ export function PlaybookView() {
                                     transition={{ duration: 0.5, ease: "easeOut" }}
                                     className={cn(
                                       "h-full rounded-full",
-                                      isComplete ? "bg-primary" : "bg-amber-500"
+                                      isStarted ? "bg-primary" : "bg-amber-500"
                                     )}
                                   />
                                 </div>
