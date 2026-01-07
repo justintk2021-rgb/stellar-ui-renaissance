@@ -115,17 +115,7 @@ const iconVariants = {
   hover: { rotate: 15, scale: 1.1 },
 };
 
-const glowVariants = {
-  initial: { opacity: 0 },
-  animate: {
-    opacity: [0.3, 0.6, 0.3],
-    transition: {
-      duration: 3,
-      repeat: Infinity,
-      ease: "easeInOut" as const,
-    },
-  },
-};
+// Removed animated glow variants to reduce visual interference
 
 export function BalanceCards({ trades, startBalance, goalBalance, onSetBalance, onSetGoalBalance }: BalanceCardsProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -263,16 +253,6 @@ export function BalanceCards({ trades, startBalance, goalBalance, onSetBalance, 
         custom={0}
         className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
       >
-        {/* Animated background glow */}
-        <motion.div
-          variants={glowVariants}
-          initial="initial"
-          animate="animate"
-          className={cn(
-            "absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl",
-            isPositive ? "bg-primary/20" : "bg-destructive/20"
-          )}
-        />
         
         <div className="relative">
           <div className="flex items-center justify-between mb-5">
@@ -390,12 +370,6 @@ export function BalanceCards({ trades, startBalance, goalBalance, onSetBalance, 
         custom={1}
         className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
       >
-        <motion.div
-          variants={glowVariants}
-          initial="initial"
-          animate="animate"
-          className="absolute -top-20 -left-20 w-40 h-40 rounded-full bg-primary/15 blur-3xl"
-        />
         
         <div className="relative">
           <div className="flex items-center justify-between mb-5">
@@ -459,12 +433,6 @@ export function BalanceCards({ trades, startBalance, goalBalance, onSetBalance, 
         custom={2}
         className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
       >
-        <motion.div
-          variants={glowVariants}
-          initial="initial"
-          animate="animate"
-          className="absolute -bottom-20 -right-20 w-40 h-40 rounded-full bg-secondary/20 blur-3xl"
-        />
         
         <div className="relative">
           <div className="flex items-center justify-between mb-5">

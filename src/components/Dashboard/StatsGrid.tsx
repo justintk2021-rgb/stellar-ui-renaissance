@@ -91,17 +91,7 @@ const iconVariants = {
   hover: { rotate: 10, scale: 1.15 },
 };
 
-const glowVariants = {
-  initial: { opacity: 0 },
-  animate: {
-    opacity: [0.2, 0.4, 0.2],
-    transition: {
-      duration: 4,
-      repeat: Infinity,
-      ease: "easeInOut" as const,
-    },
-  },
-};
+// Removed animated glow variants to reduce visual interference
 
 export function StatsGrid({ trades }: StatsGridProps) {
   const stats = trades.reduce(
@@ -218,16 +208,6 @@ export function StatsGrid({ trades }: StatsGridProps) {
                 : "border-border/30"
             )}
           >
-            {/* Animated glow */}
-            <motion.div
-              variants={glowVariants}
-              initial="initial"
-              animate="animate"
-              className={cn(
-                "absolute -top-16 -right-16 w-32 h-32 rounded-full blur-3xl",
-                card.isPositive ? "bg-primary/20" : "bg-destructive/20"
-              )}
-            />
             
             <div className="relative">
               <div className="flex items-center gap-2 mb-3">

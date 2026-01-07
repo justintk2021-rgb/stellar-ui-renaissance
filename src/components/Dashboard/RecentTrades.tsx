@@ -52,12 +52,6 @@ export function RecentTrades({ trades }: RecentTradesProps) {
       transition={{ duration: 0.5, delay: 0.3, type: "spring" as const, stiffness: 200 }}
       className="relative rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl flex flex-col min-h-[340px]"
     >
-      {/* Background glow */}
-      <motion.div
-        className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-primary/10 blur-3xl"
-        animate={{ opacity: [0.3, 0.5, 0.3], scale: [1, 1.1, 1] }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-      />
       
       {/* Header */}
       <div className="relative flex items-center justify-between mb-5">
