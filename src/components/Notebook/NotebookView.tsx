@@ -1760,6 +1760,17 @@ export function NotebookView({
                   transition={{ duration: 0.5, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
                   className="flex items-center gap-3"
                 >
+                  {/* Search */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      type="text"
+                      placeholder="Search notes..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-48 pl-9 h-9 bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/50"
+                    />
+                  </div>
                   {/* View Toggle */}
                   <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/40">
                     <motion.button
@@ -1805,7 +1816,16 @@ export function NotebookView({
 
             {/* Notes Grid/List */}
             <ScrollArea className="flex-1 px-6 pb-6">
-              {notebookEntries.filter(e => !e.isDeleted && (!selectedCategory || e.category === selectedCategory)).length === 0 ? (
+              {notebookEntries.filter(e => {
+                if (e.isDeleted) return false;
+                if (selectedCategory && e.category !== selectedCategory) return false;
+                if (searchQuery) {
+                  const query = searchQuery.toLowerCase();
+                  return e.title.toLowerCase().includes(query) || 
+                         e.content.toLowerCase().includes(query);
+                }
+                return true;
+              }).length === 0 ? (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.9, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1817,10 +1837,10 @@ export function NotebookView({
                     animate={{ scale: 1, opacity: 0.2 }}
                     transition={{ duration: 0.8, delay: 0.2 }}
                   >
-                    <BookOpen className="w-16 h-16 mb-4" />
+                    {searchQuery ? <Search className="w-16 h-16 mb-4" /> : <BookOpen className="w-16 h-16 mb-4" />}
                   </motion.div>
-                  <p className="text-lg font-medium">No notes yet</p>
-                  <p className="text-sm mt-1">Create your first note to get started</p>
+                  <p className="text-lg font-medium">{searchQuery ? 'No matching notes' : 'No notes yet'}</p>
+                  <p className="text-sm mt-1">{searchQuery ? 'Try a different search term' : 'Create your first note to get started'}</p>
                 </motion.div>
               ) : (
                 <motion.div 
@@ -1843,7 +1863,16 @@ export function NotebookView({
                   )}
                 >
                   {notebookEntries
-                    .filter(e => !e.isDeleted && (!selectedCategory || e.category === selectedCategory))
+                    .filter(e => {
+                      if (e.isDeleted) return false;
+                      if (selectedCategory && e.category !== selectedCategory) return false;
+                      if (searchQuery) {
+                        const query = searchQuery.toLowerCase();
+                        return e.title.toLowerCase().includes(query) || 
+                               e.content.toLowerCase().includes(query);
+                      }
+                      return true;
+                    })
                     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
                     .map((entry, index) => {
                       const colors = getNoteCardColor(entry.category, index);
