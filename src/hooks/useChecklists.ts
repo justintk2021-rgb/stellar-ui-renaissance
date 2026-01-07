@@ -11,6 +11,8 @@ interface ConditionalSubItem {
   children?: ConditionalSubItem[]; // For conditional checklists - reveals when parent is checked
 }
 
+type PercentageType = "fixed" | "conditional";
+
 interface ChecklistSubItem {
   id: string;
   text: string;
@@ -24,6 +26,7 @@ interface ChecklistItem {
   text: string;
   checked: boolean;
   percentage?: number; // Custom percentage weight (defaults to equal distribution)
+  percentageType?: PercentageType; // "fixed" = full % when any sub-item selected, "conditional" = sum of selected sub-items
   subItems?: ChecklistSubItem[]; // Conditional sub-items that appear when parent is checked
 }
 
@@ -37,7 +40,7 @@ interface Checklist {
   createdAt: string;
 }
 
-export type { ChecklistItem, ChecklistSubItem, ConditionalSubItem, Checklist, ChecklistType };
+export type { ChecklistItem, ChecklistSubItem, ConditionalSubItem, Checklist, ChecklistType, PercentageType };
 
 export function useChecklists() {
   const [checklists, setChecklists] = useState<Checklist[]>([]);
