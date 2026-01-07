@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3, GripVertical, ChevronRight, GitBranch, ListChecks } from "lucide-react";
+import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3, GripVertical, ChevronRight, GitBranch, ListChecks, Lock, Unlock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -317,6 +317,34 @@ export function PlaybookView() {
     }));
   };
 
+  // Check if a category (main item) is complete - all its sub-items are checked
+  const isCategoryComplete = (item: ChecklistItem): boolean => {
+    if (!item.subItems || item.subItems.length === 0) return item.checked;
+    return item.subItems.every(sub => sub.checked);
+  };
+
+  // Get the index of the current unlocked category for conditional checklists
+  // A category is unlocked if all previous categories are complete
+  const getUnlockedCategoryIndex = (items: ChecklistItem[]): number => {
+    for (let i = 0; i < items.length; i++) {
+      if (!isCategoryComplete(items[i])) {
+        return i;
+      }
+    }
+    return items.length; // All complete
+  };
+
+  // Check if a category is accessible (unlocked)
+  const isCategoryUnlocked = (items: ChecklistItem[], categoryIndex: number): boolean => {
+    const unlockedIndex = getUnlockedCategoryIndex(items);
+    return categoryIndex <= unlockedIndex;
+  };
+
+  // Count completed categories
+  const getCompletedCategoriesCount = (items: ChecklistItem[]): number => {
+    return items.filter(item => isCategoryComplete(item)).length;
+  };
+
   const addChildToSubItem = async (
     checklistId: string, 
     parentItemId: string, 
@@ -537,26 +565,27 @@ export function PlaybookView() {
   const getConditionalCompletionPercentage = (items: ChecklistItem[]) => {
     if (items.length === 0) return 0;
     
-    let totalWeight = 0;
-    let completedWeight = 0;
+    // For sequential conditional checklists, count based on category completion
+    // Each category contributes equally to progress
+    const totalCategories = items.length;
+    const completedCategories = getCompletedCategoriesCount(items);
     
-    items.forEach(item => {
-      totalWeight++;
-      if (item.checked) completedWeight++;
-      
-      if (item.subItems) {
-        item.subItems.forEach(sub => {
-          totalWeight++;
-          if (sub.checked) completedWeight++;
-          
-          const nested = countNestedItems(sub.children);
-          totalWeight += nested.total;
-          completedWeight += nested.checked;
-        });
+    // Also account for partial progress within the current unlocked category
+    const unlockedIndex = getUnlockedCategoryIndex(items);
+    let partialProgress = 0;
+    
+    if (unlockedIndex < items.length) {
+      const currentCategory = items[unlockedIndex];
+      if (currentCategory.subItems && currentCategory.subItems.length > 0) {
+        const checkedSubItems = currentCategory.subItems.filter(sub => sub.checked).length;
+        partialProgress = checkedSubItems / currentCategory.subItems.length / totalCategories;
+      } else if (currentCategory.checked) {
+        partialProgress = 1 / totalCategories;
       }
-    });
+    }
     
-    return totalWeight > 0 ? Math.round((completedWeight / totalWeight) * 100) : 0;
+    const baseProgress = completedCategories / totalCategories;
+    return Math.round((baseProgress + partialProgress) * 100);
   };
 
   const getCompletionPercentage = (items: ChecklistItem[], type?: ChecklistType) => {
@@ -1053,9 +1082,320 @@ export function PlaybookView() {
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center py-8 text-muted-foreground text-sm"
               >
-                No items yet. Add your first item below.
+                {selectedChecklist.type === "conditional" 
+                  ? "No categories yet. Add your first category (e.g., Trend, Structure, Entry) below."
+                  : "No items yet. Add your first item below."}
               </motion.div>
+            ) : selectedChecklist.type === "conditional" ? (
+              /* CONDITIONAL CHECKLIST - Sequential Category View */
+              <div className="space-y-3">
+                {/* Progress Overview */}
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-4 pb-3 border-b border-border/30">
+                  <span>Category Progress</span>
+                  <span className="font-medium">
+                    {getCompletedCategoriesCount(selectedChecklist.items)} / {selectedChecklist.items.length} categories
+                  </span>
+                </div>
+                
+                <AnimatePresence mode="popLayout">
+                  {selectedChecklist.items.map((item: ChecklistItem, categoryIndex: number) => {
+                    const isUnlocked = isCategoryUnlocked(selectedChecklist.items, categoryIndex);
+                    const isComplete = isCategoryComplete(item);
+                    const isCurrentCategory = categoryIndex === getUnlockedCategoryIndex(selectedChecklist.items);
+                    const hasSubItems = item.subItems && item.subItems.length > 0;
+                    const isExpanded = expandedItems.has(item.id) || isCurrentCategory;
+                    const subItemsCompleted = item.subItems?.filter(s => s.checked).length || 0;
+                    const subItemsTotal = item.subItems?.length || 0;
+                    
+                    return (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ 
+                          opacity: isUnlocked ? 1 : 0.4, 
+                          y: 0,
+                          scale: isUnlocked ? 1 : 0.98 
+                        }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ 
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 30,
+                          delay: categoryIndex * 0.05
+                        }}
+                        className="space-y-2"
+                      >
+                        {/* Category Header */}
+                        <motion.div
+                          className={cn(
+                            "relative flex items-center gap-3 p-4 rounded-xl transition-all duration-300",
+                            isComplete
+                              ? "bg-gradient-to-r from-primary/15 to-primary/5 border border-primary/30"
+                              : isCurrentCategory
+                                ? "bg-gradient-to-r from-amber-500/15 to-amber-500/5 border border-amber-500/30"
+                                : isUnlocked
+                                  ? "bg-muted/40 hover:bg-muted/60 border border-border/30"
+                                  : "bg-muted/20 border border-border/20 cursor-not-allowed"
+                          )}
+                          whileHover={isUnlocked && !isComplete ? { scale: 1.01 } : {}}
+                        >
+                          {/* Category Number / Status Icon */}
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm transition-all duration-300 shrink-0",
+                            isComplete
+                              ? "bg-primary text-primary-foreground"
+                              : isCurrentCategory
+                                ? "bg-amber-500/20 text-amber-500 border-2 border-amber-500/50"
+                                : isUnlocked
+                                  ? "bg-muted-foreground/20 text-muted-foreground"
+                                  : "bg-muted-foreground/10 text-muted-foreground/40"
+                          )}>
+                            {isComplete ? (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                              >
+                                <Check className="w-5 h-5" />
+                              </motion.div>
+                            ) : !isUnlocked ? (
+                              <Lock className="w-4 h-4" />
+                            ) : (
+                              categoryIndex + 1
+                            )}
+                          </div>
+                          
+                          {/* Category Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={cn(
+                                "font-semibold text-base transition-all",
+                                isComplete && "text-primary",
+                                !isUnlocked && "text-muted-foreground/50"
+                              )}>
+                                {item.text}
+                              </span>
+                              {isCurrentCategory && !isComplete && (
+                                <motion.span
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 text-[10px] font-medium"
+                                >
+                                  Current
+                                </motion.span>
+                              )}
+                            </div>
+                            {hasSubItems && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[150px]">
+                                  <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${subItemsTotal > 0 ? (subItemsCompleted / subItemsTotal) * 100 : 0}%` }}
+                                    transition={{ duration: 0.5, ease: "easeOut" }}
+                                    className={cn(
+                                      "h-full rounded-full",
+                                      isComplete ? "bg-primary" : "bg-amber-500"
+                                    )}
+                                  />
+                                </div>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {subItemsCompleted}/{subItemsTotal}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Expand/Actions */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {hasSubItems && isUnlocked && (
+                              <motion.button
+                                onClick={() => toggleExpandItem(item.id)}
+                                className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+                                animate={{ rotate: isExpanded ? 90 : 0 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                              >
+                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                              </motion.button>
+                            )}
+                            
+                            {/* Add Sub-item Button */}
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => {
+                                setAddingSubItemTo(item.id);
+                                setExpandedItems(prev => new Set(prev).add(item.id));
+                              }}
+                              className={cn(
+                                "p-1.5 rounded-lg transition-colors",
+                                isUnlocked 
+                                  ? "hover:bg-primary/20 text-muted-foreground hover:text-primary"
+                                  : "opacity-30 cursor-not-allowed"
+                              )}
+                              disabled={!isUnlocked}
+                              title="Add condition"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </motion.button>
+                            
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => deleteItem(selectedChecklist.id, item.id)}
+                              className="p-1.5 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </motion.button>
+                          </div>
+                        </motion.div>
+                        
+                        {/* Sub-items (Conditions) for this Category */}
+                        <AnimatePresence>
+                          {isUnlocked && isExpanded && (hasSubItems || addingSubItemTo === item.id) && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                              className="ml-6 pl-4 border-l-2 border-primary/30 space-y-2 overflow-hidden"
+                            >
+                              {item.subItems?.map((subItem, subIndex) => (
+                                <motion.div
+                                  key={subItem.id}
+                                  initial={{ opacity: 0, x: -10 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  exit={{ opacity: 0, x: -10 }}
+                                  transition={{ delay: subIndex * 0.03 }}
+                                  className={cn(
+                                    "flex items-center gap-3 p-3 rounded-lg transition-all duration-200",
+                                    subItem.checked 
+                                      ? "bg-primary/10 border border-primary/20" 
+                                      : "bg-muted/30 hover:bg-muted/50 border border-transparent"
+                                  )}
+                                >
+                                  <button
+                                    onClick={() => toggleSubItem(selectedChecklist.id, item.id, subItem.id)}
+                                    className={cn(
+                                      "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
+                                      subItem.checked
+                                        ? "bg-primary border-primary text-primary-foreground"
+                                        : "border-muted-foreground/40 hover:border-primary"
+                                    )}
+                                  >
+                                    {subItem.checked && (
+                                      <motion.div
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                      >
+                                        <Check className="w-3 h-3" />
+                                      </motion.div>
+                                    )}
+                                  </button>
+                                  
+                                  {editingSubItemId === subItem.id ? (
+                                    <div className="flex-1 flex gap-1">
+                                      <Input
+                                        value={editingSubItemText}
+                                        onChange={(e) => setEditingSubItemText(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            updateSubItemText(selectedChecklist.id, item.id, subItem.id, editingSubItemText);
+                                          } else if (e.key === 'Escape') {
+                                            setEditingSubItemId(null);
+                                            setEditingSubItemText("");
+                                          }
+                                        }}
+                                        onBlur={() => {
+                                          if (editingSubItemText.trim()) {
+                                            updateSubItemText(selectedChecklist.id, item.id, subItem.id, editingSubItemText);
+                                          } else {
+                                            setEditingSubItemId(null);
+                                          }
+                                        }}
+                                        className="h-7 text-sm bg-background/50"
+                                        autoFocus
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span 
+                                      className={cn(
+                                        "flex-1 text-sm transition-all cursor-pointer hover:text-primary",
+                                        subItem.checked && "line-through text-muted-foreground"
+                                      )}
+                                      onClick={() => {
+                                        setEditingSubItemId(subItem.id);
+                                        setEditingSubItemText(subItem.text);
+                                      }}
+                                    >
+                                      {subItem.text}
+                                    </span>
+                                  )}
+                                  
+                                  <motion.button
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={() => deleteSubItem(selectedChecklist.id, item.id, subItem.id)}
+                                    className="p-1 rounded hover:bg-destructive/20 text-muted-foreground/50 hover:text-destructive transition-colors"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </motion.button>
+                                </motion.div>
+                              ))}
+                              
+                              {/* Add New Condition Input */}
+                              {addingSubItemTo === item.id && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="flex gap-2"
+                                >
+                                  <Input
+                                    placeholder="Add condition (e.g., Uptrend, Downtrend)..."
+                                    value={newSubItemText}
+                                    onChange={(e) => setNewSubItemText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        addSubItem(selectedChecklist.id, item.id);
+                                      } else if (e.key === 'Escape') {
+                                        setAddingSubItemTo(null);
+                                        setNewSubItemText("");
+                                      }
+                                    }}
+                                    className="h-9 text-sm bg-background/50 border-primary/30"
+                                    autoFocus
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => addSubItem(selectedChecklist.id, item.id)}
+                                    className="h-9 px-3"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setAddingSubItemTo(null);
+                                      setNewSubItemText("");
+                                    }}
+                                    className="h-9 px-3"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </motion.div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
             ) : (
+              /* FIXED CHECKLIST - Original View */
               <Reorder.Group 
                 axis="y" 
                 values={selectedChecklist.items} 
@@ -1364,12 +1704,14 @@ export function PlaybookView() {
               </Reorder.Group>
             )}
 
-            {/* Add New Item */}
+            {/* Add New Item/Category */}
             <div className="pt-2">
               {addingItemToChecklist === selectedChecklist.id ? (
                 <div className="flex gap-2 animate-fade-in">
                   <Input
-                    placeholder="Add new item..."
+                    placeholder={selectedChecklist.type === "conditional" 
+                      ? "Add new category (e.g., Trend, Structure, Entry)..." 
+                      : "Add new item..."}
                     value={newItemTexts[selectedChecklist.id] || ""}
                     onChange={(e) => setNewItemTexts({ ...newItemTexts, [selectedChecklist.id]: e.target.value })}
                     onKeyDown={(e) => {
@@ -1415,7 +1757,7 @@ export function PlaybookView() {
                   className="w-full justify-center gap-2 text-muted-foreground hover:text-foreground border border-dashed border-border/50 hover:border-primary/50 transition-all"
                 >
                   <Plus className="w-4 h-4" />
-                  Add Item
+                  {selectedChecklist.type === "conditional" ? "Add Category" : "Add Item"}
                 </Button>
               )}
             </div>

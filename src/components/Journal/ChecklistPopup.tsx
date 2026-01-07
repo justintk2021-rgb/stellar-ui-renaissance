@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { X, ClipboardCheck, Award, ChevronRight, GitBranch, ListChecks, Plus } from "lucide-react";
+import { X, ClipboardCheck, Award, ChevronRight, GitBranch, ListChecks, Plus, Lock, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChecklistItemState, ChecklistSubItemState, ChecklistChildState } from "@/types/trade";
 import { ChecklistType, ChecklistItem, ChecklistSubItem, ConditionalSubItem } from "@/hooks/useChecklists";
@@ -223,6 +223,29 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
     });
   };
 
+  // Sequential category helpers for conditional checklists
+  const isCategoryComplete = (item: ChecklistItemState): boolean => {
+    if (!item.subItems || item.subItems.length === 0) return item.checked;
+    return item.subItems.every(sub => sub.checked);
+  };
+
+  const getUnlockedCategoryIndex = (): number => {
+    for (let i = 0; i < items.length; i++) {
+      if (!isCategoryComplete(items[i])) {
+        return i;
+      }
+    }
+    return items.length;
+  };
+
+  const isCategoryUnlocked = (categoryIndex: number): boolean => {
+    return categoryIndex <= getUnlockedCategoryIndex();
+  };
+
+  const getCompletedCategoriesCount = (): number => {
+    return items.filter(item => isCategoryComplete(item)).length;
+  };
+
   // Count all checked items recursively for conditional checklists
   const countNestedChecked = (children?: ChecklistChildState[]): { total: number; checked: number } => {
     if (!children) return { total: 0, checked: 0 };
@@ -242,25 +265,24 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
     if (items.length === 0) return 0;
     
     if (checklist.type === "conditional") {
-      // For conditional: count all items including nested
-      let totalWeight = 0;
-      let completedWeight = 0;
+      // Sequential conditional: each category contributes equally
+      const totalCategories = items.length;
+      const completedCategories = getCompletedCategoriesCount();
       
-      items.forEach(item => {
-        totalWeight++;
-        if (item.checked) completedWeight++;
-        
-        item.subItems?.forEach(sub => {
-          totalWeight++;
-          if (sub.checked) completedWeight++;
-          
-          const nested = countNestedChecked(sub.children);
-          totalWeight += nested.total;
-          completedWeight += nested.checked;
-        });
-      });
+      // Add partial progress for current category
+      const unlockedIndex = getUnlockedCategoryIndex();
+      let partialProgress = 0;
       
-      return totalWeight > 0 ? (completedWeight / totalWeight) * 100 : 0;
+      if (unlockedIndex < items.length) {
+        const currentCategory = items[unlockedIndex];
+        if (currentCategory.subItems && currentCategory.subItems.length > 0) {
+          const checkedSubItems = currentCategory.subItems.filter(sub => sub.checked).length;
+          partialProgress = checkedSubItems / currentCategory.subItems.length / totalCategories;
+        }
+      }
+      
+      const baseProgress = completedCategories / totalCategories;
+      return (baseProgress + partialProgress) * 100;
     }
     
     // Fixed checklist logic
@@ -588,73 +610,219 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
 
               {/* Checklist Items */}
               <div className="px-6 py-4 max-h-[50vh] overflow-y-auto space-y-2">
-                {items.map((item, index) => {
-                  const hasSubItems = item.subItems && item.subItems.length > 0;
-                  const isExpanded = expandedItems.has(item.id);
-                  
-                  return (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.03 }}
-                    >
-                      <div
-                        onClick={() => toggleItem(item.id)}
-                        className={cn(
-                          "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all",
-                          "border border-border/30 hover:border-primary/30",
-                          item.checked 
-                            ? "bg-primary/10 border-primary/30" 
-                            : "bg-muted/30 hover:bg-muted/50"
-                        )}
-                      >
-                        {/* Expand toggle for items with sub-items */}
-                        {hasSubItems && (
-                          <motion.button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleExpand(item.id);
-                            }}
-                            animate={{ rotate: isExpanded ? 90 : 0 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                            className="p-0.5 shrink-0"
-                          >
-                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                          </motion.button>
-                        )}
-                        
-                        <Checkbox
-                          checked={item.checked}
-                          onCheckedChange={() => toggleItem(item.id)}
-                          className="pointer-events-none"
-                        />
-                        <span className={cn(
-                          "flex-1 text-sm transition-all",
-                          item.checked && "line-through text-muted-foreground"
-                        )}>
-                          {item.text}
-                        </span>
-                        
-                        {/* Sub-items counter */}
-                        {hasSubItems && (
-                          <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
-                            {item.subItems?.filter(s => s.checked).length}/{item.subItems?.length}
-                          </span>
-                        )}
-                        
-                        {item.percentage !== undefined && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
-                            {item.percentage}%
-                          </Badge>
-                        )}
-                      </div>
+                {checklist.type === "conditional" ? (
+                  /* Sequential Conditional View */
+                  <div className="space-y-3">
+                    {/* Category Progress */}
+                    <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border/20">
+                      <span>Category Progress</span>
+                      <span className="font-medium">{getCompletedCategoriesCount()} / {items.length}</span>
+                    </div>
+                    
+                    {items.map((item, index) => {
+                      const isUnlocked = isCategoryUnlocked(index);
+                      const isComplete = isCategoryComplete(item);
+                      const isCurrentCategory = index === getUnlockedCategoryIndex();
+                      const hasSubItems = item.subItems && item.subItems.length > 0;
+                      const subItemsCompleted = item.subItems?.filter(s => s.checked).length || 0;
+                      const subItemsTotal = item.subItems?.length || 0;
                       
-                      {/* Sub-items */}
-                      {renderSubItems(item)}
-                    </motion.div>
-                  );
-                })}
+                      return (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ 
+                            opacity: isUnlocked ? 1 : 0.4, 
+                            y: 0 
+                          }}
+                          transition={{ delay: index * 0.05 }}
+                          className="space-y-2"
+                        >
+                          {/* Category Header */}
+                          <div
+                            className={cn(
+                              "flex items-center gap-3 p-3 rounded-xl transition-all",
+                              isComplete
+                                ? "bg-gradient-to-r from-primary/15 to-primary/5 border border-primary/30"
+                                : isCurrentCategory
+                                  ? "bg-gradient-to-r from-amber-500/15 to-amber-500/5 border border-amber-500/30"
+                                  : isUnlocked
+                                    ? "bg-muted/40 border border-border/30"
+                                    : "bg-muted/20 border border-border/10 cursor-not-allowed"
+                            )}
+                          >
+                            {/* Category Number / Status */}
+                            <div className={cn(
+                              "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0",
+                              isComplete
+                                ? "bg-primary text-primary-foreground"
+                                : isCurrentCategory
+                                  ? "bg-amber-500/20 text-amber-500 border border-amber-500/50"
+                                  : isUnlocked
+                                    ? "bg-muted-foreground/20 text-muted-foreground"
+                                    : "bg-muted-foreground/10 text-muted-foreground/40"
+                            )}>
+                              {isComplete ? (
+                                <Check className="w-4 h-4" />
+                              ) : !isUnlocked ? (
+                                <Lock className="w-3.5 h-3.5" />
+                              ) : (
+                                index + 1
+                              )}
+                            </div>
+                            
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={cn(
+                                  "font-medium text-sm",
+                                  isComplete && "text-primary",
+                                  !isUnlocked && "text-muted-foreground/50"
+                                )}>
+                                  {item.text}
+                                </span>
+                                {isCurrentCategory && !isComplete && (
+                                  <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-500 text-[9px] font-medium">
+                                    Current
+                                  </span>
+                                )}
+                              </div>
+                              {hasSubItems && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden max-w-[100px]">
+                                    <motion.div
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${subItemsTotal > 0 ? (subItemsCompleted / subItemsTotal) * 100 : 0}%` }}
+                                      className={cn(
+                                        "h-full rounded-full",
+                                        isComplete ? "bg-primary" : "bg-amber-500"
+                                      )}
+                                    />
+                                  </div>
+                                  <span className="text-[9px] text-muted-foreground">
+                                    {subItemsCompleted}/{subItemsTotal}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Sub-items for this Category */}
+                          <AnimatePresence>
+                            {isUnlocked && hasSubItems && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="ml-5 pl-3 border-l-2 border-primary/30 space-y-1.5"
+                              >
+                                {item.subItems?.map((sub, subIndex) => (
+                                  <motion.div
+                                    key={sub.id}
+                                    initial={{ opacity: 0, x: -5 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: subIndex * 0.02 }}
+                                    onClick={() => toggleSubItem(item.id, sub.id)}
+                                    className={cn(
+                                      "flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all",
+                                      "border border-border/20 hover:border-primary/20",
+                                      sub.checked 
+                                        ? "bg-primary/10 border-primary/20" 
+                                        : "bg-muted/20 hover:bg-muted/30"
+                                    )}
+                                  >
+                                    <div className={cn(
+                                      "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all",
+                                      sub.checked
+                                        ? "bg-primary border-primary text-primary-foreground"
+                                        : "border-muted-foreground/40"
+                                    )}>
+                                      {sub.checked && <Check className="w-2.5 h-2.5" />}
+                                    </div>
+                                    <span className={cn(
+                                      "flex-1 text-xs transition-all",
+                                      sub.checked && "line-through text-muted-foreground"
+                                    )}>
+                                      {sub.text}
+                                    </span>
+                                  </motion.div>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* Fixed Checklist - Original View */
+                  items.map((item, index) => {
+                    const hasSubItems = item.subItems && item.subItems.length > 0;
+                    const isExpanded = expandedItems.has(item.id);
+                    
+                    return (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.03 }}
+                      >
+                        <div
+                          onClick={() => toggleItem(item.id)}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all",
+                            "border border-border/30 hover:border-primary/30",
+                            item.checked 
+                              ? "bg-primary/10 border-primary/30" 
+                              : "bg-muted/30 hover:bg-muted/50"
+                          )}
+                        >
+                          {/* Expand toggle for items with sub-items */}
+                          {hasSubItems && (
+                            <motion.button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpand(item.id);
+                              }}
+                              animate={{ rotate: isExpanded ? 90 : 0 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                              className="p-0.5 shrink-0"
+                            >
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </motion.button>
+                          )}
+                          
+                          <Checkbox
+                            checked={item.checked}
+                            onCheckedChange={() => toggleItem(item.id)}
+                            className="pointer-events-none"
+                          />
+                          <span className={cn(
+                            "flex-1 text-sm transition-all",
+                            item.checked && "line-through text-muted-foreground"
+                          )}>
+                            {item.text}
+                          </span>
+                          
+                          {/* Sub-items counter */}
+                          {hasSubItems && (
+                            <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
+                              {item.subItems?.filter(s => s.checked).length}/{item.subItems?.length}
+                            </span>
+                          )}
+                          
+                          {item.percentage !== undefined && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                              {item.percentage}%
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {/* Sub-items */}
+                        {renderSubItems(item)}
+                      </motion.div>
+                    );
+                  })
+                )}
               </div>
 
               {/* Footer */}
