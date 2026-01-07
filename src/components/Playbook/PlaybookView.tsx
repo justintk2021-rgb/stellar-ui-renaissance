@@ -1075,6 +1075,10 @@ export function PlaybookView() {
         trades={allTrades}
         onBack={() => { setSelectedChecklistId(null); setShowDetailView(false); }}
         onOpenRules={() => setShowDetailView(false)}
+        onUpdateNotes={(notes) => {
+          // Update local state so it persists when switching tabs
+          updateChecklist(selectedChecklist.id, { notes });
+        }}
       />
     );
   }

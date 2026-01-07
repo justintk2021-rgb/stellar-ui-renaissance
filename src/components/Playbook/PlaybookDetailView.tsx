@@ -1,9 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ArrowLeft, Share2, TrendingUp, TrendingDown, Target, Award, 
   AlertCircle, DollarSign, BarChart3, Percent, Activity, Scale,
-  ChevronRight, Info, Settings, ChevronLeft, Filter, Calendar, Search
+  ChevronRight, Info, Settings, ChevronLeft, Filter, Calendar, Search,
+  Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, 
+  Quote, Link, Lightbulb, BookOpen, FileText, CheckCircle2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,6 +23,8 @@ import {
   Tooltip as RechartsTooltip, CartesianGrid 
 } from "recharts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Trade {
   id: string;
@@ -45,11 +49,13 @@ interface PlaybookDetailViewProps {
     name: string;
     type: string;
     items: any[];
+    notes?: string;
   };
   metrics: ChecklistMetrics | undefined;
   trades: Trade[];
   onBack: () => void;
   onOpenRules: () => void;
+  onUpdateNotes?: (notes: string) => void;
 }
 
 // Animated number component
@@ -113,6 +119,269 @@ const tabs: { id: TabType; label: string }[] = [
 ];
 
 const TRADES_PER_PAGE = 10;
+const AUTO_SAVE_DELAY = 1500; // Auto-save after 1.5s of inactivity
+
+// Notes Tab Component with rich text editor and auto-save
+function NotesTab({ 
+  checklistId, 
+  initialNotes,
+  onSave 
+}: { 
+  checklistId: string; 
+  initialNotes: string;
+  onSave: (notes: string) => void;
+}) {
+  const [notes, setNotes] = useState(initialNotes);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Auto-save with debounce
+  const saveNotes = useCallback(async (content: string) => {
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('checklists')
+        .update({ notes: content })
+        .eq('id', checklistId);
+      
+      if (error) throw error;
+      
+      setLastSaved(new Date());
+      onSave(content);
+    } catch (error) {
+      console.error('Error saving notes:', error);
+      toast.error('Failed to save notes');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [checklistId, onSave]);
+
+  const handleInput = useCallback(() => {
+    if (editorRef.current) {
+      const content = editorRef.current.innerHTML;
+      setNotes(content);
+      
+      // Clear existing timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      
+      // Set new timeout for auto-save
+      saveTimeoutRef.current = setTimeout(() => {
+        saveNotes(content);
+      }, AUTO_SAVE_DELAY);
+    }
+  }, [saveNotes]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Format commands
+  const execCommand = (command: string, value?: string) => {
+    document.execCommand(command, false, value);
+    editorRef.current?.focus();
+    handleInput();
+  };
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const noteTemplates = [
+    { icon: Lightbulb, label: "Key Insight", template: "<h3>💡 Key Insight</h3><p>What worked well in this strategy...</p>" },
+    { icon: BookOpen, label: "Lesson Learned", template: "<h3>📖 Lesson Learned</h3><p>What I learned from this playbook...</p>" },
+    { icon: FileText, label: "Market Condition", template: "<h3>📊 Best Market Conditions</h3><p>This strategy works best when...</p>" },
+    { icon: CheckCircle2, label: "Rules Summary", template: "<h3>✅ Rules Summary</h3><ul><li>Rule 1</li><li>Rule 2</li><li>Rule 3</li></ul>" },
+  ];
+
+  return (
+    <motion.div
+      key="notes"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className="glass rounded-xl border border-border/30 overflow-hidden"
+    >
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-2 p-3 border-b border-border/30 bg-muted/20">
+        <div className="flex items-center gap-1">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('bold')}>
+                  <Bold className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Bold</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('italic')}>
+                  <Italic className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Italic</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('underline')}>
+                  <Underline className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Underline</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <div className="w-px h-5 bg-border/50 mx-1" />
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('justifyLeft')}>
+                  <AlignLeft className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Align Left</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('justifyCenter')}>
+                  <AlignCenter className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Align Center</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('justifyRight')}>
+                  <AlignRight className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Align Right</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <div className="w-px h-5 bg-border/50 mx-1" />
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('insertUnorderedList')}>
+                  <List className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Bullet List</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('insertOrderedList')}>
+                  <ListOrdered className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Numbered List</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('formatBlock', 'blockquote')}>
+                  <Quote className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Quote</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {isSaving && (
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center gap-1"
+            >
+              <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              Saving...
+            </motion.span>
+          )}
+          {!isSaving && lastSaved && (
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center gap-1"
+            >
+              <CheckCircle2 className="w-3 h-3 text-primary" />
+              Saved {formatTime(lastSaved)}
+            </motion.span>
+          )}
+        </div>
+      </div>
+
+      {/* Quick Templates */}
+      {!notes && (
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="p-4 border-b border-border/30 bg-muted/10"
+        >
+          <p className="text-xs text-muted-foreground mb-3">Quick templates to get started:</p>
+          <div className="flex flex-wrap gap-2">
+            {noteTemplates.map((template, index) => (
+              <motion.button
+                key={index}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.05 }}
+                onClick={() => {
+                  if (editorRef.current) {
+                    editorRef.current.innerHTML = template.template;
+                    handleInput();
+                  }
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/40 hover:bg-muted/60 text-xs transition-colors"
+              >
+                <template.icon className="w-3.5 h-3.5 text-primary" />
+                {template.label}
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Editor */}
+      <div
+        ref={editorRef}
+        contentEditable
+        onInput={handleInput}
+        dangerouslySetInnerHTML={{ __html: initialNotes }}
+        className={cn(
+          "min-h-[400px] p-6 outline-none",
+          "prose prose-sm dark:prose-invert max-w-none",
+          "[&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 first:[&_h3]:mt-0",
+          "[&_p]:text-muted-foreground [&_p]:mb-3",
+          "[&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-3",
+          "[&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-3",
+          "[&_li]:text-muted-foreground [&_li]:mb-1",
+          "[&_blockquote]:border-l-2 [&_blockquote]:border-primary/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground"
+        )}
+        data-placeholder="Start documenting your strategy observations, lessons learned, and key insights..."
+      />
+
+      {/* Footer hint */}
+      <div className="px-4 py-2 border-t border-border/30 bg-muted/10">
+        <p className="text-xs text-muted-foreground/60">
+          Your notes auto-save as you type
+        </p>
+      </div>
+    </motion.div>
+  );
+}
 
 // Executed Trades Tab Component with pagination and filtering
 function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
@@ -330,9 +599,11 @@ export function PlaybookDetailView({
   metrics, 
   trades,
   onBack,
-  onOpenRules
+  onOpenRules,
+  onUpdateNotes
 }: PlaybookDetailViewProps) {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [currentNotes, setCurrentNotes] = useState(checklist.notes || '');
 
   // Filter trades for this checklist
   const checklistTrades = useMemo(() => 
@@ -832,18 +1103,14 @@ export function PlaybookDetailView({
         )}
 
         {activeTab === "notes" && (
-          <motion.div
-            key="notes"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="glass rounded-xl p-6 border border-border/30"
-          >
-            <h3 className="text-lg font-semibold mb-4">Notes</h3>
-            <div className="text-center py-12 text-muted-foreground">
-              <p className="text-sm">No notes yet. Coming soon!</p>
-            </div>
-          </motion.div>
+          <NotesTab 
+            checklistId={checklist.id} 
+            initialNotes={currentNotes}
+            onSave={(notes) => {
+              setCurrentNotes(notes);
+              onUpdateNotes?.(notes);
+            }}
+          />
         )}
       </AnimatePresence>
     </div>
