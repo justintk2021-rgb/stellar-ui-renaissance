@@ -1084,7 +1084,7 @@ export function PlaybookView() {
     <div className="space-y-6 animate-fade-in">
       {/* Header with Back Button */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => { setSelectedChecklistId(null); setShowDetailView(false); }} className="hover:bg-muted/50">
+        <Button variant="ghost" size="sm" onClick={() => setShowDetailView(true)} className="hover:bg-muted/50">
           <ArrowLeft className="w-4 h-4 mr-2" />Back
         </Button>
         <Button 
