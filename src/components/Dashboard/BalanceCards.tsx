@@ -2,8 +2,10 @@ import { useMemo, useState, useRef, useEffect } from "react";
 import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, X, MoreHorizontal, Target } from "lucide-react";
+import { Check, X, MoreHorizontal, Target, TrendingUp, Wallet, Trophy } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 import {
   AreaChart,
   Area,
@@ -46,17 +48,23 @@ interface SparklineProps {
 
 function Sparkline({ data, isPositive, height = 40 }: SparklineProps) {
   const chartData = data.map((value, index) => ({ value, index }));
+  const gradientId = `sparkGradient-${isPositive ? 'pos' : 'neg'}-${Math.random().toString(36).substr(2, 9)}`;
   
   return (
-    <div className="w-20 h-10">
+    <motion.div 
+      className="w-24 h-12"
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.3, duration: 0.5 }}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
           <defs>
-            <linearGradient id={`sparkGradient-${isPositive ? 'pos' : 'neg'}`} x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop
                 offset="0%"
                 stopColor={isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
-                stopOpacity={0.3}
+                stopOpacity={0.4}
               />
               <stop
                 offset="100%"
@@ -69,14 +77,55 @@ function Sparkline({ data, isPositive, height = 40 }: SparklineProps) {
             type="monotone"
             dataKey="value"
             stroke={isPositive ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
-            strokeWidth={1.5}
-            fill={`url(#sparkGradient-${isPositive ? 'pos' : 'neg'})`}
+            strokeWidth={2}
+            fill={`url(#${gradientId})`}
           />
         </AreaChart>
       </ResponsiveContainer>
-    </div>
+    </motion.div>
   );
 }
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 30, scale: 0.95 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: "spring" as const,
+      stiffness: 300,
+      damping: 24,
+      delay: i * 0.1,
+    },
+  }),
+  hover: {
+    y: -6,
+    scale: 1.02,
+    transition: {
+      type: "spring" as const,
+      stiffness: 400,
+      damping: 20,
+    },
+  },
+};
+
+const iconVariants = {
+  initial: { rotate: 0 },
+  hover: { rotate: 15, scale: 1.1 },
+};
+
+const glowVariants = {
+  initial: { opacity: 0 },
+  animate: {
+    opacity: [0.3, 0.6, 0.3],
+    transition: {
+      duration: 3,
+      repeat: Infinity,
+      ease: "easeInOut" as const,
+    },
+  },
+};
 
 export function BalanceCards({ trades, startBalance, goalBalance, onSetBalance, onSetGoalBalance }: BalanceCardsProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -201,177 +250,343 @@ export function BalanceCards({ trades, startBalance, goalBalance, onSetBalance, 
 
   const isPositive = balanceChange >= 0;
   const isProfitPositive = profit >= 0;
+  const goalProgress = goalBalance && goalBalance > 0 ? Math.min(100, (currentBalance / goalBalance) * 100) : 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
       {/* Balance Card */}
-      <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-sm text-muted-foreground">Balance</span>
-          <Sparkline data={sparklineData} isPositive={isPositive} />
-        </div>
+      <motion.div
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        whileHover="hover"
+        custom={0}
+        className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
+      >
+        {/* Animated background glow */}
+        <motion.div
+          variants={glowVariants}
+          initial="initial"
+          animate="animate"
+          className={cn(
+            "absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl",
+            isPositive ? "bg-primary/20" : "bg-destructive/20"
+          )}
+        />
         
-        <div className="space-y-3">
-          <div className="flex items-baseline gap-2">
-            {isEditing ? (
-              <div className="flex items-center gap-1">
-                <span className="text-2xl font-bold font-mono">$</span>
-                <Input
-                  ref={inputRef}
-                  type="number"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="w-32 h-8 text-2xl font-bold font-mono px-2 py-0 bg-background/50 border-primary/50"
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-primary hover:bg-primary/20"
-                  onClick={handleConfirm}
-                >
-                  <Check className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
-                  onClick={handleCancel}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            ) : (
-              <>
-                <AnimatedValue 
-                  value={currentBalance} 
-                  prefix="$" 
-                  className="text-2xl font-bold font-mono"
-                />
-                <span className={`text-xs font-medium ${isPositive ? 'text-primary' : 'text-destructive'}`}>
-                  {isPositive ? '+' : ''}{balancePercent.toFixed(2)}%
-                </span>
-              </>
-            )}
+        <div className="relative">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <motion.div
+                variants={iconVariants}
+                initial="initial"
+                whileHover="hover"
+                className={cn(
+                  "w-10 h-10 rounded-xl flex items-center justify-center",
+                  isPositive ? "bg-primary/15" : "bg-destructive/15"
+                )}
+              >
+                <Wallet className={cn("w-5 h-5", isPositive ? "text-primary" : "text-destructive")} />
+              </motion.div>
+              <span className="text-sm font-medium text-muted-foreground">Balance</span>
+            </div>
+            <Sparkline data={sparklineData} isPositive={isPositive} />
           </div>
           
-          <div>
-            <div className="text-xs text-muted-foreground mb-0.5">Highest balance</div>
-            <AnimatedValue 
-              value={highestBalance} 
-              prefix="$" 
-              className="text-sm font-semibold font-mono"
-            />
+          <div className="space-y-4">
+            <div className="flex items-baseline gap-3">
+              <AnimatePresence mode="wait">
+                {isEditing ? (
+                  <motion.div
+                    key="editing"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="flex items-center gap-2"
+                  >
+                    <span className="text-3xl font-bold font-mono">$</span>
+                    <Input
+                      ref={inputRef}
+                      type="number"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      className="w-36 h-10 text-2xl font-bold font-mono px-2 py-0 bg-background/50 border-primary/50"
+                    />
+                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-primary hover:bg-primary/20"
+                        onClick={handleConfirm}
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
+                        onClick={handleCancel}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </motion.div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="display"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-baseline gap-3"
+                  >
+                    <AnimatedValue 
+                      value={currentBalance} 
+                      prefix="$" 
+                      className="text-3xl font-bold font-mono"
+                    />
+                    <motion.span
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.5 }}
+                      className={cn(
+                        "text-sm font-semibold px-2 py-0.5 rounded-full",
+                        isPositive ? 'bg-primary/15 text-primary' : 'bg-destructive/15 text-destructive'
+                      )}
+                    >
+                      {isPositive ? '+' : ''}{balancePercent.toFixed(2)}%
+                    </motion.span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <div className="text-xs text-muted-foreground mb-1">All-time high</div>
+              <div className="flex items-center gap-2">
+                <Trophy className="w-3.5 h-3.5 text-yellow-500" />
+                <AnimatedValue 
+                  value={highestBalance} 
+                  prefix="$" 
+                  className="text-sm font-semibold font-mono"
+                />
+              </div>
+            </motion.div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Profit Card */}
-      <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-sm text-muted-foreground">Profit</span>
-          <Sparkline data={sparklineData} isPositive={isProfitPositive} />
-        </div>
+      <motion.div
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        whileHover="hover"
+        custom={1}
+        className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
+      >
+        <motion.div
+          variants={glowVariants}
+          initial="initial"
+          animate="animate"
+          className="absolute -top-20 -left-20 w-40 h-40 rounded-full bg-primary/15 blur-3xl"
+        />
         
-        <div className="space-y-3">
-          <div className="flex items-baseline gap-2">
-            <AnimatedValue 
-              value={profit} 
-              prefix="$" 
-              className="text-2xl font-bold font-mono"
-            />
-            <span className={`text-xs font-medium ${isProfitPositive ? 'text-primary' : 'text-destructive'}`}>
-              +{profitPercent.toFixed(2)}%
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Goal Balance Card */}
-      <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-sm text-muted-foreground">Goal Balance</span>
-          <div className="flex items-center gap-2">
-            <Target className="w-4 h-4 text-primary" />
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
-              onClick={handleStartEditGoal}
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-        
-        <div className="space-y-3">
-          <div className="flex items-baseline gap-2">
-            {isEditingGoal ? (
-              <div className="flex items-center gap-1">
-                <span className="text-2xl font-bold font-mono">$</span>
-                <Input
-                  ref={goalInputRef}
-                  type="number"
-                  value={editGoalValue}
-                  onChange={(e) => setEditGoalValue(e.target.value)}
-                  onKeyDown={handleKeyDownGoal}
-                  className="w-32 h-8 text-2xl font-bold font-mono px-2 py-0 bg-background/50 border-primary/50"
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-primary hover:bg-primary/20"
-                  onClick={handleConfirmGoal}
-                >
-                  <Check className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
-                  onClick={handleCancelGoal}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            ) : (
-              <>
-                <AnimatedValue 
-                  value={goalBalance || 0} 
-                  prefix="$" 
-                  className="text-2xl font-bold font-mono"
-                />
-                {goalBalance && goalBalance > 0 && (
-                  <span className={`text-xs font-medium ${currentBalance >= goalBalance ? 'text-primary' : 'text-muted-foreground'}`}>
-                    {currentBalance >= goalBalance ? '✓ Reached' : `${(((goalBalance - currentBalance) / goalBalance) * 100).toFixed(1)}% away`}
-                  </span>
-                )}
-              </>
-            )}
+        <div className="relative">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <motion.div
+                variants={iconVariants}
+                initial="initial"
+                whileHover="hover"
+                className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center"
+              >
+                <TrendingUp className="w-5 h-5 text-primary" />
+              </motion.div>
+              <span className="text-sm font-medium text-muted-foreground">Total Profit</span>
+            </div>
+            <Sparkline data={sparklineData} isPositive={isProfitPositive} />
           </div>
           
-          <div>
-            <div className="text-xs text-muted-foreground mb-0.5">Progress</div>
-            {goalBalance && goalBalance > 0 ? (
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(100, (currentBalance / goalBalance) * 100)}%` }}
-                  />
-                </div>
-                <span className="text-sm font-semibold font-mono">
-                  {Math.min(100, (currentBalance / goalBalance) * 100).toFixed(0)}%
+          <div className="space-y-4">
+            <div className="flex items-baseline gap-3">
+              <AnimatedValue 
+                value={profit} 
+                prefix="$" 
+                className="text-3xl font-bold font-mono"
+              />
+              <motion.span
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.6 }}
+                className="text-sm font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary"
+              >
+                +{profitPercent.toFixed(2)}%
+              </motion.span>
+            </div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="flex items-center gap-4"
+            >
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Net Change</div>
+                <span className={cn(
+                  "text-sm font-semibold font-mono",
+                  isPositive ? "text-primary" : "text-destructive"
+                )}>
+                  {isPositive ? '+' : ''}${balanceChange.toFixed(2)}
                 </span>
               </div>
-            ) : (
-              <span className="text-sm font-semibold font-mono text-muted-foreground">
-                Set a goal to track progress
-              </span>
-            )}
+            </motion.div>
           </div>
         </div>
-      </div>
+      </motion.div>
+
+      {/* Goal Balance Card */}
+      <motion.div
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        whileHover="hover"
+        custom={2}
+        className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
+      >
+        <motion.div
+          variants={glowVariants}
+          initial="initial"
+          animate="animate"
+          className="absolute -bottom-20 -right-20 w-40 h-40 rounded-full bg-secondary/20 blur-3xl"
+        />
+        
+        <div className="relative">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <motion.div
+                variants={iconVariants}
+                initial="initial"
+                whileHover="hover"
+                className="w-10 h-10 rounded-xl bg-secondary/15 flex items-center justify-center"
+              >
+                <Target className="w-5 h-5 text-primary" />
+              </motion.div>
+              <span className="text-sm font-medium text-muted-foreground">Goal Balance</span>
+            </div>
+            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={handleStartEditGoal}
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </motion.div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-baseline gap-3">
+              <AnimatePresence mode="wait">
+                {isEditingGoal ? (
+                  <motion.div
+                    key="editing-goal"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="flex items-center gap-2"
+                  >
+                    <span className="text-3xl font-bold font-mono">$</span>
+                    <Input
+                      ref={goalInputRef}
+                      type="number"
+                      value={editGoalValue}
+                      onChange={(e) => setEditGoalValue(e.target.value)}
+                      onKeyDown={handleKeyDownGoal}
+                      className="w-36 h-10 text-2xl font-bold font-mono px-2 py-0 bg-background/50 border-primary/50"
+                    />
+                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-primary hover:bg-primary/20"
+                        onClick={handleConfirmGoal}
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
+                        onClick={handleCancelGoal}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </motion.div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="display-goal"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-baseline gap-3"
+                  >
+                    <AnimatedValue 
+                      value={goalBalance || 0} 
+                      prefix="$" 
+                      className="text-3xl font-bold font-mono"
+                    />
+                    {goalBalance && goalBalance > 0 && currentBalance >= goalBalance && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="text-sm font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary"
+                      >
+                        ✓ Reached
+                      </motion.span>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <div className="text-xs text-muted-foreground mb-2">Progress</div>
+              {goalBalance && goalBalance > 0 ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-3 bg-muted/30 rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${goalProgress}%` }}
+                      transition={{ duration: 1, delay: 0.8, ease: "easeOut" }}
+                    />
+                  </div>
+                  <span className="text-sm font-bold font-mono text-primary">
+                    {goalProgress.toFixed(0)}%
+                  </span>
+                </div>
+              ) : (
+                <span className="text-sm font-medium text-muted-foreground">
+                  Set a goal to track progress
+                </span>
+              )}
+            </motion.div>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
