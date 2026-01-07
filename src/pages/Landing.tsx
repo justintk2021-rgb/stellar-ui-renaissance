@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import logo from "@/assets/logo-3d.png";
 
-// Animated 3D Blob Component
+// Animated 3D Blob Component - Now with white/silver color
 function AnimatedBlob() {
   const meshRef = useRef<THREE.Mesh>(null);
   
@@ -35,19 +35,19 @@ function AnimatedBlob() {
     <Float speed={1.5} rotationIntensity={0.5} floatIntensity={2}>
       <Sphere ref={meshRef} args={[2.5, 128, 128]} scale={1.5}>
         <MeshDistortMaterial
-          color="#6366f1"
+          color="#e5e5e5"
           attach="material"
           distort={0.4}
           speed={2}
-          roughness={0.2}
-          metalness={0.8}
+          roughness={0.1}
+          metalness={0.9}
         />
       </Sphere>
     </Float>
   );
 }
 
-// Floating Particles
+// Floating Particles - White/gray particles
 function Particles() {
   const count = 200;
   const positions = useMemo(() => {
@@ -81,22 +81,22 @@ function Particles() {
       </bufferGeometry>
       <pointsMaterial
         size={0.03}
-        color="#a855f7"
+        color="#ffffff"
         transparent
-        opacity={0.8}
+        opacity={0.6}
         sizeAttenuation
       />
     </points>
   );
 }
 
-// 3D Scene
+// 3D Scene - Black and white lighting
 function Scene() {
   return (
     <>
-      <ambientLight intensity={0.3} />
-      <directionalLight position={[10, 10, 5]} intensity={1} color="#c4b5fd" />
-      <pointLight position={[-10, -10, -10]} intensity={0.5} color="#6366f1" />
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[10, 10, 5]} intensity={1.2} color="#ffffff" />
+      <pointLight position={[-10, -10, -10]} intensity={0.6} color="#888888" />
       <AnimatedBlob />
       <Particles />
       <Stars radius={100} depth={50} count={3000} factor={4} fade speed={1} />
@@ -128,7 +128,7 @@ function FloatingCard({
         type: "spring",
         stiffness: 100 
       }}
-      className={`absolute backdrop-blur-xl bg-card/30 border border-white/10 rounded-2xl p-4 shadow-2xl ${className}`}
+      className={`absolute backdrop-blur-xl bg-white/5 border border-white/20 rounded-2xl p-4 shadow-2xl ${className}`}
       style={{ x, y }}
     >
       <motion.div
@@ -141,7 +141,7 @@ function FloatingCard({
   );
 }
 
-// Feature Card
+// Feature Card - Black and white theme
 function FeatureCard({ 
   icon: Icon, 
   title, 
@@ -160,21 +160,21 @@ function FeatureCard({
       viewport={{ once: true }}
       transition={{ duration: 0.6, delay: index * 0.1 }}
       whileHover={{ y: -8, scale: 1.02 }}
-      className="group relative p-6 rounded-3xl bg-gradient-to-br from-card/60 to-card/30 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden"
+      className="group relative p-6 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden"
     >
       {/* Glow effect on hover */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-primary/20 via-transparent to-purple-500/20" />
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-white/10 via-transparent to-white/5" />
       
       <motion.div
         whileHover={{ rotate: 360, scale: 1.1 }}
         transition={{ duration: 0.5 }}
-        className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center mb-4 shadow-lg shadow-primary/30"
+        className="relative w-14 h-14 rounded-2xl bg-white text-black flex items-center justify-center mb-4 shadow-lg"
       >
-        <Icon className="w-7 h-7 text-white" />
+        <Icon className="w-7 h-7" />
       </motion.div>
       
-      <h3 className="relative text-xl font-bold mb-2 text-foreground">{title}</h3>
-      <p className="relative text-muted-foreground text-sm leading-relaxed">{description}</p>
+      <h3 className="relative text-xl font-bold mb-2 text-white">{title}</h3>
+      <p className="relative text-white/60 text-sm leading-relaxed">{description}</p>
     </motion.div>
   );
 }
@@ -219,7 +219,7 @@ export default function Landing() {
   ];
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-background overflow-x-hidden">
+    <div ref={containerRef} className="min-h-screen bg-black overflow-x-hidden">
       {/* Navigation */}
       <motion.nav 
         initial={{ y: -100, opacity: 0 }}
@@ -233,7 +233,7 @@ export default function Landing() {
             whileHover={{ scale: 1.05 }}
           >
             <img src={logo} alt="NSYNC" className="w-10 h-10 rounded-xl" />
-            <span className="text-xl font-bold bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
+            <span className="text-xl font-bold text-white">
               NSYNC Journal
             </span>
           </motion.div>
@@ -241,14 +241,14 @@ export default function Landing() {
           <div className="hidden md:flex items-center gap-8">
             <motion.a 
               href="#features" 
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="text-white/60 hover:text-white transition-colors"
               whileHover={{ y: -2 }}
             >
               Features
             </motion.a>
             <motion.a 
               href="#pricing" 
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="text-white/60 hover:text-white transition-colors"
               whileHover={{ y: -2 }}
             >
               Pricing
@@ -257,13 +257,13 @@ export default function Landing() {
           
           <div className="flex items-center gap-3">
             <Link to="/auth">
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" className="text-white/60 hover:text-white hover:bg-white/10">
                 Login
               </Button>
             </Link>
             <Link to="/auth">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-lg shadow-primary/30">
+                <Button className="bg-white text-black hover:bg-white/90 shadow-lg">
                   Sign Up
                   <Sparkles className="w-4 h-4 ml-2" />
                 </Button>
@@ -288,8 +288,8 @@ export default function Landing() {
         </div>
         
         {/* Gradient Overlays */}
-        <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-transparent to-background z-10" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/50 via-transparent to-background/50 z-10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-black z-10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-black/50 z-10" />
 
         {/* Hero Content */}
         <div className="relative z-20 text-center px-6 max-w-5xl mx-auto">
@@ -301,7 +301,7 @@ export default function Landing() {
             <motion.div
               animate={{ rotate: [0, 5, -5, 0] }}
               transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-6"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 text-white text-sm font-medium mb-6"
             >
               <Zap className="w-4 h-4" />
               Elevate Your Trading Game
@@ -314,11 +314,11 @@ export default function Landing() {
             transition={{ duration: 0.8, delay: 0.5 }}
             className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight"
           >
-            <span className="bg-gradient-to-r from-foreground via-primary to-purple-500 bg-clip-text text-transparent">
+            <span className="text-white">
               Master Your
             </span>
             <br />
-            <span className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-white via-white/80 to-white/60 bg-clip-text text-transparent">
               Trading Journey
             </span>
           </motion.h1>
@@ -327,7 +327,7 @@ export default function Landing() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.7 }}
-            className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10"
+            className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-10"
           >
             The ultimate trading journal to track, analyze, and improve your trading performance. 
             Built for serious traders who want to level up.
@@ -341,10 +341,10 @@ export default function Landing() {
           >
             <Link to="/auth">
               <motion.div 
-                whileHover={{ scale: 1.05, boxShadow: "0 20px 40px -10px rgba(99, 102, 241, 0.4)" }} 
+                whileHover={{ scale: 1.05, boxShadow: "0 20px 40px -10px rgba(255, 255, 255, 0.3)" }} 
                 whileTap={{ scale: 0.95 }}
               >
-                <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-2xl shadow-primary/40 rounded-2xl">
+                <Button size="lg" className="text-lg px-8 py-6 bg-white text-black hover:bg-white/90 shadow-2xl rounded-2xl font-semibold">
                   Start Journaling
                   <ChevronRight className="w-5 h-5 ml-2" />
                 </Button>
@@ -355,7 +355,7 @@ export default function Landing() {
               <Button 
                 variant="outline" 
                 size="lg" 
-                className="text-lg px-8 py-6 rounded-2xl border-white/20 bg-white/5 backdrop-blur-sm hover:bg-white/10"
+                className="text-lg px-8 py-6 rounded-2xl border-white/30 bg-transparent text-white hover:bg-white/10 hover:border-white/50"
               >
                 Watch Demo
               </Button>
@@ -366,24 +366,24 @@ export default function Landing() {
         {/* Floating Stat Cards */}
         <FloatingCard className="left-[5%] top-[30%] hidden lg:block" delay={1.2}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-primary" />
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Win Rate</p>
-              <p className="text-2xl font-bold text-primary">72%</p>
+              <p className="text-xs text-white/50">Win Rate</p>
+              <p className="text-2xl font-bold text-white">72%</p>
             </div>
           </div>
         </FloatingCard>
 
         <FloatingCard className="right-[8%] top-[25%] hidden lg:block" delay={1.4}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
-              <PieChart className="w-5 h-5 text-green-500" />
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+              <PieChart className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Trading Pairs</p>
-              <p className="text-lg font-semibold">Unparalleled<br/>Market Access</p>
+              <p className="text-xs text-white/50">Trading Pairs</p>
+              <p className="text-lg font-semibold text-white">Unparalleled<br/>Market Access</p>
             </div>
           </div>
         </FloatingCard>
@@ -391,20 +391,20 @@ export default function Landing() {
         <FloatingCard className="right-[15%] bottom-[20%] hidden lg:block" delay={1.6}>
           <div className="flex items-center gap-3">
             <div>
-              <p className="text-xs text-muted-foreground">Profit Factor</p>
-              <p className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">2.4x</p>
+              <p className="text-xs text-white/50">Profit Factor</p>
+              <p className="text-3xl font-bold text-white">2.4x</p>
             </div>
           </div>
         </FloatingCard>
 
         <FloatingCard className="left-[10%] bottom-[25%] hidden lg:block" delay={1.8}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
-              <BarChart3 className="w-4 h-4 text-purple-500" />
+            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+              <BarChart3 className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Monthly ROI</p>
-              <p className="text-xl font-bold text-purple-400">+18.5%</p>
+              <p className="text-xs text-white/50">Monthly ROI</p>
+              <p className="text-xl font-bold text-white">+18.5%</p>
             </div>
           </div>
         </FloatingCard>
@@ -419,19 +419,19 @@ export default function Landing() {
           <motion.div
             animate={{ y: [0, 10, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="w-6 h-10 rounded-full border-2 border-white/20 flex items-start justify-center p-2"
+            className="w-6 h-10 rounded-full border-2 border-white/30 flex items-start justify-center p-2"
           >
             <motion.div
               animate={{ y: [0, 12, 0] }}
               transition={{ duration: 2, repeat: Infinity }}
-              className="w-1.5 h-1.5 rounded-full bg-primary"
+              className="w-1.5 h-1.5 rounded-full bg-white"
             />
           </motion.div>
         </motion.div>
       </motion.section>
 
       {/* Features Section */}
-      <section id="features" className="relative py-32 px-6">
+      <section id="features" className="relative py-32 px-6 bg-black">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -442,21 +442,21 @@ export default function Landing() {
             <motion.div
               animate={{ scale: [1, 1.1, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-6"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 text-white text-sm font-medium mb-6"
             >
               <Sparkles className="w-4 h-4" />
               Powerful Features
             </motion.div>
             <h2 className="text-4xl md:text-5xl font-bold mb-4">
-              <span className="bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+              <span className="text-white">
                 Everything You Need to
               </span>
               <br />
-              <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
                 Trade Smarter
               </span>
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+            <p className="text-white/50 max-w-2xl mx-auto text-lg">
               A comprehensive suite of tools designed to help you analyze, learn, and improve your trading consistently.
             </p>
           </motion.div>
@@ -470,8 +470,8 @@ export default function Landing() {
       </section>
 
       {/* CTA Section */}
-      <section className="relative py-32 px-6 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-purple-500/5 to-transparent" />
+      <section className="relative py-32 px-6 overflow-hidden bg-black">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5" />
         
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -480,15 +480,15 @@ export default function Landing() {
           className="relative max-w-4xl mx-auto text-center"
         >
           <h2 className="text-4xl md:text-6xl font-bold mb-6">
-            <span className="bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+            <span className="text-white">
               Ready to Transform
             </span>
             <br />
-            <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
               Your Trading?
             </span>
           </h2>
-          <p className="text-muted-foreground text-lg mb-10 max-w-2xl mx-auto">
+          <p className="text-white/50 text-lg mb-10 max-w-2xl mx-auto">
             Join thousands of traders who have already improved their performance with NSYNC Journal.
           </p>
           
@@ -498,7 +498,7 @@ export default function Landing() {
               whileTap={{ scale: 0.95 }}
               className="inline-block"
             >
-              <Button size="lg" className="text-lg px-10 py-7 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-2xl shadow-primary/40 rounded-2xl">
+              <Button size="lg" className="text-lg px-10 py-7 bg-white text-black hover:bg-white/90 shadow-2xl rounded-2xl font-semibold">
                 Get Started Free
                 <ChevronRight className="w-5 h-5 ml-2" />
               </Button>
@@ -508,13 +508,13 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 py-12 px-6">
+      <footer className="border-t border-white/10 py-12 px-6 bg-black">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img src={logo} alt="NSYNC" className="w-8 h-8 rounded-lg" />
-            <span className="text-lg font-bold text-foreground">NSYNC Journal</span>
+            <span className="text-lg font-bold text-white">NSYNC Journal</span>
           </div>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-white/40 text-sm">
             © 2025 NSYNC Journal. All rights reserved.
           </p>
         </div>
