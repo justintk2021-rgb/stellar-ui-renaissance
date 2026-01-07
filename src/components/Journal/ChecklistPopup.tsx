@@ -265,24 +265,27 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
     if (items.length === 0) return 0;
     
     if (checklist.type === "conditional") {
-      // Sequential conditional: each category contributes equally
-      const totalCategories = items.length;
-      const completedCategories = getCompletedCategoriesCount();
+      // Sequential conditional: each category contributes its weight
+      // Sub-items use their custom percentages - users only check relevant ones
+      let totalPercentage = 0;
+      const categoryWeight = 100 / items.length;
       
-      // Add partial progress for current category
-      const unlockedIndex = getUnlockedCategoryIndex();
-      let partialProgress = 0;
-      
-      if (unlockedIndex < items.length) {
-        const currentCategory = items[unlockedIndex];
-        if (currentCategory.subItems && currentCategory.subItems.length > 0) {
-          const checkedSubItems = currentCategory.subItems.filter(sub => sub.checked).length;
-          partialProgress = checkedSubItems / currentCategory.subItems.length / totalCategories;
+      items.forEach((item, index) => {
+        if (!isCategoryUnlocked(index)) return;
+        
+        if (item.subItems && item.subItems.length > 0) {
+          // Sum the percentages of checked sub-items
+          const checkedSubItems = item.subItems.filter(sub => sub.checked);
+          const subItemPercentages = checkedSubItems.reduce((sum, sub) => {
+            return sum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
+          }, 0);
+          totalPercentage += (subItemPercentages / 100) * categoryWeight;
+        } else if (item.checked) {
+          totalPercentage += categoryWeight;
         }
-      }
+      });
       
-      const baseProgress = completedCategories / totalCategories;
-      return (baseProgress + partialProgress) * 100;
+      return totalPercentage;
     }
     
     // Fixed checklist logic
@@ -293,10 +296,13 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
       items.forEach(item => {
         const itemPercentage = item.percentage ?? Math.round(100 / items.length);
         if (item.subItems && item.subItems.length > 0) {
-          const subChecked = item.subItems.filter(sub => sub.checked).length;
-          const subTotal = item.subItems.length;
           if (item.checked) {
-            totalPercentage += itemPercentage * (subTotal > 0 ? subChecked / subTotal : 1);
+            // Sum the percentages of checked sub-items only
+            const checkedSubItems = item.subItems.filter(sub => sub.checked);
+            const subItemPercentages = checkedSubItems.reduce((sum, sub) => {
+              return sum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
+            }, 0);
+            totalPercentage += itemPercentage * (subItemPercentages / 100);
           }
         } else if (item.checked) {
           totalPercentage += itemPercentage;
@@ -305,24 +311,25 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
       return Math.min(100, totalPercentage);
     }
     
-    // Default equal distribution
-    let totalWeight = 0;
-    let completedWeight = 0;
+    // Default equal distribution - sum checked sub-item percentages
+    let totalPercentage = 0;
+    const itemWeight = 100 / items.length;
     
     items.forEach(item => {
       if (item.subItems && item.subItems.length > 0) {
-        totalWeight += 1 + item.subItems.length;
         if (item.checked) {
-          completedWeight += 1;
-          completedWeight += item.subItems.filter(sub => sub.checked).length;
+          const checkedSubItems = item.subItems.filter(sub => sub.checked);
+          const subItemPercentages = checkedSubItems.reduce((sum, sub) => {
+            return sum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
+          }, 0);
+          totalPercentage += itemWeight * (subItemPercentages / 100);
         }
       } else {
-        totalWeight += 1;
-        if (item.checked) completedWeight += 1;
+        if (item.checked) totalPercentage += itemWeight;
       }
     });
     
-    return totalWeight > 0 ? (completedWeight / totalWeight) * 100 : 0;
+    return totalPercentage;
   };
 
   const completionPercentage = getCompletionPercentage();
