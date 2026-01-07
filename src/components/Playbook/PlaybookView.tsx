@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
+import { PlaybookDetailView } from "./PlaybookDetailView";
 import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3, GripVertical, ChevronRight, GitBranch, ListChecks, Lock, Unlock, MoreHorizontal, LayoutGrid, List, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,9 +67,30 @@ export function PlaybookView() {
   const [activeTab, setActiveTab] = useState<"my" | "shared">("my");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  // Detail view state
+  const [showDetailView, setShowDetailView] = useState(false);
+  const [allTrades, setAllTrades] = useState<any[]>([]);
 
   const selectedChecklist = checklists.find(c => c.id === selectedChecklistId) || null;
   const selectedMetrics = checklistMetrics.find(m => m.checklistId === selectedChecklistId);
+
+  // Fetch all trades for detail view
+  useEffect(() => {
+    const fetchTrades = async () => {
+      if (!isAuthenticated) return;
+      
+      const { data, error } = await supabase
+        .from('trades')
+        .select('id, date, result, checklist_id')
+        .not('checklist_id', 'is', null);
+      
+      if (!error && data) {
+        setAllTrades(data);
+      }
+    };
+    
+    fetchTrades();
+  }, [isAuthenticated]);
 
   // Fetch metrics for all checklists
   useEffect(() => {
@@ -971,7 +993,7 @@ export function PlaybookView() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05, duration: 0.3 }}
-                  onClick={() => setSelectedChecklistId(checklist.id)}
+                  onClick={() => { setSelectedChecklistId(checklist.id); setShowDetailView(true); }}
                   className={cn(
                     "group relative bg-card hover:bg-muted/30 rounded-xl p-4 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-lg",
                     viewMode === "list" && "flex items-center justify-between"
@@ -1005,8 +1027,8 @@ export function PlaybookView() {
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="min-w-[140px]">
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedChecklistId(checklist.id); }}>
-                          <Edit2 className="w-3.5 h-3.5 mr-2" />Edit
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedChecklistId(checklist.id); setShowDetailView(false); }}>
+                          <Edit2 className="w-3.5 h-3.5 mr-2" />Edit Rules
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(checklist.id); }}
@@ -1044,12 +1066,25 @@ export function PlaybookView() {
     );
   }
 
-  // Detailed view when a checklist is selected
+  // Detail view - show analytics and overview
+  if (showDetailView && selectedChecklist) {
+    return (
+      <PlaybookDetailView
+        checklist={selectedChecklist}
+        metrics={selectedMetrics}
+        trades={allTrades}
+        onBack={() => { setSelectedChecklistId(null); setShowDetailView(false); }}
+        onOpenRules={() => setShowDetailView(false)}
+      />
+    );
+  }
+
+  // Rules editor view when a checklist is selected
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header with Back Button */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => setSelectedChecklistId(null)} className="hover:bg-muted/50">
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedChecklistId(null); setShowDetailView(false); }} className="hover:bg-muted/50">
           <ArrowLeft className="w-4 h-4 mr-2" />Back
         </Button>
         <Button 
