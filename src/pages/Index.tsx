@@ -12,7 +12,7 @@ import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
 import { StatsGrid } from "@/components/Dashboard/StatsGrid";
 import { BalanceCards } from "@/components/Dashboard/BalanceCards";
-import { RankCard } from "@/components/Dashboard/RankCard";
+
 import { PnLCalendar } from "@/components/Dashboard/PnLCalendar";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { TradeTable } from "@/components/Journal/TradeTable";
@@ -406,7 +406,7 @@ const Index = () => {
             "glass-strong rounded-2xl min-h-[calc(100vh-120px)]",
             isChartPage ? "p-4 lg:min-h-[calc(100vh-100px)]" : "p-5 lg:p-6 lg:min-h-[calc(100vh-60px)]"
           )}>
-            {!isChartPage && <TopBar title={title} subtitle={subtitle} theme={theme} onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)} />}
+            {!isChartPage && <TopBar title={title} subtitle={subtitle} theme={theme} onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)} trades={trades} showRank={currentPage === 'dashboard'} />}
 
             {/* Dashboard Page */}
             {currentPage === 'dashboard' && (
@@ -432,15 +432,7 @@ const Index = () => {
                   onSetGoalBalance={handleSetGoalBalance}
                 />
                 
-                {/* Stats and Rank Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2">
-                    <StatsGrid trades={trades} />
-                  </div>
-                  <div>
-                    <RankCard trades={trades} />
-                  </div>
-                </div>
+                <StatsGrid trades={trades} />
                 <PnLCalendar 
                   trades={trades} 
                   onUpdateTrade={async (id, updates) => {
