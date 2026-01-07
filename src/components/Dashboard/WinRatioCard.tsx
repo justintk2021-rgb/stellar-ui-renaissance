@@ -1,7 +1,7 @@
 import { Trade } from "@/types/trade";
 import { useState, useEffect, useMemo } from "react";
-import { Info, Settings, Trash2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { Info, Settings, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useCountUp } from "@/hooks/useCountUp";
 import { cn } from "@/lib/utils";
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isWithinInterval, subWeeks, subMonths, subYears } from "date-fns";
@@ -143,45 +143,56 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium">Win ratio</h3>
-        <div className="flex items-center gap-2">
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          Win Ratio
+          <motion.div
+            className="w-2 h-2 rounded-full bg-primary"
+            animate={{ scale: [1, 1.3, 1], opacity: [1, 0.7, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+        </h3>
+        <div className="flex items-center gap-1">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors">
+                <motion.button 
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+                >
                   <Info className="w-4 h-4 text-muted-foreground" />
-                </button>
+                </motion.button>
               </TooltipTrigger>
               <TooltipContent>
                 <p className="text-xs">Win percentage based on trades</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <button className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors">
-            <Settings className="w-4 h-4 text-muted-foreground" />
-          </button>
-          <button className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors">
-            <Trash2 className="w-4 h-4 text-muted-foreground" />
-          </button>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex items-center justify-center gap-8 mb-6 flex-1">
         {/* Circular Progress */}
-        <div className="relative" style={{ width: size, height: size }}>
+        <motion.div 
+          className="relative" 
+          style={{ width: size, height: size }}
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.2, type: "spring" as const, stiffness: 200 }}
+        >
           <svg className="transform -rotate-90" width={size} height={size}>
             {/* Background circle */}
             <circle
               cx={size / 2}
               cy={size / 2}
               r={radius}
-              stroke="hsl(var(--muted) / 0.5)"
+              stroke="hsl(var(--muted) / 0.3)"
               strokeWidth={strokeWidth}
               fill="none"
             />
             {/* Progress circle */}
-            <circle
+            <motion.circle
               cx={size / 2}
               cy={size / 2}
               r={radius}
@@ -190,70 +201,126 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
               fill="none"
               strokeLinecap="round"
               strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-              className="transition-all duration-1000 ease-out"
+              initial={{ strokeDashoffset: circumference }}
+              animate={{ strokeDashoffset }}
+              transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
             />
           </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
+          
+          {/* Center content */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
             <AnimatedPercentage value={animatedValue} />
+            <span className="text-xs text-muted-foreground mt-1">win rate</span>
           </div>
-        </div>
+          
+          {/* Glow effect */}
+          <motion.div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: `radial-gradient(circle, ${animatedValue > 75 ? 'hsl(142 76% 46% / 0.15)' : 'hsl(var(--primary) / 0.15)'} 0%, transparent 70%)`,
+            }}
+            animate={{ opacity: [0.5, 0.8, 0.5] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </motion.div>
 
         {/* Stats */}
-        <div className="flex flex-col gap-3">
-          <div>
-            <p className="text-xs text-muted-foreground mb-0.5">Winning trades</p>
+        <div className="flex flex-col gap-4">
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+              <TrendingUp className="w-3 h-3 text-primary" />
+              Winning trades
+            </p>
             <p className="text-2xl font-bold text-primary">{currentStats.wins}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-0.5">Losing trades</p>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+              <TrendingDown className="w-3 h-3 text-destructive" />
+              Losing trades
+            </p>
             <p className="text-2xl font-bold text-destructive">{currentStats.losses}</p>
-          </div>
+          </motion.div>
         </div>
       </div>
 
       {/* Period Tabs */}
-      <div className="flex items-center gap-1 mb-4">
-        {periods.map((period) => (
-          <button
+      <div className="flex items-center gap-1 mb-4 p-1 bg-muted/20 rounded-lg">
+        {periods.map((period, index) => (
+          <motion.button
             key={period}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 * index }}
             onClick={() => setSelectedPeriod(period)}
             className={cn(
-              "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 capitalize",
+              "flex-1 px-3 py-2 text-xs font-medium rounded-md transition-all duration-200 capitalize relative",
               selectedPeriod === period
-                ? "bg-primary/10 text-primary"
+                ? "text-primary"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            {period}
-          </button>
+            {selectedPeriod === period && (
+              <motion.div
+                layoutId="activePeriod"
+                className="absolute inset-0 bg-primary/10 rounded-md"
+                transition={{ type: "spring" as const, stiffness: 400, damping: 30 }}
+              />
+            )}
+            <span className="relative z-10">{period}</span>
+          </motion.button>
         ))}
       </div>
 
       {/* Comparison Text */}
-      {previousStats.total > 0 && (
-        <p className="text-xs text-muted-foreground text-center">
-          Your win % is{" "}
-          <span className={isImproved ? "text-primary" : "text-destructive"}>
-            {isImproved ? "higher" : "lower"} on {Math.abs(winRateDiff).toFixed(0)}%
-          </span>{" "}
-          compared to{" "}
-          <span className="text-primary">{previousStats.wins} winning</span>
-          {" / "}
-          <span className="text-destructive">{previousStats.losses} losing</span>{" "}
-          {periodLabels[selectedPeriod]}
-        </p>
-      )}
-      {previousStats.total === 0 && currentStats.total > 0 && (
-        <p className="text-xs text-muted-foreground text-center">
-          No data from {periodLabels[selectedPeriod]} to compare
-        </p>
-      )}
-      {currentStats.total === 0 && (
-        <p className="text-xs text-muted-foreground text-center">
-          No trades in this period
-        </p>
-      )}
+      <AnimatePresence mode="wait">
+        {previousStats.total > 0 && (
+          <motion.p
+            key="comparison"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="text-xs text-muted-foreground text-center"
+          >
+            Your win % is{" "}
+            <span className={cn("font-semibold", isImproved ? "text-primary" : "text-destructive")}>
+              {isImproved ? "higher" : "lower"} by {Math.abs(winRateDiff).toFixed(0)}%
+            </span>{" "}
+            compared to{" "}
+            <span className="text-primary font-medium">{previousStats.wins}W</span>
+            {" / "}
+            <span className="text-destructive font-medium">{previousStats.losses}L</span>{" "}
+            {periodLabels[selectedPeriod]}
+          </motion.p>
+        )}
+        {previousStats.total === 0 && currentStats.total > 0 && (
+          <motion.p
+            key="no-comparison"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-xs text-muted-foreground text-center"
+          >
+            No data from {periodLabels[selectedPeriod]} to compare
+          </motion.p>
+        )}
+        {currentStats.total === 0 && (
+          <motion.p
+            key="no-trades"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-xs text-muted-foreground text-center"
+          >
+            No trades in this period
+          </motion.p>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
