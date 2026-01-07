@@ -21,6 +21,7 @@ export interface ChecklistItemState {
   text: string;
   checked: boolean;
   percentage?: number;
+  percentageType?: "fixed" | "conditional"; // "fixed" = full % when any sub-item selected, "conditional" = sum of selected
   subItems?: ChecklistSubItemState[];
 }
 

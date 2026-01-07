@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useChecklists, ChecklistItem, ChecklistSubItem, ConditionalSubItem, ChecklistType } from "@/hooks/useChecklists";
+import { useChecklists, ChecklistItem, ChecklistSubItem, ConditionalSubItem, ChecklistType, PercentageType } from "@/hooks/useChecklists";
 import { supabase } from "@/integrations/supabase/client";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
@@ -310,6 +310,23 @@ export function PlaybookView() {
     });
   };
 
+  // Toggle percentageType for a category (fixed = full % on any selection, conditional = sum of selections)
+  const toggleCategoryPercentageType = async (checklistId: string, itemId: string) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const updatedItems = checklist.items.map(item => {
+      if (item.id === itemId) {
+        const currentType = item.percentageType || "conditional";
+        const newType: PercentageType = currentType === "conditional" ? "fixed" : "conditional";
+        return { ...item, percentageType: newType };
+      }
+      return item;
+    });
+
+    await updateChecklist(checklistId, { items: updatedItems });
+  };
+
   // Deep nesting helpers for conditional checklists
   const resetNestedChildren = (children?: ConditionalSubItem[]): ConditionalSubItem[] | undefined => {
     if (!children) return undefined;
@@ -569,7 +586,7 @@ export function PlaybookView() {
     if (items.length === 0) return 0;
     
     // For sequential conditional checklists, each category contributes its percentage
-    // Sub-items within each category use their custom percentages
+    // Categories can be "fixed" (full % when ANY sub-item selected) or "conditional" (sum of selected sub-items)
     let totalPercentage = 0;
     const categoryWeight = 100 / items.length;
     
@@ -577,13 +594,22 @@ export function PlaybookView() {
       if (!isCategoryUnlocked(items, index)) return;
       
       if (item.subItems && item.subItems.length > 0) {
-        // Sum the percentages of checked sub-items
         const checkedSubItems = item.subItems.filter(sub => sub.checked);
-        const subItemPercentages = checkedSubItems.reduce((sum, sub) => {
-          return sum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
-        }, 0);
-        // Category contribution = (sub-item completion %) * category weight
-        totalPercentage += (subItemPercentages / 100) * categoryWeight;
+        
+        // Check if this category uses "fixed" percentage type
+        // Fixed: give full category weight when ANY sub-item is checked
+        if (item.percentageType === "fixed") {
+          if (checkedSubItems.length > 0) {
+            totalPercentage += categoryWeight;
+          }
+        } else {
+          // Conditional (default): sum the percentages of checked sub-items
+          const subItemPercentages = checkedSubItems.reduce((sum, sub) => {
+            return sum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
+          }, 0);
+          // Category contribution = (sub-item completion %) * category weight
+          totalPercentage += (subItemPercentages / 100) * categoryWeight;
+        }
       } else if (item.checked) {
         totalPercentage += categoryWeight;
       }
@@ -1212,6 +1238,27 @@ export function PlaybookView() {
                                 >
                                   Current
                                 </motion.span>
+                              )}
+                              {/* Percentage Type Toggle */}
+                              {hasSubItems && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleCategoryPercentageType(selectedChecklist.id, item.id);
+                                  }}
+                                  className={cn(
+                                    "px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors",
+                                    item.percentageType === "fixed"
+                                      ? "bg-blue-500/20 text-blue-500 hover:bg-blue-500/30"
+                                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                  )}
+                                  title={item.percentageType === "fixed" 
+                                    ? "Fixed: Full category % when any sub-item is selected" 
+                                    : "Conditional: Sum of selected sub-item percentages"
+                                  }
+                                >
+                                  {item.percentageType === "fixed" ? "Fixed %" : "Sum %"}
+                                </button>
                               )}
                             </div>
                             {hasSubItems && (

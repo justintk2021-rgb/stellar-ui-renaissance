@@ -267,20 +267,32 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
     
     if (checklist.type === "conditional") {
       // Sequential conditional: each category contributes its weight
-      // Sub-items use their custom percentages - users only check relevant ones
+      // Categories can be "fixed" (full % on any selection) or "conditional" (sum of selections)
       let totalPercentage = 0;
       const categoryWeight = 100 / items.length;
       
       items.forEach((item, index) => {
         if (!isCategoryUnlocked(index)) return;
         
+        // Get the original checklist item to check percentageType
+        const originalItem = checklist.items[index];
+        
         if (item.subItems && item.subItems.length > 0) {
-          // Sum the percentages of checked sub-items
           const checkedSubItems = item.subItems.filter(sub => sub.checked);
-          const subItemPercentages = checkedSubItems.reduce((sum, sub) => {
-            return sum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
-          }, 0);
-          totalPercentage += (subItemPercentages / 100) * categoryWeight;
+          
+          // Check if this category uses "fixed" percentage type
+          if (originalItem?.percentageType === "fixed") {
+            // Fixed: give full category weight when ANY sub-item is checked
+            if (checkedSubItems.length > 0) {
+              totalPercentage += categoryWeight;
+            }
+          } else {
+            // Conditional (default): sum the percentages of checked sub-items
+            const subItemPercentages = checkedSubItems.reduce((sum, sub) => {
+              return sum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
+            }, 0);
+            totalPercentage += (subItemPercentages / 100) * categoryWeight;
+          }
         } else if (item.checked) {
           totalPercentage += categoryWeight;
         }
