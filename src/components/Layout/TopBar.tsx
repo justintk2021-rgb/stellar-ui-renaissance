@@ -1,21 +1,35 @@
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { RankBadge } from "@/components/Dashboard/RankBadge";
+
+interface Trade {
+  id: string;
+  date: string;
+  result: number;
+  checklist_id?: string | null;
+  checklist_state?: any;
+}
 
 interface TopBarProps {
   title: string;
   subtitle: string;
   theme?: 'dark' | 'light';
   onThemeChange?: (theme: 'dark' | 'light') => void;
+  trades?: Trade[];
+  showRank?: boolean;
 }
 
-export function TopBar({ title, subtitle, theme, onThemeChange }: TopBarProps) {
+export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], showRank = false }: TopBarProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-6">
       <div>
         <h2 className="text-xl font-semibold tracking-wide">{title}</h2>
         <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        {showRank && trades.length > 0 && (
+          <RankBadge trades={trades} />
+        )}
         {onThemeChange && (
           <ThemeToggle
             checked={theme === 'dark'}

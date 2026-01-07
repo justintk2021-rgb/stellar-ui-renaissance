@@ -178,14 +178,16 @@ export function StatsGrid({ trades }: StatsGridProps) {
       </div>
 
       {/* Main Content Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left Column - Win Ratio Card */}
         <div className="glass rounded-xl p-6 border border-border/40 flex flex-col min-h-[320px]">
           <WinRatioCard trades={trades} />
         </div>
 
         {/* Right Column - Recent Trades */}
-        <RecentTrades trades={trades} />
+        <div className="lg:col-span-2">
+          <RecentTrades trades={trades} />
+        </div>
       </div>
     </div>
   );
