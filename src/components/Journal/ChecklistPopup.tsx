@@ -224,14 +224,15 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
   };
 
   // Sequential category helpers for conditional checklists
-  const isCategoryComplete = (item: ChecklistItemState): boolean => {
+  // A category is "started" if at least one sub-item is checked (unlocks next category)
+  const isCategoryStarted = (item: ChecklistItemState): boolean => {
     if (!item.subItems || item.subItems.length === 0) return item.checked;
-    return item.subItems.every(sub => sub.checked);
+    return item.subItems.some(sub => sub.checked);
   };
 
   const getUnlockedCategoryIndex = (): number => {
     for (let i = 0; i < items.length; i++) {
-      if (!isCategoryComplete(items[i])) {
+      if (!isCategoryStarted(items[i])) {
         return i;
       }
     }
@@ -242,8 +243,8 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
     return categoryIndex <= getUnlockedCategoryIndex();
   };
 
-  const getCompletedCategoriesCount = (): number => {
-    return items.filter(item => isCategoryComplete(item)).length;
+  const getStartedCategoriesCount = (): number => {
+    return items.filter(item => isCategoryStarted(item)).length;
   };
 
   // Count all checked items recursively for conditional checklists
@@ -623,12 +624,12 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
                     {/* Category Progress */}
                     <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border/20">
                       <span>Category Progress</span>
-                      <span className="font-medium">{getCompletedCategoriesCount()} / {items.length}</span>
+                      <span className="font-medium">{getStartedCategoriesCount()} / {items.length}</span>
                     </div>
                     
                     {items.map((item, index) => {
                       const isUnlocked = isCategoryUnlocked(index);
-                      const isComplete = isCategoryComplete(item);
+                      const isStarted = isCategoryStarted(item);
                       const isCurrentCategory = index === getUnlockedCategoryIndex();
                       const hasSubItems = item.subItems && item.subItems.length > 0;
                       const subItemsCompleted = item.subItems?.filter(s => s.checked).length || 0;
@@ -649,7 +650,7 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
                           <div
                             className={cn(
                               "flex items-center gap-3 p-3 rounded-xl transition-all",
-                              isComplete
+                              isStarted
                                 ? "bg-gradient-to-r from-primary/15 to-primary/5 border border-primary/30"
                                 : isCurrentCategory
                                   ? "bg-gradient-to-r from-amber-500/15 to-amber-500/5 border border-amber-500/30"
@@ -661,7 +662,7 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
                             {/* Category Number / Status */}
                             <div className={cn(
                               "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0",
-                              isComplete
+                              isStarted
                                 ? "bg-primary text-primary-foreground"
                                 : isCurrentCategory
                                   ? "bg-amber-500/20 text-amber-500 border border-amber-500/50"
@@ -669,7 +670,7 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
                                     ? "bg-muted-foreground/20 text-muted-foreground"
                                     : "bg-muted-foreground/10 text-muted-foreground/40"
                             )}>
-                              {isComplete ? (
+                              {isStarted ? (
                                 <Check className="w-4 h-4" />
                               ) : !isUnlocked ? (
                                 <Lock className="w-3.5 h-3.5" />
@@ -682,12 +683,12 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
                               <div className="flex items-center gap-2">
                                 <span className={cn(
                                   "font-medium text-sm",
-                                  isComplete && "text-primary",
+                                  isStarted && "text-primary",
                                   !isUnlocked && "text-muted-foreground/50"
                                 )}>
                                   {item.text}
                                 </span>
-                                {isCurrentCategory && !isComplete && (
+                                {isCurrentCategory && !isStarted && (
                                   <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-500 text-[9px] font-medium">
                                     Current
                                   </span>
@@ -701,7 +702,7 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
                                       animate={{ width: `${subItemsTotal > 0 ? (subItemsCompleted / subItemsTotal) * 100 : 0}%` }}
                                       className={cn(
                                         "h-full rounded-full",
-                                        isComplete ? "bg-primary" : "bg-amber-500"
+                                        isStarted ? "bg-primary" : "bg-amber-500"
                                       )}
                                     />
                                   </div>
