@@ -1681,6 +1681,147 @@ export function NotebookView({
               )}
             </motion.div>
 
+            {/* Formatting Toolbar - Word-style */}
+            {!isSelectedEntryInTrash && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.15, duration: 0.3 }}
+                className="flex items-center gap-1 px-4 py-2 border-b border-border/20 bg-muted/10"
+              >
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('bold')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Bold (Ctrl+B)"
+                  >
+                    <Bold className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('italic')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Italic (Ctrl+I)"
+                  >
+                    <Italic className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('underline')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Underline (Ctrl+U)"
+                  >
+                    <Underline className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('strikeThrough')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Strikethrough"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+                
+                <div className="w-px h-5 bg-border/50 mx-1" />
+                
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('justifyLeft')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Align Left"
+                  >
+                    <AlignLeft className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('justifyCenter')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Align Center"
+                  >
+                    <AlignCenter className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('justifyRight')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Align Right"
+                  >
+                    <AlignRight className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+                
+                <div className="w-px h-5 bg-border/50 mx-1" />
+                
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('insertUnorderedList')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Bullet List"
+                  >
+                    <List className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('insertOrderedList')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Numbered List"
+                  >
+                    <ListOrdered className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+                
+                <div className="w-px h-5 bg-border/50 mx-1" />
+                
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const url = prompt('Enter URL:');
+                      if (url) document.execCommand('createLink', false, url);
+                    }}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Insert Link"
+                  >
+                    <Link className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('formatBlock', false, 'blockquote')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Quote"
+                  >
+                    <Quote className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
             {/* Editor with Block Menu */}
             <ScrollArea className="flex-1">
               <div 
