@@ -11,6 +11,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Trade {
   id: string;
@@ -242,26 +248,35 @@ export function RankBadge({ trades }: RankBadgeProps) {
                 const Icon = rank.icon;
                 
                 return (
-                  <div
-                    key={rank.name}
-                    className={cn(
-                      "relative flex-1 flex flex-col items-center py-1 rounded transition-all",
-                      isCurrent && "bg-muted/40"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-5 h-5 rounded flex items-center justify-center transition-all",
-                      isActive ? `bg-gradient-to-br ${rank.color}` : "bg-muted/30"
-                    )}>
-                      <Icon className={cn(
-                        "w-2.5 h-2.5",
-                        isActive ? "text-white" : "text-muted-foreground/40"
-                      )} />
-                    </div>
-                    {isCurrent && (
-                      <div className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-primary" />
-                    )}
-                  </div>
+                  <TooltipProvider key={rank.name} delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={cn(
+                            "relative flex-1 flex flex-col items-center py-1 rounded transition-all cursor-pointer hover:bg-muted/30",
+                            isCurrent && "bg-muted/40"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-5 h-5 rounded flex items-center justify-center transition-all",
+                            isActive ? `bg-gradient-to-br ${rank.color}` : "bg-muted/30"
+                          )}>
+                            <Icon className={cn(
+                              "w-2.5 h-2.5",
+                              isActive ? "text-white" : "text-muted-foreground/40"
+                            )} />
+                          </div>
+                          {isCurrent && (
+                            <div className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-primary" />
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-xs">
+                        <p className={cn("font-medium", rank.textColor)}>{rank.name}</p>
+                        <p className="text-muted-foreground">{rank.minPoints}+ pts</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 );
               })}
             </div>
