@@ -81,7 +81,7 @@ export function PlaybookView() {
       
       const { data, error } = await supabase
         .from('trades')
-        .select('id, date, result, checklist_id')
+        .select('id, date, pair, result, checklist_id')
         .not('checklist_id', 'is', null);
       
       if (!error && data) {
