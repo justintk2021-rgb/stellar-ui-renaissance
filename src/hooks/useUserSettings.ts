@@ -15,6 +15,7 @@ interface UserSettings {
   customColor: string;
   customGradient: CustomGradient | null;
   sidebarCollapsed: boolean;
+  notebookFont: string;
 }
 
 interface DbUserSettings {
@@ -35,6 +36,7 @@ const defaultSettings: UserSettings = {
   customColor: '#10b981',
   customGradient: null,
   sidebarCollapsed: false,
+  notebookFont: 'inter',
 };
 
 export function useUserSettings(userId: string | undefined) {
@@ -59,6 +61,7 @@ export function useUserSettings(userId: string | undefined) {
         customColor: localCustomColor ? JSON.parse(localCustomColor) : '#10b981',
         customGradient: localGradient ? JSON.parse(localGradient) : null,
         sidebarCollapsed: localSidebar ? JSON.parse(localSidebar) : false,
+        notebookFont: 'inter',
       });
       setIsLoading(false);
       setIsInitialized(true);
@@ -81,6 +84,7 @@ export function useUserSettings(userId: string | undefined) {
           customColor: data.custom_color || '#10b981',
           customGradient: data.custom_gradient as unknown as CustomGradient | null,
           sidebarCollapsed: data.sidebar_collapsed,
+          notebookFont: (data as any).notebook_font || 'inter',
         });
         
         // Clear localStorage after successful fetch from DB
@@ -117,6 +121,7 @@ export function useUserSettings(userId: string | undefined) {
       customColor: localCustomColor ? JSON.parse(localCustomColor) : '#10b981',
       customGradient: localGradient ? JSON.parse(localGradient) : null,
       sidebarCollapsed: localSidebar ? JSON.parse(localSidebar) : false,
+      notebookFont: 'inter',
     };
 
     try {
@@ -129,6 +134,7 @@ export function useUserSettings(userId: string | undefined) {
           custom_color: migratedSettings.customColor,
           custom_gradient: migratedSettings.customGradient ? JSON.parse(JSON.stringify(migratedSettings.customGradient)) : null,
           sidebar_collapsed: migratedSettings.sidebarCollapsed,
+          notebook_font: migratedSettings.notebookFont,
         }]);
 
       if (error) throw error;
@@ -165,6 +171,7 @@ export function useUserSettings(userId: string | undefined) {
           custom_color: newSettings.customColor,
           custom_gradient: newSettings.customGradient ? JSON.parse(JSON.stringify(newSettings.customGradient)) : null,
           sidebar_collapsed: newSettings.sidebarCollapsed,
+          notebook_font: newSettings.notebookFont,
         }], {
           onConflict: 'user_id',
         });
@@ -216,5 +223,6 @@ export function useUserSettings(userId: string | undefined) {
     setCustomColor: (color: string) => updateSetting('customColor', color),
     setCustomGradient: (gradient: CustomGradient | null) => updateSetting('customGradient', gradient),
     setSidebarCollapsed: (collapsed: boolean) => updateSetting('sidebarCollapsed', collapsed),
+    setNotebookFont: (font: string) => updateSetting('notebookFont', font),
   };
 }

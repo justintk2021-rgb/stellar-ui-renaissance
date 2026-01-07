@@ -103,6 +103,8 @@ interface NotebookViewProps {
   notebookEntries: NotebookEntry[];
   onSaveEntry: (entry: NotebookEntry) => void;
   onDeleteEntry: (id: string) => void;
+  notebookFont?: string;
+  onFontChange?: (font: string) => void;
 }
 
 const MARKER_COLORS = [
@@ -192,13 +194,14 @@ export function NotebookView({
   notebookEntries,
   onSaveEntry,
   onDeleteEntry,
+  notebookFont = 'inter',
+  onFontChange,
 }: NotebookViewProps) {
   const { checklists } = useChecklists();
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreatingNew, setIsCreatingNew] = useState(false);
-  const [fontStyle, setFontStyle] = useState<FontStyle>('inter');
   const [isSmallText, setIsSmallText] = useState(false);
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isFullWidthClosing, setIsFullWidthClosing] = useState(false);
@@ -236,6 +239,13 @@ export function NotebookView({
     const saved = localStorage.getItem('notebook-view-mode');
     return (saved === 'list' ? 'list' : 'grid') as 'grid' | 'list';
   });
+  
+  // Right-click context menu state
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [showTextColorPicker, setShowTextColorPicker] = useState(false);
+  const [showHighlightColorPicker, setShowHighlightColorPicker] = useState(false);
+  
   const editorRef = useRef<HTMLDivElement>(null);
   const fullscreenEditorRef = useRef<HTMLDivElement>(null);
   const fullscreenEditorContainerRef = useRef<HTMLDivElement>(null);
@@ -818,6 +828,78 @@ export function NotebookView({
     setFullscreenBlockMenuOpen(true);
   };
 
+  // Text and highlight colors
+  const TEXT_COLORS = [
+    { id: 'default', label: 'Default', color: 'inherit' },
+    { id: 'red', label: 'Red', color: '#ef4444' },
+    { id: 'orange', label: 'Orange', color: '#f97316' },
+    { id: 'yellow', label: 'Yellow', color: '#eab308' },
+    { id: 'green', label: 'Green', color: '#22c55e' },
+    { id: 'blue', label: 'Blue', color: '#3b82f6' },
+    { id: 'purple', label: 'Purple', color: '#a855f7' },
+    { id: 'pink', label: 'Pink', color: '#ec4899' },
+    { id: 'gray', label: 'Gray', color: '#6b7280' },
+  ];
+
+  const HIGHLIGHT_COLORS = [
+    { id: 'none', label: 'None', color: 'transparent' },
+    { id: 'yellow', label: 'Yellow', color: 'rgba(234, 179, 8, 0.3)' },
+    { id: 'green', label: 'Green', color: 'rgba(34, 197, 94, 0.3)' },
+    { id: 'blue', label: 'Blue', color: 'rgba(59, 130, 246, 0.3)' },
+    { id: 'purple', label: 'Purple', color: 'rgba(168, 85, 247, 0.3)' },
+    { id: 'pink', label: 'Pink', color: 'rgba(236, 72, 153, 0.3)' },
+    { id: 'red', label: 'Red', color: 'rgba(239, 68, 68, 0.3)' },
+    { id: 'orange', label: 'Orange', color: 'rgba(249, 115, 22, 0.3)' },
+    { id: 'gray', label: 'Gray', color: 'rgba(107, 114, 128, 0.3)' },
+  ];
+
+  // Handle right-click context menu for text formatting
+  const handleContextMenu = (e: React.MouseEvent) => {
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 0) {
+      e.preventDefault();
+      setContextMenuPosition({ x: e.clientX, y: e.clientY });
+      setContextMenuOpen(true);
+      setShowTextColorPicker(false);
+      setShowHighlightColorPicker(false);
+    }
+  };
+
+  // Apply text color to selected text
+  const applyTextColor = (color: string) => {
+    if (color === 'inherit') {
+      document.execCommand('removeFormat', false);
+    } else {
+      document.execCommand('foreColor', false, color);
+    }
+    setContextMenuOpen(false);
+    setShowTextColorPicker(false);
+  };
+
+  // Apply highlight/background color to selected text
+  const applyHighlightColor = (color: string) => {
+    if (color === 'transparent') {
+      document.execCommand('removeFormat', false);
+    } else {
+      document.execCommand('hiliteColor', false, color);
+    }
+    setContextMenuOpen(false);
+    setShowHighlightColorPicker(false);
+  };
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuOpen) {
+        setContextMenuOpen(false);
+        setShowTextColorPicker(false);
+        setShowHighlightColorPicker(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [contextMenuOpen]);
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
@@ -852,9 +934,9 @@ export function NotebookView({
 
   // Get font family from NOTEBOOK_FONTS array
   const selectedFontFamily = useMemo(() => {
-    const font = NOTEBOOK_FONTS.find(f => f.id === fontStyle);
+    const font = NOTEBOOK_FONTS.find(f => f.id === notebookFont);
     return font?.family || "'Inter', sans-serif";
-  }, [fontStyle]);
+  }, [notebookFont]);
 
   const isViewingTrash = selectedCategory === "trash";
   const isSelectedEntryInTrash = selectedEntry?.isDeleted;
@@ -1590,30 +1672,30 @@ export function NotebookView({
                       {/* Font Style Selector */}
                       <div className="flex items-center justify-center gap-2 mb-2 p-1">
                         <button 
-                          onClick={() => setFontStyle('default')}
+                          onClick={() => onFontChange?.('inter')}
                           className={cn(
                             "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors",
-                            fontStyle === 'default' ? "bg-primary/20 text-primary" : "hover:bg-muted"
+                            notebookFont === 'inter' ? "bg-primary/20 text-primary" : "hover:bg-muted"
                           )}
                         >
                           <span className="text-lg font-sans">Ag</span>
                           <span className="text-[10px] text-muted-foreground">Default</span>
                         </button>
                         <button 
-                          onClick={() => setFontStyle('serif')}
+                          onClick={() => onFontChange?.('merriweather')}
                           className={cn(
                             "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors",
-                            fontStyle === 'serif' ? "bg-primary/20 text-primary" : "hover:bg-muted"
+                            notebookFont === 'merriweather' ? "bg-primary/20 text-primary" : "hover:bg-muted"
                           )}
                         >
                           <span className="text-lg font-serif">Ag</span>
                           <span className="text-[10px] text-muted-foreground">Serif</span>
                         </button>
                         <button 
-                          onClick={() => setFontStyle('mono')}
+                          onClick={() => onFontChange?.('source-code')}
                           className={cn(
                             "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors",
-                            fontStyle === 'mono' ? "bg-primary/20 text-primary" : "hover:bg-muted"
+                            notebookFont === 'source-code' ? "bg-primary/20 text-primary" : "hover:bg-muted"
                           )}
                         >
                           <span className="text-lg font-mono">Ag</span>
@@ -1751,8 +1833,8 @@ export function NotebookView({
                       className="h-7 px-2 rounded hover:bg-muted text-xs gap-1 min-w-[120px] justify-between"
                       disabled={isLocked}
                     >
-                      <span style={{ fontFamily: NOTEBOOK_FONTS.find(f => f.id === fontStyle)?.family }}>
-                        {NOTEBOOK_FONTS.find(f => f.id === fontStyle)?.name || 'Inter'}
+                      <span style={{ fontFamily: NOTEBOOK_FONTS.find(f => f.id === notebookFont)?.family }}>
+                        {NOTEBOOK_FONTS.find(f => f.id === notebookFont)?.name || 'Inter'}
                       </span>
                       <ChevronDown className="w-3 h-3" />
                     </Button>
@@ -1765,8 +1847,8 @@ export function NotebookView({
                     {NOTEBOOK_FONTS.filter(f => f.category === 'Sans Serif').map((font) => (
                       <DropdownMenuItem 
                         key={font.id}
-                        onClick={() => setFontStyle(font.id)}
-                        className={cn("text-xs cursor-pointer", fontStyle === font.id && "bg-primary/10")}
+                        onClick={() => onFontChange?.(font.id)}
+                        className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
                         style={{ fontFamily: font.family }}
                       >
                         {font.name}
@@ -1779,8 +1861,8 @@ export function NotebookView({
                     {NOTEBOOK_FONTS.filter(f => f.category === 'Serif').map((font) => (
                       <DropdownMenuItem 
                         key={font.id}
-                        onClick={() => setFontStyle(font.id)}
-                        className={cn("text-xs cursor-pointer", fontStyle === font.id && "bg-primary/10")}
+                        onClick={() => onFontChange?.(font.id)}
+                        className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
                         style={{ fontFamily: font.family }}
                       >
                         {font.name}
@@ -1793,8 +1875,8 @@ export function NotebookView({
                     {NOTEBOOK_FONTS.filter(f => f.category === 'Monospace').map((font) => (
                       <DropdownMenuItem 
                         key={font.id}
-                        onClick={() => setFontStyle(font.id)}
-                        className={cn("text-xs cursor-pointer", fontStyle === font.id && "bg-primary/10")}
+                        onClick={() => onFontChange?.(font.id)}
+                        className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
                         style={{ fontFamily: font.family }}
                       >
                         {font.name}
@@ -1998,6 +2080,7 @@ export function NotebookView({
                   ref={editorRef}
                   contentEditable={!isLocked && !isSelectedEntryInTrash}
                   style={{ fontFamily: selectedFontFamily }}
+                  onContextMenu={handleContextMenu}
                   className={cn(
                     "min-h-full p-4 pl-12 pr-12 outline-none focus:outline-none focus-visible:outline-none transition-all caret-primary",
                     isSmallText ? "text-xs" : "text-sm",
@@ -2635,6 +2718,58 @@ export function NotebookView({
           }
         }
       `}</style>
+
+      {/* Right-click Context Menu for Text Color/Highlight */}
+      {contextMenuOpen && (
+        <div
+          className="fixed z-[9999] bg-background border border-border rounded-lg shadow-xl p-1 min-w-[160px]"
+          style={{ left: contextMenuPosition.x, top: contextMenuPosition.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded-md transition-colors"
+            onClick={() => setShowTextColorPicker(!showTextColorPicker)}
+          >
+            <Type className="w-4 h-4" />
+            Text Color
+            <ChevronRight className="w-3 h-3 ml-auto" />
+          </button>
+          {showTextColorPicker && (
+            <div className="flex flex-wrap gap-1 p-2 border-t border-border">
+              {TEXT_COLORS.map((color) => (
+                <button
+                  key={color.id}
+                  onClick={() => applyTextColor(color.color)}
+                  className="w-6 h-6 rounded border border-border hover:scale-110 transition-transform"
+                  style={{ backgroundColor: color.id === 'default' ? 'transparent' : color.color }}
+                  title={color.label}
+                />
+              ))}
+            </div>
+          )}
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded-md transition-colors"
+            onClick={() => setShowHighlightColorPicker(!showHighlightColorPicker)}
+          >
+            <div className="w-4 h-4 rounded bg-yellow-300/50" />
+            Highlight
+            <ChevronRight className="w-3 h-3 ml-auto" />
+          </button>
+          {showHighlightColorPicker && (
+            <div className="flex flex-wrap gap-1 p-2 border-t border-border">
+              {HIGHLIGHT_COLORS.map((color) => (
+                <button
+                  key={color.id}
+                  onClick={() => applyHighlightColor(color.color)}
+                  className="w-6 h-6 rounded border border-border hover:scale-110 transition-transform"
+                  style={{ backgroundColor: color.color }}
+                  title={color.label}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
     </>
   );

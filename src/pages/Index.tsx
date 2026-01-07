@@ -105,9 +105,10 @@ const Index = () => {
     setCustomColor,
     setCustomGradient,
     setSidebarCollapsed,
+    setNotebookFont,
   } = useUserSettings(user?.id);
   
-  const { theme, accentColor, customColor, customGradient, sidebarCollapsed } = settings;
+  const { theme, accentColor, customColor, customGradient, sidebarCollapsed, notebookFont } = settings;
   
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
@@ -528,6 +529,8 @@ const Index = () => {
                   notebookEntries={notebookEntries}
                   onSaveEntry={handleSaveEntry}
                   onDeleteEntry={handleDeleteEntry}
+                  notebookFont={notebookFont}
+                  onFontChange={setNotebookFont}
                 />
               </div>
             )}
