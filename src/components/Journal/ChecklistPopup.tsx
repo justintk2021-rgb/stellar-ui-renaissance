@@ -5,20 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { X, ClipboardCheck, Award } from "lucide-react";
+import { X, ClipboardCheck, Award, ChevronRight, GitBranch, ListChecks, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ChecklistItemState } from "@/types/trade";
-
-interface ChecklistItem {
-  id: string;
-  text: string;
-  checked: boolean;
-  percentage?: number;
-}
+import { ChecklistItemState, ChecklistSubItemState, ChecklistChildState } from "@/types/trade";
+import { ChecklistType, ChecklistItem, ChecklistSubItem, ConditionalSubItem } from "@/hooks/useChecklists";
 
 interface Checklist {
   id: string;
   name: string;
+  type: ChecklistType;
   items: ChecklistItem[];
 }
 
@@ -37,45 +32,275 @@ function getGrade(percentage: number): { grade: string; color: string; bgColor: 
   return { grade: "D Setup", color: "text-red-500", bgColor: "bg-red-500/20" };
 }
 
+// Convert checklist sub-items to state format
+const convertSubItemsToState = (subItems?: ChecklistSubItem[]): ChecklistSubItemState[] | undefined => {
+  if (!subItems) return undefined;
+  return subItems.map(sub => ({
+    id: sub.id,
+    text: sub.text,
+    checked: false,
+    children: convertChildrenToState(sub.children),
+  }));
+};
+
+const convertChildrenToState = (children?: ConditionalSubItem[]): ChecklistChildState[] | undefined => {
+  if (!children) return undefined;
+  return children.map(child => ({
+    id: child.id,
+    text: child.text,
+    checked: false,
+    children: convertChildrenToState(child.children),
+  }));
+};
+
+// Merge initial state with checklist structure
+const mergeWithInitialState = (
+  subItems: ChecklistSubItemState[] | undefined,
+  initialSubItems: ChecklistSubItemState[] | undefined
+): ChecklistSubItemState[] | undefined => {
+  if (!subItems) return undefined;
+  if (!initialSubItems) return subItems;
+  
+  return subItems.map(sub => {
+    const initial = initialSubItems.find(i => i.id === sub.id);
+    return {
+      ...sub,
+      checked: initial?.checked ?? sub.checked,
+      children: mergeChildrenWithInitial(sub.children, initial?.children),
+    };
+  });
+};
+
+const mergeChildrenWithInitial = (
+  children: ChecklistChildState[] | undefined,
+  initialChildren: ChecklistChildState[] | undefined
+): ChecklistChildState[] | undefined => {
+  if (!children) return undefined;
+  if (!initialChildren) return children;
+  
+  return children.map(child => {
+    const initial = initialChildren.find(i => i.id === child.id);
+    return {
+      ...child,
+      checked: initial?.checked ?? child.checked,
+      children: mergeChildrenWithInitial(child.children, initial?.children),
+    };
+  });
+};
+
 export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialState }: ChecklistPopupProps) {
   const [items, setItems] = useState<ChecklistItemState[]>([]);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (isOpen && checklist) {
-      // Initialize from initialState or reset all items to unchecked
       if (initialState && initialState.length > 0) {
-        setItems(initialState);
+        // Merge initial state with current checklist structure
+        const merged = checklist.items.map(item => {
+          const initial = initialState.find(i => i.id === item.id);
+          const subItems = convertSubItemsToState(item.subItems);
+          return {
+            id: item.id,
+            text: item.text,
+            checked: initial?.checked ?? false,
+            percentage: item.percentage,
+            subItems: mergeWithInitialState(subItems, initial?.subItems),
+          };
+        });
+        setItems(merged);
+        
+        // Auto-expand checked items
+        const expanded = new Set<string>();
+        merged.forEach(item => {
+          if (item.checked && item.subItems?.length) {
+            expanded.add(item.id);
+          }
+        });
+        setExpandedItems(expanded);
       } else {
         setItems(checklist.items.map(item => ({
           id: item.id,
           text: item.text,
           checked: false,
           percentage: item.percentage,
+          subItems: convertSubItemsToState(item.subItems),
         })));
+        setExpandedItems(new Set());
       }
     }
   }, [isOpen, checklist, initialState]);
 
   const toggleItem = (id: string) => {
-    setItems(prev => prev.map(item =>
-      item.id === id ? { ...item, checked: !item.checked } : item
-    ));
+    setItems(prev => prev.map(item => {
+      if (item.id === id) {
+        const newChecked = !item.checked;
+        // Auto-expand when checking in conditional mode
+        if (newChecked && checklist.type === "conditional" && item.subItems?.length) {
+          setExpandedItems(prev => new Set(prev).add(id));
+        }
+        return { ...item, checked: newChecked };
+      }
+      return item;
+    }));
+  };
+
+  const toggleSubItem = (itemId: string, subItemId: string) => {
+    setItems(prev => prev.map(item => {
+      if (item.id === itemId && item.subItems) {
+        return {
+          ...item,
+          subItems: item.subItems.map(sub => {
+            if (sub.id === subItemId) {
+              const newChecked = !sub.checked;
+              if (newChecked && checklist.type === "conditional" && sub.children?.length) {
+                setExpandedItems(prev => new Set(prev).add(subItemId));
+              }
+              return { ...sub, checked: newChecked };
+            }
+            return sub;
+          }),
+        };
+      }
+      return item;
+    }));
+  };
+
+  const toggleNestedChild = (itemId: string, path: string[]) => {
+    setItems(prev => prev.map(item => {
+      if (item.id === itemId && item.subItems) {
+        return {
+          ...item,
+          subItems: toggleInSubItems(item.subItems, path, 0),
+        };
+      }
+      return item;
+    }));
+  };
+
+  const toggleInSubItems = (subItems: ChecklistSubItemState[], path: string[], index: number): ChecklistSubItemState[] => {
+    return subItems.map(sub => {
+      if (sub.id === path[index]) {
+        if (index === path.length - 1) {
+          const newChecked = !sub.checked;
+          if (newChecked && sub.children?.length) {
+            setExpandedItems(prev => new Set(prev).add(sub.id));
+          }
+          return { ...sub, checked: newChecked };
+        } else if (sub.children) {
+          return { ...sub, children: toggleInChildren(sub.children, path, index + 1) };
+        }
+      }
+      return sub;
+    });
+  };
+
+  const toggleInChildren = (children: ChecklistChildState[], path: string[], index: number): ChecklistChildState[] => {
+    return children.map(child => {
+      if (child.id === path[index]) {
+        if (index === path.length - 1) {
+          const newChecked = !child.checked;
+          if (newChecked && child.children?.length) {
+            setExpandedItems(prev => new Set(prev).add(child.id));
+          }
+          return { ...child, checked: newChecked };
+        } else if (child.children) {
+          return { ...child, children: toggleInChildren(child.children, path, index + 1) };
+        }
+      }
+      return child;
+    });
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // Count all checked items recursively for conditional checklists
+  const countNestedChecked = (children?: ChecklistChildState[]): { total: number; checked: number } => {
+    if (!children) return { total: 0, checked: 0 };
+    let total = 0;
+    let checked = 0;
+    children.forEach(child => {
+      total++;
+      if (child.checked) checked++;
+      const nested = countNestedChecked(child.children);
+      total += nested.total;
+      checked += nested.checked;
+    });
+    return { total, checked };
   };
 
   const getCompletionPercentage = (): number => {
     if (items.length === 0) return 0;
     
+    if (checklist.type === "conditional") {
+      // For conditional: count all items including nested
+      let totalWeight = 0;
+      let completedWeight = 0;
+      
+      items.forEach(item => {
+        totalWeight++;
+        if (item.checked) completedWeight++;
+        
+        item.subItems?.forEach(sub => {
+          totalWeight++;
+          if (sub.checked) completedWeight++;
+          
+          const nested = countNestedChecked(sub.children);
+          totalWeight += nested.total;
+          completedWeight += nested.checked;
+        });
+      });
+      
+      return totalWeight > 0 ? (completedWeight / totalWeight) * 100 : 0;
+    }
+    
+    // Fixed checklist logic
     const hasCustomPercentages = items.some(item => item.percentage !== undefined);
     
     if (hasCustomPercentages) {
-      const checkedPercentage = items
-        .filter(item => item.checked)
-        .reduce((sum, item) => sum + (item.percentage || 0), 0);
-      return Math.min(100, checkedPercentage);
+      let totalPercentage = 0;
+      items.forEach(item => {
+        const itemPercentage = item.percentage ?? Math.round(100 / items.length);
+        if (item.subItems && item.subItems.length > 0) {
+          const subChecked = item.subItems.filter(sub => sub.checked).length;
+          const subTotal = item.subItems.length;
+          if (item.checked) {
+            totalPercentage += itemPercentage * (subTotal > 0 ? subChecked / subTotal : 1);
+          }
+        } else if (item.checked) {
+          totalPercentage += itemPercentage;
+        }
+      });
+      return Math.min(100, totalPercentage);
     }
     
-    const checkedCount = items.filter(item => item.checked).length;
-    return (checkedCount / items.length) * 100;
+    // Default equal distribution
+    let totalWeight = 0;
+    let completedWeight = 0;
+    
+    items.forEach(item => {
+      if (item.subItems && item.subItems.length > 0) {
+        totalWeight += 1 + item.subItems.length;
+        if (item.checked) {
+          completedWeight += 1;
+          completedWeight += item.subItems.filter(sub => sub.checked).length;
+        }
+      } else {
+        totalWeight += 1;
+        if (item.checked) completedWeight += 1;
+      }
+    });
+    
+    return totalWeight > 0 ? (completedWeight / totalWeight) * 100 : 0;
   };
 
   const completionPercentage = getCompletionPercentage();
@@ -84,6 +309,189 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
   const handleConfirm = () => {
     onConfirm(items);
     onClose();
+  };
+
+  // Render nested children recursively
+  const renderNestedChildren = (
+    children: ChecklistChildState[],
+    itemId: string,
+    parentPath: string[],
+    depth: number
+  ) => {
+    return (
+      <div className="space-y-1.5">
+        {children.map((child, childIndex) => {
+          const currentPath = [...parentPath, child.id];
+          const hasChildren = child.children && child.children.length > 0;
+          const isExpanded = expandedItems.has(child.id);
+          const showChildren = checklist.type === "conditional" ? child.checked && hasChildren : isExpanded && hasChildren;
+          
+          return (
+            <motion.div
+              key={child.id}
+              initial={{ opacity: 0, x: -5 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: childIndex * 0.02 }}
+            >
+              <div
+                onClick={() => toggleNestedChild(itemId, currentPath)}
+                className={cn(
+                  "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-all",
+                  "border border-border/20 hover:border-primary/20",
+                  child.checked 
+                    ? "bg-primary/5 border-primary/20" 
+                    : "bg-muted/20 hover:bg-muted/30"
+                )}
+              >
+                {hasChildren && checklist.type === "conditional" && (
+                  <motion.button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleExpand(child.id);
+                    }}
+                    animate={{ rotate: isExpanded ? 90 : 0 }}
+                    className="p-0.5 shrink-0"
+                  >
+                    <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                  </motion.button>
+                )}
+                <Checkbox
+                  checked={child.checked}
+                  onCheckedChange={() => toggleNestedChild(itemId, currentPath)}
+                  className="pointer-events-none w-3.5 h-3.5"
+                />
+                <span className={cn(
+                  "flex-1 text-xs transition-all",
+                  child.checked && "line-through text-muted-foreground"
+                )}>
+                  {child.text}
+                </span>
+                {hasChildren && (
+                  <span className="text-[9px] text-muted-foreground">
+                    {child.children?.filter(c => c.checked).length}/{child.children?.length}
+                  </span>
+                )}
+              </div>
+              
+              {/* Deeper nested children */}
+              <AnimatePresence>
+                {showChildren && child.children && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className={cn(
+                      "ml-4 pl-3 mt-1 border-l-2",
+                      checklist.type === "conditional" ? "border-amber-500/30" : "border-primary/20"
+                    )}
+                  >
+                    {renderNestedChildren(child.children, itemId, currentPath, depth + 1)}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Render sub-items
+  const renderSubItems = (item: ChecklistItemState) => {
+    if (!item.subItems?.length) return null;
+    
+    const showSubItems = checklist.type === "conditional" 
+      ? item.checked 
+      : expandedItems.has(item.id) || item.checked;
+    
+    return (
+      <AnimatePresence>
+        {showSubItems && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className={cn(
+              "ml-8 pl-3 mt-2 border-l-2 space-y-1.5",
+              checklist.type === "conditional" ? "border-amber-500/30" : "border-primary/20"
+            )}
+          >
+            {item.subItems.map((sub, subIndex) => {
+              const hasChildren = sub.children && sub.children.length > 0;
+              const isExpanded = expandedItems.has(sub.id);
+              const showChildren = checklist.type === "conditional" ? sub.checked && hasChildren : isExpanded && hasChildren;
+              
+              return (
+                <motion.div
+                  key={sub.id}
+                  initial={{ opacity: 0, x: -5 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: subIndex * 0.03 }}
+                >
+                  <div
+                    onClick={() => toggleSubItem(item.id, sub.id)}
+                    className={cn(
+                      "flex items-center gap-2 p-2.5 rounded-md cursor-pointer transition-all",
+                      "border border-border/20 hover:border-primary/20",
+                      sub.checked 
+                        ? "bg-primary/5 border-primary/20" 
+                        : "bg-muted/20 hover:bg-muted/30"
+                    )}
+                  >
+                    {hasChildren && checklist.type === "conditional" && (
+                      <motion.button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleExpand(sub.id);
+                        }}
+                        animate={{ rotate: isExpanded ? 90 : 0 }}
+                        className="p-0.5 shrink-0"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                      </motion.button>
+                    )}
+                    <Checkbox
+                      checked={sub.checked}
+                      onCheckedChange={() => toggleSubItem(item.id, sub.id)}
+                      className="pointer-events-none w-4 h-4"
+                    />
+                    <span className={cn(
+                      "flex-1 text-xs transition-all",
+                      sub.checked && "line-through text-muted-foreground"
+                    )}>
+                      {sub.text}
+                    </span>
+                    {hasChildren && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {sub.children?.filter(c => c.checked).length}/{sub.children?.length}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Nested children */}
+                  <AnimatePresence>
+                    {showChildren && sub.children && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className={cn(
+                          "ml-4 pl-3 mt-1 border-l-2",
+                          checklist.type === "conditional" ? "border-amber-500/30" : "border-primary/20"
+                        )}
+                      >
+                        {renderNestedChildren(sub.children, item.id, [sub.id], 0)}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
   };
 
   const modalContent = (
@@ -113,12 +521,36 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
               <div className="px-6 pt-6 pb-4 border-b border-border/30">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                      <ClipboardCheck className="w-5 h-5 text-primary" />
+                    <div className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center",
+                      checklist.type === "conditional" 
+                        ? "bg-gradient-to-br from-amber-500/20 to-amber-500/5"
+                        : "bg-gradient-to-br from-primary/20 to-primary/5"
+                    )}>
+                      {checklist.type === "conditional" ? (
+                        <GitBranch className="w-5 h-5 text-amber-500" />
+                      ) : (
+                        <ClipboardCheck className="w-5 h-5 text-primary" />
+                      )}
                     </div>
                     <div>
-                      <h2 className="text-lg font-semibold">{checklist.name}</h2>
-                      <p className="text-xs text-muted-foreground">Check off completed criteria</p>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-semibold">{checklist.name}</h2>
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded text-[9px] font-medium",
+                          checklist.type === "conditional" 
+                            ? "bg-amber-500/10 text-amber-500" 
+                            : "bg-primary/10 text-primary"
+                        )}>
+                          {checklist.type === "conditional" ? "Branching" : "Fixed"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {checklist.type === "conditional" 
+                          ? "Check items to reveal conditions"
+                          : "Check off completed criteria"
+                        }
+                      </p>
                     </div>
                   </div>
                   <Button
@@ -156,39 +588,73 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
 
               {/* Checklist Items */}
               <div className="px-6 py-4 max-h-[50vh] overflow-y-auto space-y-2">
-                {items.map((item, index) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.03 }}
-                    onClick={() => toggleItem(item.id)}
-                    className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all",
-                      "border border-border/30 hover:border-primary/30",
-                      item.checked 
-                        ? "bg-primary/10 border-primary/30" 
-                        : "bg-muted/30 hover:bg-muted/50"
-                    )}
-                  >
-                    <Checkbox
-                      checked={item.checked}
-                      onCheckedChange={() => toggleItem(item.id)}
-                      className="pointer-events-none"
-                    />
-                    <span className={cn(
-                      "flex-1 text-sm transition-all",
-                      item.checked && "line-through text-muted-foreground"
-                    )}>
-                      {item.text}
-                    </span>
-                    {item.percentage !== undefined && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
-                        {item.percentage}%
-                      </Badge>
-                    )}
-                  </motion.div>
-                ))}
+                {items.map((item, index) => {
+                  const hasSubItems = item.subItems && item.subItems.length > 0;
+                  const isExpanded = expandedItems.has(item.id);
+                  
+                  return (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                    >
+                      <div
+                        onClick={() => toggleItem(item.id)}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all",
+                          "border border-border/30 hover:border-primary/30",
+                          item.checked 
+                            ? "bg-primary/10 border-primary/30" 
+                            : "bg-muted/30 hover:bg-muted/50"
+                        )}
+                      >
+                        {/* Expand toggle for items with sub-items */}
+                        {hasSubItems && (
+                          <motion.button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpand(item.id);
+                            }}
+                            animate={{ rotate: isExpanded ? 90 : 0 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                            className="p-0.5 shrink-0"
+                          >
+                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          </motion.button>
+                        )}
+                        
+                        <Checkbox
+                          checked={item.checked}
+                          onCheckedChange={() => toggleItem(item.id)}
+                          className="pointer-events-none"
+                        />
+                        <span className={cn(
+                          "flex-1 text-sm transition-all",
+                          item.checked && "line-through text-muted-foreground"
+                        )}>
+                          {item.text}
+                        </span>
+                        
+                        {/* Sub-items counter */}
+                        {hasSubItems && (
+                          <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
+                            {item.subItems?.filter(s => s.checked).length}/{item.subItems?.length}
+                          </span>
+                        )}
+                        
+                        {item.percentage !== undefined && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                            {item.percentage}%
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      {/* Sub-items */}
+                      {renderSubItems(item)}
+                    </motion.div>
+                  );
+                })}
               </div>
 
               {/* Footer */}

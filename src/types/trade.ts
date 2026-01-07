@@ -1,8 +1,25 @@
+// Nested child state for conditional checklists
+export interface ChecklistChildState {
+  id: string;
+  text: string;
+  checked: boolean;
+  children?: ChecklistChildState[];
+}
+
+// Sub-item state with potential nested children
+export interface ChecklistSubItemState {
+  id: string;
+  text: string;
+  checked: boolean;
+  children?: ChecklistChildState[];
+}
+
 export interface ChecklistItemState {
   id: string;
   text: string;
   checked: boolean;
   percentage?: number;
+  subItems?: ChecklistSubItemState[];
 }
 
 export interface Trade {

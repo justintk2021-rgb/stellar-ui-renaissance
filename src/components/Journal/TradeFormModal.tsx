@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, X, ImagePlus, Trash2, ClipboardList, Award } from "lucide-react";
+import { Plus, X, ImagePlus, Trash2, ClipboardList, Award, GitBranch, ListChecks } from "lucide-react";
 import { useChecklists } from "@/hooks/useChecklists";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -384,7 +384,14 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
                           <SelectItem value="none">None</SelectItem>
                           {checklists.map((checklist) => (
                             <SelectItem key={checklist.id} value={checklist.id}>
-                              {checklist.name}
+                              <div className="flex items-center gap-2">
+                                {checklist.type === "conditional" ? (
+                                  <GitBranch className="w-3.5 h-3.5 text-amber-500" />
+                                ) : (
+                                  <ListChecks className="w-3.5 h-3.5 text-primary" />
+                                )}
+                                <span>{checklist.name}</span>
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
