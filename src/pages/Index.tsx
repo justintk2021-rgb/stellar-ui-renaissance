@@ -12,6 +12,7 @@ import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
 import { StatsGrid } from "@/components/Dashboard/StatsGrid";
 import { BalanceCards } from "@/components/Dashboard/BalanceCards";
+import { RankCard } from "@/components/Dashboard/RankCard";
 import { PnLCalendar } from "@/components/Dashboard/PnLCalendar";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { TradeTable } from "@/components/Journal/TradeTable";
@@ -431,7 +432,16 @@ const Index = () => {
                   onSetBalance={handleSetBalance}
                   onSetGoalBalance={handleSetGoalBalance}
                 />
-                <StatsGrid trades={trades} />
+                
+                {/* Stats and Rank Row */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2">
+                    <StatsGrid trades={trades} />
+                  </div>
+                  <div>
+                    <RankCard trades={trades} />
+                  </div>
+                </div>
                 <PnLCalendar 
                   trades={trades} 
                   onUpdateTrade={async (id, updates) => {
