@@ -851,10 +851,10 @@ export function NotebookView({
   };
 
   // Get font family from NOTEBOOK_FONTS array
-  const getSelectedFontFamily = () => {
+  const selectedFontFamily = useMemo(() => {
     const font = NOTEBOOK_FONTS.find(f => f.id === fontStyle);
     return font?.family || "'Inter', sans-serif";
-  };
+  }, [fontStyle]);
 
   const isViewingTrash = selectedCategory === "trash";
   const isSelectedEntryInTrash = selectedEntry?.isDeleted;
@@ -1104,7 +1104,7 @@ export function NotebookView({
               <div
                 ref={fullscreenEditorRef}
                 contentEditable={!isLocked}
-                style={{ fontFamily: getSelectedFontFamily() }}
+                style={{ fontFamily: selectedFontFamily }}
                 className={cn(
                   "min-h-[calc(100vh-400px)] outline-none focus:outline-none caret-primary",
                   isSmallText ? "text-sm leading-relaxed" : "text-base leading-loose",
@@ -1997,7 +1997,7 @@ export function NotebookView({
                 <div
                   ref={editorRef}
                   contentEditable={!isLocked && !isSelectedEntryInTrash}
-                  style={{ fontFamily: getSelectedFontFamily() }}
+                  style={{ fontFamily: selectedFontFamily }}
                   className={cn(
                     "min-h-full p-4 pl-12 pr-12 outline-none focus:outline-none focus-visible:outline-none transition-all caret-primary",
                     isSmallText ? "text-xs" : "text-sm",
