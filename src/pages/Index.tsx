@@ -20,7 +20,6 @@ import { MiniCalendar } from "@/components/Journal/MiniCalendar";
 import { NotebookView } from "@/components/Notebook/NotebookView";
 import { SettingsView } from "@/components/Settings/SettingsView";
 import { CustomChart } from "@/components/Chart/CustomChart";
-import { TradingAssistant } from "@/components/AI/TradingAssistant";
 import { PlaybookView } from "@/components/Playbook/PlaybookView";
 import { EconomicCalendarView } from "@/components/EconomicCalendar/EconomicCalendarView";
 import { AccountSelector } from "@/components/Dashboard/AccountSelector";
@@ -589,8 +588,6 @@ const Index = () => {
           <MobileNav currentPage={currentPage} onPageChange={setCurrentPage} />
         )}
 
-        {/* AI Trading Assistant */}
-        <TradingAssistant trades={trades} onAddTrade={handleAddTrade} />
       </div>
     </>
   );
