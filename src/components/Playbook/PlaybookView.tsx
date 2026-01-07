@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3, GripVertical } from "lucide-react";
+import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3, GripVertical, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -18,16 +18,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useChecklists } from "@/hooks/useChecklists";
+import { useChecklists, ChecklistItem, ChecklistSubItem } from "@/hooks/useChecklists";
 import { supabase } from "@/integrations/supabase/client";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
-
-interface ChecklistItem {
-  id: string;
-  text: string;
-  checked: boolean;
-  percentage?: number;
-}
 
 interface ChecklistMetrics {
   checklistId: string;
@@ -52,6 +45,12 @@ export function PlaybookView() {
   const [addingItemToChecklist, setAddingItemToChecklist] = useState<string | null>(null);
   const [checklistMetrics, setChecklistMetrics] = useState<ChecklistMetrics[]>([]);
   const [metricsLoading, setMetricsLoading] = useState(false);
+  // New state for sub-items
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [addingSubItemTo, setAddingSubItemTo] = useState<string | null>(null);
+  const [newSubItemText, setNewSubItemText] = useState("");
+  const [editingSubItemId, setEditingSubItemId] = useState<string | null>(null);
+  const [editingSubItemText, setEditingSubItemText] = useState("");
 
   const selectedChecklist = checklists.find(c => c.id === selectedChecklistId) || null;
   const selectedMetrics = checklistMetrics.find(m => m.checklistId === selectedChecklistId);
@@ -164,9 +163,17 @@ export function PlaybookView() {
     const checklist = checklists.find(c => c.id === checklistId);
     if (!checklist) return;
 
-    const updatedItems = checklist.items.map(item =>
-      item.id === itemId ? { ...item, checked: !item.checked } : item
-    );
+    const updatedItems = checklist.items.map(item => {
+      if (item.id === itemId) {
+        const newChecked = !item.checked;
+        // Auto-expand sub-items when parent is checked
+        if (newChecked && item.subItems && item.subItems.length > 0) {
+          setExpandedItems(prev => new Set(prev).add(itemId));
+        }
+        return { ...item, checked: newChecked };
+      }
+      return item;
+    });
     await updateChecklist(checklistId, { items: updatedItems });
   };
 
@@ -176,6 +183,109 @@ export function PlaybookView() {
 
     const updatedItems = checklist.items.filter(item => item.id !== itemId);
     await updateChecklist(checklistId, { items: updatedItems });
+    // Clean up expanded state
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      next.delete(itemId);
+      return next;
+    });
+  };
+
+  // Sub-item functions
+  const addSubItem = async (checklistId: string, parentItemId: string) => {
+    if (!newSubItemText.trim()) return;
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const newSubItem: ChecklistSubItem = {
+      id: Date.now().toString(),
+      text: newSubItemText.trim(),
+      checked: false,
+    };
+
+    const updatedItems = checklist.items.map(item => {
+      if (item.id === parentItemId) {
+        return {
+          ...item,
+          subItems: [...(item.subItems || []), newSubItem],
+        };
+      }
+      return item;
+    });
+
+    await updateChecklist(checklistId, { items: updatedItems });
+    setNewSubItemText("");
+    setAddingSubItemTo(null);
+  };
+
+  const toggleSubItem = async (checklistId: string, parentItemId: string, subItemId: string) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const updatedItems = checklist.items.map(item => {
+      if (item.id === parentItemId && item.subItems) {
+        return {
+          ...item,
+          subItems: item.subItems.map(sub =>
+            sub.id === subItemId ? { ...sub, checked: !sub.checked } : sub
+          ),
+        };
+      }
+      return item;
+    });
+
+    await updateChecklist(checklistId, { items: updatedItems });
+  };
+
+  const deleteSubItem = async (checklistId: string, parentItemId: string, subItemId: string) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const updatedItems = checklist.items.map(item => {
+      if (item.id === parentItemId && item.subItems) {
+        return {
+          ...item,
+          subItems: item.subItems.filter(sub => sub.id !== subItemId),
+        };
+      }
+      return item;
+    });
+
+    await updateChecklist(checklistId, { items: updatedItems });
+  };
+
+  const updateSubItemText = async (checklistId: string, parentItemId: string, subItemId: string, newText: string) => {
+    if (!newText.trim()) return;
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const updatedItems = checklist.items.map(item => {
+      if (item.id === parentItemId && item.subItems) {
+        return {
+          ...item,
+          subItems: item.subItems.map(sub =>
+            sub.id === subItemId ? { ...sub, text: newText.trim() } : sub
+          ),
+        };
+      }
+      return item;
+    });
+
+    await updateChecklist(checklistId, { items: updatedItems });
+    setEditingSubItemId(null);
+    setEditingSubItemText("");
+  };
+
+  const toggleExpandItem = (itemId: string) => {
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
   };
 
   const getCompletionPercentage = (items: ChecklistItem[]) => {
@@ -186,17 +296,54 @@ export function PlaybookView() {
     
     if (hasCustomPercentages) {
       // Use custom percentages - sum up the percentages of checked items
+      // For items with sub-items, calculate based on sub-item completion
       const totalPercentage = items.reduce((sum, item) => {
-        if (item.checked) {
-          return sum + (item.percentage ?? Math.round(100 / items.length));
+        const itemPercentage = item.percentage ?? Math.round(100 / items.length);
+        
+        if (item.subItems && item.subItems.length > 0) {
+          // Item has sub-items: calculate partial completion
+          const subChecked = item.subItems.filter(sub => sub.checked).length;
+          const subTotal = item.subItems.length;
+          const subCompletion = subTotal > 0 ? subChecked / subTotal : 0;
+          // Parent must be checked AND sub-items contribute to percentage
+          if (item.checked) {
+            return sum + (itemPercentage * subCompletion);
+          }
+          return sum;
+        } else {
+          // Simple item without sub-items
+          if (item.checked) {
+            return sum + itemPercentage;
+          }
+          return sum;
         }
-        return sum;
       }, 0);
       return Math.min(100, Math.round(totalPercentage));
     } else {
-      // Default equal distribution
-      const checked = items.filter(item => item.checked).length;
-      return Math.round((checked / items.length) * 100);
+      // Default equal distribution with sub-item consideration
+      let totalWeight = 0;
+      let completedWeight = 0;
+      
+      items.forEach(item => {
+        if (item.subItems && item.subItems.length > 0) {
+          // For items with sub-items, both parent and sub-items contribute
+          const parentWeight = 1;
+          const subWeight = item.subItems.length;
+          totalWeight += parentWeight + subWeight;
+          
+          if (item.checked) {
+            completedWeight += parentWeight;
+            completedWeight += item.subItems.filter(sub => sub.checked).length;
+          }
+        } else {
+          totalWeight += 1;
+          if (item.checked) {
+            completedWeight += 1;
+          }
+        }
+      });
+      
+      return totalWeight > 0 ? Math.round((completedWeight / totalWeight) * 100) : 0;
     }
   };
 
@@ -221,8 +368,13 @@ export function PlaybookView() {
     const checklist = checklists.find(c => c.id === checklistId);
     if (!checklist) return;
 
-    const resetItems = checklist.items.map(item => ({ ...item, checked: false }));
+    const resetItems = checklist.items.map(item => ({
+      ...item,
+      checked: false,
+      subItems: item.subItems?.map(sub => ({ ...sub, checked: false })),
+    }));
     await updateChecklist(checklistId, { items: resetItems });
+    setExpandedItems(new Set());
   };
 
   if (!isAuthenticated) {
@@ -515,101 +667,303 @@ export function PlaybookView() {
                 className="space-y-2"
               >
                 <AnimatePresence mode="popLayout">
-                  {selectedChecklist.items.map((item: ChecklistItem) => (
-                    <Reorder.Item
-                      key={item.id}
-                      value={item}
-                      initial={{ opacity: 0, x: -20, scale: 0.95 }}
-                      animate={{ opacity: 1, x: 0, scale: 1 }}
-                      exit={{ opacity: 0, x: 20, scale: 0.95 }}
-                      whileDrag={{ 
-                        scale: 1.02, 
-                        boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
-                        zIndex: 50
-                      }}
-                      transition={{ 
-                        type: "spring",
-                        stiffness: 500,
-                        damping: 30,
-                        opacity: { duration: 0.2 }
-                      }}
-                      className={cn(
-                        "flex items-center gap-3 p-3 rounded-lg transition-colors duration-200 cursor-grab active:cursor-grabbing",
-                        item.checked 
-                          ? "bg-primary/10" 
-                          : "bg-muted/30 hover:bg-muted/50"
-                      )}
-                    >
-                      <GripVertical className="w-4 h-4 text-muted-foreground/50 shrink-0" />
-                      <button
-                        onClick={() => toggleItem(selectedChecklist.id, item.id)}
-                        className={cn(
-                          "w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0",
-                          item.checked
-                            ? "bg-primary border-primary text-primary-foreground"
-                            : "border-muted-foreground/50 hover:border-primary"
-                        )}
+                  {selectedChecklist.items.map((item: ChecklistItem) => {
+                    const hasSubItems = item.subItems && item.subItems.length > 0;
+                    const isExpanded = expandedItems.has(item.id);
+                    const subItemsCompleted = item.subItems?.filter(s => s.checked).length || 0;
+                    const subItemsTotal = item.subItems?.length || 0;
+                    
+                    return (
+                      <Reorder.Item
+                        key={item.id}
+                        value={item}
+                        initial={{ opacity: 0, x: -20, scale: 0.95 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, x: 20, scale: 0.95 }}
+                        whileDrag={{ 
+                          scale: 1.02, 
+                          boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+                          zIndex: 50
+                        }}
+                        transition={{ 
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 30,
+                          opacity: { duration: 0.2 }
+                        }}
+                        className="space-y-1"
                       >
-                        {item.checked && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                          >
-                            <Check className="w-3 h-3" />
-                          </motion.div>
-                        )}
-                      </button>
-                      <span className={cn(
-                        "flex-1 text-sm transition-all",
-                        item.checked && "line-through text-muted-foreground"
-                      )}>
-                        {item.text}
-                      </span>
-                      
-                      {/* Percentage Editor */}
-                      {editingItemId === item.id ? (
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={editingPercentage}
-                            onChange={(e) => setEditingPercentage(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0);
-                              } else if (e.key === 'Escape') {
-                                setEditingItemId(null);
-                              }
-                            }}
-                            onBlur={() => updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0)}
-                            className="w-16 h-7 text-xs text-center p-1"
-                            autoFocus
-                          />
-                          <span className="text-xs text-muted-foreground">%</span>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => startEditingPercentage(item.id, item.percentage, selectedChecklist.items.length)}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                          title="Edit percentage weight"
+                        {/* Main Item */}
+                        <div
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-lg transition-colors duration-200 cursor-grab active:cursor-grabbing",
+                            item.checked 
+                              ? "bg-primary/10" 
+                              : "bg-muted/30 hover:bg-muted/50"
+                          )}
                         >
-                          <Percent className="w-3 h-3" />
-                          <span>{item.percentage ?? Math.round(100 / selectedChecklist.items.length)}%</span>
-                        </button>
-                      )}
-                      
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => deleteItem(selectedChecklist.id, item.id)}
-                        className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </motion.button>
-                    </Reorder.Item>
-                  ))}
+                          <GripVertical className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+                          
+                          {/* Expand/Collapse Toggle for items with sub-items */}
+                          {hasSubItems ? (
+                            <motion.button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpandItem(item.id);
+                              }}
+                              className="p-0.5 rounded hover:bg-muted/50 transition-colors shrink-0"
+                              animate={{ rotate: isExpanded ? 90 : 0 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                            >
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </motion.button>
+                          ) : (
+                            <div className="w-5" />
+                          )}
+                          
+                          <button
+                            onClick={() => toggleItem(selectedChecklist.id, item.id)}
+                            className={cn(
+                              "w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0",
+                              item.checked
+                                ? "bg-primary border-primary text-primary-foreground"
+                                : "border-muted-foreground/50 hover:border-primary"
+                            )}
+                          >
+                            {item.checked && (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                              >
+                                <Check className="w-3 h-3" />
+                              </motion.div>
+                            )}
+                          </button>
+                          <span className={cn(
+                            "flex-1 text-sm transition-all",
+                            item.checked && "line-through text-muted-foreground"
+                          )}>
+                            {item.text}
+                          </span>
+                          
+                          {/* Sub-items counter badge */}
+                          {hasSubItems && (
+                            <motion.div 
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className={cn(
+                                "px-2 py-0.5 rounded-full text-[10px] font-medium",
+                                subItemsCompleted === subItemsTotal && subItemsTotal > 0
+                                  ? "bg-primary/20 text-primary"
+                                  : "bg-muted text-muted-foreground"
+                              )}
+                            >
+                              {subItemsCompleted}/{subItemsTotal}
+                            </motion.div>
+                          )}
+                          
+                          {/* Percentage Editor */}
+                          {editingItemId === item.id ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={editingPercentage}
+                                onChange={(e) => setEditingPercentage(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingItemId(null);
+                                  }
+                                }}
+                                onBlur={() => updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0)}
+                                className="w-16 h-7 text-xs text-center p-1"
+                                autoFocus
+                              />
+                              <span className="text-xs text-muted-foreground">%</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => startEditingPercentage(item.id, item.percentage, selectedChecklist.items.length)}
+                              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                              title="Edit percentage weight"
+                            >
+                              <Percent className="w-3 h-3" />
+                              <span>{item.percentage ?? Math.round(100 / selectedChecklist.items.length)}%</span>
+                            </button>
+                          )}
+                          
+                          {/* Add Sub-item Button */}
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => {
+                              setAddingSubItemTo(item.id);
+                              setExpandedItems(prev => new Set(prev).add(item.id));
+                            }}
+                            className="p-1 rounded hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                            title="Add sub-item"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </motion.button>
+                          
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => deleteItem(selectedChecklist.id, item.id)}
+                            className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </motion.button>
+                        </div>
+                        
+                        {/* Sub-items Section */}
+                        <AnimatePresence>
+                          {(isExpanded || item.checked) && (hasSubItems || addingSubItemTo === item.id) && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                              className="ml-14 pl-4 border-l-2 border-primary/30 space-y-1.5 overflow-hidden"
+                            >
+                              {/* Existing Sub-items */}
+                              {item.subItems?.map((subItem, subIndex) => (
+                                <motion.div
+                                  key={subItem.id}
+                                  initial={{ opacity: 0, x: -10 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  exit={{ opacity: 0, x: -10 }}
+                                  transition={{ delay: subIndex * 0.05 }}
+                                  className={cn(
+                                    "flex items-center gap-2 p-2 rounded-md transition-colors",
+                                    subItem.checked 
+                                      ? "bg-primary/5" 
+                                      : "bg-muted/20 hover:bg-muted/40"
+                                  )}
+                                >
+                                  <button
+                                    onClick={() => toggleSubItem(selectedChecklist.id, item.id, subItem.id)}
+                                    className={cn(
+                                      "w-4 h-4 rounded border-2 flex items-center justify-center transition-all shrink-0",
+                                      subItem.checked
+                                        ? "bg-primary border-primary text-primary-foreground"
+                                        : "border-muted-foreground/40 hover:border-primary"
+                                    )}
+                                  >
+                                    {subItem.checked && (
+                                      <motion.div
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                      >
+                                        <Check className="w-2.5 h-2.5" />
+                                      </motion.div>
+                                    )}
+                                  </button>
+                                  
+                                  {editingSubItemId === subItem.id ? (
+                                    <div className="flex-1 flex gap-1">
+                                      <Input
+                                        value={editingSubItemText}
+                                        onChange={(e) => setEditingSubItemText(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            updateSubItemText(selectedChecklist.id, item.id, subItem.id, editingSubItemText);
+                                          } else if (e.key === 'Escape') {
+                                            setEditingSubItemId(null);
+                                            setEditingSubItemText("");
+                                          }
+                                        }}
+                                        onBlur={() => {
+                                          if (editingSubItemText.trim()) {
+                                            updateSubItemText(selectedChecklist.id, item.id, subItem.id, editingSubItemText);
+                                          } else {
+                                            setEditingSubItemId(null);
+                                          }
+                                        }}
+                                        className="h-6 text-xs bg-background/50"
+                                        autoFocus
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span 
+                                      className={cn(
+                                        "flex-1 text-xs transition-all cursor-pointer hover:text-primary",
+                                        subItem.checked && "line-through text-muted-foreground"
+                                      )}
+                                      onClick={() => {
+                                        setEditingSubItemId(subItem.id);
+                                        setEditingSubItemText(subItem.text);
+                                      }}
+                                    >
+                                      {subItem.text}
+                                    </span>
+                                  )}
+                                  
+                                  <motion.button
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={() => deleteSubItem(selectedChecklist.id, item.id, subItem.id)}
+                                    className="p-0.5 rounded hover:bg-destructive/20 text-muted-foreground/50 hover:text-destructive transition-colors"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </motion.button>
+                                </motion.div>
+                              ))}
+                              
+                              {/* Add New Sub-item Input */}
+                              {addingSubItemTo === item.id && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="flex gap-1.5"
+                                >
+                                  <Input
+                                    placeholder="Add condition..."
+                                    value={newSubItemText}
+                                    onChange={(e) => setNewSubItemText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        addSubItem(selectedChecklist.id, item.id);
+                                      } else if (e.key === 'Escape') {
+                                        setAddingSubItemTo(null);
+                                        setNewSubItemText("");
+                                      }
+                                    }}
+                                    className="h-7 text-xs bg-background/50 border-primary/30"
+                                    autoFocus
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => addSubItem(selectedChecklist.id, item.id)}
+                                    className="h-7 px-2"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setAddingSubItemTo(null);
+                                      setNewSubItemText("");
+                                    }}
+                                    className="h-7 px-2"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                </motion.div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </Reorder.Item>
+                    );
+                  })}
                 </AnimatePresence>
               </Reorder.Group>
             )}
