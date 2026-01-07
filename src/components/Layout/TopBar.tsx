@@ -27,7 +27,7 @@ export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], sho
         <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
       </div>
       <div className="flex items-center gap-3">
-        {showRank && trades.length > 0 && (
+        {showRank && (
           <RankBadge trades={trades} />
         )}
         {onThemeChange && (
