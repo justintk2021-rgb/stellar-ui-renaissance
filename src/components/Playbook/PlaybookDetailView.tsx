@@ -185,6 +185,16 @@ export function PlaybookDetailView({
     }
   };
 
+  const handleBack = () => {
+    if (activeTab === "overview") {
+      onBack();
+    } else {
+      setActiveTab("overview");
+    }
+  };
+
+  const currentTabLabel = tabs.find(t => t.id === activeTab)?.label || "Overview";
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header with Breadcrumb */}
@@ -197,16 +207,16 @@ export function PlaybookDetailView({
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={onBack} 
+            onClick={handleBack} 
             className="hover:bg-muted/50 -ml-2"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Playbook
+            {activeTab === "overview" ? "Playbook" : "Overview"}
           </Button>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
           <span className="font-medium truncate max-w-[200px]">{checklist.name}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          <span className="text-primary font-semibold">Overview</span>
+          <span className="text-primary font-semibold">{currentTabLabel}</span>
         </div>
 
         <Button variant="outline" size="sm" className="gap-2 hover:bg-muted/50">
