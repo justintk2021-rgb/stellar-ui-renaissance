@@ -213,15 +213,6 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
             <span className="text-xs text-muted-foreground mt-1">win rate</span>
           </div>
           
-          {/* Glow effect */}
-          <motion.div
-            className="absolute inset-0 rounded-full"
-            style={{
-              background: `radial-gradient(circle, ${animatedValue > 75 ? 'hsl(142 76% 46% / 0.15)' : 'hsl(var(--primary) / 0.15)'} 0%, transparent 70%)`,
-            }}
-            animate={{ opacity: [0.5, 0.8, 0.5] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          />
         </motion.div>
 
         {/* Stats */}
