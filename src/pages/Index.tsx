@@ -519,7 +519,7 @@ const Index = () => {
 
             {/* Notebook Page */}
             {currentPage === 'notebook' && (
-              <div className="animate-fade-in max-w-7xl mx-auto">
+              <div className="animate-fade-in -m-5 lg:-m-6">
                 <NotebookView
                   trades={trades}
                   selectedTradeId={selectedTradeId}

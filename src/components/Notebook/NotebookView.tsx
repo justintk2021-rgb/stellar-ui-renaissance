@@ -1014,7 +1014,7 @@ export function NotebookView({
     )}
     
     <div className={cn(
-      "h-[calc(100vh-120px)] flex gap-0 transition-all duration-300 relative -mx-6 -mt-2",
+      "h-[calc(100vh-80px)] flex gap-0 transition-all duration-300 relative",
       isFullWidth && "invisible"
     )}>
       {/* Bookmark Tab Toggle - Notes */}
@@ -1716,12 +1716,12 @@ export function NotebookView({
             transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
           >
             {/* All Notes Header */}
-            <div className="px-8 py-5 border-b border-border/20">
+            <div className="px-6 lg:px-10 py-4 border-b border-border/20">
               <motion.div 
                 initial={{ opacity: 0, y: -15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="flex items-center justify-between mb-6"
+                className="flex items-center justify-between"
               >
                 {/* Category Filter Tabs with sliding indicator */}
                 <motion.div 
@@ -1827,7 +1827,7 @@ export function NotebookView({
             </div>
 
             {/* Notes Grid/List */}
-            <ScrollArea className="flex-1 px-8 py-6">
+            <ScrollArea className="flex-1 px-6 lg:px-10 py-6">
               {notebookEntries.filter(e => {
                 if (e.isDeleted) return false;
                 if (selectedCategory !== "all" && e.category !== selectedCategory) return false;
