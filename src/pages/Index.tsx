@@ -12,6 +12,7 @@ import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
 import { StatsGrid } from "@/components/Dashboard/StatsGrid";
 import { BalanceCards } from "@/components/Dashboard/BalanceCards";
+import { AnimatedBackground } from "@/components/Layout/AnimatedBackground";
 
 import { PnLCalendar } from "@/components/Dashboard/PnLCalendar";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
@@ -359,6 +360,9 @@ const Index = () => {
         <title>NSYNC Journal - Trading Journal & Notebook</title>
         <meta name="description" content="Track your trades, analyze performance, and keep detailed notes with NSYNC Journal - your personal trading journal." />
       </Helmet>
+
+      {/* Animated Stars Background */}
+      <AnimatedBackground />
 
       {/* Global Sidebar - works for all pages */}
       <Sidebar 
