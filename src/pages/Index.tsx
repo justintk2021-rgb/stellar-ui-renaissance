@@ -153,7 +153,7 @@ const Index = () => {
           }, 0);
         } else {
           setUserProfile(null);
-          navigate('/auth');
+          navigate('/');
         }
       }
     );
@@ -166,7 +166,7 @@ const Index = () => {
       if (session?.user) {
         fetchProfile(session.user.id);
       } else {
-        navigate('/auth');
+        navigate('/');
       }
     });
 
