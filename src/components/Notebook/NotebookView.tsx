@@ -1723,28 +1723,42 @@ export function NotebookView({
                 transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
                 className="flex items-center justify-between mb-6"
               >
-                {/* Category Filter Tabs */}
+                {/* Category Filter Tabs with sliding indicator */}
                 <motion.div 
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: 0.1 }}
-                  className="flex items-center gap-1 p-1 rounded-lg bg-muted/40"
+                  className="relative flex items-center gap-1 p-1 rounded-lg bg-muted/40"
                 >
+                  {/* Sliding background pill */}
+                  <motion.div
+                    className="absolute top-1 bottom-1 rounded-md bg-primary shadow-sm"
+                    initial={false}
+                    animate={{
+                      x: selectedCategory === 'all' ? 0 : 'calc(100% + 4px)',
+                      width: selectedCategory === 'all' ? 'calc(50% - 2px)' : 'calc(50% - 2px)',
+                    }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 30,
+                    }}
+                    style={{ left: 4 }}
+                  />
                   {[
                     { id: 'all', label: 'All' },
                     { id: 'trading-plan', label: 'Plans' },
-                  ].map((tab, i) => (
+                  ].map((tab) => (
                     <motion.button
                       key={tab.id}
-                      initial={{ opacity: 0, y: -5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: 0.1 + i * 0.05 }}
                       onClick={() => setSelectedCategory(tab.id)}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                       className={cn(
-                        "px-4 py-2 text-sm font-medium rounded-md transition-all duration-200",
+                        "relative z-10 px-6 py-2 text-sm font-medium rounded-md transition-colors duration-200",
                         selectedCategory === tab.id
-                          ? "bg-primary text-primary-foreground shadow-sm" 
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                          ? "text-primary-foreground" 
+                          : "text-muted-foreground hover:text-foreground"
                       )}
                     >
                       {tab.label}
@@ -1841,25 +1855,22 @@ export function NotebookView({
                   <p className="text-sm mt-1">{searchQuery ? 'Try a different search term' : 'Create your first note to get started'}</p>
                 </motion.div>
               ) : (
-                <motion.div 
-                  initial="hidden"
-                  animate="visible"
-                  variants={{
-                    hidden: { opacity: 0 },
-                    visible: {
-                      opacity: 1,
-                      transition: {
-                        staggerChildren: 0.03,
-                        delayChildren: 0.05
-                      }
-                    }
-                  }}
-                  className={cn(
-                    viewMode === 'grid' 
-                      ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5" 
-                      : "flex flex-col gap-3"
-                  )}
-                >
+                <AnimatePresence mode="wait">
+                  <motion.div 
+                    key={selectedCategory}
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    transition={{ 
+                      duration: 0.25,
+                      ease: [0.25, 0.46, 0.45, 0.94]
+                    }}
+                    className={cn(
+                      viewMode === 'grid' 
+                        ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5" 
+                        : "flex flex-col gap-3"
+                    )}
+                  >
                   {notebookEntries
                     .filter(e => {
                       if (e.isDeleted) return false;
@@ -2023,7 +2034,8 @@ export function NotebookView({
                         </motion.button>
                       );
                     })}
-                </motion.div>
+                  </motion.div>
+                </AnimatePresence>
               )}
             </ScrollArea>
           </motion.div>
