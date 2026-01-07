@@ -77,6 +77,65 @@ export function useTradingAccounts(userId: string | undefined) {
     }
   }, [userId, selectedAccountId]);
 
+  // Set up realtime subscription
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel('accounts-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'trading_accounts',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('Accounts realtime update:', payload.eventType);
+          
+          if (payload.eventType === 'INSERT') {
+            const newAccount: TradingAccount = {
+              id: payload.new.id,
+              user_id: payload.new.user_id,
+              name: payload.new.name,
+              broker: payload.new.broker,
+              starting_balance: Number(payload.new.starting_balance),
+              goal_balance: payload.new.goal_balance ? Number(payload.new.goal_balance) : null,
+              currency: payload.new.currency,
+              is_default: payload.new.is_default,
+              created_at: payload.new.created_at,
+              updated_at: payload.new.updated_at,
+            };
+            setAccounts(prev => {
+              if (prev.some(a => a.id === newAccount.id)) return prev;
+              return [...prev, newAccount];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setAccounts(prev => prev.map(a => 
+              a.id === payload.new.id ? {
+                ...a,
+                name: payload.new.name,
+                broker: payload.new.broker,
+                starting_balance: Number(payload.new.starting_balance),
+                goal_balance: payload.new.goal_balance ? Number(payload.new.goal_balance) : null,
+                currency: payload.new.currency,
+                is_default: payload.new.is_default,
+                updated_at: payload.new.updated_at,
+              } : a
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            setAccounts(prev => prev.filter(a => a.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
   useEffect(() => {
     fetchAccounts();
   }, [fetchAccounts]);
