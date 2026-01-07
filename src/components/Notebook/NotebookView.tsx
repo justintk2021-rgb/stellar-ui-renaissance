@@ -135,7 +135,7 @@ export function NotebookView({
   onDeleteEntry,
 }: NotebookViewProps) {
   const { checklists } = useChecklists();
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -1741,10 +1741,10 @@ export function NotebookView({
                       initial={{ opacity: 0, y: -5 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: 0.1 + i * 0.05 }}
-                      onClick={() => setSelectedCategory(tab.id === 'all' ? null : tab.id)}
+                      onClick={() => setSelectedCategory(tab.id)}
                       className={cn(
                         "px-4 py-2 text-sm font-medium rounded-md transition-all duration-200",
-                        (tab.id === 'all' && !selectedCategory) || selectedCategory === tab.id
+                        selectedCategory === tab.id
                           ? "bg-primary text-primary-foreground shadow-sm" 
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                       )}
@@ -1818,7 +1818,7 @@ export function NotebookView({
             <ScrollArea className="flex-1 px-6 pb-6">
               {notebookEntries.filter(e => {
                 if (e.isDeleted) return false;
-                if (selectedCategory && e.category !== selectedCategory) return false;
+                if (selectedCategory !== "all" && e.category !== selectedCategory) return false;
                 if (searchQuery) {
                   const query = searchQuery.toLowerCase();
                   return e.title.toLowerCase().includes(query) || 
@@ -1865,7 +1865,7 @@ export function NotebookView({
                   {notebookEntries
                     .filter(e => {
                       if (e.isDeleted) return false;
-                      if (selectedCategory && e.category !== selectedCategory) return false;
+                      if (selectedCategory !== "all" && e.category !== selectedCategory) return false;
                       if (searchQuery) {
                         const query = searchQuery.toLowerCase();
                         return e.title.toLowerCase().includes(query) || 
