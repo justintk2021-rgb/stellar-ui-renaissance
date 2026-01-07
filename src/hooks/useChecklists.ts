@@ -15,6 +15,7 @@ interface ChecklistSubItem {
   id: string;
   text: string;
   checked: boolean;
+  percentage?: number; // Custom percentage weight for sub-items
   children?: ConditionalSubItem[]; // Support deep nesting for conditional checklists
 }
 

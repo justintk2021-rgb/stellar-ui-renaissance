@@ -58,6 +58,9 @@ export function PlaybookView() {
   const [addingChildTo, setAddingChildTo] = useState<string | null>(null); // "parentId:subItemId:childId..." path
   const [newChildText, setNewChildText] = useState("");
   const [editingChildId, setEditingChildId] = useState<string | null>(null);
+  // State for sub-item percentage editing
+  const [editingSubItemPercentageId, setEditingSubItemPercentageId] = useState<string | null>(null);
+  const [editingSubItemPercentage, setEditingSubItemPercentage] = useState<string>("");
   const [editingChildText, setEditingChildText] = useState("");
 
   const selectedChecklist = checklists.find(c => c.id === selectedChecklistId) || null;
@@ -667,6 +670,32 @@ export function PlaybookView() {
   const startEditingPercentage = (itemId: string, currentPercentage: number | undefined, totalItems: number) => {
     setEditingItemId(itemId);
     setEditingPercentage(String(currentPercentage ?? Math.round(100 / totalItems)));
+  };
+
+  // Sub-item percentage functions
+  const updateSubItemPercentage = async (checklistId: string, parentItemId: string, subItemId: string, percentage: number) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const clampedPercentage = Math.max(0, Math.min(100, percentage));
+    const updatedItems = checklist.items.map(item => {
+      if (item.id === parentItemId && item.subItems) {
+        return {
+          ...item,
+          subItems: item.subItems.map(sub =>
+            sub.id === subItemId ? { ...sub, percentage: clampedPercentage } : sub
+          ),
+        };
+      }
+      return item;
+    });
+    await updateChecklist(checklistId, { items: updatedItems });
+    setEditingSubItemPercentageId(null);
+  };
+
+  const startEditingSubItemPercentage = (subItemId: string, currentPercentage: number | undefined, totalSubItems: number) => {
+    setEditingSubItemPercentageId(subItemId);
+    setEditingSubItemPercentage(String(currentPercentage ?? Math.round(100 / totalSubItems)));
   };
 
   const resetSubItemChildren = (subItems?: ChecklistSubItem[]): ChecklistSubItem[] | undefined => {
@@ -1332,6 +1361,39 @@ export function PlaybookView() {
                                     </span>
                                   )}
                                   
+                                  {/* Sub-item Percentage Editor */}
+                                  {editingSubItemPercentageId === subItem.id ? (
+                                    <div className="flex items-center gap-1">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        value={editingSubItemPercentage}
+                                        onChange={(e) => setEditingSubItemPercentage(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            updateSubItemPercentage(selectedChecklist.id, item.id, subItem.id, parseInt(editingSubItemPercentage) || 0);
+                                          } else if (e.key === 'Escape') {
+                                            setEditingSubItemPercentageId(null);
+                                          }
+                                        }}
+                                        onBlur={() => updateSubItemPercentage(selectedChecklist.id, item.id, subItem.id, parseInt(editingSubItemPercentage) || 0)}
+                                        className="w-14 h-7 text-xs text-center p-1"
+                                        autoFocus
+                                      />
+                                      <span className="text-xs text-muted-foreground">%</span>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => startEditingSubItemPercentage(subItem.id, subItem.percentage, item.subItems?.length || 1)}
+                                      className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                                      title="Edit percentage weight"
+                                    >
+                                      <Percent className="w-3 h-3" />
+                                      <span>{subItem.percentage ?? Math.round(100 / (item.subItems?.length || 1))}%</span>
+                                    </button>
+                                  )}
+                                  
                                   <motion.button
                                     whileHover={{ scale: 1.1 }}
                                     whileTap={{ scale: 0.9 }}
@@ -1638,6 +1700,39 @@ export function PlaybookView() {
                                     >
                                       {subItem.text}
                                     </span>
+                                  )}
+                                  
+                                  {/* Sub-item Percentage Editor */}
+                                  {editingSubItemPercentageId === subItem.id ? (
+                                    <div className="flex items-center gap-1">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        value={editingSubItemPercentage}
+                                        onChange={(e) => setEditingSubItemPercentage(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            updateSubItemPercentage(selectedChecklist.id, item.id, subItem.id, parseInt(editingSubItemPercentage) || 0);
+                                          } else if (e.key === 'Escape') {
+                                            setEditingSubItemPercentageId(null);
+                                          }
+                                        }}
+                                        onBlur={() => updateSubItemPercentage(selectedChecklist.id, item.id, subItem.id, parseInt(editingSubItemPercentage) || 0)}
+                                        className="w-14 h-6 text-[10px] text-center p-1"
+                                        autoFocus
+                                      />
+                                      <span className="text-[10px] text-muted-foreground">%</span>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => startEditingSubItemPercentage(subItem.id, subItem.percentage, item.subItems?.length || 1)}
+                                      className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                                      title="Edit percentage weight"
+                                    >
+                                      <Percent className="w-2.5 h-2.5" />
+                                      <span>{subItem.percentage ?? Math.round(100 / (item.subItems?.length || 1))}%</span>
+                                    </button>
                                   )}
                                   
                                   <motion.button
