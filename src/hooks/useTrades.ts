@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Trade } from '@/types/trade';
 import { toast } from 'sonner';
@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 export function useTrades(userId: string | undefined, accountId: string | null = null) {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Fetch trades from database
   const fetchTrades = useCallback(async () => {
@@ -59,8 +60,15 @@ export function useTrades(userId: string | undefined, accountId: string | null =
   useEffect(() => {
     if (!userId) return;
 
+    // Clean up existing channel first
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    const channelName = `trades-realtime-${userId}-${accountId || 'all'}-${Date.now()}`;
     const channel = supabase
-      .channel('trades-realtime')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -117,8 +125,13 @@ export function useTrades(userId: string | undefined, accountId: string | null =
       )
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [userId, accountId]);
 

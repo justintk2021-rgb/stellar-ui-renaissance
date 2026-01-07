@@ -44,6 +44,7 @@ export function useUserSettings(userId: string | undefined) {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Fetch settings from database
   const fetchSettings = useCallback(async () => {
@@ -161,8 +162,15 @@ export function useUserSettings(userId: string | undefined) {
   useEffect(() => {
     if (!userId) return;
 
+    // Clean up existing channel first
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    const channelName = `settings-realtime-${userId}-${Date.now()}`;
     const channel = supabase
-      .channel('settings-realtime')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -185,8 +193,13 @@ export function useUserSettings(userId: string | undefined) {
       )
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [userId]);
 
