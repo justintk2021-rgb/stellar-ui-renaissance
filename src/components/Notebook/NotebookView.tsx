@@ -1344,7 +1344,7 @@ export function NotebookView({
         )}
 
         
-        <div className="flex-1 bg-background overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-hidden flex flex-col">
         {selectedEntry || isCreatingNew ? (
           <motion.div
             key={selectedEntry?.id || 'new-note'}
@@ -1710,7 +1710,7 @@ export function NotebookView({
           </motion.div>
         ) : (
           <motion.div 
-            className="flex-1 flex flex-col overflow-hidden bg-background"
+            className="flex-1 flex flex-col overflow-hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
