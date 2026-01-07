@@ -3,8 +3,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   ArrowLeft, Share2, TrendingUp, TrendingDown, Target, Award, 
   AlertCircle, DollarSign, BarChart3, Percent, Activity, Scale,
-  ChevronRight, Info, Settings
+  ChevronRight, Info, Settings, ChevronLeft, Filter, Calendar, Search
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useCountUp } from "@/hooks/useCountUp";
@@ -95,6 +103,7 @@ function InfoTooltip({ content }: { content: string }) {
 }
 
 type TabType = "overview" | "rules" | "executed" | "notes";
+type FilterType = "all" | "wins" | "losses";
 
 const tabs: { id: TabType; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -102,6 +111,219 @@ const tabs: { id: TabType; label: string }[] = [
   { id: "executed", label: "Executed Trades" },
   { id: "notes", label: "Notes" },
 ];
+
+const TRADES_PER_PAGE = 10;
+
+// Executed Trades Tab Component with pagination and filtering
+function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [filter, setFilter] = useState<FilterType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+
+  // Filter and sort trades
+  const filteredTrades = useMemo(() => {
+    let result = [...trades];
+    
+    // Apply result filter
+    if (filter === "wins") {
+      result = result.filter(t => t.result > 0);
+    } else if (filter === "losses") {
+      result = result.filter(t => t.result < 0);
+    }
+    
+    // Apply search (by date)
+    if (searchQuery) {
+      result = result.filter(t => 
+        t.date.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    // Sort
+    result.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
+    });
+    
+    return result;
+  }, [trades, filter, searchQuery, sortOrder]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredTrades.length / TRADES_PER_PAGE);
+  const paginatedTrades = useMemo(() => {
+    const start = (currentPage - 1) * TRADES_PER_PAGE;
+    return filteredTrades.slice(start, start + TRADES_PER_PAGE);
+  }, [filteredTrades, currentPage]);
+
+  // Reset page when filter changes
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [filter, searchQuery]);
+
+  const winCount = trades.filter(t => t.result > 0).length;
+  const lossCount = trades.filter(t => t.result < 0).length;
+
+  return (
+    <motion.div
+      key="executed"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className="glass rounded-xl p-6 border border-border/30"
+    >
+      {/* Header with filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <h3 className="text-lg font-semibold">Executed Trades</h3>
+        
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by date..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 w-[160px] h-9 bg-muted/30 border-border/30"
+            />
+          </div>
+          
+          {/* Filter by result */}
+          <Select value={filter} onValueChange={(v: FilterType) => setFilter(v)}>
+            <SelectTrigger className="w-[120px] h-9 bg-muted/30 border-border/30">
+              <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All ({trades.length})</SelectItem>
+              <SelectItem value="wins">Wins ({winCount})</SelectItem>
+              <SelectItem value="losses">Losses ({lossCount})</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          {/* Sort order */}
+          <Select value={sortOrder} onValueChange={(v: "newest" | "oldest") => setSortOrder(v)}>
+            <SelectTrigger className="w-[110px] h-9 bg-muted/30 border-border/30">
+              <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest</SelectItem>
+              <SelectItem value="oldest">Oldest</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Trades List */}
+      {paginatedTrades.length > 0 ? (
+        <div className="space-y-2">
+          <AnimatePresence mode="popLayout">
+            {paginatedTrades.map((trade, index) => (
+              <motion.div
+                key={trade.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ delay: index * 0.03 }}
+                className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-2 h-2 rounded-full",
+                    trade.result >= 0 ? "bg-primary" : "bg-destructive"
+                  )} />
+                  <span className="text-sm text-muted-foreground">{trade.date}</span>
+                </div>
+                <span className={cn(
+                  "font-mono font-semibold",
+                  trade.result >= 0 ? "text-primary" : "text-destructive"
+                )}>
+                  {trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}
+                </span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      ) : (
+        <div className="text-center py-12 text-muted-foreground">
+          <Activity className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">
+            {trades.length === 0 
+              ? "No trades executed with this playbook yet"
+              : "No trades match your filters"
+            }
+          </p>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center justify-between mt-6 pt-4 border-t border-border/30"
+        >
+          <span className="text-sm text-muted-foreground">
+            Showing {((currentPage - 1) * TRADES_PER_PAGE) + 1}-{Math.min(currentPage * TRADES_PER_PAGE, filteredTrades.length)} of {filteredTrades.length}
+          </span>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="h-8 px-3 bg-muted/30 border-border/30 hover:bg-muted/50"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum: number;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={cn(
+                      "h-8 w-8 p-0",
+                      currentPage !== pageNum && "bg-muted/30 border-border/30 hover:bg-muted/50"
+                    )}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="h-8 px-3 bg-muted/30 border-border/30 hover:bg-muted/50"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
+  );
+}
 
 export function PlaybookDetailView({ 
   checklist, 
@@ -606,41 +828,7 @@ export function PlaybookDetailView({
         )}
 
         {activeTab === "executed" && (
-          <motion.div
-            key="executed"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="glass rounded-xl p-6 border border-border/30"
-          >
-            <h3 className="text-lg font-semibold mb-4">Executed Trades</h3>
-            {checklistTrades.length > 0 ? (
-              <div className="space-y-3">
-                {checklistTrades.slice(0, 10).map((trade, index) => (
-                  <motion.div
-                    key={trade.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                  >
-                    <span className="text-sm text-muted-foreground">{trade.date}</span>
-                    <span className={cn(
-                      "font-mono font-semibold",
-                      trade.result >= 0 ? "text-primary" : "text-destructive"
-                    )}>
-                      {trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}
-                    </span>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <Activity className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">No trades executed with this playbook yet</p>
-              </div>
-            )}
-          </motion.div>
+          <ExecutedTradesTab trades={checklistTrades} />
         )}
 
         {activeTab === "notes" && (
