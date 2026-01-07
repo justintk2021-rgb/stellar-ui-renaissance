@@ -762,74 +762,44 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
                     })}
                   </div>
                 ) : (
-                  /* Fixed Checklist - Original View */
-                  items.map((item, index) => {
-                    const hasSubItems = item.subItems && item.subItems.length > 0;
-                    const isExpanded = expandedItems.has(item.id);
-                    
-                    return (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.03 }}
+                  /* Fixed Checklist - Simple View without sub-items */
+                  items.map((item, index) => (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                    >
+                      <div
+                        onClick={() => toggleItem(item.id)}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all",
+                          "border border-border/30 hover:border-primary/30",
+                          item.checked 
+                            ? "bg-primary/10 border-primary/30" 
+                            : "bg-muted/30 hover:bg-muted/50"
+                        )}
                       >
-                        <div
-                          onClick={() => toggleItem(item.id)}
-                          className={cn(
-                            "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all",
-                            "border border-border/30 hover:border-primary/30",
-                            item.checked 
-                              ? "bg-primary/10 border-primary/30" 
-                              : "bg-muted/30 hover:bg-muted/50"
-                          )}
-                        >
-                          {/* Expand toggle for items with sub-items */}
-                          {hasSubItems && (
-                            <motion.button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleExpand(item.id);
-                              }}
-                              animate={{ rotate: isExpanded ? 90 : 0 }}
-                              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                              className="p-0.5 shrink-0"
-                            >
-                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                            </motion.button>
-                          )}
-                          
-                          <Checkbox
-                            checked={item.checked}
-                            onCheckedChange={() => toggleItem(item.id)}
-                            className="pointer-events-none"
-                          />
-                          <span className={cn(
-                            "flex-1 text-sm transition-all",
-                            item.checked && "line-through text-muted-foreground"
-                          )}>
-                            {item.text}
-                          </span>
-                          
-                          {/* Sub-items counter */}
-                          {hasSubItems && (
-                            <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
-                              {item.subItems?.filter(s => s.checked).length}/{item.subItems?.length}
-                            </span>
-                          )}
-                          
-                          {item.percentage !== undefined && (
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
-                              {item.percentage}%
-                            </Badge>
-                          )}
-                        </div>
+                        <Checkbox
+                          checked={item.checked}
+                          onCheckedChange={() => toggleItem(item.id)}
+                          className="pointer-events-none"
+                        />
+                        <span className={cn(
+                          "flex-1 text-sm transition-all",
+                          item.checked && "line-through text-muted-foreground"
+                        )}>
+                          {item.text}
+                        </span>
                         
-                        {/* Sub-items */}
-                        {renderSubItems(item)}
-                      </motion.div>
-                    );
-                  })
+                        {item.percentage !== undefined && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                            {item.percentage}%
+                          </Badge>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))
                 )}
               </div>
 
