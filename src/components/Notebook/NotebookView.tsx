@@ -135,7 +135,7 @@ export function NotebookView({
   onDeleteEntry,
 }: NotebookViewProps) {
   const { checklists } = useChecklists();
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -1710,37 +1710,50 @@ export function NotebookView({
           </motion.div>
         ) : (
           <motion.div 
-            className="flex-1 flex flex-col overflow-hidden"
+            className="flex-1 flex flex-col overflow-hidden bg-background"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
           >
             {/* All Notes Header */}
-            <div className="p-6 pb-4">
+            <div className="p-6 pb-0">
               <motion.div 
                 initial={{ opacity: 0, y: -15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="flex items-center justify-between"
+                className="flex items-center justify-between mb-6"
               >
-                <div>
-                  <motion.h1 
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
-                    className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent"
-                  >
-                    All Notes
-                  </motion.h1>
-                  <motion.p 
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
-                    className="text-sm text-muted-foreground mt-1"
-                  >
-                    {notebookEntries.filter(e => !e.isDeleted).length} notes
-                  </motion.p>
-                </div>
+                {/* Category Filter Tabs */}
+                <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                  className="flex items-center gap-1 p-1 rounded-lg bg-muted/40"
+                >
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'trade-notes', label: 'Trade Notes' },
+                    { id: 'daily-journal', label: 'Journal' },
+                    { id: 'trading-plan', label: 'Plans' },
+                  ].map((tab, i) => (
+                    <motion.button
+                      key={tab.id}
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: 0.1 + i * 0.05 }}
+                      onClick={() => setSelectedCategory(tab.id === 'all' ? null : tab.id)}
+                      className={cn(
+                        "px-4 py-2 text-sm font-medium rounded-md transition-all duration-200",
+                        (tab.id === 'all' && !selectedCategory) || selectedCategory === tab.id
+                          ? "bg-primary text-primary-foreground shadow-sm" 
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                      )}
+                    >
+                      {tab.label}
+                    </motion.button>
+                  ))}
+                </motion.div>
+
                 <motion.div 
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -1748,7 +1761,7 @@ export function NotebookView({
                   className="flex items-center gap-3"
                 >
                   {/* View Toggle */}
-                  <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/40">
                     <motion.button
                       onClick={() => { setViewMode('grid'); localStorage.setItem('notebook-view-mode', 'grid'); }}
                       whileHover={{ scale: 1.05 }}
@@ -1779,10 +1792,11 @@ export function NotebookView({
                   <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                     <Button
                       onClick={handleNewNote}
-                      className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-300"
+                      variant="ghost"
+                      className="text-primary hover:text-primary hover:bg-primary/5 font-medium"
                     >
                       <Plus className="w-4 h-4 mr-2" />
-                      New Note
+                      Add new note
                     </Button>
                   </motion.div>
                 </motion.div>
@@ -1791,7 +1805,7 @@ export function NotebookView({
 
             {/* Notes Grid/List */}
             <ScrollArea className="flex-1 px-6 pb-6">
-              {notebookEntries.filter(e => !e.isDeleted).length === 0 ? (
+              {notebookEntries.filter(e => !e.isDeleted && (!selectedCategory || e.category === selectedCategory)).length === 0 ? (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.9, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1817,23 +1831,24 @@ export function NotebookView({
                     visible: {
                       opacity: 1,
                       transition: {
-                        staggerChildren: 0.04,
-                        delayChildren: 0.1
+                        staggerChildren: 0.03,
+                        delayChildren: 0.05
                       }
                     }
                   }}
                   className={cn(
                     viewMode === 'grid' 
-                      ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
+                      ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5" 
                       : "flex flex-col gap-3"
                   )}
                 >
                   {notebookEntries
-                    .filter(e => !e.isDeleted)
+                    .filter(e => !e.isDeleted && (!selectedCategory || e.category === selectedCategory))
                     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
                     .map((entry, index) => {
                       const colors = getNoteCardColor(entry.category, index);
-                      const plainText = entry.content.replace(/<[^>]*>/g, '').slice(0, 150);
+                      const plainText = entry.content.replace(/<[^>]*>/g, '').slice(0, 200);
+                      const contentLines = plainText.split(/[.!?]\s+/).filter(s => s.trim()).slice(0, 3);
                       const isDark = document.documentElement.classList.contains('dark');
                       
                       return (
@@ -1842,8 +1857,8 @@ export function NotebookView({
                           variants={{
                             hidden: { 
                               opacity: 0, 
-                              y: 20,
-                              scale: 0.95
+                              y: 15,
+                              scale: 0.98
                             },
                             visible: { 
                               opacity: 1, 
@@ -1851,88 +1866,107 @@ export function NotebookView({
                               scale: 1,
                               transition: {
                                 type: "spring",
-                                stiffness: 300,
-                                damping: 24
+                                stiffness: 400,
+                                damping: 28
                               }
                             }
                           }}
                           whileHover={{ 
-                            y: -4, 
-                            scale: 1.02,
-                            boxShadow: "0 12px 24px -8px rgba(0,0,0,0.15)",
+                            y: -3,
                             transition: { 
                               type: "spring", 
-                              stiffness: 400, 
-                              damping: 20 
+                              stiffness: 500, 
+                              damping: 25 
                             } 
                           }}
-                          whileTap={{ scale: 0.98 }}
+                          whileTap={{ scale: 0.99 }}
                           onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
                           className={cn(
-                            "text-left rounded-xl border transition-colors overflow-hidden group relative",
+                            "text-left bg-card rounded-xl overflow-hidden group relative",
+                            "shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)]",
+                            "transition-shadow duration-300",
                             viewMode === 'grid' 
-                              ? "p-4 min-h-[180px] flex flex-col" 
-                              : "p-4 flex items-start gap-4"
+                              ? "p-0 min-h-[200px] flex flex-col" 
+                              : "p-4 flex items-start gap-4 border border-border/30"
                           )}
-                          style={{
-                            backgroundColor: isDark ? colors.bgDark : colors.bg,
-                            borderColor: isDark ? colors.borderDark : colors.border,
-                          }}
                         >
-                          {/* Color accent bar */}
-                          <motion.div 
-                            className="absolute top-0 left-0 w-1 h-full rounded-l-xl"
-                            style={{ backgroundColor: colors.accent }}
-                            initial={{ scaleY: 0 }}
-                            animate={{ scaleY: 1 }}
-                            transition={{ duration: 0.4, delay: index * 0.02, ease: [0.25, 0.46, 0.45, 0.94] }}
-                          />
-                          
                           {viewMode === 'grid' ? (
                             <>
-                              {/* Header */}
-                              <div className="flex items-center justify-between mb-2 pl-2">
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  <Calendar className="w-3 h-3" />
-                                  <span>{new Date(entry.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                                </div>
-                                <motion.div
-                                  initial={{ opacity: 0, scale: 0.8 }}
-                                  whileHover={{ opacity: 1, scale: 1 }}
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                              {/* Color accent bar - left side */}
+                              <motion.div 
+                                className="absolute top-0 left-0 w-1 h-full"
+                                style={{ backgroundColor: colors.accent }}
+                                initial={{ scaleY: 0, originY: 0 }}
+                                animate={{ scaleY: 1 }}
+                                transition={{ duration: 0.5, delay: index * 0.02, ease: [0.25, 0.46, 0.45, 0.94] }}
+                              />
+                              
+                              <div className="p-4 pl-5 flex flex-col flex-1">
+                                {/* Date Header */}
+                                <motion.p 
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  transition={{ delay: 0.1 + index * 0.02 }}
+                                  className="text-xs text-muted-foreground mb-2 font-medium"
                                 >
-                                  <Pin className="w-3.5 h-3.5 text-muted-foreground/50" />
-                                </motion.div>
-                              </div>
-                              
-                              {/* Title */}
-                              <h3 className="font-semibold text-foreground mb-2 line-clamp-2 pl-2">
-                                {entry.title || 'Untitled'}
-                              </h3>
-                              
-                              {/* Content Preview */}
-                              <p className="text-sm text-muted-foreground line-clamp-4 flex-1 pl-2">
-                                {plainText || 'No content...'}
-                              </p>
-                              
-                              {/* Footer */}
-                              <div className="flex items-center gap-2 mt-3 pt-2 border-t border-foreground/10 pl-2">
+                                  {new Date(entry.date).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                </motion.p>
+                                
+                                {/* Title with accent dot */}
+                                <div className="flex items-start gap-2 mb-3">
+                                  <motion.div 
+                                    className="w-1.5 h-1.5 rounded-full mt-2 shrink-0"
+                                    style={{ backgroundColor: colors.accent }}
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    transition={{ delay: 0.15 + index * 0.02, type: "spring", stiffness: 500 }}
+                                  />
+                                  <h3 className="font-semibold text-foreground leading-tight line-clamp-2">
+                                    {entry.title || 'Untitled'}
+                                  </h3>
+                                </div>
+                                
+                                {/* Content Preview as bullet points */}
+                                <div className="flex-1 space-y-1.5">
+                                  {contentLines.length > 0 ? (
+                                    contentLines.map((line, i) => (
+                                      <motion.div 
+                                        key={i}
+                                        initial={{ opacity: 0, x: -5 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: 0.2 + i * 0.05 }}
+                                        className="flex items-start gap-2 text-sm text-muted-foreground"
+                                      >
+                                        <span className="text-muted-foreground/40 mt-0.5">•</span>
+                                        <span className="line-clamp-1">{line.trim()}</span>
+                                      </motion.div>
+                                    ))
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground/60 italic">No content...</p>
+                                  )}
+                                </div>
+                                
+                                {/* Optional: Trade indicator badge */}
                                 {entry.tradeId && (
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50">
-                                    <TrendingUp className="w-2.5 h-2.5 mr-1" />
-                                    Trade
-                                  </Badge>
+                                  <motion.div 
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.3 }}
+                                    className="mt-3 pt-2"
+                                  >
+                                    <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-background/80 border-border/50">
+                                      <TrendingUp className="w-2.5 h-2.5 mr-1" />
+                                      Linked Trade
+                                    </Badge>
+                                  </motion.div>
                                 )}
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50 capitalize">
-                                  {entry.category.replace('-', ' ')}
-                                </Badge>
                               </div>
                             </>
                           ) : (
                             <>
-                              {/* List View */}
+                              {/* List View - accent bar */}
                               <motion.div 
-                                className="w-2 h-12 rounded-full shrink-0"
+                                className="w-1 h-14 rounded-full shrink-0"
                                 style={{ backgroundColor: colors.accent }}
                                 initial={{ scaleY: 0 }}
                                 animate={{ scaleY: 1 }}
