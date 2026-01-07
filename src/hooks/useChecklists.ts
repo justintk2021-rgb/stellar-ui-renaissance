@@ -3,10 +3,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
 
+// Deep nested sub-item for conditional checklists (can have unlimited depth)
+interface ConditionalSubItem {
+  id: string;
+  text: string;
+  checked: boolean;
+  children?: ConditionalSubItem[]; // For conditional checklists - reveals when parent is checked
+}
+
 interface ChecklistSubItem {
   id: string;
   text: string;
   checked: boolean;
+  children?: ConditionalSubItem[]; // Support deep nesting for conditional checklists
 }
 
 interface ChecklistItem {
@@ -17,14 +26,17 @@ interface ChecklistItem {
   subItems?: ChecklistSubItem[]; // Conditional sub-items that appear when parent is checked
 }
 
+type ChecklistType = "fixed" | "conditional";
+
 interface Checklist {
   id: string;
   name: string;
+  type: ChecklistType;
   items: ChecklistItem[];
   createdAt: string;
 }
 
-export type { ChecklistItem, ChecklistSubItem, Checklist };
+export type { ChecklistItem, ChecklistSubItem, ConditionalSubItem, Checklist, ChecklistType };
 
 export function useChecklists() {
   const [checklists, setChecklists] = useState<Checklist[]>([]);
@@ -63,12 +75,28 @@ export function useChecklists() {
 
       if (error) throw error;
 
-      const mapped = (data || []).map((c) => ({
-        id: c.id,
-        name: c.name,
-        items: (c.items as unknown as ChecklistItem[]) || [],
-        createdAt: c.created_at,
-      }));
+      const mapped = (data || []).map((c) => {
+        const items = c.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType } | ChecklistItem[];
+        
+        // Handle both old format (array) and new format (object with type)
+        if (Array.isArray(items)) {
+          return {
+            id: c.id,
+            name: c.name,
+            type: "fixed" as ChecklistType,
+            items: items || [],
+            createdAt: c.created_at,
+          };
+        } else {
+          return {
+            id: c.id,
+            name: c.name,
+            type: (items?.type || "fixed") as ChecklistType,
+            items: items?.items || [],
+            createdAt: c.created_at,
+          };
+        }
+      });
 
       setChecklists(mapped);
     } catch (error) {
@@ -87,16 +115,17 @@ export function useChecklists() {
     fetchChecklists();
   }, [fetchChecklists]);
 
-  const createChecklist = async (name: string): Promise<Checklist | null> => {
+  const createChecklist = async (name: string, type: ChecklistType = "fixed"): Promise<Checklist | null> => {
     if (!userId || !name.trim()) return null;
 
     try {
+      // Store type alongside items in the JSON column
       const { data, error } = await supabase
         .from('checklists')
         .insert({
           user_id: userId,
           name: name.trim(),
-          items: [],
+          items: { type, items: [] } as unknown as Json,
         })
         .select()
         .single();
@@ -106,6 +135,7 @@ export function useChecklists() {
       const newChecklist: Checklist = {
         id: data.id,
         name: data.name,
+        type,
         items: [],
         createdAt: data.created_at,
       };
@@ -125,9 +155,16 @@ export function useChecklists() {
 
   const updateChecklist = async (id: string, updates: Partial<Pick<Checklist, 'name' | 'items'>>) => {
     try {
+      const checklist = checklists.find(c => c.id === id);
       const dbUpdates: { name?: string; items?: Json } = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
-      if (updates.items !== undefined) dbUpdates.items = updates.items as unknown as Json;
+      if (updates.items !== undefined) {
+        // Store with type preserved
+        dbUpdates.items = { 
+          type: checklist?.type || "fixed", 
+          items: updates.items 
+        } as unknown as Json;
+      }
       
       const { error } = await supabase
         .from('checklists')

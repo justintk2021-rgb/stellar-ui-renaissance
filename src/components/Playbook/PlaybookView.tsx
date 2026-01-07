@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3, GripVertical, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3, GripVertical, ChevronRight, GitBranch, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -18,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useChecklists, ChecklistItem, ChecklistSubItem } from "@/hooks/useChecklists";
+import { useChecklists, ChecklistItem, ChecklistSubItem, ConditionalSubItem, ChecklistType } from "@/hooks/useChecklists";
 import { supabase } from "@/integrations/supabase/client";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
@@ -35,22 +36,29 @@ interface ChecklistMetrics {
 export function PlaybookView() {
   const { checklists, loading, isAuthenticated, createChecklist, updateChecklist, deleteChecklist } = useChecklists();
   const [newChecklistName, setNewChecklistName] = useState("");
+  const [newChecklistType, setNewChecklistType] = useState<ChecklistType | null>(null);
   const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
   const [editingChecklistName, setEditingChecklistName] = useState("");
   const [newItemTexts, setNewItemTexts] = useState<Record<string, string>>({});
   const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null);
+  const [isTypeSelectOpen, setIsTypeSelectOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingPercentage, setEditingPercentage] = useState<string>("");
   const [addingItemToChecklist, setAddingItemToChecklist] = useState<string | null>(null);
   const [checklistMetrics, setChecklistMetrics] = useState<ChecklistMetrics[]>([]);
   const [metricsLoading, setMetricsLoading] = useState(false);
-  // New state for sub-items
+  // State for sub-items (fixed checklists)
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [addingSubItemTo, setAddingSubItemTo] = useState<string | null>(null);
   const [newSubItemText, setNewSubItemText] = useState("");
   const [editingSubItemId, setEditingSubItemId] = useState<string | null>(null);
   const [editingSubItemText, setEditingSubItemText] = useState("");
+  // State for conditional checklist deep nesting
+  const [addingChildTo, setAddingChildTo] = useState<string | null>(null); // "parentId:subItemId:childId..." path
+  const [newChildText, setNewChildText] = useState("");
+  const [editingChildId, setEditingChildId] = useState<string | null>(null);
+  const [editingChildText, setEditingChildText] = useState("");
 
   const selectedChecklist = checklists.find(c => c.id === selectedChecklistId) || null;
   const selectedMetrics = checklistMetrics.find(m => m.checklistId === selectedChecklistId);
@@ -114,13 +122,24 @@ export function PlaybookView() {
   }, [isAuthenticated, checklists]);
 
   const handleCreateChecklist = async () => {
-    if (!newChecklistName.trim()) return;
-    const newChecklist = await createChecklist(newChecklistName);
+    if (!newChecklistName.trim() || !newChecklistType) return;
+    const newChecklist = await createChecklist(newChecklistName, newChecklistType);
     if (newChecklist) {
       setSelectedChecklistId(newChecklist.id);
     }
     setNewChecklistName("");
+    setNewChecklistType(null);
     setIsCreateDialogOpen(false);
+  };
+
+  const openTypeSelect = () => {
+    setIsTypeSelectOpen(true);
+  };
+
+  const selectType = (type: ChecklistType) => {
+    setNewChecklistType(type);
+    setIsTypeSelectOpen(false);
+    setIsCreateDialogOpen(true);
   };
 
   const handleDeleteChecklist = async (id: string) => {
@@ -288,7 +307,264 @@ export function PlaybookView() {
     });
   };
 
-  const getCompletionPercentage = (items: ChecklistItem[]) => {
+  // Deep nesting helpers for conditional checklists
+  const resetNestedChildren = (children?: ConditionalSubItem[]): ConditionalSubItem[] | undefined => {
+    if (!children) return undefined;
+    return children.map(child => ({
+      ...child,
+      checked: false,
+      children: resetNestedChildren(child.children),
+    }));
+  };
+
+  const addChildToSubItem = async (
+    checklistId: string, 
+    parentItemId: string, 
+    path: string[], // Array of subItem IDs to traverse
+    text: string
+  ) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist || !text.trim()) return;
+
+    const newChild: ConditionalSubItem = {
+      id: Date.now().toString(),
+      text: text.trim(),
+      checked: false,
+    };
+
+    const addToPath = (subItems: ChecklistSubItem[], pathIndex: number): ChecklistSubItem[] => {
+      return subItems.map(sub => {
+        if (sub.id === path[pathIndex]) {
+          if (pathIndex === path.length - 1) {
+            // Target found, add child here
+            return { ...sub, children: [...(sub.children || []), newChild] };
+          } else if (sub.children) {
+            // Traverse deeper
+            return { 
+              ...sub, 
+              children: addToPathNested(sub.children, pathIndex + 1) 
+            };
+          }
+        }
+        return sub;
+      });
+    };
+
+    const addToPathNested = (children: ConditionalSubItem[], pathIndex: number): ConditionalSubItem[] => {
+      return children.map(child => {
+        if (child.id === path[pathIndex]) {
+          if (pathIndex === path.length - 1) {
+            return { ...child, children: [...(child.children || []), newChild] };
+          } else if (child.children) {
+            return { ...child, children: addToPathNested(child.children, pathIndex + 1) };
+          }
+        }
+        return child;
+      });
+    };
+
+    const updatedItems = checklist.items.map(item => {
+      if (item.id === parentItemId && item.subItems) {
+        return { ...item, subItems: addToPath(item.subItems, 0) };
+      }
+      return item;
+    });
+
+    await updateChecklist(checklistId, { items: updatedItems });
+    setNewChildText("");
+    setAddingChildTo(null);
+  };
+
+  const toggleNestedChild = async (
+    checklistId: string,
+    parentItemId: string,
+    path: string[] // Array of IDs to traverse to the target
+  ) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const toggleInSubItems = (subItems: ChecklistSubItem[], pathIndex: number): ChecklistSubItem[] => {
+      return subItems.map(sub => {
+        if (sub.id === path[pathIndex]) {
+          if (pathIndex === path.length - 1) {
+            const newChecked = !sub.checked;
+            if (newChecked) {
+              setExpandedItems(prev => new Set(prev).add(sub.id));
+            }
+            return { ...sub, checked: newChecked };
+          } else if (sub.children) {
+            return { ...sub, children: toggleInNested(sub.children, pathIndex + 1) };
+          }
+        }
+        return sub;
+      });
+    };
+
+    const toggleInNested = (children: ConditionalSubItem[], pathIndex: number): ConditionalSubItem[] => {
+      return children.map(child => {
+        if (child.id === path[pathIndex]) {
+          if (pathIndex === path.length - 1) {
+            const newChecked = !child.checked;
+            if (newChecked) {
+              setExpandedItems(prev => new Set(prev).add(child.id));
+            }
+            return { ...child, checked: newChecked };
+          } else if (child.children) {
+            return { ...child, children: toggleInNested(child.children, pathIndex + 1) };
+          }
+        }
+        return child;
+      });
+    };
+
+    const updatedItems = checklist.items.map(item => {
+      if (item.id === parentItemId && item.subItems) {
+        return { ...item, subItems: toggleInSubItems(item.subItems, 0) };
+      }
+      return item;
+    });
+
+    await updateChecklist(checklistId, { items: updatedItems });
+  };
+
+  const deleteNestedChild = async (
+    checklistId: string,
+    parentItemId: string,
+    path: string[]
+  ) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const deleteFromSubItems = (subItems: ChecklistSubItem[], pathIndex: number): ChecklistSubItem[] => {
+      if (pathIndex === path.length - 1) {
+        return subItems.filter(sub => sub.id !== path[pathIndex]);
+      }
+      return subItems.map(sub => {
+        if (sub.id === path[pathIndex] && sub.children) {
+          return { ...sub, children: deleteFromNested(sub.children, pathIndex + 1) };
+        }
+        return sub;
+      });
+    };
+
+    const deleteFromNested = (children: ConditionalSubItem[], pathIndex: number): ConditionalSubItem[] => {
+      if (pathIndex === path.length - 1) {
+        return children.filter(child => child.id !== path[pathIndex]);
+      }
+      return children.map(child => {
+        if (child.id === path[pathIndex] && child.children) {
+          return { ...child, children: deleteFromNested(child.children, pathIndex + 1) };
+        }
+        return child;
+      });
+    };
+
+    const updatedItems = checklist.items.map(item => {
+      if (item.id === parentItemId && item.subItems) {
+        return { ...item, subItems: deleteFromSubItems(item.subItems, 0) };
+      }
+      return item;
+    });
+
+    await updateChecklist(checklistId, { items: updatedItems });
+  };
+
+  const updateNestedChildText = async (
+    checklistId: string,
+    parentItemId: string,
+    path: string[],
+    newText: string
+  ) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist || !newText.trim()) return;
+
+    const updateInSubItems = (subItems: ChecklistSubItem[], pathIndex: number): ChecklistSubItem[] => {
+      return subItems.map(sub => {
+        if (sub.id === path[pathIndex]) {
+          if (pathIndex === path.length - 1) {
+            return { ...sub, text: newText.trim() };
+          } else if (sub.children) {
+            return { ...sub, children: updateInNested(sub.children, pathIndex + 1) };
+          }
+        }
+        return sub;
+      });
+    };
+
+    const updateInNested = (children: ConditionalSubItem[], pathIndex: number): ConditionalSubItem[] => {
+      return children.map(child => {
+        if (child.id === path[pathIndex]) {
+          if (pathIndex === path.length - 1) {
+            return { ...child, text: newText.trim() };
+          } else if (child.children) {
+            return { ...child, children: updateInNested(child.children, pathIndex + 1) };
+          }
+        }
+        return child;
+      });
+    };
+
+    const updatedItems = checklist.items.map(item => {
+      if (item.id === parentItemId && item.subItems) {
+        return { ...item, subItems: updateInSubItems(item.subItems, 0) };
+      }
+      return item;
+    });
+
+    await updateChecklist(checklistId, { items: updatedItems });
+    setEditingChildId(null);
+    setEditingChildText("");
+  };
+
+  // Count all nested items recursively for conditional checklist percentage
+  const countNestedItems = (children?: ConditionalSubItem[]): { total: number; checked: number } => {
+    if (!children || children.length === 0) return { total: 0, checked: 0 };
+    
+    let total = 0;
+    let checked = 0;
+    
+    children.forEach(child => {
+      total++;
+      if (child.checked) checked++;
+      const nested = countNestedItems(child.children);
+      total += nested.total;
+      checked += nested.checked;
+    });
+    
+    return { total, checked };
+  };
+
+  const getConditionalCompletionPercentage = (items: ChecklistItem[]) => {
+    if (items.length === 0) return 0;
+    
+    let totalWeight = 0;
+    let completedWeight = 0;
+    
+    items.forEach(item => {
+      totalWeight++;
+      if (item.checked) completedWeight++;
+      
+      if (item.subItems) {
+        item.subItems.forEach(sub => {
+          totalWeight++;
+          if (sub.checked) completedWeight++;
+          
+          const nested = countNestedItems(sub.children);
+          totalWeight += nested.total;
+          completedWeight += nested.checked;
+        });
+      }
+    });
+    
+    return totalWeight > 0 ? Math.round((completedWeight / totalWeight) * 100) : 0;
+  };
+
+  const getCompletionPercentage = (items: ChecklistItem[], type?: ChecklistType) => {
+    // Use conditional calculation for conditional checklists
+    if (type === "conditional") {
+      return getConditionalCompletionPercentage(items);
+    }
+    
     if (items.length === 0) return 0;
     
     // Check if any items have custom percentages
@@ -364,6 +640,15 @@ export function PlaybookView() {
     setEditingPercentage(String(currentPercentage ?? Math.round(100 / totalItems)));
   };
 
+  const resetSubItemChildren = (subItems?: ChecklistSubItem[]): ChecklistSubItem[] | undefined => {
+    if (!subItems) return undefined;
+    return subItems.map(sub => ({
+      ...sub,
+      checked: false,
+      children: resetNestedChildren(sub.children),
+    }));
+  };
+
   const resetChecklist = async (checklistId: string) => {
     const checklist = checklists.find(c => c.id === checklistId);
     if (!checklist) return;
@@ -371,7 +656,7 @@ export function PlaybookView() {
     const resetItems = checklist.items.map(item => ({
       ...item,
       checked: false,
-      subItems: item.subItems?.map(sub => ({ ...sub, checked: false })),
+      subItems: resetSubItemChildren(item.subItems),
     }));
     await updateChecklist(checklistId, { items: resetItems });
     setExpandedItems(new Set());
@@ -433,7 +718,7 @@ export function PlaybookView() {
           </div>
         </div>
         <Button 
-          onClick={() => setIsCreateDialogOpen(true)}
+          onClick={openTypeSelect}
           className="group relative overflow-hidden bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary transition-all duration-300 hover:scale-105 hover:shadow-glow-sm active:scale-95"
         >
           <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
@@ -442,11 +727,94 @@ export function PlaybookView() {
         </Button>
       </div>
 
-      {/* Create Checklist Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+      {/* Type Selection Dialog */}
+      <Dialog open={isTypeSelectOpen} onOpenChange={setIsTypeSelectOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Choose Checklist Type</DialogTitle>
+            <DialogDescription>
+              Select the type of checklist you want to create
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 grid grid-cols-2 gap-4">
+            {/* Fixed Checklist Option */}
+            <motion.button
+              onClick={() => selectType("fixed")}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="group relative p-6 rounded-xl border-2 border-border/50 hover:border-primary/50 bg-muted/30 hover:bg-muted/50 transition-all duration-300 text-left"
+            >
+              <div className="absolute top-3 right-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center transition-colors">
+                  <ListChecks className="w-4 h-4 text-primary" />
+                </div>
+              </div>
+              <div className="pr-10">
+                <h3 className="font-semibold text-base mb-2">Fixed Checklist</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Standard checklist with items you check off one by one. Great for simple pre-trade routines.
+                </p>
+              </div>
+              <div className="mt-4 flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full border-2 border-muted-foreground/30" />
+                <div className="w-3 h-3 rounded-full border-2 border-muted-foreground/30" />
+                <div className="w-3 h-3 rounded-full border-2 border-muted-foreground/30" />
+                <span className="text-[10px] text-muted-foreground ml-1">Linear items</span>
+              </div>
+            </motion.button>
+
+            {/* Conditional Checklist Option */}
+            <motion.button
+              onClick={() => selectType("conditional")}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="group relative p-6 rounded-xl border-2 border-border/50 hover:border-primary/50 bg-muted/30 hover:bg-muted/50 transition-all duration-300 text-left"
+            >
+              <div className="absolute top-3 right-3">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 group-hover:bg-amber-500/20 flex items-center justify-center transition-colors">
+                  <GitBranch className="w-4 h-4 text-amber-500" />
+                </div>
+              </div>
+              <div className="pr-10">
+                <h3 className="font-semibold text-base mb-2">Conditional Checklist</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Branching checklist where checking an item reveals sub-conditions. Perfect for complex decision trees.
+                </p>
+              </div>
+              <div className="mt-4 flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full border-2 border-amber-500/40" />
+                <div className="flex flex-col gap-0.5 ml-1">
+                  <div className="w-2 h-2 rounded-full border border-amber-500/30" />
+                  <div className="w-2 h-2 rounded-full border border-amber-500/30" />
+                </div>
+                <span className="text-[10px] text-muted-foreground ml-1">Branching</span>
+              </div>
+            </motion.button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Checklist Dialog (Name Input) */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+        setIsCreateDialogOpen(open);
+        if (!open) setNewChecklistType(null);
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Create New Checklist</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {newChecklistType === "conditional" ? (
+                <GitBranch className="w-5 h-5 text-amber-500" />
+              ) : (
+                <ListChecks className="w-5 h-5 text-primary" />
+              )}
+              Create {newChecklistType === "conditional" ? "Conditional" : "Fixed"} Checklist
+            </DialogTitle>
+            <DialogDescription>
+              {newChecklistType === "conditional" 
+                ? "Items will reveal sub-conditions when checked"
+                : "A standard checklist with linear items"
+              }
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Input
@@ -458,9 +826,12 @@ export function PlaybookView() {
               autoFocus
             />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-              Cancel
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => {
+              setIsCreateDialogOpen(false);
+              setIsTypeSelectOpen(true);
+            }}>
+              Back
             </Button>
             <Button onClick={handleCreateChecklist} disabled={!newChecklistName.trim()}>
               Create
@@ -474,25 +845,37 @@ export function PlaybookView() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="w-fit justify-between bg-background/50">
-              <span className="truncate">
-                {selectedChecklist ? selectedChecklist.name : "Select a checklist"}
+              <span className="flex items-center gap-2">
+                {selectedChecklist?.type === "conditional" ? (
+                  <GitBranch className="w-3.5 h-3.5 text-amber-500" />
+                ) : selectedChecklist ? (
+                  <ListChecks className="w-3.5 h-3.5 text-primary" />
+                ) : null}
+                <span className="truncate">
+                  {selectedChecklist ? selectedChecklist.name : "Select a checklist"}
+                </span>
               </span>
               <ChevronDown className="w-4 h-4 ml-2 shrink-0" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-[200px] max-h-[300px] overflow-y-auto bg-popover">
+          <DropdownMenuContent align="start" className="min-w-[250px] max-h-[300px] overflow-y-auto bg-popover">
             {checklists.map((checklist) => (
               <DropdownMenuItem
                 key={checklist.id}
                 onClick={() => setSelectedChecklistId(checklist.id)}
                 className={cn(
-                  "cursor-pointer",
+                  "cursor-pointer flex items-center gap-2",
                   selectedChecklistId === checklist.id && "bg-primary/10"
                 )}
               >
-                <span className="truncate">{checklist.name}</span>
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {getCompletionPercentage(checklist.items)}%
+                {checklist.type === "conditional" ? (
+                  <GitBranch className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                ) : (
+                  <ListChecks className="w-3.5 h-3.5 text-primary shrink-0" />
+                )}
+                <span className="truncate flex-1">{checklist.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {getCompletionPercentage(checklist.items, checklist.type)}%
                 </span>
               </DropdownMenuItem>
             ))}
@@ -525,7 +908,7 @@ export function PlaybookView() {
             <div 
               className={cn(
                 "glass rounded-xl transition-all duration-300",
-                getCompletionPercentage(selectedChecklist.items) === 100 && selectedChecklist.items.length > 0
+                getCompletionPercentage(selectedChecklist.items, selectedChecklist.type) === 100 && selectedChecklist.items.length > 0
                   && "bg-primary/5"
               )}
         >
@@ -550,7 +933,20 @@ export function PlaybookView() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
+                  {selectedChecklist.type === "conditional" ? (
+                    <GitBranch className="w-4 h-4 text-amber-500" />
+                  ) : (
+                    <ListChecks className="w-4 h-4 text-primary" />
+                  )}
                   <h3 className="font-semibold text-lg">{selectedChecklist.name}</h3>
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded text-[10px] font-medium",
+                    selectedChecklist.type === "conditional" 
+                      ? "bg-amber-500/10 text-amber-500" 
+                      : "bg-primary/10 text-primary"
+                  )}>
+                    {selectedChecklist.type === "conditional" ? "Branching" : "Fixed"}
+                  </span>
                   <button 
                     onClick={() => startEditingChecklist(selectedChecklist.id, selectedChecklist.name)}
                     className="p-1 rounded hover:bg-muted/50 transition-colors"
@@ -565,7 +961,7 @@ export function PlaybookView() {
             <div className="flex items-center gap-3">
               {/* Grade Badge */}
               {selectedChecklist.items.length > 0 && (() => {
-                const percentage = getCompletionPercentage(selectedChecklist.items);
+                const percentage = getCompletionPercentage(selectedChecklist.items, selectedChecklist.type);
                 let grade: string;
                 let gradeColor: string;
                 let gradeLabel: string;
@@ -608,20 +1004,20 @@ export function PlaybookView() {
                   <div 
                     className={cn(
                       "h-full transition-all duration-500",
-                      getCompletionPercentage(selectedChecklist.items) === 100 && selectedChecklist.items.length > 0
+                      getCompletionPercentage(selectedChecklist.items, selectedChecklist.type) === 100 && selectedChecklist.items.length > 0
                         ? "bg-primary" 
                         : "bg-primary/70"
                     )}
-                    style={{ width: `${getCompletionPercentage(selectedChecklist.items)}%` }}
+                    style={{ width: `${getCompletionPercentage(selectedChecklist.items, selectedChecklist.type)}%` }}
                   />
                 </div>
                 <span className={cn(
                   "text-sm font-bold min-w-[3rem] text-right",
-                  getCompletionPercentage(selectedChecklist.items) === 100 && selectedChecklist.items.length > 0
+                  getCompletionPercentage(selectedChecklist.items, selectedChecklist.type) === 100 && selectedChecklist.items.length > 0
                     ? "text-primary" 
                     : "text-muted-foreground"
                 )}>
-                  {getCompletionPercentage(selectedChecklist.items)}%
+                  {getCompletionPercentage(selectedChecklist.items, selectedChecklist.type)}%
                 </span>
               </div>
 
