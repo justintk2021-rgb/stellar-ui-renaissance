@@ -128,7 +128,61 @@ const CATEGORIES = [
   { id: "trash", label: "Trash", icon: Trash2 },
 ];
 
-type FontStyle = 'default' | 'serif' | 'mono';
+// 50 Fonts organized by category
+const NOTEBOOK_FONTS = [
+  // Sans Serif - Modern
+  { id: 'inter', name: 'Inter', family: "'Inter', sans-serif", category: 'Sans Serif' },
+  { id: 'roboto', name: 'Roboto', family: "'Roboto', sans-serif", category: 'Sans Serif' },
+  { id: 'open-sans', name: 'Open Sans', family: "'Open Sans', sans-serif", category: 'Sans Serif' },
+  { id: 'lato', name: 'Lato', family: "'Lato', sans-serif", category: 'Sans Serif' },
+  { id: 'montserrat', name: 'Montserrat', family: "'Montserrat', sans-serif", category: 'Sans Serif' },
+  { id: 'poppins', name: 'Poppins', family: "'Poppins', sans-serif", category: 'Sans Serif' },
+  { id: 'raleway', name: 'Raleway', family: "'Raleway', sans-serif", category: 'Sans Serif' },
+  { id: 'nunito', name: 'Nunito', family: "'Nunito', sans-serif", category: 'Sans Serif' },
+  { id: 'ubuntu', name: 'Ubuntu', family: "'Ubuntu', sans-serif", category: 'Sans Serif' },
+  { id: 'rubik', name: 'Rubik', family: "'Rubik', sans-serif", category: 'Sans Serif' },
+  { id: 'oswald', name: 'Oswald', family: "'Oswald', sans-serif", category: 'Sans Serif' },
+  { id: 'dm-sans', name: 'DM Sans', family: "'DM Sans', sans-serif", category: 'Sans Serif' },
+  { id: 'space-grotesk', name: 'Space Grotesk', family: "'Space Grotesk', sans-serif", category: 'Sans Serif' },
+  { id: 'outfit', name: 'Outfit', family: "'Outfit', sans-serif", category: 'Sans Serif' },
+  { id: 'work-sans', name: 'Work Sans', family: "'Work Sans', sans-serif", category: 'Sans Serif' },
+  { id: 'plus-jakarta', name: 'Plus Jakarta Sans', family: "'Plus Jakarta Sans', sans-serif", category: 'Sans Serif' },
+  { id: 'manrope', name: 'Manrope', family: "'Manrope', sans-serif", category: 'Sans Serif' },
+  { id: 'sora', name: 'Sora', family: "'Sora', sans-serif", category: 'Sans Serif' },
+  { id: 'lexend', name: 'Lexend', family: "'Lexend', sans-serif", category: 'Sans Serif' },
+  { id: 'urbanist', name: 'Urbanist', family: "'Urbanist', sans-serif", category: 'Sans Serif' },
+  { id: 'figtree', name: 'Figtree', family: "'Figtree', sans-serif", category: 'Sans Serif' },
+  { id: 'archivo', name: 'Archivo', family: "'Archivo', sans-serif", category: 'Sans Serif' },
+  { id: 'barlow', name: 'Barlow', family: "'Barlow', sans-serif", category: 'Sans Serif' },
+  { id: 'karla', name: 'Karla', family: "'Karla', sans-serif", category: 'Sans Serif' },
+  { id: 'quicksand', name: 'Quicksand', family: "'Quicksand', sans-serif", category: 'Sans Serif' },
+  { id: 'comfortaa', name: 'Comfortaa', family: "'Comfortaa', sans-serif", category: 'Sans Serif' },
+  { id: 'varela-round', name: 'Varela Round', family: "'Varela Round', sans-serif", category: 'Sans Serif' },
+  // Serif - Classic
+  { id: 'merriweather', name: 'Merriweather', family: "'Merriweather', serif", category: 'Serif' },
+  { id: 'playfair', name: 'Playfair Display', family: "'Playfair Display', serif", category: 'Serif' },
+  { id: 'libre-baskerville', name: 'Libre Baskerville', family: "'Libre Baskerville', serif", category: 'Serif' },
+  { id: 'crimson', name: 'Crimson Text', family: "'Crimson Text', serif", category: 'Serif' },
+  { id: 'source-serif', name: 'Source Serif 4', family: "'Source Serif 4', serif", category: 'Serif' },
+  { id: 'cormorant', name: 'Cormorant Garamond', family: "'Cormorant Garamond', serif", category: 'Serif' },
+  { id: 'eb-garamond', name: 'EB Garamond', family: "'EB Garamond', serif", category: 'Serif' },
+  { id: 'spectral', name: 'Spectral', family: "'Spectral', serif", category: 'Serif' },
+  { id: 'bitter', name: 'Bitter', family: "'Bitter', serif", category: 'Serif' },
+  { id: 'lora', name: 'Lora', family: "'Lora', serif", category: 'Serif' },
+  // Monospace - Code
+  { id: 'source-code', name: 'Source Code Pro', family: "'Source Code Pro', monospace", category: 'Monospace' },
+  { id: 'fira-code', name: 'Fira Code', family: "'Fira Code', monospace", category: 'Monospace' },
+  { id: 'jetbrains', name: 'JetBrains Mono', family: "'JetBrains Mono', monospace", category: 'Monospace' },
+  { id: 'ibm-plex', name: 'IBM Plex Mono', family: "'IBM Plex Mono', monospace", category: 'Monospace' },
+  { id: 'space-mono', name: 'Space Mono', family: "'Space Mono', monospace", category: 'Monospace' },
+  { id: 'roboto-mono', name: 'Roboto Mono', family: "'Roboto Mono', monospace", category: 'Monospace' },
+  { id: 'cousine', name: 'Cousine', family: "'Cousine', monospace", category: 'Monospace' },
+  { id: 'anonymous', name: 'Anonymous Pro', family: "'Anonymous Pro', monospace", category: 'Monospace' },
+  { id: 'overpass-mono', name: 'Overpass Mono', family: "'Overpass Mono', monospace", category: 'Monospace' },
+  { id: 'inconsolata', name: 'Inconsolata', family: "'Inconsolata', monospace", category: 'Monospace' },
+];
+
+type FontStyle = string;
 
 export function NotebookView({
   trades,
@@ -144,7 +198,7 @@ export function NotebookView({
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreatingNew, setIsCreatingNew] = useState(false);
-  const [fontStyle, setFontStyle] = useState<FontStyle>('default');
+  const [fontStyle, setFontStyle] = useState<FontStyle>('inter');
   const [isSmallText, setIsSmallText] = useState(false);
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isFullWidthClosing, setIsFullWidthClosing] = useState(false);
@@ -796,11 +850,10 @@ export function NotebookView({
     winRate: trades.length > 0 ? (trades.filter(t => t.result > 0).length / trades.length) * 100 : 0,
   };
 
-  // Font style classes
-  const fontClasses = {
-    default: 'font-sans',
-    serif: 'font-serif',
-    mono: 'font-mono',
+  // Get font family from NOTEBOOK_FONTS array
+  const getSelectedFontFamily = () => {
+    const font = NOTEBOOK_FONTS.find(f => f.id === fontStyle);
+    return font?.family || "'Inter', sans-serif";
   };
 
   const isViewingTrash = selectedCategory === "trash";
@@ -1051,9 +1104,9 @@ export function NotebookView({
               <div
                 ref={fullscreenEditorRef}
                 contentEditable={!isLocked}
+                style={{ fontFamily: getSelectedFontFamily() }}
                 className={cn(
                   "min-h-[calc(100vh-400px)] outline-none focus:outline-none caret-primary",
-                  fontClasses[fontStyle],
                   isSmallText ? "text-sm leading-relaxed" : "text-base leading-loose",
                   isLocked && "cursor-not-allowed opacity-70",
                   "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-3",
@@ -1695,38 +1748,58 @@ export function NotebookView({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 px-2 rounded hover:bg-muted text-xs gap-1"
+                      className="h-7 px-2 rounded hover:bg-muted text-xs gap-1 min-w-[120px] justify-between"
                       disabled={isLocked}
                     >
-                      <span className={cn(
-                        fontStyle === 'default' && 'font-sans',
-                        fontStyle === 'serif' && 'font-serif',
-                        fontStyle === 'mono' && 'font-mono'
-                      )}>
-                        {fontStyle === 'default' ? 'Sans Serif' : fontStyle === 'serif' ? 'Serif' : 'Mono'}
+                      <span style={{ fontFamily: NOTEBOOK_FONTS.find(f => f.id === fontStyle)?.family }}>
+                        {NOTEBOOK_FONTS.find(f => f.id === fontStyle)?.name || 'Inter'}
                       </span>
                       <ChevronDown className="w-3 h-3" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-36 bg-background border border-border z-50">
-                    <DropdownMenuItem 
-                      onClick={() => setFontStyle('default')}
-                      className={cn("text-xs font-sans", fontStyle === 'default' && "bg-primary/10")}
-                    >
+                  <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto bg-background border border-border z-50">
+                    {/* Sans Serif */}
+                    <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
                       Sans Serif
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setFontStyle('serif')}
-                      className={cn("text-xs font-serif", fontStyle === 'serif' && "bg-primary/10")}
-                    >
+                    </div>
+                    {NOTEBOOK_FONTS.filter(f => f.category === 'Sans Serif').map((font) => (
+                      <DropdownMenuItem 
+                        key={font.id}
+                        onClick={() => setFontStyle(font.id)}
+                        className={cn("text-xs cursor-pointer", fontStyle === font.id && "bg-primary/10")}
+                        style={{ fontFamily: font.family }}
+                      >
+                        {font.name}
+                      </DropdownMenuItem>
+                    ))}
+                    {/* Serif */}
+                    <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background mt-1">
                       Serif
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setFontStyle('mono')}
-                      className={cn("text-xs font-mono", fontStyle === 'mono' && "bg-primary/10")}
-                    >
+                    </div>
+                    {NOTEBOOK_FONTS.filter(f => f.category === 'Serif').map((font) => (
+                      <DropdownMenuItem 
+                        key={font.id}
+                        onClick={() => setFontStyle(font.id)}
+                        className={cn("text-xs cursor-pointer", fontStyle === font.id && "bg-primary/10")}
+                        style={{ fontFamily: font.family }}
+                      >
+                        {font.name}
+                      </DropdownMenuItem>
+                    ))}
+                    {/* Monospace */}
+                    <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background mt-1">
                       Monospace
-                    </DropdownMenuItem>
+                    </div>
+                    {NOTEBOOK_FONTS.filter(f => f.category === 'Monospace').map((font) => (
+                      <DropdownMenuItem 
+                        key={font.id}
+                        onClick={() => setFontStyle(font.id)}
+                        className={cn("text-xs cursor-pointer", fontStyle === font.id && "bg-primary/10")}
+                        style={{ fontFamily: font.family }}
+                      >
+                        {font.name}
+                      </DropdownMenuItem>
+                    ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
                 
@@ -1924,9 +1997,9 @@ export function NotebookView({
                 <div
                   ref={editorRef}
                   contentEditable={!isLocked && !isSelectedEntryInTrash}
+                  style={{ fontFamily: getSelectedFontFamily() }}
                   className={cn(
                     "min-h-full p-4 pl-12 pr-12 outline-none focus:outline-none focus-visible:outline-none transition-all caret-primary",
-                    fontClasses[fontStyle],
                     isSmallText ? "text-xs" : "text-sm",
                     (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70",
                     "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2",
