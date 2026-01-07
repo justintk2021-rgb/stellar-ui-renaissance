@@ -2720,56 +2720,108 @@ export function NotebookView({
       `}</style>
 
       {/* Right-click Context Menu for Text Color/Highlight */}
-      {contextMenuOpen && (
-        <div
-          className="fixed z-[9999] bg-background border border-border rounded-lg shadow-xl p-1 min-w-[160px]"
-          style={{ left: contextMenuPosition.x, top: contextMenuPosition.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded-md transition-colors"
-            onClick={() => setShowTextColorPicker(!showTextColorPicker)}
+      <AnimatePresence>
+        {contextMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -8 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25, duration: 0.2 }}
+            className="fixed z-[9999] bg-background/95 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl p-1.5 min-w-[180px]"
+            style={{ left: contextMenuPosition.x, top: contextMenuPosition.y }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <Type className="w-4 h-4" />
-            Text Color
-            <ChevronRight className="w-3 h-3 ml-auto" />
-          </button>
-          {showTextColorPicker && (
-            <div className="flex flex-wrap gap-1 p-2 border-t border-border">
-              {TEXT_COLORS.map((color) => (
-                <button
-                  key={color.id}
-                  onClick={() => applyTextColor(color.color)}
-                  className="w-6 h-6 rounded border border-border hover:scale-110 transition-transform"
-                  style={{ backgroundColor: color.id === 'default' ? 'transparent' : color.color }}
-                  title={color.label}
-                />
-              ))}
-            </div>
-          )}
-          <button
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded-md transition-colors"
-            onClick={() => setShowHighlightColorPicker(!showHighlightColorPicker)}
-          >
-            <div className="w-4 h-4 rounded bg-yellow-300/50" />
-            Highlight
-            <ChevronRight className="w-3 h-3 ml-auto" />
-          </button>
-          {showHighlightColorPicker && (
-            <div className="flex flex-wrap gap-1 p-2 border-t border-border">
-              {HIGHLIGHT_COLORS.map((color) => (
-                <button
-                  key={color.id}
-                  onClick={() => applyHighlightColor(color.color)}
-                  className="w-6 h-6 rounded border border-border hover:scale-110 transition-transform"
-                  style={{ backgroundColor: color.color }}
-                  title={color.label}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+            <motion.button
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.05 }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted/80 rounded-lg transition-all duration-200"
+              onClick={() => setShowTextColorPicker(!showTextColorPicker)}
+            >
+              <Type className="w-4 h-4 text-muted-foreground" />
+              <span className="flex-1 text-left">Text Color</span>
+              <motion.div
+                animate={{ rotate: showTextColorPicker ? 90 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+              </motion.div>
+            </motion.button>
+            <AnimatePresence>
+              {showTextColorPicker && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex flex-wrap gap-1.5 p-2 border-t border-border/30 mt-1">
+                    {TEXT_COLORS.map((color, index) => (
+                      <motion.button
+                        key={color.id}
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.03 }}
+                        whileHover={{ scale: 1.2 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => applyTextColor(color.color)}
+                        className="w-7 h-7 rounded-lg border border-border/50 shadow-sm hover:shadow-md transition-shadow"
+                        style={{ backgroundColor: color.id === 'default' ? 'transparent' : color.color }}
+                        title={color.label}
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <motion.button
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted/80 rounded-lg transition-all duration-200"
+              onClick={() => setShowHighlightColorPicker(!showHighlightColorPicker)}
+            >
+              <div className="w-4 h-4 rounded bg-gradient-to-br from-yellow-300/60 to-yellow-400/60" />
+              <span className="flex-1 text-left">Highlight</span>
+              <motion.div
+                animate={{ rotate: showHighlightColorPicker ? 90 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+              </motion.div>
+            </motion.button>
+            <AnimatePresence>
+              {showHighlightColorPicker && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex flex-wrap gap-1.5 p-2 border-t border-border/30 mt-1">
+                    {HIGHLIGHT_COLORS.map((color, index) => (
+                      <motion.button
+                        key={color.id}
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.03 }}
+                        whileHover={{ scale: 1.2 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => applyHighlightColor(color.color)}
+                        className="w-7 h-7 rounded-lg border border-border/50 shadow-sm hover:shadow-md transition-shadow"
+                        style={{ backgroundColor: color.color }}
+                        title={color.label}
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
     </>
   );
