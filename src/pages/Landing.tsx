@@ -345,7 +345,7 @@ export default function Landing() {
                 whileTap={{ scale: 0.95 }}
               >
                 <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-2xl shadow-primary/40 rounded-2xl">
-                  Start Trading Journal
+                  Start Journaling
                   <ChevronRight className="w-5 h-5 ml-2" />
                 </Button>
               </motion.div>
