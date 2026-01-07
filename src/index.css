@@ -686,10 +686,10 @@
   transition: all 0.25s ease;
   border: none;
   outline: none;
-  border-radius: 0 0 8px 8px;
-  transform: rotate(-90deg) translateX(-100%);
+  border-radius: 8px 8px 0 0;
+  transform: rotate(90deg) translateY(-100%);
   transform-origin: top left;
-  box-shadow: 2px 2px 8px hsl(var(--foreground) / 0.2);
+  box-shadow: -2px 2px 8px hsl(var(--foreground) / 0.2);
 }
 
 .bookmark-tab:nth-of-type(2) {
@@ -699,11 +699,11 @@
 
 .bookmark-tab:hover {
   padding: 8px 20px;
-  box-shadow: 2px 4px 12px hsl(var(--foreground) / 0.3);
+  box-shadow: -2px 4px 12px hsl(var(--foreground) / 0.3);
 }
 
 .bookmark-tab:active {
-  transform: rotate(-90deg) translateX(-100%) scale(0.97);
+  transform: rotate(90deg) translateY(-100%) scale(0.97);
 }
 
 .bookmark-label {
