@@ -3,11 +3,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Json } from "@/integrations/supabase/types";
 
+interface ChecklistSubItem {
+  id: string;
+  text: string;
+  checked: boolean;
+}
+
 interface ChecklistItem {
   id: string;
   text: string;
   checked: boolean;
   percentage?: number; // Custom percentage weight (defaults to equal distribution)
+  subItems?: ChecklistSubItem[]; // Conditional sub-items that appear when parent is checked
 }
 
 interface Checklist {
@@ -16,6 +23,8 @@ interface Checklist {
   items: ChecklistItem[];
   createdAt: string;
 }
+
+export type { ChecklistItem, ChecklistSubItem, Checklist };
 
 export function useChecklists() {
   const [checklists, setChecklists] = useState<Checklist[]>([]);
