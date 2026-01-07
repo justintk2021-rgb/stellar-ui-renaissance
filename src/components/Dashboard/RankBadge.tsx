@@ -197,23 +197,40 @@ export function RankBadge({ trades }: RankBadgeProps) {
 
           {/* Consistency Metrics */}
           <div className="grid grid-cols-2 gap-2">
-            {metrics.map((metric) => (
+          {metrics.map((metric) => {
+            const isFlame = metric.label === "Win Streak" && stats.currentStreak > 0;
+            
+            return (
               <div
                 key={metric.label}
                 className="flex items-center gap-2 p-2 rounded-lg bg-muted/30"
               >
-                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center">
-                  <metric.icon className="w-3.5 h-3.5 text-muted-foreground" />
+                <div className={cn(
+                  "w-7 h-7 rounded-md flex items-center justify-center",
+                  isFlame ? "bg-orange-500/20" : "bg-muted/50"
+                )}>
+                  <metric.icon className={cn(
+                    "w-3.5 h-3.5",
+                    isFlame 
+                      ? "text-orange-500 animate-[flicker_0.5s_ease-in-out_infinite]" 
+                      : "text-muted-foreground"
+                  )} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold">{metric.value}</div>
+                  <div className={cn(
+                    "text-sm font-semibold",
+                    isFlame && stats.currentStreak >= 3 && "text-orange-500"
+                  )}>
+                    {metric.value}
+                  </div>
                   <div className="text-[9px] text-muted-foreground truncate">{metric.label}</div>
                 </div>
                 <div className="text-[9px] text-primary font-medium">
                   +{metric.score}
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
 
           {/* Rank Progression */}

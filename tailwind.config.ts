@@ -157,6 +157,24 @@ export default {
 				to: {
 					transform: 'rotateY(360deg)'
 				}
+			},
+			'flicker': {
+				'0%, 100%': {
+					opacity: '1',
+					transform: 'scale(1)'
+				},
+				'25%': {
+					opacity: '0.8',
+					transform: 'scale(1.05) rotate(-2deg)'
+				},
+				'50%': {
+					opacity: '1',
+					transform: 'scale(0.95) rotate(2deg)'
+				},
+				'75%': {
+					opacity: '0.9',
+					transform: 'scale(1.02) rotate(-1deg)'
+				}
 			}
 		},
 		animation: {
