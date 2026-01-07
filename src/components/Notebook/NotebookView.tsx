@@ -1014,7 +1014,7 @@ export function NotebookView({
     )}
     
     <div className={cn(
-      "h-[calc(100vh-220px)] lg:h-[calc(100vh-180px)] flex gap-4 transition-all duration-300 relative",
+      "h-[calc(100vh-120px)] flex gap-0 transition-all duration-300 relative -mx-6 -mt-2",
       isFullWidth && "invisible"
     )}>
       {/* Bookmark Tab Toggle - Notes */}
@@ -1344,7 +1344,7 @@ export function NotebookView({
         )}
 
         
-        <div className="flex-1 glass rounded-xl border border-border/40 overflow-hidden flex flex-col">
+        <div className="flex-1 bg-background overflow-hidden flex flex-col">
         {selectedEntry || isCreatingNew ? (
           <motion.div
             key={selectedEntry?.id || 'new-note'}
@@ -1716,7 +1716,7 @@ export function NotebookView({
             transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
           >
             {/* All Notes Header */}
-            <div className="p-6 pb-0">
+            <div className="px-8 py-5 border-b border-border/20">
               <motion.div 
                 initial={{ opacity: 0, y: -15 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1827,7 +1827,7 @@ export function NotebookView({
             </div>
 
             {/* Notes Grid/List */}
-            <ScrollArea className="flex-1 px-6 pb-6">
+            <ScrollArea className="flex-1 px-8 py-6">
               {notebookEntries.filter(e => {
                 if (e.isDeleted) return false;
                 if (selectedCategory !== "all" && e.category !== selectedCategory) return false;
