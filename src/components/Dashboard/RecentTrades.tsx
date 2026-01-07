@@ -22,7 +22,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      className="lg:col-span-2 glass rounded-2xl p-6 border border-border/40 shadow-lg"
+      className="glass rounded-2xl p-6 border border-border/40 shadow-lg flex flex-col min-h-[320px]"
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
