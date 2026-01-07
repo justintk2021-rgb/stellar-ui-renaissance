@@ -1732,8 +1732,6 @@ export function NotebookView({
                 >
                   {[
                     { id: 'all', label: 'All' },
-                    { id: 'trade-notes', label: 'Trade Notes' },
-                    { id: 'daily-journal', label: 'Journal' },
                     { id: 'trading-plan', label: 'Plans' },
                   ].map((tab, i) => (
                     <motion.button
