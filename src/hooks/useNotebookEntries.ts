@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { NotebookEntry } from '@/types/trade';
 import { toast } from 'sonner';
@@ -37,6 +37,7 @@ function mapDbToEntry(db: DbNotebookEntry): NotebookEntry {
 export function useNotebookEntries(userId: string | undefined) {
   const [entries, setEntries] = useState<NotebookEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Fetch entries from database
   const fetchEntries = useCallback(async () => {
@@ -68,8 +69,15 @@ export function useNotebookEntries(userId: string | undefined) {
   useEffect(() => {
     if (!userId) return;
 
+    // Clean up existing channel first
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    const channelName = `notebook-realtime-${userId}-${Date.now()}`;
     const channel = supabase
-      .channel('notebook-realtime')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -99,8 +107,13 @@ export function useNotebookEntries(userId: string | undefined) {
       )
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [userId]);
 
