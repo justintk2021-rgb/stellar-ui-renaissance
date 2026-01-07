@@ -1226,7 +1226,6 @@ export function NotebookView({
           className="bookmark-tab"
           style={{ top: '200px' }}
         >
-          <span className="bookmark-icon-shape" />
           <span className="bookmark-label">Notes</span>
         </button>
       )}
@@ -1236,9 +1235,8 @@ export function NotebookView({
         <button
           onMouseEnter={() => setIsFoldersPanelOpen(true)}
           className="bookmark-tab"
-          style={{ top: '270px' }}
+          style={{ top: '260px' }}
         >
-          <span className="bookmark-icon-shape" />
           <span className="bookmark-label">Folders</span>
         </button>
       )}
