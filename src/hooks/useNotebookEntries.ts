@@ -64,6 +64,46 @@ export function useNotebookEntries(userId: string | undefined) {
     }
   }, [userId]);
 
+  // Set up realtime subscription
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel('notebook-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notebook_entries',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('Notebook realtime update:', payload.eventType);
+          
+          if (payload.eventType === 'INSERT') {
+            const newEntry = mapDbToEntry(payload.new as DbNotebookEntry);
+            setEntries(prev => {
+              if (prev.some(e => e.id === newEntry.id)) return prev;
+              return [newEntry, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedEntry = mapDbToEntry(payload.new as DbNotebookEntry);
+            setEntries(prev => prev.map(e => 
+              e.id === updatedEntry.id ? updatedEntry : e
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            setEntries(prev => prev.filter(e => e.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
   useEffect(() => {
     fetchEntries();
   }, [fetchEntries]);

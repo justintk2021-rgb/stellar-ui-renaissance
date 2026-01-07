@@ -55,6 +55,73 @@ export function useTrades(userId: string | undefined, accountId: string | null =
     }
   }, [userId, accountId]);
 
+  // Set up realtime subscription
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel('trades-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'trades',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('Trades realtime update:', payload.eventType);
+          
+          if (payload.eventType === 'INSERT') {
+            const newTrade: Trade = {
+              id: payload.new.id,
+              date: payload.new.date,
+              pair: payload.new.pair,
+              direction: payload.new.direction as 'Long' | 'Short',
+              result: Number(payload.new.result),
+              session: payload.new.session || undefined,
+              notes: payload.new.notes || undefined,
+              notebook: payload.new.notebook || undefined,
+              chartImage: payload.new.chart_image || undefined,
+              accountId: payload.new.account_id || undefined,
+              checklistId: payload.new.checklist_id || undefined,
+              checklistState: payload.new.checklist_state || undefined,
+            };
+            // Only add if matches current account filter
+            if (!accountId || payload.new.account_id === accountId) {
+              setTrades(prev => {
+                if (prev.some(t => t.id === newTrade.id)) return prev;
+                return [newTrade, ...prev];
+              });
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            setTrades(prev => prev.map(t => 
+              t.id === payload.new.id ? {
+                ...t,
+                date: payload.new.date,
+                pair: payload.new.pair,
+                direction: payload.new.direction as 'Long' | 'Short',
+                result: Number(payload.new.result),
+                session: payload.new.session || undefined,
+                notes: payload.new.notes || undefined,
+                notebook: payload.new.notebook || undefined,
+                chartImage: payload.new.chart_image || undefined,
+                checklistId: payload.new.checklist_id || undefined,
+                checklistState: payload.new.checklist_state || undefined,
+              } : t
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            setTrades(prev => prev.filter(t => t.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, accountId]);
+
   useEffect(() => {
     fetchTrades();
   }, [fetchTrades]);

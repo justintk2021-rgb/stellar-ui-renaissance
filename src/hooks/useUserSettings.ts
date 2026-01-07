@@ -157,6 +157,39 @@ export function useUserSettings(userId: string | undefined) {
     fetchSettings();
   }, [fetchSettings]);
 
+  // Set up realtime subscription for settings sync across devices
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel('settings-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_settings',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('Settings realtime update');
+          setSettings({
+            theme: payload.new.theme as 'dark' | 'light',
+            accentColor: payload.new.accent_color as AccentColor,
+            customColor: payload.new.custom_color || '#10b981',
+            customGradient: payload.new.custom_gradient as unknown as CustomGradient | null,
+            sidebarCollapsed: payload.new.sidebar_collapsed,
+            notebookFont: payload.new.notebook_font || 'inter',
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
   // Debounced save to database
   const saveToDatabase = useCallback(async (newSettings: UserSettings) => {
     if (!userId) return;

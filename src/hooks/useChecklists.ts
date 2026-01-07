@@ -118,6 +118,86 @@ export function useChecklists() {
     }
   }, [userId, toast]);
 
+  // Set up realtime subscription
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel('checklists-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'checklists',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('Checklists realtime update:', payload.eventType);
+          
+          if (payload.eventType === 'INSERT') {
+            const items = payload.new.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType } | ChecklistItem[];
+            let newChecklist: Checklist;
+            
+            if (Array.isArray(items)) {
+              newChecklist = {
+                id: payload.new.id,
+                name: payload.new.name,
+                type: "fixed" as ChecklistType,
+                items: items || [],
+                notes: payload.new.notes || '',
+                createdAt: payload.new.created_at,
+              };
+            } else {
+              newChecklist = {
+                id: payload.new.id,
+                name: payload.new.name,
+                type: (items?.type || "fixed") as ChecklistType,
+                items: items?.items || [],
+                notes: payload.new.notes || '',
+                createdAt: payload.new.created_at,
+              };
+            }
+            
+            setChecklists(prev => {
+              if (prev.some(c => c.id === newChecklist.id)) return prev;
+              return [newChecklist, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const items = payload.new.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType } | ChecklistItem[];
+            
+            setChecklists(prev => prev.map(c => {
+              if (c.id !== payload.new.id) return c;
+              
+              if (Array.isArray(items)) {
+                return {
+                  ...c,
+                  name: payload.new.name,
+                  items: items || [],
+                  notes: payload.new.notes || '',
+                };
+              } else {
+                return {
+                  ...c,
+                  name: payload.new.name,
+                  type: (items?.type || c.type) as ChecklistType,
+                  items: items?.items || [],
+                  notes: payload.new.notes || '',
+                };
+              }
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            setChecklists(prev => prev.filter(c => c.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
   useEffect(() => {
     fetchChecklists();
   }, [fetchChecklists]);
