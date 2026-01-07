@@ -29,6 +29,7 @@ import { toast } from "sonner";
 interface Trade {
   id: string;
   date: string;
+  pair: string;
   result: number;
   checklist_id?: string;
 }
@@ -401,10 +402,12 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
       result = result.filter(t => t.result < 0);
     }
     
-    // Apply search (by date)
+    // Apply search (by date or symbol)
     if (searchQuery) {
+      const query = searchQuery.toLowerCase();
       result = result.filter(t => 
-        t.date.toLowerCase().includes(searchQuery.toLowerCase())
+        t.date.toLowerCase().includes(query) ||
+        t.pair.toLowerCase().includes(query)
       );
     }
     
@@ -450,10 +453,10 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search by date..."
+              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 w-[160px] h-9 bg-muted/30 border-border/30"
+              className="pl-9 w-[140px] h-9 bg-muted/30 border-border/30"
             />
           </div>
           
@@ -484,34 +487,49 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
         </div>
       </div>
 
-      {/* Trades List */}
+      {/* Table Header */}
+      <div className="grid grid-cols-4 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/30">
+        <div>Open Date</div>
+        <div>Symbol</div>
+        <div className="text-right">Net P&L</div>
+        <div className="text-right">Net ROI</div>
+      </div>
+
+      {/* Trades Table */}
       {paginatedTrades.length > 0 ? (
-        <div className="space-y-2">
+        <div className="divide-y divide-border/20">
           <AnimatePresence mode="popLayout">
-            {paginatedTrades.map((trade, index) => (
-              <motion.div
-                key={trade.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ delay: index * 0.03 }}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
+            {paginatedTrades.map((trade, index) => {
+              // Calculate a mock ROI based on result (you can adjust this based on actual account balance)
+              const mockAccountValue = 10000; // Placeholder - could be passed as prop
+              const roi = (trade.result / mockAccountValue) * 100;
+              
+              return (
+                <motion.div
+                  key={trade.id}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ delay: index * 0.02 }}
+                  className="grid grid-cols-4 gap-4 px-4 py-3 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="text-sm text-muted-foreground">{trade.date}</div>
+                  <div className="text-sm font-medium">{trade.pair}</div>
                   <div className={cn(
-                    "w-2 h-2 rounded-full",
-                    trade.result >= 0 ? "bg-primary" : "bg-destructive"
-                  )} />
-                  <span className="text-sm text-muted-foreground">{trade.date}</span>
-                </div>
-                <span className={cn(
-                  "font-mono font-semibold",
-                  trade.result >= 0 ? "text-primary" : "text-destructive"
-                )}>
-                  {trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}
-                </span>
-              </motion.div>
-            ))}
+                    "text-sm font-mono font-semibold text-right",
+                    trade.result >= 0 ? "text-primary" : "text-destructive"
+                  )}>
+                    ${Math.abs(trade.result).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className={cn(
+                    "text-sm font-mono text-right",
+                    roi >= 0 ? "text-primary" : "text-destructive"
+                  )}>
+                    {roi >= 0 ? '+' : ''}{roi.toFixed(2)}%
+                  </div>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       ) : (
@@ -526,12 +544,11 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex items-center justify-between mt-6 pt-4 border-t border-border/30"
+          className="flex items-center justify-between px-4 py-3 border-t border-border/30"
         >
           <span className="text-sm text-muted-foreground">
             Showing {((currentPage - 1) * TRADES_PER_PAGE) + 1}-{Math.min(currentPage * TRADES_PER_PAGE, filteredTrades.length)} of {filteredTrades.length}
