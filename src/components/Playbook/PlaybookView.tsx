@@ -1791,6 +1791,7 @@ export function PlaybookView() {
               )}
             </div>
           </div>
+          </div>
         </div>
 
         {/* Right Side - Metrics Panel */}
