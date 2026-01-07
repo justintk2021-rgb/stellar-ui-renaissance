@@ -37,6 +37,7 @@ interface Checklist {
   name: string;
   type: ChecklistType;
   items: ChecklistItem[];
+  notes: string;
   createdAt: string;
 }
 
@@ -89,6 +90,7 @@ export function useChecklists() {
             name: c.name,
             type: "fixed" as ChecklistType,
             items: items || [],
+            notes: c.notes || '',
             createdAt: c.created_at,
           };
         } else {
@@ -97,6 +99,7 @@ export function useChecklists() {
             name: c.name,
             type: (items?.type || "fixed") as ChecklistType,
             items: items?.items || [],
+            notes: c.notes || '',
             createdAt: c.created_at,
           };
         }
@@ -141,6 +144,7 @@ export function useChecklists() {
         name: data.name,
         type,
         items: [],
+        notes: '',
         createdAt: data.created_at,
       };
 
@@ -157,11 +161,12 @@ export function useChecklists() {
     }
   };
 
-  const updateChecklist = async (id: string, updates: Partial<Pick<Checklist, 'name' | 'items'>>) => {
+  const updateChecklist = async (id: string, updates: Partial<Pick<Checklist, 'name' | 'items' | 'notes'>>) => {
     try {
       const checklist = checklists.find(c => c.id === id);
-      const dbUpdates: { name?: string; items?: Json } = {};
+      const dbUpdates: { name?: string; items?: Json; notes?: string } = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
       if (updates.items !== undefined) {
         // Store with type preserved
         dbUpdates.items = { 
