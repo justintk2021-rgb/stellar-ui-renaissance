@@ -1210,6 +1210,7 @@ export function PlaybookView() {
               {selectedChecklist.items.length > 0 && (() => {
                 const itemState = convertItemsToState(selectedChecklist.items);
                 const gradeResult = getGradeFromCriteria(itemState, selectedChecklist.gradeCriteria);
+                const actualCompletion = getCompletionPercentage(selectedChecklist.items, selectedChecklist.type);
                 
                 return (
                   <motion.div
@@ -1223,7 +1224,7 @@ export function PlaybookView() {
                       gradeResult.borderColor
                     )}
                   >
-                    {gradeResult.gradeLabel} ({gradeResult.percentage}%)
+                    {gradeResult.gradeLabel} ({actualCompletion}%)
                   </motion.div>
                 );
               })()}
