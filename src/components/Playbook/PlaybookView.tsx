@@ -46,6 +46,8 @@ export function PlaybookView() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingPercentage, setEditingPercentage] = useState<string>("");
+  const [editingItemTextId, setEditingItemTextId] = useState<string | null>(null);
+  const [editingItemText, setEditingItemText] = useState<string>("");
   const [addingItemToChecklist, setAddingItemToChecklist] = useState<string | null>(null);
   const [checklistMetrics, setChecklistMetrics] = useState<ChecklistMetrics[]>([]);
   const [metricsLoading, setMetricsLoading] = useState(false);
@@ -237,6 +239,22 @@ export function PlaybookView() {
       next.delete(itemId);
       return next;
     });
+  };
+
+  const updateItemText = async (checklistId: string, itemId: string, newText: string) => {
+    if (!newText.trim()) return;
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    const updatedItems = checklist.items.map(item => {
+      if (item.id === itemId) {
+        return { ...item, text: newText.trim() };
+      }
+      return item;
+    });
+    await updateChecklist(checklistId, { items: updatedItems });
+    setEditingItemTextId(null);
+    setEditingItemText("");
   };
 
   // Sub-item functions
@@ -1716,12 +1734,37 @@ export function PlaybookView() {
                               </motion.div>
                             )}
                           </button>
-                          <span className={cn(
-                            "flex-1 text-sm transition-all",
-                            item.checked && "line-through text-muted-foreground"
-                          )}>
-                            {item.text}
-                          </span>
+                          {editingItemTextId === item.id ? (
+                            <Input
+                              value={editingItemText}
+                              onChange={(e) => setEditingItemText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  updateItemText(selectedChecklist.id, item.id, editingItemText);
+                                } else if (e.key === 'Escape') {
+                                  setEditingItemTextId(null);
+                                  setEditingItemText("");
+                                }
+                              }}
+                              onBlur={() => updateItemText(selectedChecklist.id, item.id, editingItemText)}
+                              className="flex-1 h-7 text-sm bg-background/50"
+                              autoFocus
+                            />
+                          ) : (
+                            <span 
+                              className={cn(
+                                "flex-1 text-sm transition-all cursor-pointer hover:text-primary",
+                                item.checked && "line-through text-muted-foreground"
+                              )}
+                              onClick={() => {
+                                setEditingItemTextId(item.id);
+                                setEditingItemText(item.text);
+                              }}
+                              title="Click to edit"
+                            >
+                              {item.text}
+                            </span>
+                          )}
                           
                           {/* Percentage Editor */}
                           {editingItemId === item.id ? (
