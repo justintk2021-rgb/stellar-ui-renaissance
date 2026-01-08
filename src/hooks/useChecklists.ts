@@ -32,12 +32,14 @@ interface ChecklistItem {
 
 type ChecklistType = "fixed" | "conditional";
 
-// Custom grade thresholds - minimum percentage for each grade
+// Item-based grade criteria - defines which items must be checked for each grade
+// Each grade contains an array of item IDs that must ALL be checked to achieve that grade
+// The system checks from A down - first matching grade wins
 interface GradeCriteria {
-  A: number; // e.g., 90 means A = 90-100%
-  B: number; // e.g., 75 means B = 75-89%
-  C: number; // e.g., 60 means C = 60-74%
-  D: number; // e.g., 0 means D = 0-59%
+  A: string[]; // Item IDs required for grade A (highest)
+  B: string[]; // Item IDs required for grade B
+  C: string[]; // Item IDs required for grade C
+  D: string[]; // Item IDs required for grade D (can be empty = default)
 }
 
 interface Checklist {
@@ -46,18 +48,18 @@ interface Checklist {
   type: ChecklistType;
   items: ChecklistItem[];
   notes: string;
-  gradeCriteria?: GradeCriteria; // Custom grade thresholds
+  gradeCriteria?: GradeCriteria; // Item-based grade rules
   createdAt: string;
 }
 
 export type { ChecklistItem, ChecklistSubItem, ConditionalSubItem, Checklist, ChecklistType, PercentageType, GradeCriteria };
 
-// Default grade criteria
+// Default empty grade criteria (percentage-based fallback when no criteria defined)
 export const DEFAULT_GRADE_CRITERIA: GradeCriteria = {
-  A: 90,
-  B: 75,
-  C: 60,
-  D: 0,
+  A: [],
+  B: [],
+  C: [],
+  D: [],
 };
 
 export function useChecklists() {

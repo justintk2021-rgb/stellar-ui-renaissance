@@ -9,7 +9,7 @@ import { X, ClipboardCheck, Award, ChevronRight, GitBranch, ListChecks, Plus, Lo
 import { cn } from "@/lib/utils";
 import { ChecklistItemState, ChecklistSubItemState, ChecklistChildState } from "@/types/trade";
 import { ChecklistType, ChecklistItem, ChecklistSubItem, ConditionalSubItem, GradeCriteria } from "@/hooks/useChecklists";
-import { getGradeFromPercentage } from "@/lib/gradeUtils";
+import { getGradeFromCriteria } from "@/lib/gradeUtils";
 
 interface Checklist {
   id: string;
@@ -341,8 +341,8 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
   };
 
   const completionPercentage = getCompletionPercentage();
-  const gradeResult = getGradeFromPercentage(completionPercentage, checklist.gradeCriteria);
-  const { gradeLabel: grade, color, bgColor } = gradeResult;
+  const gradeResult = getGradeFromCriteria(items, checklist.gradeCriteria);
+  const { gradeLabel: grade, color, bgColor, percentage: gradePercentage } = gradeResult;
 
   const handleConfirm = () => {
     onConfirm(items);

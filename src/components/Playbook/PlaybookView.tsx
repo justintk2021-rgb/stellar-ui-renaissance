@@ -26,9 +26,10 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useChecklists, ChecklistItem, ChecklistSubItem, ConditionalSubItem, ChecklistType, PercentageType, GradeCriteria, DEFAULT_GRADE_CRITERIA } from "@/hooks/useChecklists";
-import { getGradeFromPercentage } from "@/lib/gradeUtils";
+import { getGradeFromCriteria, convertItemsToState } from "@/lib/gradeUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ChecklistMetrics {
   checklistId: string;
@@ -1207,8 +1208,8 @@ export function PlaybookView() {
             <div className="flex items-center gap-3">
               {/* Grade Badge */}
               {selectedChecklist.items.length > 0 && (() => {
-                const percentage = getCompletionPercentage(selectedChecklist.items, selectedChecklist.type);
-                const gradeResult = getGradeFromPercentage(percentage, selectedChecklist.gradeCriteria);
+                const itemState = convertItemsToState(selectedChecklist.items);
+                const gradeResult = getGradeFromCriteria(itemState, selectedChecklist.gradeCriteria);
                 
                 return (
                   <motion.div
@@ -1222,7 +1223,7 @@ export function PlaybookView() {
                       gradeResult.borderColor
                     )}
                   >
-                    {gradeResult.gradeLabel}
+                    {gradeResult.gradeLabel} ({gradeResult.percentage}%)
                   </motion.div>
                 );
               })()}
@@ -1836,9 +1837,9 @@ export function PlaybookView() {
                     <div className="text-left">
                       <span className="text-sm font-medium">Grade Criteria</span>
                       <p className="text-[10px] text-muted-foreground">
-                        {selectedChecklist.gradeCriteria 
-                          ? `A≥${selectedChecklist.gradeCriteria.A}% B≥${selectedChecklist.gradeCriteria.B}% C≥${selectedChecklist.gradeCriteria.C}%`
-                          : "Default: A≥90% B≥75% C≥60%"
+                        {selectedChecklist.gradeCriteria && (selectedChecklist.gradeCriteria.A.length > 0 || selectedChecklist.gradeCriteria.B.length > 0 || selectedChecklist.gradeCriteria.C.length > 0)
+                          ? `A: ${selectedChecklist.gradeCriteria.A.length} items, B: ${selectedChecklist.gradeCriteria.B.length} items, C: ${selectedChecklist.gradeCriteria.C.length} items`
+                          : "Define which items are needed for each grade"
                         }
                       </p>
                     </div>
@@ -1849,113 +1850,155 @@ export function PlaybookView() {
                   )} />
                 </button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3 space-y-3">
+              <CollapsibleContent className="pt-3 space-y-4">
                 <p className="text-xs text-muted-foreground px-1">
-                  Set minimum percentage thresholds for each grade. When you check items, the grade will be calculated based on these thresholds.
+                  Select which items must be checked to achieve each grade. The system checks from A down - first grade where all required items are checked wins.
                 </p>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['A', 'B', 'C', 'D'] as const).map((grade) => {
-                    const criteria = editingGradeCriteria || selectedChecklist.gradeCriteria || DEFAULT_GRADE_CRITERIA;
-                    const colors = {
-                      A: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-500" },
-                      B: { bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-500" },
-                      C: { bg: "bg-yellow-500/10", border: "border-yellow-500/30", text: "text-yellow-500" },
-                      D: { bg: "bg-red-500/10", border: "border-red-500/30", text: "text-red-500" },
-                    };
-                    
-                    return (
-                      <div 
-                        key={grade}
-                        className={cn(
-                          "rounded-lg p-3 border transition-all",
-                          colors[grade].bg,
-                          colors[grade].border
-                        )}
-                      >
-                        <div className={cn("text-lg font-bold text-center mb-1", colors[grade].text)}>
-                          {grade}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-muted-foreground">≥</span>
-                          <Input
-                            type="number"
-                            min={0}
-                            max={100}
-                            value={editingGradeCriteria?.[grade] ?? criteria[grade]}
-                            onChange={(e) => {
-                              const value = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
-                              setEditingGradeCriteria(prev => ({
-                                ...DEFAULT_GRADE_CRITERIA,
-                                ...selectedChecklist.gradeCriteria,
-                                ...prev,
-                                [grade]: value,
-                              }));
-                            }}
-                            className="h-7 text-xs text-center px-1 bg-background/50"
-                            disabled={grade === 'D'}
-                          />
-                          <span className="text-[10px] text-muted-foreground">%</span>
-                        </div>
-                        {grade !== 'D' && (
-                          <div className="text-[9px] text-muted-foreground text-center mt-1">
-                            {grade === 'A' && `to 100%`}
-                            {grade === 'B' && `to ${(editingGradeCriteria?.A ?? criteria.A) - 1}%`}
-                            {grade === 'C' && `to ${(editingGradeCriteria?.B ?? criteria.B) - 1}%`}
-                          </div>
-                        )}
-                        {grade === 'D' && (
-                          <div className="text-[9px] text-muted-foreground text-center mt-1">
-                            to {(editingGradeCriteria?.C ?? criteria.C) - 1}%
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
                 
-                {/* Save/Reset buttons */}
-                <div className="flex items-center gap-2 pt-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setEditingGradeCriteria(null);
-                    }}
-                    className="flex-1 text-xs"
-                  >
-                    Reset to Default
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      if (editingGradeCriteria) {
-                        updateChecklist(selectedChecklist.id, { gradeCriteria: editingGradeCriteria });
-                        setEditingGradeCriteria(null);
+                {/* Get all items including sub-items for selection */}
+                {(() => {
+                  // Flatten all items and sub-items for selection
+                  const allSelectableItems: { id: string; text: string; isSubItem: boolean; parentText?: string }[] = [];
+                  selectedChecklist.items.forEach(item => {
+                    allSelectableItems.push({ id: item.id, text: item.text, isSubItem: false });
+                    item.subItems?.forEach(sub => {
+                      allSelectableItems.push({ id: sub.id, text: sub.text, isSubItem: true, parentText: item.text });
+                    });
+                  });
+                  
+                  const criteria = editingGradeCriteria || selectedChecklist.gradeCriteria || DEFAULT_GRADE_CRITERIA;
+                  
+                  const grades = [
+                    { key: 'A' as const, label: 'A Setup', desc: 'Best setup - all conditions perfect', colors: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-500", check: "data-[state=checked]:bg-emerald-500" } },
+                    { key: 'B' as const, label: 'B Setup', desc: 'Good setup - most conditions met', colors: { bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-500", check: "data-[state=checked]:bg-blue-500" } },
+                    { key: 'C' as const, label: 'C Setup', desc: 'Average setup - minimum requirements', colors: { bg: "bg-yellow-500/10", border: "border-yellow-500/30", text: "text-yellow-500", check: "data-[state=checked]:bg-yellow-500" } },
+                    { key: 'D' as const, label: 'D Setup', desc: 'Below criteria - use as default', colors: { bg: "bg-red-500/10", border: "border-red-500/30", text: "text-red-500", check: "data-[state=checked]:bg-red-500" } },
+                  ];
+                  
+                  const toggleItemForGrade = (gradeKey: 'A' | 'B' | 'C' | 'D', itemId: string) => {
+                    setEditingGradeCriteria(prev => {
+                      const current = prev || selectedChecklist.gradeCriteria || DEFAULT_GRADE_CRITERIA;
+                      const gradeItems = [...current[gradeKey]];
+                      const index = gradeItems.indexOf(itemId);
+                      if (index > -1) {
+                        gradeItems.splice(index, 1);
+                      } else {
+                        gradeItems.push(itemId);
                       }
-                    }}
-                    disabled={!editingGradeCriteria}
-                    className="flex-1 text-xs"
-                  >
-                    <Check className="w-3 h-3 mr-1" />
-                    Save Criteria
-                  </Button>
-                </div>
-                
-                {/* Clear custom criteria */}
-                {selectedChecklist.gradeCriteria && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      updateChecklist(selectedChecklist.id, { gradeCriteria: undefined });
-                      setEditingGradeCriteria(null);
-                    }}
-                    className="w-full text-xs text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="w-3 h-3 mr-1" />
-                    Remove Custom Criteria (Use Defaults)
-                  </Button>
-                )}
+                      return { ...current, [gradeKey]: gradeItems };
+                    });
+                  };
+                  
+                  return (
+                    <div className="space-y-4">
+                      {grades.map(({ key, label, desc, colors }) => (
+                        <div 
+                          key={key}
+                          className={cn(
+                            "rounded-xl p-4 border transition-all",
+                            colors.bg,
+                            colors.border
+                          )}
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <div className={cn("text-sm font-bold", colors.text)}>{label}</div>
+                              <div className="text-[10px] text-muted-foreground">{desc}</div>
+                            </div>
+                            <div className={cn("text-xs font-medium px-2 py-0.5 rounded-full", colors.bg, colors.text)}>
+                              {criteria[key].length} items
+                            </div>
+                          </div>
+                          
+                          {allSelectableItems.length > 0 ? (
+                            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                              {allSelectableItems.map(item => {
+                                const isSelected = criteria[key].includes(item.id);
+                                return (
+                                  <label
+                                    key={item.id}
+                                    className={cn(
+                                      "flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all",
+                                      "hover:bg-background/50",
+                                      isSelected && "bg-background/80"
+                                    )}
+                                  >
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={() => toggleItemForGrade(key, item.id)}
+                                      className={cn("border-border/50", colors.check)}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <span className={cn(
+                                        "text-xs block truncate",
+                                        isSelected && "font-medium"
+                                      )}>
+                                        {item.text}
+                                      </span>
+                                      {item.isSubItem && (
+                                        <span className="text-[10px] text-muted-foreground">
+                                          under {item.parentText}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground text-center py-2">
+                              Add items to your checklist first
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                      
+                      {/* Save/Reset buttons */}
+                      <div className="flex items-center gap-2 pt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingGradeCriteria(null);
+                          }}
+                          className="flex-1 text-xs"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (editingGradeCriteria) {
+                              updateChecklist(selectedChecklist.id, { gradeCriteria: editingGradeCriteria });
+                              setEditingGradeCriteria(null);
+                            }
+                          }}
+                          disabled={!editingGradeCriteria}
+                          className="flex-1 text-xs"
+                        >
+                          <Check className="w-3 h-3 mr-1" />
+                          Save Grade Rules
+                        </Button>
+                      </div>
+                      
+                      {/* Clear custom criteria */}
+                      {selectedChecklist.gradeCriteria && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            updateChecklist(selectedChecklist.id, { gradeCriteria: undefined });
+                            setEditingGradeCriteria(null);
+                          }}
+                          className="w-full text-xs text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Clear All Grade Rules
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })()}
               </CollapsibleContent>
             </Collapsible>
           </div>
