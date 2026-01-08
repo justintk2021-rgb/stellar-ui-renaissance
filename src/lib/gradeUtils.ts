@@ -133,6 +133,7 @@ export function getGradeFromCriteria(
 
 /**
  * Fallback percentage-based grading when no item criteria is defined
+ * Counts all checked items INCLUDING sub-items
  */
 export function getGradeFromPercentage(
   checklistState: ChecklistItemState[]
@@ -148,17 +149,46 @@ export function getGradeFromPercentage(
     };
   }
   
-  // Calculate percentage based on checked items
-  const hasCustomPercentages = checklistState.some(item => item.percentage !== undefined);
-  let percentage: number;
+  // Count total checkable items and checked items (including sub-items)
+  let totalItems = 0;
+  let checkedItems = 0;
+  let totalPercentage = 0;
+  let hasCustomPercentages = false;
   
+  checklistState.forEach(item => {
+    if (item.subItems && item.subItems.length > 0) {
+      // Item has sub-items - count those instead
+      item.subItems.forEach(sub => {
+        totalItems++;
+        if (sub.checked) {
+          checkedItems++;
+          if (sub.percentage !== undefined) {
+            hasCustomPercentages = true;
+            totalPercentage += sub.percentage;
+          }
+        }
+      });
+    } else {
+      // Simple item without sub-items
+      totalItems++;
+      if (item.checked) {
+        checkedItems++;
+        if (item.percentage !== undefined) {
+          hasCustomPercentages = true;
+          totalPercentage += item.percentage;
+        }
+      }
+    }
+  });
+  
+  // Calculate percentage
+  let percentage: number;
   if (hasCustomPercentages) {
-    percentage = checklistState
-      .filter(item => item.checked)
-      .reduce((sum, item) => sum + (item.percentage || 0), 0);
+    percentage = Math.round(totalPercentage);
+  } else if (totalItems > 0) {
+    percentage = Math.round((checkedItems / totalItems) * 100);
   } else {
-    const checkedCount = checklistState.filter(item => item.checked).length;
-    percentage = Math.round((checkedCount / checklistState.length) * 100);
+    percentage = 0;
   }
   
   // Determine grade from percentage
