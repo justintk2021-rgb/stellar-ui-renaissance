@@ -41,8 +41,8 @@ function areAllItemsChecked(requiredIds: string[], checkedIds: Set<string>): boo
   return requiredIds.every(id => checkedIds.has(id));
 }
 
-// Predefined percentage for each grade
-const GRADE_PERCENTAGES = {
+// Default percentages for each grade (used when no custom percentage is set)
+const DEFAULT_GRADE_PERCENTAGES = {
   A: 100,
   B: 80,
   C: 60,
@@ -58,12 +58,12 @@ export function getGradeFromCriteria(
   checklistState: ChecklistItemState[],
   gradeCriteria?: GradeCriteria
 ): GradeResult {
-  // If no criteria or all grades have empty arrays, use percentage fallback
+  // If no criteria or all grades have empty item arrays, use percentage fallback
   const hasAnyCriteria = gradeCriteria && (
-    gradeCriteria.A.length > 0 ||
-    gradeCriteria.B.length > 0 ||
-    gradeCriteria.C.length > 0 ||
-    gradeCriteria.D.length > 0
+    gradeCriteria.A.items.length > 0 ||
+    gradeCriteria.B.items.length > 0 ||
+    gradeCriteria.C.items.length > 0 ||
+    gradeCriteria.D.items.length > 0
   );
   
   if (!hasAnyCriteria) {
@@ -73,34 +73,34 @@ export function getGradeFromCriteria(
   
   const checkedIds = getCheckedItemIds(checklistState);
   
-  // Check grades from highest to lowest
-  if (areAllItemsChecked(gradeCriteria!.A, checkedIds)) {
+  // Check grades from highest to lowest, using custom percentages from criteria
+  if (areAllItemsChecked(gradeCriteria!.A.items, checkedIds)) {
     return {
       grade: "A",
       gradeLabel: "A Setup",
-      percentage: GRADE_PERCENTAGES.A,
+      percentage: gradeCriteria!.A.percentage ?? DEFAULT_GRADE_PERCENTAGES.A,
       color: "text-emerald-500",
       bgColor: "bg-emerald-500/20",
       borderColor: "border-emerald-500/30",
     };
   }
   
-  if (areAllItemsChecked(gradeCriteria!.B, checkedIds)) {
+  if (areAllItemsChecked(gradeCriteria!.B.items, checkedIds)) {
     return {
       grade: "B",
       gradeLabel: "B Setup",
-      percentage: GRADE_PERCENTAGES.B,
+      percentage: gradeCriteria!.B.percentage ?? DEFAULT_GRADE_PERCENTAGES.B,
       color: "text-blue-500",
       bgColor: "bg-blue-500/20",
       borderColor: "border-blue-500/30",
     };
   }
   
-  if (areAllItemsChecked(gradeCriteria!.C, checkedIds)) {
+  if (areAllItemsChecked(gradeCriteria!.C.items, checkedIds)) {
     return {
       grade: "C",
       gradeLabel: "C Setup",
-      percentage: GRADE_PERCENTAGES.C,
+      percentage: gradeCriteria!.C.percentage ?? DEFAULT_GRADE_PERCENTAGES.C,
       color: "text-yellow-500",
       bgColor: "bg-yellow-500/20",
       borderColor: "border-yellow-500/30",
@@ -109,11 +109,11 @@ export function getGradeFromCriteria(
   
   // D is the default when nothing else matches
   // Check D criteria if defined, otherwise just return D
-  if (gradeCriteria!.D.length === 0 || areAllItemsChecked(gradeCriteria!.D, checkedIds)) {
+  if (gradeCriteria!.D.items.length === 0 || areAllItemsChecked(gradeCriteria!.D.items, checkedIds)) {
     return {
       grade: "D",
       gradeLabel: "D Setup",
-      percentage: GRADE_PERCENTAGES.D,
+      percentage: gradeCriteria!.D.percentage ?? DEFAULT_GRADE_PERCENTAGES.D,
       color: "text-red-500",
       bgColor: "bg-red-500/20",
       borderColor: "border-red-500/30",

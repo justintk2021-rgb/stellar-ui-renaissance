@@ -2030,8 +2030,8 @@ export function PlaybookView() {
                     <div className="text-left">
                       <span className="text-sm font-medium">Grade Criteria</span>
                       <p className="text-[10px] text-muted-foreground">
-                        {selectedChecklist.gradeCriteria && (selectedChecklist.gradeCriteria.A.length > 0 || selectedChecklist.gradeCriteria.B.length > 0 || selectedChecklist.gradeCriteria.C.length > 0)
-                          ? `A: ${selectedChecklist.gradeCriteria.A.length} items, B: ${selectedChecklist.gradeCriteria.B.length} items, C: ${selectedChecklist.gradeCriteria.C.length} items`
+                        {selectedChecklist.gradeCriteria && (selectedChecklist.gradeCriteria.A.items.length > 0 || selectedChecklist.gradeCriteria.B.items.length > 0 || selectedChecklist.gradeCriteria.C.items.length > 0)
+                          ? `A: ${selectedChecklist.gradeCriteria.A.items.length} items (${selectedChecklist.gradeCriteria.A.percentage}%), B: ${selectedChecklist.gradeCriteria.B.items.length} items (${selectedChecklist.gradeCriteria.B.percentage}%), C: ${selectedChecklist.gradeCriteria.C.items.length} items (${selectedChecklist.gradeCriteria.C.percentage}%)`
                           : "Define which items are needed for each grade"
                         }
                       </p>
@@ -2045,7 +2045,7 @@ export function PlaybookView() {
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-3 space-y-4">
                 <p className="text-xs text-muted-foreground px-1">
-                  Select which items must be checked to achieve each grade. The system checks from A down - first grade where all required items are checked wins.
+                  Select which items must be checked to achieve each grade and set the percentage for each. The system checks from A down - first grade where all required items are checked wins.
                 </p>
                 
                 {/* Get all items including sub-items for selection */}
@@ -2062,29 +2062,48 @@ export function PlaybookView() {
                   const criteria = editingGradeCriteria || selectedChecklist.gradeCriteria || DEFAULT_GRADE_CRITERIA;
                   
                   const grades = [
-                    { key: 'A' as const, label: 'A Setup', desc: 'Best setup - all conditions perfect', colors: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-500", check: "data-[state=checked]:bg-emerald-500" } },
-                    { key: 'B' as const, label: 'B Setup', desc: 'Good setup - most conditions met', colors: { bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-500", check: "data-[state=checked]:bg-blue-500" } },
-                    { key: 'C' as const, label: 'C Setup', desc: 'Average setup - minimum requirements', colors: { bg: "bg-yellow-500/10", border: "border-yellow-500/30", text: "text-yellow-500", check: "data-[state=checked]:bg-yellow-500" } },
-                    { key: 'D' as const, label: 'D Setup', desc: 'Below criteria - use as default', colors: { bg: "bg-red-500/10", border: "border-red-500/30", text: "text-red-500", check: "data-[state=checked]:bg-red-500" } },
+                    { key: 'A' as const, label: 'A Setup', desc: 'Best setup - all conditions perfect', defaultPct: 100, colors: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-500", check: "data-[state=checked]:bg-emerald-500" } },
+                    { key: 'B' as const, label: 'B Setup', desc: 'Good setup - most conditions met', defaultPct: 80, colors: { bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-500", check: "data-[state=checked]:bg-blue-500" } },
+                    { key: 'C' as const, label: 'C Setup', desc: 'Average setup - minimum requirements', defaultPct: 60, colors: { bg: "bg-yellow-500/10", border: "border-yellow-500/30", text: "text-yellow-500", check: "data-[state=checked]:bg-yellow-500" } },
+                    { key: 'D' as const, label: 'D Setup', desc: 'Below criteria - use as default', defaultPct: 40, colors: { bg: "bg-red-500/10", border: "border-red-500/30", text: "text-red-500", check: "data-[state=checked]:bg-red-500" } },
                   ];
                   
                   const toggleItemForGrade = (gradeKey: 'A' | 'B' | 'C' | 'D', itemId: string) => {
                     setEditingGradeCriteria(prev => {
                       const current = prev || selectedChecklist.gradeCriteria || DEFAULT_GRADE_CRITERIA;
-                      const gradeItems = [...current[gradeKey]];
+                      const gradeItems = [...current[gradeKey].items];
                       const index = gradeItems.indexOf(itemId);
                       if (index > -1) {
                         gradeItems.splice(index, 1);
                       } else {
                         gradeItems.push(itemId);
                       }
-                      return { ...current, [gradeKey]: gradeItems };
+                      return { 
+                        ...current, 
+                        [gradeKey]: { 
+                          ...current[gradeKey], 
+                          items: gradeItems 
+                        } 
+                      };
+                    });
+                  };
+                  
+                  const updateGradePercentage = (gradeKey: 'A' | 'B' | 'C' | 'D', percentage: number) => {
+                    setEditingGradeCriteria(prev => {
+                      const current = prev || selectedChecklist.gradeCriteria || DEFAULT_GRADE_CRITERIA;
+                      return { 
+                        ...current, 
+                        [gradeKey]: { 
+                          ...current[gradeKey], 
+                          percentage: Math.min(100, Math.max(0, percentage))
+                        } 
+                      };
                     });
                   };
                   
                   return (
                     <div className="space-y-4">
-                      {grades.map(({ key, label, desc, colors }) => (
+                      {grades.map(({ key, label, desc, defaultPct, colors }) => (
                         <div 
                           key={key}
                           className={cn(
@@ -2094,19 +2113,32 @@ export function PlaybookView() {
                           )}
                         >
                           <div className="flex items-center justify-between mb-3">
-                            <div>
+                            <div className="flex-1">
                               <div className={cn("text-sm font-bold", colors.text)}>{label}</div>
                               <div className="text-[10px] text-muted-foreground">{desc}</div>
                             </div>
-                            <div className={cn("text-xs font-medium px-2 py-0.5 rounded-full", colors.bg, colors.text)}>
-                              {criteria[key].length} items
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={criteria[key].percentage}
+                                  onChange={(e) => updateGradePercentage(key, parseInt(e.target.value) || 0)}
+                                  className="w-14 h-7 text-xs text-center p-1"
+                                />
+                                <span className="text-xs text-muted-foreground">%</span>
+                              </div>
+                              <div className={cn("text-xs font-medium px-2 py-0.5 rounded-full", colors.bg, colors.text)}>
+                                {criteria[key].items.length} items
+                              </div>
                             </div>
                           </div>
                           
                           {allSelectableItems.length > 0 ? (
                             <div className="space-y-1.5 max-h-40 overflow-y-auto">
                               {allSelectableItems.map(item => {
-                                const isSelected = criteria[key].includes(item.id);
+                                const isSelected = criteria[key].items.includes(item.id);
                                 return (
                                   <label
                                     key={item.id}
