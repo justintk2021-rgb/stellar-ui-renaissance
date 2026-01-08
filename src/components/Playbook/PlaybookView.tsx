@@ -1740,39 +1740,6 @@ export function PlaybookView() {
                           
                           {/* Expand/Actions */}
                           <div className="flex items-center gap-2 shrink-0">
-                            {/* Percentage Editor */}
-                            {editingItemId === item.id ? (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={editingPercentage}
-                                  onChange={(e) => setEditingPercentage(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0);
-                                    } else if (e.key === 'Escape') {
-                                      setEditingItemId(null);
-                                    }
-                                  }}
-                                  onBlur={() => updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0)}
-                                  className="w-16 h-7 text-xs text-center p-1"
-                                  autoFocus
-                                />
-                                <span className="text-xs text-muted-foreground">%</span>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => startEditingPercentage(item.id, item.percentage, selectedChecklist.items.length)}
-                                className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                                title="Edit percentage weight"
-                              >
-                                <Percent className="w-3 h-3" />
-                                <span>{item.percentage ?? Math.round(100 / selectedChecklist.items.length)}%</span>
-                              </button>
-                            )}
-                            
                             {hasSubItems && (
                               <motion.button
                                 onClick={() => toggleExpandItem(item.id)}
@@ -1783,7 +1750,6 @@ export function PlaybookView() {
                                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
                               </motion.button>
                             )}
-                            
                             {/* Add Sub-item Button */}
                             <motion.button
                               whileHover={{ scale: 1.1 }}
@@ -2050,12 +2016,12 @@ export function PlaybookView() {
                 
                 {/* Get all items including sub-items for selection */}
                 {(() => {
-                  // Flatten all items and sub-items for selection
-                  const allSelectableItems: { id: string; text: string; isSubItem: boolean; parentText?: string }[] = [];
+                  // Flatten all items and sub-items for selection with their percentages
+                  const allSelectableItems: { id: string; text: string; isSubItem: boolean; parentText?: string; percentage?: number }[] = [];
                   selectedChecklist.items.forEach(item => {
-                    allSelectableItems.push({ id: item.id, text: item.text, isSubItem: false });
+                    allSelectableItems.push({ id: item.id, text: item.text, isSubItem: false, percentage: item.percentage });
                     item.subItems?.forEach(sub => {
-                      allSelectableItems.push({ id: sub.id, text: sub.text, isSubItem: true, parentText: item.text });
+                      allSelectableItems.push({ id: sub.id, text: sub.text, isSubItem: true, parentText: item.text, percentage: sub.percentage });
                     });
                   });
                   
@@ -2101,6 +2067,23 @@ export function PlaybookView() {
                     });
                   };
                   
+                  // Update item percentage in the checklist
+                  const updateItemPercentageInCriteria = (itemId: string, percentage: number, isSubItem: boolean, parentItemId?: string) => {
+                    const updatedItems = selectedChecklist.items.map(item => {
+                      if (!isSubItem && item.id === itemId) {
+                        return { ...item, percentage: Math.min(100, Math.max(0, percentage)) };
+                      }
+                      if (isSubItem && item.subItems) {
+                        const updatedSubItems = item.subItems.map(sub => 
+                          sub.id === itemId ? { ...sub, percentage: Math.min(100, Math.max(0, percentage)) } : sub
+                        );
+                        return { ...item, subItems: updatedSubItems };
+                      }
+                      return item;
+                    });
+                    updateChecklist(selectedChecklist.id, { items: updatedItems });
+                  };
+                  
                   return (
                     <div className="space-y-4">
                       {grades.map(({ key, label, desc, defaultPct, colors }) => (
@@ -2136,14 +2119,15 @@ export function PlaybookView() {
                           </div>
                           
                           {allSelectableItems.length > 0 ? (
-                            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto">
                               {allSelectableItems.map(item => {
                                 const isSelected = (criteria[key]?.items || []).includes(item.id);
+                                const defaultPct = Math.round(100 / allSelectableItems.length);
                                 return (
-                                  <label
+                                  <div
                                     key={item.id}
                                     className={cn(
-                                      "flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all",
+                                      "flex items-center gap-2 p-2 rounded-lg transition-all",
                                       "hover:bg-background/50",
                                       isSelected && "bg-background/80"
                                     )}
@@ -2151,7 +2135,7 @@ export function PlaybookView() {
                                     <Checkbox
                                       checked={isSelected}
                                       onCheckedChange={() => toggleItemForGrade(key, item.id)}
-                                      className={cn("border-border/50", colors.check)}
+                                      className={cn("border-border/50 shrink-0", colors.check)}
                                     />
                                     <div className="flex-1 min-w-0">
                                       <span className={cn(
@@ -2166,7 +2150,23 @@ export function PlaybookView() {
                                         </span>
                                       )}
                                     </div>
-                                  </label>
+                                    {/* Percentage input for item */}
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        value={item.percentage ?? defaultPct}
+                                        onChange={(e) => {
+                                          e.stopPropagation();
+                                          updateItemPercentageInCriteria(item.id, parseInt(e.target.value) || 0, item.isSubItem);
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="w-12 h-6 text-[10px] text-center p-1"
+                                      />
+                                      <span className="text-[10px] text-muted-foreground">%</span>
+                                    </div>
+                                  </div>
                                 );
                               })}
                             </div>
