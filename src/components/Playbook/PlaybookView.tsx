@@ -1649,7 +1649,7 @@ export function PlaybookView() {
                 </AnimatePresence>
               </div>
             ) : (
-              /* FIXED CHECKLIST - Original View */
+              /* FIXED CHECKLIST - With Sub-items Support */
               <Reorder.Group 
                 axis="y" 
                 values={selectedChecklist.items} 
@@ -1658,6 +1658,11 @@ export function PlaybookView() {
               >
                 <AnimatePresence mode="popLayout">
                   {selectedChecklist.items.map((item: ChecklistItem) => {
+                    const hasSubItems = item.subItems && item.subItems.length > 0;
+                    const isExpanded = expandedItems.has(item.id);
+                    const subItemsCompleted = item.subItems?.filter(s => s.checked).length || 0;
+                    const subItemsTotal = item.subItems?.length || 0;
+                    
                     return (
                       <Reorder.Item
                         key={item.id}
@@ -1715,6 +1720,23 @@ export function PlaybookView() {
                             {item.text}
                           </span>
                           
+                          {/* Sub-items progress */}
+                          {hasSubItems && (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden w-16">
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${subItemsTotal > 0 ? (subItemsCompleted / subItemsTotal) * 100 : 0}%` }}
+                                  transition={{ duration: 0.5, ease: "easeOut" }}
+                                  className="h-full rounded-full bg-primary"
+                                />
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">
+                                {subItemsCompleted}/{subItemsTotal}
+                              </span>
+                            </div>
+                          )}
+                          
                           {/* Percentage Editor */}
                           {editingItemId === item.id ? (
                             <div className="flex items-center gap-1">
@@ -1748,6 +1770,32 @@ export function PlaybookView() {
                             </button>
                           )}
                           
+                          {/* Expand/Collapse for sub-items */}
+                          {hasSubItems && (
+                            <motion.button
+                              onClick={() => toggleExpandItem(item.id)}
+                              className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+                              animate={{ rotate: isExpanded ? 90 : 0 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                            >
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </motion.button>
+                          )}
+                          
+                          {/* Add Sub-item Button */}
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => {
+                              setAddingSubItemTo(item.id);
+                              setExpandedItems(prev => new Set(prev).add(item.id));
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                            title="Add sub-item"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </motion.button>
+                          
                           <motion.button
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
@@ -1757,6 +1805,148 @@ export function PlaybookView() {
                             <X className="w-4 h-4" />
                           </motion.button>
                         </div>
+                        
+                        {/* Sub-items for Fixed Checklist */}
+                        <AnimatePresence>
+                          {isExpanded && (hasSubItems || addingSubItemTo === item.id) && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                              className="ml-8 pl-4 border-l-2 border-primary/30 space-y-2 overflow-hidden"
+                            >
+                              {item.subItems?.map((subItem, subIndex) => (
+                                <motion.div
+                                  key={subItem.id}
+                                  initial={{ opacity: 0, x: -10 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  exit={{ opacity: 0, x: -10 }}
+                                  transition={{ delay: subIndex * 0.03 }}
+                                  className={cn(
+                                    "flex items-center gap-3 p-3 rounded-lg transition-all duration-200",
+                                    subItem.checked 
+                                      ? "bg-primary/10 border border-primary/20" 
+                                      : "bg-muted/30 hover:bg-muted/50 border border-transparent"
+                                  )}
+                                >
+                                  <button
+                                    onClick={() => toggleSubItem(selectedChecklist.id, item.id, subItem.id)}
+                                    className={cn(
+                                      "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
+                                      subItem.checked
+                                        ? "bg-primary border-primary text-primary-foreground"
+                                        : "border-muted-foreground/40 hover:border-primary"
+                                    )}
+                                  >
+                                    {subItem.checked && (
+                                      <motion.div
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                      >
+                                        <Check className="w-3 h-3" />
+                                      </motion.div>
+                                    )}
+                                  </button>
+                                  
+                                  {editingSubItemId === subItem.id ? (
+                                    <div className="flex-1 flex gap-1">
+                                      <Input
+                                        value={editingSubItemText}
+                                        onChange={(e) => setEditingSubItemText(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            updateSubItemText(selectedChecklist.id, item.id, subItem.id, editingSubItemText);
+                                          } else if (e.key === 'Escape') {
+                                            setEditingSubItemId(null);
+                                            setEditingSubItemText("");
+                                          }
+                                        }}
+                                        onBlur={() => {
+                                          if (editingSubItemText.trim()) {
+                                            updateSubItemText(selectedChecklist.id, item.id, subItem.id, editingSubItemText);
+                                          } else {
+                                            setEditingSubItemId(null);
+                                          }
+                                        }}
+                                        className="h-7 text-sm bg-background/50"
+                                        autoFocus
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span 
+                                      className={cn(
+                                        "flex-1 text-sm transition-all cursor-pointer hover:text-primary",
+                                        subItem.checked && "line-through text-muted-foreground"
+                                      )}
+                                      onClick={() => {
+                                        setEditingSubItemId(subItem.id);
+                                        setEditingSubItemText(subItem.text);
+                                      }}
+                                    >
+                                      {subItem.text}
+                                    </span>
+                                  )}
+                                  
+                                  <motion.button
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={() => deleteSubItem(selectedChecklist.id, item.id, subItem.id)}
+                                    className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </motion.button>
+                                </motion.div>
+                              ))}
+                              
+                              {/* Add Sub-item Input */}
+                              {addingSubItemTo === item.id && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -10 }}
+                                  className="flex gap-2"
+                                >
+                                  <Input
+                                    placeholder="Add sub-item..."
+                                    value={newSubItemText}
+                                    onChange={(e) => setNewSubItemText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        addSubItem(selectedChecklist.id, item.id);
+                                      } else if (e.key === 'Escape') {
+                                        setAddingSubItemTo(null);
+                                        setNewSubItemText("");
+                                      }
+                                    }}
+                                    className="h-8 text-sm bg-background/50"
+                                    autoFocus
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => addSubItem(selectedChecklist.id, item.id)}
+                                    className="h-8 px-2"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setAddingSubItemTo(null);
+                                      setNewSubItemText("");
+                                    }}
+                                    className="h-8 px-2"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </motion.div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </Reorder.Item>
                     );
                   })}
