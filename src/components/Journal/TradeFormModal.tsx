@@ -7,12 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Plus, X, ImagePlus, Trash2, ClipboardList, Award, GitBranch, ListChecks } from "lucide-react";
-import { useChecklists, GradeCriteria } from "@/hooks/useChecklists";
+import { useChecklists } from "@/hooks/useChecklists";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChecklistPopup } from "./ChecklistPopup";
 import { Badge } from "@/components/ui/badge";
-import { getGradeFromCriteria } from "@/lib/gradeUtils";
 
 // Common trading pairs and assets
 const TRADING_PAIRS = [
@@ -137,11 +136,25 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Helper to get grade from checklist state
-  const getGradeFromState = (state?: ChecklistItemState[], gradeCriteria?: GradeCriteria): { grade: string; color: string; percentage: number } | null => {
+  const getGradeFromState = (state?: ChecklistItemState[]): { grade: string; color: string } | null => {
     if (!state || state.length === 0) return null;
     
-    const result = getGradeFromCriteria(state, gradeCriteria);
-    return { grade: result.gradeLabel, color: result.color, percentage: result.percentage };
+    const hasCustomPercentages = state.some(item => item.percentage !== undefined);
+    let percentage: number;
+    
+    if (hasCustomPercentages) {
+      percentage = state
+        .filter(item => item.checked)
+        .reduce((sum, item) => sum + (item.percentage || 0), 0);
+    } else {
+      const checkedCount = state.filter(item => item.checked).length;
+      percentage = (checkedCount / state.length) * 100;
+    }
+    
+    if (percentage >= 90) return { grade: "A Setup", color: "text-emerald-500" };
+    if (percentage >= 75) return { grade: "B Setup", color: "text-blue-500" };
+    if (percentage >= 60) return { grade: "C Setup", color: "text-yellow-500" };
+    return { grade: "D Setup", color: "text-red-500" };
   };
 
   useEffect(() => {
@@ -233,7 +246,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
   };
 
   const selectedChecklist = checklists.find(c => c.id === (pendingChecklistId || formData.checklistId));
-  const currentGrade = getGradeFromState(checklistState, selectedChecklist?.gradeCriteria);
+  const currentGrade = getGradeFromState(checklistState);
 
   const handleClose = () => {
     if (editingTrade) {

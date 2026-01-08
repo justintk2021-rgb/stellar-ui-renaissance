@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { PlaybookDetailView } from "./PlaybookDetailView";
-import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3, GripVertical, ChevronRight, GitBranch, ListChecks, Lock, Unlock, MoreHorizontal, LayoutGrid, List, ArrowLeft, Award, Settings2 } from "lucide-react";
+import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3, GripVertical, ChevronRight, GitBranch, ListChecks, Lock, Unlock, MoreHorizontal, LayoutGrid, List, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -20,16 +20,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { useChecklists, ChecklistItem, ChecklistSubItem, ConditionalSubItem, ChecklistType, PercentageType, GradeCriteria, DEFAULT_GRADE_CRITERIA } from "@/hooks/useChecklists";
-import { getGradeFromCriteria, convertItemsToState } from "@/lib/gradeUtils";
+import { useChecklists, ChecklistItem, ChecklistSubItem, ConditionalSubItem, ChecklistType, PercentageType } from "@/hooks/useChecklists";
 import { supabase } from "@/integrations/supabase/client";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
-import { Checkbox } from "@/components/ui/checkbox";
 
 interface ChecklistMetrics {
   checklistId: string;
@@ -77,9 +70,6 @@ export function PlaybookView() {
   // Detail view state
   const [showDetailView, setShowDetailView] = useState(false);
   const [allTrades, setAllTrades] = useState<any[]>([]);
-  // Grade criteria state
-  const [isGradeCriteriaOpen, setIsGradeCriteriaOpen] = useState(false);
-  const [editingGradeCriteria, setEditingGradeCriteria] = useState<GradeCriteria | null>(null);
 
   const selectedChecklist = checklists.find(c => c.id === selectedChecklistId) || null;
   const selectedMetrics = checklistMetrics.find(m => m.checklistId === selectedChecklistId);
@@ -621,33 +611,37 @@ export function PlaybookView() {
   const getConditionalCompletionPercentage = (items: ChecklistItem[]) => {
     if (items.length === 0) return 0;
     
-    // Count total selectable items (sub-items) for default percentage calculation
-    let totalSelectableItems = 0;
-    items.forEach(item => {
-      if (item.subItems && item.subItems.length > 0) {
-        totalSelectableItems += item.subItems.length;
-      } else {
-        totalSelectableItems += 1;
-      }
-    });
-    const defaultPct = totalSelectableItems > 0 ? Math.round(100 / totalSelectableItems) : 0;
-    
+    // For sequential conditional checklists, each category contributes its percentage
+    // Categories can be "fixed" (full % when ANY sub-item selected) or "conditional" (sum of selected sub-items)
     let totalPercentage = 0;
+    const categoryWeight = 100 / items.length;
     
     items.forEach((item, index) => {
       if (!isCategoryUnlocked(items, index)) return;
       
       if (item.subItems && item.subItems.length > 0) {
         const checkedSubItems = item.subItems.filter(sub => sub.checked);
-        checkedSubItems.forEach(sub => {
-          totalPercentage += sub.percentage ?? defaultPct;
-        });
+        
+        // Check if this category uses "fixed" percentage type
+        // Fixed: give full category weight when ANY sub-item is checked
+        if (item.percentageType === "fixed") {
+          if (checkedSubItems.length > 0) {
+            totalPercentage += categoryWeight;
+          }
+        } else {
+          // Conditional (default): sum the percentages of checked sub-items
+          const subItemPercentages = checkedSubItems.reduce((sum, sub) => {
+            return sum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
+          }, 0);
+          // Category contribution = (sub-item completion %) * category weight
+          totalPercentage += (subItemPercentages / 100) * categoryWeight;
+        }
       } else if (item.checked) {
-        totalPercentage += item.percentage ?? defaultPct;
+        totalPercentage += categoryWeight;
       }
     });
     
-    return Math.min(100, Math.round(totalPercentage));
+    return Math.round(totalPercentage);
   };
 
   const getCompletionPercentage = (items: ChecklistItem[], type?: ChecklistType) => {
@@ -658,31 +652,59 @@ export function PlaybookView() {
     
     if (items.length === 0) return 0;
     
-    // Count total selectable items for default percentage calculation
-    let totalSelectableItems = 0;
-    items.forEach(item => {
-      if (item.subItems && item.subItems.length > 0) {
-        totalSelectableItems += item.subItems.length;
-      } else {
-        totalSelectableItems += 1;
-      }
-    });
-    const defaultPct = totalSelectableItems > 0 ? Math.round(100 / totalSelectableItems) : 0;
+    // Check if any items have custom percentages
+    const hasCustomPercentages = items.some(item => item.percentage !== undefined);
     
-    let totalPercentage = 0;
-    
-    items.forEach(item => {
-      if (item.subItems && item.subItems.length > 0) {
-        const checkedSubItems = item.subItems.filter(sub => sub.checked);
-        checkedSubItems.forEach(sub => {
-          totalPercentage += sub.percentage ?? defaultPct;
-        });
-      } else if (item.checked) {
-        totalPercentage += item.percentage ?? defaultPct;
-      }
-    });
-    
-    return Math.min(100, Math.round(totalPercentage));
+    if (hasCustomPercentages) {
+      // Use custom percentages - sum up the percentages of checked items
+      const totalPercentage = items.reduce((sum, item) => {
+        const itemPercentage = item.percentage ?? Math.round(100 / items.length);
+        
+        if (item.subItems && item.subItems.length > 0) {
+          // For trading checklists: sum the checked sub-item percentages
+          // Users don't need to check all sub-items - just the ones relevant to their trade
+          if (item.checked) {
+            const checkedSubItems = item.subItems.filter(sub => sub.checked);
+            const subItemPercentages = checkedSubItems.reduce((subSum, sub) => {
+              return subSum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
+            }, 0);
+            // Item contribution = item % * (sum of checked sub-item %s / 100)
+            return sum + (itemPercentage * (subItemPercentages / 100));
+          }
+          return sum;
+        } else {
+          // Simple item without sub-items
+          if (item.checked) {
+            return sum + itemPercentage;
+          }
+          return sum;
+        }
+      }, 0);
+      return Math.min(100, Math.round(totalPercentage));
+    } else {
+      // Default equal distribution - sum checked sub-item percentages
+      let totalPercentage = 0;
+      const itemWeight = 100 / items.length;
+      
+      items.forEach(item => {
+        if (item.subItems && item.subItems.length > 0) {
+          if (item.checked) {
+            // Sum the percentages of checked sub-items
+            const checkedSubItems = item.subItems.filter(sub => sub.checked);
+            const subItemPercentages = checkedSubItems.reduce((sum, sub) => {
+              return sum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
+            }, 0);
+            totalPercentage += (itemWeight * (subItemPercentages / 100));
+          }
+        } else {
+          if (item.checked) {
+            totalPercentage += itemWeight;
+          }
+        }
+      });
+      
+      return Math.round(totalPercentage);
+    }
   };
 
   const updateItemPercentage = async (checklistId: string, itemId: string, percentage: number) => {
@@ -1176,23 +1198,40 @@ export function PlaybookView() {
             <div className="flex items-center gap-3">
               {/* Grade Badge */}
               {selectedChecklist.items.length > 0 && (() => {
-                const itemState = convertItemsToState(selectedChecklist.items);
-                const gradeResult = getGradeFromCriteria(itemState, selectedChecklist.gradeCriteria);
-                const actualCompletion = getCompletionPercentage(selectedChecklist.items, selectedChecklist.type);
+                const percentage = getCompletionPercentage(selectedChecklist.items, selectedChecklist.type);
+                let grade: string;
+                let gradeColor: string;
+                let gradeLabel: string;
+                
+                if (percentage >= 90) {
+                  grade = "A";
+                  gradeColor = "bg-emerald-500/20 text-emerald-500 border-emerald-500/30";
+                  gradeLabel = "A Setup";
+                } else if (percentage >= 75) {
+                  grade = "B";
+                  gradeColor = "bg-amber-500/20 text-amber-500 border-amber-500/30";
+                  gradeLabel = "B Setup";
+                } else if (percentage >= 60) {
+                  grade = "C";
+                  gradeColor = "bg-orange-500/20 text-orange-500 border-orange-500/30";
+                  gradeLabel = "C Setup";
+                } else {
+                  grade = "D";
+                  gradeColor = "bg-rose-500/20 text-rose-500 border-rose-500/30";
+                  gradeLabel = "D Setup";
+                }
                 
                 return (
                   <motion.div
-                    key={gradeResult.grade}
+                    key={grade}
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     className={cn(
                       "px-2.5 py-1 rounded-md text-xs font-bold border",
-                      gradeResult.bgColor,
-                      gradeResult.color,
-                      gradeResult.borderColor
+                      gradeColor
                     )}
                   >
-                    {gradeResult.gradeLabel} ({actualCompletion}%)
+                    {gradeLabel}
                   </motion.div>
                 );
               })()}
@@ -1618,278 +1657,119 @@ export function PlaybookView() {
                 </AnimatePresence>
               </div>
             ) : (
-              /* FIXED CHECKLIST - Same UI as Conditional but without sequential unlocking */
-              <div className="space-y-3">
-                {/* Progress Overview */}
-                <div className="flex items-center justify-between text-xs text-muted-foreground mb-4 pb-3 border-b border-border/30">
-                  <span>Item Progress</span>
-                  <span className="font-medium">
-                    {selectedChecklist.items.filter(i => i.checked || (i.subItems && i.subItems.some(s => s.checked))).length} / {selectedChecklist.items.length} items
-                  </span>
-                </div>
-                
+              /* FIXED CHECKLIST - Original View */
+              <Reorder.Group 
+                axis="y" 
+                values={selectedChecklist.items} 
+                onReorder={(newItems) => updateChecklist(selectedChecklist.id, { items: newItems })}
+                className="space-y-2"
+              >
                 <AnimatePresence mode="popLayout">
-                  {selectedChecklist.items.map((item: ChecklistItem, itemIndex: number) => {
-                    const hasSubItems = item.subItems && item.subItems.length > 0;
-                    const isExpanded = expandedItems.has(item.id);
-                    const subItemsCompleted = item.subItems?.filter(s => s.checked).length || 0;
-                    const subItemsTotal = item.subItems?.length || 0;
-                    const isStarted = item.checked || (hasSubItems && subItemsCompleted > 0);
-                    
+                  {selectedChecklist.items.map((item: ChecklistItem) => {
                     return (
-                      <motion.div
+                      <Reorder.Item
                         key={item.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
+                        value={item}
+                        initial={{ opacity: 0, x: -20, scale: 0.95 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, x: 20, scale: 0.95 }}
+                        whileDrag={{ 
+                          scale: 1.02, 
+                          boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+                          zIndex: 50
+                        }}
                         transition={{ 
                           type: "spring",
-                          stiffness: 400,
+                          stiffness: 500,
                           damping: 30,
-                          delay: itemIndex * 0.05
+                          opacity: { duration: 0.2 }
                         }}
-                        className="space-y-2"
+                        className="space-y-1"
                       >
-                        {/* Item Header - Same style as Conditional */}
-                        <motion.div
+                        {/* Main Item */}
+                        <div
                           className={cn(
-                            "relative flex items-center gap-3 p-4 rounded-xl transition-all duration-300",
-                            isStarted
-                              ? "bg-gradient-to-r from-primary/15 to-primary/5 border border-primary/30"
-                              : "bg-muted/40 hover:bg-muted/60 border border-border/30"
+                            "flex items-center gap-3 p-3 rounded-lg transition-colors duration-200 cursor-grab active:cursor-grabbing",
+                            item.checked 
+                              ? "bg-primary/10" 
+                              : "bg-muted/30 hover:bg-muted/50"
                           )}
-                          whileHover={{ scale: 1.01 }}
                         >
-                          {/* Item Number / Status Icon */}
-                          <div className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm transition-all duration-300 shrink-0",
-                            isStarted
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted-foreground/20 text-muted-foreground"
-                          )}>
-                            {isStarted ? (
+                          <GripVertical className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+                          
+                          <button
+                            onClick={() => toggleItem(selectedChecklist.id, item.id)}
+                            className={cn(
+                              "w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0",
+                              item.checked
+                                ? "bg-primary border-primary text-primary-foreground"
+                                : "border-muted-foreground/50 hover:border-primary"
+                            )}
+                          >
+                            {item.checked && (
                               <motion.div
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
-                                transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                                transition={{ type: "spring", stiffness: 500, damping: 30 }}
                               >
-                                <Check className="w-5 h-5" />
+                                <Check className="w-3 h-3" />
                               </motion.div>
-                            ) : (
-                              itemIndex + 1
                             )}
-                          </div>
+                          </button>
+                          <span className={cn(
+                            "flex-1 text-sm transition-all",
+                            item.checked && "line-through text-muted-foreground"
+                          )}>
+                            {item.text}
+                          </span>
                           
-                          {/* Item Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className={cn(
-                                "font-semibold text-base transition-all",
-                                isStarted && "text-primary"
-                              )}>
-                                {item.text}
-                              </span>
+                          {/* Percentage Editor */}
+                          {editingItemId === item.id ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={editingPercentage}
+                                onChange={(e) => setEditingPercentage(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingItemId(null);
+                                  }
+                                }}
+                                onBlur={() => updateItemPercentage(selectedChecklist.id, item.id, parseInt(editingPercentage) || 0)}
+                                className="w-16 h-7 text-xs text-center p-1"
+                                autoFocus
+                              />
+                              <span className="text-xs text-muted-foreground">%</span>
                             </div>
-                            {hasSubItems && (
-                              <div className="flex items-center gap-2 mt-1">
-                                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[150px]">
-                                  <motion.div
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${subItemsTotal > 0 ? (subItemsCompleted / subItemsTotal) * 100 : 0}%` }}
-                                    transition={{ duration: 0.5, ease: "easeOut" }}
-                                    className="h-full rounded-full bg-primary"
-                                  />
-                                </div>
-                                <span className="text-[10px] text-muted-foreground">
-                                  {subItemsCompleted}/{subItemsTotal}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Expand/Actions */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            {hasSubItems && (
-                              <motion.button
-                                onClick={() => toggleExpandItem(item.id)}
-                                className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
-                                animate={{ rotate: isExpanded ? 90 : 0 }}
-                                transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                              >
-                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                              </motion.button>
-                            )}
-                            {/* Add Sub-item Button */}
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => {
-                                setAddingSubItemTo(item.id);
-                                setExpandedItems(prev => new Set(prev).add(item.id));
-                              }}
-                              className="p-1.5 rounded-lg hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
-                              title="Add sub-item"
+                          ) : (
+                            <button
+                              onClick={() => startEditingPercentage(item.id, item.percentage, selectedChecklist.items.length)}
+                              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                              title="Edit percentage weight"
                             >
-                              <Plus className="w-4 h-4" />
-                            </motion.button>
-                            
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => deleteItem(selectedChecklist.id, item.id)}
-                              className="p-1.5 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                            >
-                              <X className="w-4 h-4" />
-                            </motion.button>
-                          </div>
-                        </motion.div>
-                        
-                        {/* Sub-items */}
-                        <AnimatePresence>
-                          {isExpanded && (hasSubItems || addingSubItemTo === item.id) && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                              className="ml-6 pl-4 border-l-2 border-primary/30 space-y-2 overflow-hidden"
-                            >
-                              {item.subItems?.map((subItem, subIndex) => (
-                                <motion.div
-                                  key={subItem.id}
-                                  initial={{ opacity: 0, x: -10 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  exit={{ opacity: 0, x: -10 }}
-                                  transition={{ delay: subIndex * 0.03 }}
-                                  className={cn(
-                                    "flex items-center gap-3 p-3 rounded-lg transition-all duration-200",
-                                    subItem.checked 
-                                      ? "bg-primary/10 border border-primary/20" 
-                                      : "bg-muted/30 hover:bg-muted/50 border border-transparent"
-                                  )}
-                                >
-                                  <button
-                                    onClick={() => toggleSubItem(selectedChecklist.id, item.id, subItem.id)}
-                                    className={cn(
-                                      "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
-                                      subItem.checked
-                                        ? "bg-primary border-primary text-primary-foreground"
-                                        : "border-muted-foreground/40 hover:border-primary"
-                                    )}
-                                  >
-                                    {subItem.checked && (
-                                      <motion.div
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                      >
-                                        <Check className="w-3 h-3" />
-                                      </motion.div>
-                                    )}
-                                  </button>
-                                  
-                                  {editingSubItemId === subItem.id ? (
-                                    <div className="flex-1 flex gap-1">
-                                      <Input
-                                        value={editingSubItemText}
-                                        onChange={(e) => setEditingSubItemText(e.target.value)}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            updateSubItemText(selectedChecklist.id, item.id, subItem.id, editingSubItemText);
-                                          } else if (e.key === 'Escape') {
-                                            setEditingSubItemId(null);
-                                            setEditingSubItemText("");
-                                          }
-                                        }}
-                                        onBlur={() => {
-                                          if (editingSubItemText.trim()) {
-                                            updateSubItemText(selectedChecklist.id, item.id, subItem.id, editingSubItemText);
-                                          } else {
-                                            setEditingSubItemId(null);
-                                          }
-                                        }}
-                                        className="h-7 text-sm bg-background/50"
-                                        autoFocus
-                                      />
-                                    </div>
-                                  ) : (
-                                    <span 
-                                      className={cn(
-                                        "flex-1 text-sm transition-all cursor-pointer hover:text-primary",
-                                        subItem.checked && "line-through text-muted-foreground"
-                                      )}
-                                      onClick={() => {
-                                        setEditingSubItemId(subItem.id);
-                                        setEditingSubItemText(subItem.text);
-                                      }}
-                                    >
-                                      {subItem.text}
-                                    </span>
-                                  )}
-                                  
-                                  <motion.button
-                                    whileHover={{ scale: 1.1 }}
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={() => deleteSubItem(selectedChecklist.id, item.id, subItem.id)}
-                                    className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </motion.button>
-                                </motion.div>
-                              ))}
-                              
-                              {/* Add Sub-item Input */}
-                              {addingSubItemTo === item.id && (
-                                <motion.div
-                                  initial={{ opacity: 0, y: -10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -10 }}
-                                  className="flex gap-2"
-                                >
-                                  <Input
-                                    placeholder="Add sub-item..."
-                                    value={newSubItemText}
-                                    onChange={(e) => setNewSubItemText(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        addSubItem(selectedChecklist.id, item.id);
-                                      } else if (e.key === 'Escape') {
-                                        setAddingSubItemTo(null);
-                                        setNewSubItemText("");
-                                      }
-                                    }}
-                                    className="h-8 text-sm bg-background/50"
-                                    autoFocus
-                                  />
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => addSubItem(selectedChecklist.id, item.id)}
-                                    className="h-8 px-2"
-                                  >
-                                    <Check className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => {
-                                      setAddingSubItemTo(null);
-                                      setNewSubItemText("");
-                                    }}
-                                    className="h-8 px-2"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </Button>
-                                </motion.div>
-                              )}
-                            </motion.div>
+                              <Percent className="w-3 h-3" />
+                              <span>{item.percentage ?? Math.round(100 / selectedChecklist.items.length)}%</span>
+                            </button>
                           )}
-                        </AnimatePresence>
-                      </motion.div>
+                          
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => deleteItem(selectedChecklist.id, item.id)}
+                            className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </motion.button>
+                        </div>
+                      </Reorder.Item>
                     );
                   })}
                 </AnimatePresence>
-              </div>
+              </Reorder.Group>
             )}
 
             {/* Add New Item/Category */}
@@ -1949,252 +1829,6 @@ export function PlaybookView() {
                 </Button>
               )}
             </div>
-
-            {/* Grade Criteria Section */}
-            <Collapsible 
-              open={isGradeCriteriaOpen} 
-              onOpenChange={setIsGradeCriteriaOpen}
-              className="border-t border-border/30 pt-4"
-            >
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center justify-between w-full px-3 py-2 rounded-lg hover:bg-muted/30 transition-colors group">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500/20 to-amber-500/5 flex items-center justify-center">
-                      <Award className="w-3.5 h-3.5 text-amber-500" />
-                    </div>
-                    <div className="text-left">
-                      <span className="text-sm font-medium">Grade Criteria</span>
-                      <p className="text-[10px] text-muted-foreground">
-                        {selectedChecklist.gradeCriteria && ((selectedChecklist.gradeCriteria.A?.items?.length ?? 0) > 0 || (selectedChecklist.gradeCriteria.B?.items?.length ?? 0) > 0 || (selectedChecklist.gradeCriteria.C?.items?.length ?? 0) > 0)
-                          ? `A: ${selectedChecklist.gradeCriteria.A?.items?.length ?? 0} items (${selectedChecklist.gradeCriteria.A?.percentage ?? 100}%), B: ${selectedChecklist.gradeCriteria.B?.items?.length ?? 0} items (${selectedChecklist.gradeCriteria.B?.percentage ?? 80}%), C: ${selectedChecklist.gradeCriteria.C?.items?.length ?? 0} items (${selectedChecklist.gradeCriteria.C?.percentage ?? 60}%)`
-                          : "Define which items are needed for each grade"
-                        }
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronDown className={cn(
-                    "w-4 h-4 text-muted-foreground transition-transform duration-200",
-                    isGradeCriteriaOpen && "rotate-180"
-                  )} />
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3 space-y-4">
-                <p className="text-xs text-muted-foreground px-1">
-                  Select which items must be checked to achieve each grade and set the percentage for each. The system checks from A down - first grade where all required items are checked wins.
-                </p>
-                
-                {/* Get all items including sub-items for selection */}
-                {(() => {
-                  // Flatten all items and sub-items for selection with their percentages
-                  const allSelectableItems: { id: string; text: string; isSubItem: boolean; parentText?: string; percentage?: number }[] = [];
-                  selectedChecklist.items.forEach(item => {
-                    allSelectableItems.push({ id: item.id, text: item.text, isSubItem: false, percentage: item.percentage });
-                    item.subItems?.forEach(sub => {
-                      allSelectableItems.push({ id: sub.id, text: sub.text, isSubItem: true, parentText: item.text, percentage: sub.percentage });
-                    });
-                  });
-                  
-                  const criteria = editingGradeCriteria || selectedChecklist.gradeCriteria || DEFAULT_GRADE_CRITERIA;
-                  
-                  const grades = [
-                    { key: 'A' as const, label: 'A Setup', desc: 'Best setup - all conditions perfect', defaultPct: 100, colors: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-500", check: "data-[state=checked]:bg-emerald-500" } },
-                    { key: 'B' as const, label: 'B Setup', desc: 'Good setup - most conditions met', defaultPct: 80, colors: { bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-500", check: "data-[state=checked]:bg-blue-500" } },
-                    { key: 'C' as const, label: 'C Setup', desc: 'Average setup - minimum requirements', defaultPct: 60, colors: { bg: "bg-yellow-500/10", border: "border-yellow-500/30", text: "text-yellow-500", check: "data-[state=checked]:bg-yellow-500" } },
-                    { key: 'D' as const, label: 'D Setup', desc: 'Below criteria - use as default', defaultPct: 40, colors: { bg: "bg-red-500/10", border: "border-red-500/30", text: "text-red-500", check: "data-[state=checked]:bg-red-500" } },
-                  ];
-                  
-                  const toggleItemForGrade = (gradeKey: 'A' | 'B' | 'C' | 'D', itemId: string) => {
-                    setEditingGradeCriteria(prev => {
-                      const current = prev || selectedChecklist.gradeCriteria || DEFAULT_GRADE_CRITERIA;
-                      const gradeItems = [...(current[gradeKey]?.items || [])];
-                      const index = gradeItems.indexOf(itemId);
-                      if (index > -1) {
-                        gradeItems.splice(index, 1);
-                      } else {
-                        gradeItems.push(itemId);
-                      }
-                      return { 
-                        ...current, 
-                        [gradeKey]: { 
-                          ...current[gradeKey], 
-                          items: gradeItems 
-                        } 
-                      };
-                    });
-                  };
-                  
-                  const updateGradePercentage = (gradeKey: 'A' | 'B' | 'C' | 'D', percentage: number) => {
-                    setEditingGradeCriteria(prev => {
-                      const current = prev || selectedChecklist.gradeCriteria || DEFAULT_GRADE_CRITERIA;
-                      return { 
-                        ...current, 
-                        [gradeKey]: { 
-                          ...current[gradeKey], 
-                          percentage: Math.min(100, Math.max(0, percentage))
-                        } 
-                      };
-                    });
-                  };
-                  
-                  // Update item percentage in the checklist
-                  const updateItemPercentageInCriteria = (itemId: string, percentage: number, isSubItem: boolean, parentItemId?: string) => {
-                    const updatedItems = selectedChecklist.items.map(item => {
-                      if (!isSubItem && item.id === itemId) {
-                        return { ...item, percentage: Math.min(100, Math.max(0, percentage)) };
-                      }
-                      if (isSubItem && item.subItems) {
-                        const updatedSubItems = item.subItems.map(sub => 
-                          sub.id === itemId ? { ...sub, percentage: Math.min(100, Math.max(0, percentage)) } : sub
-                        );
-                        return { ...item, subItems: updatedSubItems };
-                      }
-                      return item;
-                    });
-                    updateChecklist(selectedChecklist.id, { items: updatedItems });
-                  };
-                  
-                  return (
-                    <div className="space-y-4">
-                      {grades.map(({ key, label, desc, defaultPct, colors }) => (
-                        <div 
-                          key={key}
-                          className={cn(
-                            "rounded-xl p-4 border transition-all",
-                            colors.bg,
-                            colors.border
-                          )}
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex-1">
-                              <div className={cn("text-sm font-bold", colors.text)}>{label}</div>
-                              <div className="text-[10px] text-muted-foreground">{desc}</div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={criteria[key]?.percentage ?? defaultPct}
-                                  onChange={(e) => updateGradePercentage(key, parseInt(e.target.value) || 0)}
-                                  className="w-14 h-7 text-xs text-center p-1"
-                                />
-                                <span className="text-xs text-muted-foreground">%</span>
-                              </div>
-                              <div className={cn("text-xs font-medium px-2 py-0.5 rounded-full", colors.bg, colors.text)}>
-                                {criteria[key]?.items?.length ?? 0} items
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {allSelectableItems.length > 0 ? (
-                            <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                              {allSelectableItems.map(item => {
-                                const isSelected = (criteria[key]?.items || []).includes(item.id);
-                                const defaultPct = Math.round(100 / allSelectableItems.length);
-                                return (
-                                  <div
-                                    key={item.id}
-                                    className={cn(
-                                      "flex items-center gap-2 p-2 rounded-lg transition-all",
-                                      "hover:bg-background/50",
-                                      isSelected && "bg-background/80"
-                                    )}
-                                  >
-                                    <Checkbox
-                                      checked={isSelected}
-                                      onCheckedChange={() => toggleItemForGrade(key, item.id)}
-                                      className={cn("border-border/50 shrink-0", colors.check)}
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                      <span className={cn(
-                                        "text-xs block truncate",
-                                        isSelected && "font-medium"
-                                      )}>
-                                        {item.text}
-                                      </span>
-                                      {item.isSubItem && (
-                                        <span className="text-[10px] text-muted-foreground">
-                                          under {item.parentText}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {/* Percentage input for item */}
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        max="100"
-                                        value={item.percentage ?? defaultPct}
-                                        onChange={(e) => {
-                                          e.stopPropagation();
-                                          updateItemPercentageInCriteria(item.id, parseInt(e.target.value) || 0, item.isSubItem);
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="w-12 h-6 text-[10px] text-center p-1"
-                                      />
-                                      <span className="text-[10px] text-muted-foreground">%</span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-muted-foreground text-center py-2">
-                              Add items to your checklist first
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                      
-                      {/* Save/Reset buttons */}
-                      <div className="flex items-center gap-2 pt-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setEditingGradeCriteria(null);
-                          }}
-                          className="flex-1 text-xs"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (editingGradeCriteria) {
-                              updateChecklist(selectedChecklist.id, { gradeCriteria: editingGradeCriteria });
-                              setEditingGradeCriteria(null);
-                            }
-                          }}
-                          disabled={!editingGradeCriteria}
-                          className="flex-1 text-xs"
-                        >
-                          <Check className="w-3 h-3 mr-1" />
-                          Save Grade Rules
-                        </Button>
-                      </div>
-                      
-                      {/* Clear custom criteria */}
-                      {selectedChecklist.gradeCriteria && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            updateChecklist(selectedChecklist.id, { gradeCriteria: undefined });
-                            setEditingGradeCriteria(null);
-                          }}
-                          className="w-full text-xs text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="w-3 h-3 mr-1" />
-                          Clear All Grade Rules
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })()}
-              </CollapsibleContent>
-            </Collapsible>
           </div>
           </div>
         </div>

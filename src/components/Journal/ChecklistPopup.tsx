@@ -8,15 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { X, ClipboardCheck, Award, ChevronRight, GitBranch, ListChecks, Plus, Lock, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChecklistItemState, ChecklistSubItemState, ChecklistChildState } from "@/types/trade";
-import { ChecklistType, ChecklistItem, ChecklistSubItem, ConditionalSubItem, GradeCriteria } from "@/hooks/useChecklists";
-import { getGradeFromCriteria } from "@/lib/gradeUtils";
+import { ChecklistType, ChecklistItem, ChecklistSubItem, ConditionalSubItem } from "@/hooks/useChecklists";
 
 interface Checklist {
   id: string;
   name: string;
   type: ChecklistType;
   items: ChecklistItem[];
-  gradeCriteria?: GradeCriteria;
 }
 
 interface ChecklistPopupProps {
@@ -25,6 +23,13 @@ interface ChecklistPopupProps {
   checklist: Checklist;
   onConfirm: (items: ChecklistItemState[]) => void;
   initialState?: ChecklistItemState[];
+}
+
+function getGrade(percentage: number): { grade: string; color: string; bgColor: string } {
+  if (percentage >= 90) return { grade: "A Setup", color: "text-emerald-500", bgColor: "bg-emerald-500/20" };
+  if (percentage >= 75) return { grade: "B Setup", color: "text-blue-500", bgColor: "bg-blue-500/20" };
+  if (percentage >= 60) return { grade: "C Setup", color: "text-yellow-500", bgColor: "bg-yellow-500/20" };
+  return { grade: "D Setup", color: "text-red-500", bgColor: "bg-red-500/20" };
 }
 
 // Convert checklist sub-items to state format
@@ -341,8 +346,7 @@ export function ChecklistPopup({ isOpen, onClose, checklist, onConfirm, initialS
   };
 
   const completionPercentage = getCompletionPercentage();
-  const gradeResult = getGradeFromCriteria(items, checklist.gradeCriteria);
-  const { gradeLabel: grade, color, bgColor, percentage: gradePercentage } = gradeResult;
+  const { grade, color, bgColor } = getGrade(completionPercentage);
 
   const handleConfirm = () => {
     onConfirm(items);

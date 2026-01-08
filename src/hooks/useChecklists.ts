@@ -32,41 +32,16 @@ interface ChecklistItem {
 
 type ChecklistType = "fixed" | "conditional";
 
-// Grade entry with items and percentage
-interface GradeEntry {
-  items: string[]; // Item IDs required for this grade
-  percentage: number; // Percentage value for this grade
-}
-
-// Item-based grade criteria - defines which items must be checked for each grade
-// Each grade contains an array of item IDs that must ALL be checked to achieve that grade
-// The system checks from A down - first matching grade wins
-interface GradeCriteria {
-  A: GradeEntry; // Item IDs and percentage for grade A (highest)
-  B: GradeEntry; // Item IDs and percentage for grade B
-  C: GradeEntry; // Item IDs and percentage for grade C
-  D: GradeEntry; // Item IDs and percentage for grade D (default)
-}
-
 interface Checklist {
   id: string;
   name: string;
   type: ChecklistType;
   items: ChecklistItem[];
   notes: string;
-  gradeCriteria?: GradeCriteria; // Item-based grade rules with percentages
   createdAt: string;
 }
 
-export type { ChecklistItem, ChecklistSubItem, ConditionalSubItem, Checklist, ChecklistType, PercentageType, GradeCriteria, GradeEntry };
-
-// Default grade criteria with standard percentages
-export const DEFAULT_GRADE_CRITERIA: GradeCriteria = {
-  A: { items: [], percentage: 100 },
-  B: { items: [], percentage: 80 },
-  C: { items: [], percentage: 60 },
-  D: { items: [], percentage: 40 },
-};
+export type { ChecklistItem, ChecklistSubItem, ConditionalSubItem, Checklist, ChecklistType, PercentageType };
 
 export function useChecklists() {
   const [checklists, setChecklists] = useState<Checklist[]>([]);
@@ -107,27 +82,25 @@ export function useChecklists() {
       if (error) throw error;
 
       const mapped = (data || []).map((c) => {
-        const itemsData = c.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType; gradeCriteria?: GradeCriteria } | ChecklistItem[];
+        const items = c.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType } | ChecklistItem[];
         
         // Handle both old format (array) and new format (object with type)
-        if (Array.isArray(itemsData)) {
+        if (Array.isArray(items)) {
           return {
             id: c.id,
             name: c.name,
             type: "fixed" as ChecklistType,
-            items: itemsData || [],
+            items: items || [],
             notes: c.notes || '',
-            gradeCriteria: undefined,
             createdAt: c.created_at,
           };
         } else {
           return {
             id: c.id,
             name: c.name,
-            type: (itemsData?.type || "fixed") as ChecklistType,
-            items: itemsData?.items || [],
+            type: (items?.type || "fixed") as ChecklistType,
+            items: items?.items || [],
             notes: c.notes || '',
-            gradeCriteria: itemsData?.gradeCriteria,
             createdAt: c.created_at,
           };
         }
@@ -171,27 +144,25 @@ export function useChecklists() {
           console.log('Checklists realtime update:', payload.eventType);
           
           if (payload.eventType === 'INSERT') {
-            const itemsData = payload.new.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType; gradeCriteria?: GradeCriteria } | ChecklistItem[];
+            const items = payload.new.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType } | ChecklistItem[];
             let newChecklist: Checklist;
             
-            if (Array.isArray(itemsData)) {
+            if (Array.isArray(items)) {
               newChecklist = {
                 id: payload.new.id,
                 name: payload.new.name,
                 type: "fixed" as ChecklistType,
-                items: itemsData || [],
+                items: items || [],
                 notes: payload.new.notes || '',
-                gradeCriteria: undefined,
                 createdAt: payload.new.created_at,
               };
             } else {
               newChecklist = {
                 id: payload.new.id,
                 name: payload.new.name,
-                type: (itemsData?.type || "fixed") as ChecklistType,
-                items: itemsData?.items || [],
+                type: (items?.type || "fixed") as ChecklistType,
+                items: items?.items || [],
                 notes: payload.new.notes || '',
-                gradeCriteria: itemsData?.gradeCriteria,
                 createdAt: payload.new.created_at,
               };
             }
@@ -201,26 +172,25 @@ export function useChecklists() {
               return [newChecklist, ...prev];
             });
           } else if (payload.eventType === 'UPDATE') {
-            const itemsData = payload.new.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType; gradeCriteria?: GradeCriteria } | ChecklistItem[];
+            const items = payload.new.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType } | ChecklistItem[];
             
             setChecklists(prev => prev.map(c => {
               if (c.id !== payload.new.id) return c;
               
-              if (Array.isArray(itemsData)) {
+              if (Array.isArray(items)) {
                 return {
                   ...c,
                   name: payload.new.name,
-                  items: itemsData || [],
+                  items: items || [],
                   notes: payload.new.notes || '',
                 };
               } else {
                 return {
                   ...c,
                   name: payload.new.name,
-                  type: (itemsData?.type || c.type) as ChecklistType,
-                  items: itemsData?.items || [],
+                  type: (items?.type || c.type) as ChecklistType,
+                  items: items?.items || [],
                   notes: payload.new.notes || '',
-                  gradeCriteria: itemsData?.gradeCriteria,
                 };
               }
             }));
@@ -284,20 +254,17 @@ export function useChecklists() {
     }
   };
 
-  const updateChecklist = async (id: string, updates: Partial<Pick<Checklist, 'name' | 'items' | 'notes' | 'gradeCriteria'>>) => {
+  const updateChecklist = async (id: string, updates: Partial<Pick<Checklist, 'name' | 'items' | 'notes'>>) => {
     try {
       const checklist = checklists.find(c => c.id === id);
       const dbUpdates: { name?: string; items?: Json; notes?: string } = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
       if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
-      
-      // If items or gradeCriteria is being updated, we need to update the items JSON column
-      if (updates.items !== undefined || updates.gradeCriteria !== undefined) {
-        // Store with type, items, and gradeCriteria preserved
+      if (updates.items !== undefined) {
+        // Store with type preserved
         dbUpdates.items = { 
           type: checklist?.type || "fixed", 
-          items: updates.items ?? checklist?.items ?? [],
-          gradeCriteria: updates.gradeCriteria ?? checklist?.gradeCriteria,
+          items: updates.items 
         } as unknown as Json;
       }
       
