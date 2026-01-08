@@ -621,8 +621,17 @@ export function PlaybookView() {
   const getConditionalCompletionPercentage = (items: ChecklistItem[]) => {
     if (items.length === 0) return 0;
     
-    // Simple approach: sum the percentages of all checked sub-items directly
-    // Sub-item percentages are set in Grade Criteria Rules
+    // Count total selectable items (sub-items) for default percentage calculation
+    let totalSelectableItems = 0;
+    items.forEach(item => {
+      if (item.subItems && item.subItems.length > 0) {
+        totalSelectableItems += item.subItems.length;
+      } else {
+        totalSelectableItems += 1;
+      }
+    });
+    const defaultPct = totalSelectableItems > 0 ? Math.round(100 / totalSelectableItems) : 0;
+    
     let totalPercentage = 0;
     
     items.forEach((item, index) => {
@@ -631,10 +640,10 @@ export function PlaybookView() {
       if (item.subItems && item.subItems.length > 0) {
         const checkedSubItems = item.subItems.filter(sub => sub.checked);
         checkedSubItems.forEach(sub => {
-          totalPercentage += sub.percentage ?? 0;
+          totalPercentage += sub.percentage ?? defaultPct;
         });
       } else if (item.checked) {
-        totalPercentage += item.percentage ?? 0;
+        totalPercentage += item.percentage ?? defaultPct;
       }
     });
     
@@ -649,20 +658,27 @@ export function PlaybookView() {
     
     if (items.length === 0) return 0;
     
-    // Simple approach: sum the percentages of all checked sub-items directly
-    // Sub-item percentages are set in Grade Criteria Rules
+    // Count total selectable items for default percentage calculation
+    let totalSelectableItems = 0;
+    items.forEach(item => {
+      if (item.subItems && item.subItems.length > 0) {
+        totalSelectableItems += item.subItems.length;
+      } else {
+        totalSelectableItems += 1;
+      }
+    });
+    const defaultPct = totalSelectableItems > 0 ? Math.round(100 / totalSelectableItems) : 0;
+    
     let totalPercentage = 0;
     
     items.forEach(item => {
       if (item.subItems && item.subItems.length > 0) {
-        // Sum the percentages of checked sub-items directly
         const checkedSubItems = item.subItems.filter(sub => sub.checked);
         checkedSubItems.forEach(sub => {
-          totalPercentage += sub.percentage ?? 0;
+          totalPercentage += sub.percentage ?? defaultPct;
         });
       } else if (item.checked) {
-        // Simple item without sub-items - use item percentage
-        totalPercentage += item.percentage ?? 0;
+        totalPercentage += item.percentage ?? defaultPct;
       }
     });
     
