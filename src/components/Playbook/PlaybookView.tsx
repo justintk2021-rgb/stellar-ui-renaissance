@@ -2030,8 +2030,8 @@ export function PlaybookView() {
                     <div className="text-left">
                       <span className="text-sm font-medium">Grade Criteria</span>
                       <p className="text-[10px] text-muted-foreground">
-                        {selectedChecklist.gradeCriteria && (selectedChecklist.gradeCriteria.A.items.length > 0 || selectedChecklist.gradeCriteria.B.items.length > 0 || selectedChecklist.gradeCriteria.C.items.length > 0)
-                          ? `A: ${selectedChecklist.gradeCriteria.A.items.length} items (${selectedChecklist.gradeCriteria.A.percentage}%), B: ${selectedChecklist.gradeCriteria.B.items.length} items (${selectedChecklist.gradeCriteria.B.percentage}%), C: ${selectedChecklist.gradeCriteria.C.items.length} items (${selectedChecklist.gradeCriteria.C.percentage}%)`
+                        {selectedChecklist.gradeCriteria && ((selectedChecklist.gradeCriteria.A?.items?.length ?? 0) > 0 || (selectedChecklist.gradeCriteria.B?.items?.length ?? 0) > 0 || (selectedChecklist.gradeCriteria.C?.items?.length ?? 0) > 0)
+                          ? `A: ${selectedChecklist.gradeCriteria.A?.items?.length ?? 0} items (${selectedChecklist.gradeCriteria.A?.percentage ?? 100}%), B: ${selectedChecklist.gradeCriteria.B?.items?.length ?? 0} items (${selectedChecklist.gradeCriteria.B?.percentage ?? 80}%), C: ${selectedChecklist.gradeCriteria.C?.items?.length ?? 0} items (${selectedChecklist.gradeCriteria.C?.percentage ?? 60}%)`
                           : "Define which items are needed for each grade"
                         }
                       </p>
@@ -2071,7 +2071,7 @@ export function PlaybookView() {
                   const toggleItemForGrade = (gradeKey: 'A' | 'B' | 'C' | 'D', itemId: string) => {
                     setEditingGradeCriteria(prev => {
                       const current = prev || selectedChecklist.gradeCriteria || DEFAULT_GRADE_CRITERIA;
-                      const gradeItems = [...current[gradeKey].items];
+                      const gradeItems = [...(current[gradeKey]?.items || [])];
                       const index = gradeItems.indexOf(itemId);
                       if (index > -1) {
                         gradeItems.splice(index, 1);
@@ -2123,14 +2123,14 @@ export function PlaybookView() {
                                   type="number"
                                   min="0"
                                   max="100"
-                                  value={criteria[key].percentage}
+                                  value={criteria[key]?.percentage ?? defaultPct}
                                   onChange={(e) => updateGradePercentage(key, parseInt(e.target.value) || 0)}
                                   className="w-14 h-7 text-xs text-center p-1"
                                 />
                                 <span className="text-xs text-muted-foreground">%</span>
                               </div>
                               <div className={cn("text-xs font-medium px-2 py-0.5 rounded-full", colors.bg, colors.text)}>
-                                {criteria[key].items.length} items
+                                {criteria[key]?.items?.length ?? 0} items
                               </div>
                             </div>
                           </div>
@@ -2138,7 +2138,7 @@ export function PlaybookView() {
                           {allSelectableItems.length > 0 ? (
                             <div className="space-y-1.5 max-h-40 overflow-y-auto">
                               {allSelectableItems.map(item => {
-                                const isSelected = criteria[key].items.includes(item.id);
+                                const isSelected = (criteria[key]?.items || []).includes(item.id);
                                 return (
                                   <label
                                     key={item.id}
