@@ -621,37 +621,24 @@ export function PlaybookView() {
   const getConditionalCompletionPercentage = (items: ChecklistItem[]) => {
     if (items.length === 0) return 0;
     
-    // For sequential conditional checklists, each category contributes its percentage
-    // Categories can be "fixed" (full % when ANY sub-item selected) or "conditional" (sum of selected sub-items)
+    // Simple approach: sum the percentages of all checked sub-items directly
+    // Sub-item percentages are set in Grade Criteria Rules
     let totalPercentage = 0;
-    const categoryWeight = 100 / items.length;
     
     items.forEach((item, index) => {
       if (!isCategoryUnlocked(items, index)) return;
       
       if (item.subItems && item.subItems.length > 0) {
         const checkedSubItems = item.subItems.filter(sub => sub.checked);
-        
-        // Check if this category uses "fixed" percentage type
-        // Fixed: give full category weight when ANY sub-item is checked
-        if (item.percentageType === "fixed") {
-          if (checkedSubItems.length > 0) {
-            totalPercentage += categoryWeight;
-          }
-        } else {
-          // Conditional (default): sum the percentages of checked sub-items
-          const subItemPercentages = checkedSubItems.reduce((sum, sub) => {
-            return sum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
-          }, 0);
-          // Category contribution = (sub-item completion %) * category weight
-          totalPercentage += (subItemPercentages / 100) * categoryWeight;
-        }
+        checkedSubItems.forEach(sub => {
+          totalPercentage += sub.percentage ?? 0;
+        });
       } else if (item.checked) {
-        totalPercentage += categoryWeight;
+        totalPercentage += item.percentage ?? 0;
       }
     });
     
-    return Math.round(totalPercentage);
+    return Math.min(100, Math.round(totalPercentage));
   };
 
   const getCompletionPercentage = (items: ChecklistItem[], type?: ChecklistType) => {
@@ -662,59 +649,24 @@ export function PlaybookView() {
     
     if (items.length === 0) return 0;
     
-    // Check if any items have custom percentages
-    const hasCustomPercentages = items.some(item => item.percentage !== undefined);
+    // Simple approach: sum the percentages of all checked sub-items directly
+    // Sub-item percentages are set in Grade Criteria Rules
+    let totalPercentage = 0;
     
-    if (hasCustomPercentages) {
-      // Use custom percentages - sum up the percentages of checked items
-      const totalPercentage = items.reduce((sum, item) => {
-        const itemPercentage = item.percentage ?? Math.round(100 / items.length);
-        
-        if (item.subItems && item.subItems.length > 0) {
-          // For trading checklists: sum the checked sub-item percentages
-          // Users don't need to check all sub-items - just the ones relevant to their trade
-          if (item.checked) {
-            const checkedSubItems = item.subItems.filter(sub => sub.checked);
-            const subItemPercentages = checkedSubItems.reduce((subSum, sub) => {
-              return subSum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
-            }, 0);
-            // Item contribution = item % * (sum of checked sub-item %s / 100)
-            return sum + (itemPercentage * (subItemPercentages / 100));
-          }
-          return sum;
-        } else {
-          // Simple item without sub-items
-          if (item.checked) {
-            return sum + itemPercentage;
-          }
-          return sum;
-        }
-      }, 0);
-      return Math.min(100, Math.round(totalPercentage));
-    } else {
-      // Default equal distribution - sum checked sub-item percentages
-      let totalPercentage = 0;
-      const itemWeight = 100 / items.length;
-      
-      items.forEach(item => {
-        if (item.subItems && item.subItems.length > 0) {
-          if (item.checked) {
-            // Sum the percentages of checked sub-items
-            const checkedSubItems = item.subItems.filter(sub => sub.checked);
-            const subItemPercentages = checkedSubItems.reduce((sum, sub) => {
-              return sum + (sub.percentage ?? Math.round(100 / item.subItems!.length));
-            }, 0);
-            totalPercentage += (itemWeight * (subItemPercentages / 100));
-          }
-        } else {
-          if (item.checked) {
-            totalPercentage += itemWeight;
-          }
-        }
-      });
-      
-      return Math.round(totalPercentage);
-    }
+    items.forEach(item => {
+      if (item.subItems && item.subItems.length > 0) {
+        // Sum the percentages of checked sub-items directly
+        const checkedSubItems = item.subItems.filter(sub => sub.checked);
+        checkedSubItems.forEach(sub => {
+          totalPercentage += sub.percentage ?? 0;
+        });
+      } else if (item.checked) {
+        // Simple item without sub-items - use item percentage
+        totalPercentage += item.percentage ?? 0;
+      }
+    });
+    
+    return Math.min(100, Math.round(totalPercentage));
   };
 
   const updateItemPercentage = async (checklistId: string, itemId: string, percentage: number) => {
