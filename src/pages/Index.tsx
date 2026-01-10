@@ -23,6 +23,7 @@ import { SettingsView } from "@/components/Settings/SettingsView";
 import { CustomChart } from "@/components/Chart/CustomChart";
 import { PlaybookView } from "@/components/Playbook/PlaybookView";
 import { EconomicCalendarView } from "@/components/EconomicCalendar/EconomicCalendarView";
+import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
 import { AccountSelector } from "@/components/Dashboard/AccountSelector";
 import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +36,7 @@ const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
   journal: { title: 'Journal', subtitle: 'Log and manage your trades' },
   chart: { title: 'Chart', subtitle: 'Interactive chart with drawing tools' },
+  calculator: { title: 'Calculator', subtitle: 'Calculate position size and risk' },
   calendar: { title: 'Economic Calendar', subtitle: 'Live economic news and events' },
   playbook: { title: 'Playbook', subtitle: 'Your trading checklists and rules' },
   notebook: { title: 'Notebook', subtitle: 'Your personal trading notes and journal' },
@@ -575,6 +577,13 @@ const Index = () => {
             {/* Chart Page */}
             {currentPage === 'chart' && (
               <CustomChart />
+            )}
+
+            {/* Calculator Page */}
+            {currentPage === 'calculator' && (
+              <div className="max-w-4xl mx-auto animate-fade-in">
+                <LotSizeCalculator />
+              </div>
             )}
           </div>
         </main>
