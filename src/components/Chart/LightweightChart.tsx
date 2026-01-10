@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Sun, Moon, Calculator, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
-import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
+import { Search, Sun, Moon, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type ChartTheme = "light" | "dark";
@@ -17,15 +16,7 @@ export function LightweightChart() {
     const stored = localStorage.getItem("chart-theme");
     return stored === "light" ? "light" : "dark";
   });
-  const [showCalculator, setShowCalculator] = useState(() => {
-    return localStorage.getItem("chart-show-calculator") === "true";
-  });
   const [isFullscreen, setIsFullscreen] = useState(false);
-
-  // Save calculator visibility to localStorage
-  useEffect(() => {
-    localStorage.setItem("chart-show-calculator", String(showCalculator));
-  }, [showCalculator]);
 
   // Save chart theme to localStorage
   useEffect(() => {
@@ -137,14 +128,6 @@ export function LightweightChart() {
             {chartTheme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </Button>
           <Button
-            variant={showCalculator ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => setShowCalculator(!showCalculator)}
-            title={showCalculator ? "Hide calculator" : "Show calculator"}
-          >
-            <Calculator className="w-4 h-4" />
-          </Button>
-          <Button
             variant={isFullscreen ? "secondary" : "ghost"}
             size="icon"
             onClick={() => setIsFullscreen(!isFullscreen)}
@@ -161,24 +144,6 @@ export function LightweightChart() {
           style={{ minHeight: "400px" }}
         />
       </div>
-
-      {/* Calculator Panel - hidden in fullscreen */}
-      {showCalculator && !isFullscreen && (
-        <div className="w-[420px] flex-shrink-0 overflow-y-auto border-l border-border/50 pl-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Lot Size Calculator</h3>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => setShowCalculator(false)}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-          <LotSizeCalculator compact />
-        </div>
-      )}
     </div>
   );
 }
