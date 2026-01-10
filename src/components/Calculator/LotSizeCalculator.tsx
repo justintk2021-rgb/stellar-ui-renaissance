@@ -14,7 +14,7 @@ interface Instrument {
   pipValue: number;        // Value per pip/point for 1 standard lot
   contractSize: number;    // Units per standard lot
   pipSize: number;         // What constitutes 1 pip (0.0001, 0.01, 1, etc.)
-  category: 'forex' | 'stocks' | 'futures' | 'indices';
+  category: 'forex' | 'stocks' | 'futures' | 'indices' | 'derived';
 }
 
 const instruments: Instrument[] = [
@@ -124,6 +124,28 @@ const instruments: Instrument[] = [
   { symbol: "EU50", name: "Euro Stoxx 50 Index", pipValue: 1, contractSize: 1, pipSize: 0.1, category: 'indices' },
   { symbol: "VIX", name: "Volatility Index", pipValue: 100, contractSize: 1, pipSize: 0.01, category: 'indices' },
   { symbol: "SPX", name: "S&P 500 (Full)", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'indices' },
+
+  // Derived / Synthetic Indices (Deriv)
+  { symbol: "VIX10", name: "Volatility 10 Index", pipValue: 1, contractSize: 1, pipSize: 0.001, category: 'derived' },
+  { symbol: "VIX25", name: "Volatility 25 Index", pipValue: 1, contractSize: 1, pipSize: 0.001, category: 'derived' },
+  { symbol: "VIX50", name: "Volatility 50 Index", pipValue: 1, contractSize: 1, pipSize: 0.0001, category: 'derived' },
+  { symbol: "VIX75", name: "Volatility 75 Index", pipValue: 1, contractSize: 1, pipSize: 0.0001, category: 'derived' },
+  { symbol: "VIX100", name: "Volatility 100 Index", pipValue: 1, contractSize: 1, pipSize: 0.0001, category: 'derived' },
+  { symbol: "VIX10(1s)", name: "Volatility 10 (1s) Index", pipValue: 1, contractSize: 1, pipSize: 0.001, category: 'derived' },
+  { symbol: "VIX25(1s)", name: "Volatility 25 (1s) Index", pipValue: 1, contractSize: 1, pipSize: 0.001, category: 'derived' },
+  { symbol: "VIX50(1s)", name: "Volatility 50 (1s) Index", pipValue: 1, contractSize: 1, pipSize: 0.0001, category: 'derived' },
+  { symbol: "VIX75(1s)", name: "Volatility 75 (1s) Index", pipValue: 1, contractSize: 1, pipSize: 0.0001, category: 'derived' },
+  { symbol: "VIX100(1s)", name: "Volatility 100 (1s) Index", pipValue: 1, contractSize: 1, pipSize: 0.0001, category: 'derived' },
+  { symbol: "BOOM300", name: "Boom 300 Index", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'derived' },
+  { symbol: "BOOM500", name: "Boom 500 Index", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'derived' },
+  { symbol: "BOOM1000", name: "Boom 1000 Index", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'derived' },
+  { symbol: "CRASH300", name: "Crash 300 Index", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'derived' },
+  { symbol: "CRASH500", name: "Crash 500 Index", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'derived' },
+  { symbol: "CRASH1000", name: "Crash 1000 Index", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'derived' },
+  { symbol: "STEP", name: "Step Index", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'derived' },
+  { symbol: "RB50", name: "Range Break 50 Index", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'derived' },
+  { symbol: "RB100", name: "Range Break 100 Index", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'derived' },
+  { symbol: "RB200", name: "Range Break 200 Index", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'derived' },
 ];
 
 function AnimatedResult({ value, prefix = "", suffix = "", decimals = 2, className = "" }: {
@@ -366,7 +388,7 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
               />
             </div>
             <div className="flex gap-1 flex-wrap">
-              {(['forex', 'stocks', 'futures', 'indices'] as const).map((cat) => (
+              {(['forex', 'stocks', 'futures', 'indices', 'derived'] as const).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
@@ -618,14 +640,15 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
 
             {/* Category Tabs */}
             <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-              <TabsList className="grid grid-cols-4 w-full">
+              <TabsList className="grid grid-cols-5 w-full">
                 <TabsTrigger value="forex" className="text-xs">Forex</TabsTrigger>
                 <TabsTrigger value="stocks" className="text-xs">Stocks</TabsTrigger>
                 <TabsTrigger value="futures" className="text-xs">Futures</TabsTrigger>
                 <TabsTrigger value="indices" className="text-xs">Indices</TabsTrigger>
+                <TabsTrigger value="derived" className="text-xs">Derived</TabsTrigger>
               </TabsList>
 
-              {['forex', 'stocks', 'futures', 'indices'].map((category) => (
+              {['forex', 'stocks', 'futures', 'indices', 'derived'].map((category) => (
                 <TabsContent key={category} value={category} className="mt-3">
                   <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
                     {filteredInstruments.length === 0 ? (
