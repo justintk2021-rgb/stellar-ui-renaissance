@@ -232,21 +232,40 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
       ? (balance * riskPercent) / 100 
       : riskDollar;
 
-    // Convert stop loss to pips if user entered ticks
-    // Ticks = actual price movement, Pips = number of pip units
-    // If mode is 'ticks', we need to convert: pips_equivalent = ticks / pipSize
-    const slInPips = stopLossMode === 'ticks' 
-      ? sl / pipSize 
-      : sl;
+    // For derived indices (synthetics), the tick value from TradingView IS the raw price movement
+    // We calculate: Risk Amount / (Price Movement × Pip Value per lot)
+    // For forex/standard instruments, ticks need to be converted to pips using pipSize
+    const isDerived = selectedInstrument?.category === 'derived';
+    
+    let effectiveStopLoss: number;
+    if (stopLossMode === 'ticks') {
+      if (isDerived) {
+        // For derived indices: tick value IS the price movement, use directly
+        // Lot Size = Risk Amount / (Tick Movement × Pip Value)
+        effectiveStopLoss = sl; // Use raw tick value
+      } else {
+        // For forex/standard: convert ticks to pips
+        effectiveStopLoss = sl / pipSize;
+      }
+    } else {
+      // Pips mode - use as entered
+      effectiveStopLoss = sl;
+    }
 
-    // Lot size calculation: Risk Amount / (Stop Loss in Pips × Pip Value)
-    const lotSize = slInPips > 0 ? riskAmount / (slInPips * pipValue) : 0;
+    // Lot size calculation
+    // For derived: Lot Size = Risk Amount / (Price Movement × Pip Value)
+    // For forex: Lot Size = Risk Amount / (Pips × Pip Value per pip)
+    const lotSize = effectiveStopLoss > 0 
+      ? (isDerived && stopLossMode === 'ticks' 
+          ? riskAmount / (effectiveStopLoss * pipValue)  // Derived with ticks
+          : riskAmount / (effectiveStopLoss * pipValue)) // Standard pips calculation
+      : 0;
 
     // Position size in units
     const positionUnits = lotSize * contractSize;
 
     // Potential loss at stop loss
-    const potentialLoss = lotSize * slInPips * pipValue;
+    const potentialLoss = lotSize * effectiveStopLoss * pipValue;
 
     // Get the correct unit label based on instrument type
     const getUnitLabel = () => {
