@@ -187,6 +187,7 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
   const [riskUsd, setRiskUsd] = useState<string>("100");
   const [riskMode, setRiskMode] = useState<'percent' | 'usd'>('percent');
   const [stopLoss, setStopLoss] = useState<string>("50");
+  const [stopLossMode, setStopLossMode] = useState<'pips' | 'ticks'>('pips');
   const [selectedSymbol, setSelectedSymbol] = useState<string>("EUR/USD");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [activeCategory, setActiveCategory] = useState<string>("forex");
@@ -231,14 +232,21 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
       ? (balance * riskPercent) / 100 
       : riskDollar;
 
-    // Lot size calculation: Risk Amount / (Stop Loss × Pip Value)
-    const lotSize = sl > 0 ? riskAmount / (sl * pipValue) : 0;
+    // Convert stop loss to pips if user entered ticks
+    // Ticks = actual price movement, Pips = number of pip units
+    // If mode is 'ticks', we need to convert: pips_equivalent = ticks / pipSize
+    const slInPips = stopLossMode === 'ticks' 
+      ? sl / pipSize 
+      : sl;
+
+    // Lot size calculation: Risk Amount / (Stop Loss in Pips × Pip Value)
+    const lotSize = slInPips > 0 ? riskAmount / (slInPips * pipValue) : 0;
 
     // Position size in units
     const positionUnits = lotSize * contractSize;
 
     // Potential loss at stop loss
-    const potentialLoss = lotSize * sl * pipValue;
+    const potentialLoss = lotSize * slInPips * pipValue;
 
     // Get the correct unit label based on instrument type
     const getUnitLabel = () => {
@@ -274,7 +282,7 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
       unitLabel: getUnitLabel(),
       pipLabel: getPipLabel()
     };
-  }, [accountBalance, riskPercentage, riskUsd, riskMode, stopLoss, selectedInstrument, useCustom, customPipValue, customContractSize]);
+  }, [accountBalance, riskPercentage, riskUsd, riskMode, stopLoss, stopLossMode, selectedInstrument, useCustom, customPipValue, customContractSize]);
 
   const handleReset = () => {
     setAccountBalance("10000");
@@ -282,10 +290,10 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
     setRiskUsd("100");
     setRiskMode("percent");
     setStopLoss("50");
+    setStopLossMode("pips");
     setSelectedSymbol("EUR/USD");
     setSearchQuery("");
     setActiveCategory("forex");
-    setUseCustom(false);
     setUseCustom(false);
   };
 
@@ -365,9 +373,35 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
 
           {/* Stop Loss */}
           <div className="space-y-1.5">
-            <Label htmlFor="sl-compact" className="text-xs text-muted-foreground">
-              Stop Loss (pips)
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="sl-compact" className="text-xs text-muted-foreground">
+                Stop Loss
+              </Label>
+              <div className="flex rounded-md overflow-hidden border border-border/50">
+                <button
+                  onClick={() => setStopLossMode('pips')}
+                  className={cn(
+                    "px-2 py-0.5 text-[10px] font-medium transition-all",
+                    stopLossMode === 'pips'
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                  )}
+                >
+                  Pips
+                </button>
+                <button
+                  onClick={() => setStopLossMode('ticks')}
+                  className={cn(
+                    "px-2 py-0.5 text-[10px] font-medium transition-all",
+                    stopLossMode === 'ticks'
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                  )}
+                >
+                  Ticks
+                </button>
+              </div>
+            </div>
             <div className="relative">
               <TrendingDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -376,7 +410,7 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
                 value={stopLoss}
                 onChange={(e) => setStopLoss(e.target.value)}
                 className="pl-9 font-mono h-9 text-sm"
-                placeholder="50"
+                placeholder={stopLossMode === 'pips' ? "50" : "0.0050"}
               />
             </div>
           </div>
@@ -609,9 +643,35 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
 
             {/* Stop Loss */}
             <div className="space-y-2">
-              <Label htmlFor="stopLoss" className="text-xs uppercase tracking-wider text-muted-foreground">
-                Stop Loss ({calculations.pipLabel})
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="stopLoss" className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Stop Loss
+                </Label>
+                <div className="flex rounded-lg overflow-hidden border border-border/50">
+                  <button
+                    onClick={() => setStopLossMode('pips')}
+                    className={cn(
+                      "px-2 py-1 text-[10px] font-medium transition-all",
+                      stopLossMode === 'pips'
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    Pips
+                  </button>
+                  <button
+                    onClick={() => setStopLossMode('ticks')}
+                    className={cn(
+                      "px-2 py-1 text-[10px] font-medium transition-all",
+                      stopLossMode === 'ticks'
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    Ticks
+                  </button>
+                </div>
+              </div>
               <div className="relative">
                 <TrendingDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -620,10 +680,16 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
                   value={stopLoss}
                   onChange={(e) => setStopLoss(e.target.value)}
                   className="pl-9 font-mono"
-                  placeholder="50"
-                  min="1"
+                  placeholder={stopLossMode === 'pips' ? "50" : "0.0050"}
+                  min="0"
+                  step={stopLossMode === 'ticks' ? "0.0001" : "1"}
                 />
               </div>
+              <p className="text-[10px] text-muted-foreground">
+                {stopLossMode === 'pips' 
+                  ? `1 pip = ${calculations.pipSize} price movement` 
+                  : "Enter raw price movement (e.g., 0.0050)"}
+              </p>
             </div>
           </div>
 
