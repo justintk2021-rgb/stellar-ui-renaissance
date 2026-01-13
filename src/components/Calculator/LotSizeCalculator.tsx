@@ -15,6 +15,7 @@ interface Instrument {
   contractSize: number;    // Units per standard lot
   pipSize: number;         // What constitutes 1 pip (0.0001, 0.01, 1, etc.)
   category: 'forex' | 'stocks' | 'futures' | 'indices' | 'derived';
+  minLotSize?: number;     // Minimum lot size allowed for this instrument
 }
 
 const instruments: Instrument[] = [
@@ -127,15 +128,16 @@ const instruments: Instrument[] = [
 
   // Derived / Synthetic Indices (Deriv) - pip value is per 1 lot, pip size is minimum tick
   // For synthetics: Profit = Lot Size × Price Movement × Pip Value
-  { symbol: "V10", name: "Volatility 10 Index", pipValue: 0.10, contractSize: 1, pipSize: 0.001, category: 'derived' },
-  { symbol: "V25", name: "Volatility 25 Index", pipValue: 0.25, contractSize: 1, pipSize: 0.001, category: 'derived' },
-  { symbol: "V50", name: "Volatility 50 Index", pipValue: 5.00, contractSize: 1, pipSize: 0.00001, category: 'derived' },
-  { symbol: "V75", name: "Volatility 75 Index", pipValue: 10.00, contractSize: 1, pipSize: 0.00001, category: 'derived' },
+  // minLotSize: Broker minimum lot size requirement
+  { symbol: "V10", name: "Volatility 10 Index", pipValue: 0.10, contractSize: 1, pipSize: 0.001, category: 'derived', minLotSize: 0.5 },
+  { symbol: "V25", name: "Volatility 25 Index", pipValue: 0.25, contractSize: 1, pipSize: 0.001, category: 'derived', minLotSize: 0.5 },
+  { symbol: "V50", name: "Volatility 50 Index", pipValue: 5.00, contractSize: 1, pipSize: 0.00001, category: 'derived', minLotSize: 4.0 },
+  { symbol: "V75", name: "Volatility 75 Index", pipValue: 10.00, contractSize: 1, pipSize: 0.00001, category: 'derived', minLotSize: 0.001 },
   { symbol: "V100", name: "Volatility 100 Index", pipValue: 10.00, contractSize: 1, pipSize: 0.00001, category: 'derived' },
-  { symbol: "V10(1s)", name: "Volatility 10 (1s) Index", pipValue: 0.10, contractSize: 1, pipSize: 0.001, category: 'derived' },
-  { symbol: "V25(1s)", name: "Volatility 25 (1s) Index", pipValue: 0.25, contractSize: 1, pipSize: 0.001, category: 'derived' },
-  { symbol: "V50(1s)", name: "Volatility 50 (1s) Index", pipValue: 5.00, contractSize: 1, pipSize: 0.00001, category: 'derived' },
-  { symbol: "V75(1s)", name: "Volatility 75 (1s) Index", pipValue: 10.00, contractSize: 1, pipSize: 0.00001, category: 'derived' },
+  { symbol: "V10(1s)", name: "Volatility 10 (1s) Index", pipValue: 0.10, contractSize: 1, pipSize: 0.001, category: 'derived', minLotSize: 0.5 },
+  { symbol: "V25(1s)", name: "Volatility 25 (1s) Index", pipValue: 0.25, contractSize: 1, pipSize: 0.001, category: 'derived', minLotSize: 0.5 },
+  { symbol: "V50(1s)", name: "Volatility 50 (1s) Index", pipValue: 5.00, contractSize: 1, pipSize: 0.00001, category: 'derived', minLotSize: 4.0 },
+  { symbol: "V75(1s)", name: "Volatility 75 (1s) Index", pipValue: 10.00, contractSize: 1, pipSize: 0.00001, category: 'derived', minLotSize: 0.001 },
   { symbol: "V100(1s)", name: "Volatility 100 (1s) Index", pipValue: 10.00, contractSize: 1, pipSize: 0.00001, category: 'derived' },
   { symbol: "BOOM300", name: "Boom 300 Index", pipValue: 1.00, contractSize: 1, pipSize: 0.01, category: 'derived' },
   { symbol: "BOOM500", name: "Boom 500 Index", pipValue: 1.00, contractSize: 1, pipSize: 0.01, category: 'derived' },
@@ -255,11 +257,16 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
     // Lot size calculation
     // For derived: Lot Size = Risk Amount / (Price Movement × Pip Value)
     // For forex: Lot Size = Risk Amount / (Pips × Pip Value per pip)
-    const lotSize = effectiveStopLoss > 0 
+    let calculatedLotSize = effectiveStopLoss > 0 
       ? (isDerived && stopLossMode === 'ticks' 
           ? riskAmount / (effectiveStopLoss * pipValue)  // Derived with ticks
           : riskAmount / (effectiveStopLoss * pipValue)) // Standard pips calculation
       : 0;
+    
+    // Apply minimum lot size constraint if defined
+    const minLotSize = selectedInstrument?.minLotSize ?? 0;
+    const lotSize = Math.max(calculatedLotSize, minLotSize);
+    const isBelowMinimum = calculatedLotSize > 0 && calculatedLotSize < minLotSize;
 
     // Position size in units
     const positionUnits = lotSize * contractSize;
@@ -299,7 +306,9 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
       contractSize,
       pipSize,
       unitLabel: getUnitLabel(),
-      pipLabel: getPipLabel()
+      pipLabel: getPipLabel(),
+      isBelowMinimum,
+      minLotSize
     };
   }, [accountBalance, riskPercentage, riskUsd, riskMode, stopLoss, stopLossMode, selectedInstrument, useCustom, customPipValue, customContractSize]);
 
@@ -493,6 +502,11 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
               decimals={2}
               className="text-2xl font-bold text-primary"
             />
+            {calculations.isBelowMinimum && (
+              <div className="mt-2 text-[10px] text-amber-500 bg-amber-500/10 rounded px-2 py-1">
+                ⚠️ Min lot: {calculations.minLotSize} (adjusted)
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="bg-muted/30 rounded p-2 text-center">
@@ -845,6 +859,11 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
               />
               <span className="text-lg text-muted-foreground">{calculations.unitLabel}</span>
             </div>
+            {calculations.isBelowMinimum && (
+              <div className="mt-3 text-xs text-amber-500 bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20">
+                ⚠️ Calculated lot size was below the broker minimum of <span className="font-mono font-semibold">{calculations.minLotSize}</span> lots. Adjusted to minimum.
+              </div>
+            )}
             {selectedInstrument?.category === 'forex' && (
               <div className="mt-3 flex gap-4 text-sm">
                 <div>
