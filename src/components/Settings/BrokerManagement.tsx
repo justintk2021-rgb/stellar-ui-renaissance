@@ -19,6 +19,7 @@ import {
 const PLATFORMS = [
   { value: 'mt5', label: 'MetaTrader 5' },
   { value: 'mt4', label: 'MetaTrader 4' },
+  { value: 'ctrader', label: 'cTrader' },
   { value: 'tradelocker', label: 'TradeLocker' },
 ];
 
@@ -45,6 +46,7 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [metaapiAccountId, setMetaapiAccountId] = useState('');
+  const [useAdvanced, setUseAdvanced] = useState(false);
 
   // Check connecting accounts periodically
   useEffect(() => {
@@ -65,6 +67,7 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
     setLogin('');
     setPassword('');
     setMetaapiAccountId('');
+    setUseAdvanced(false);
   };
 
   const handleConnect = async () => {
@@ -80,9 +83,13 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
         return;
       }
     } else {
-      // MT4/MT5 - always require MetaAPI Account ID
-      if (!metaapiAccountId.trim()) {
+      // MT4/MT5/cTrader - require credentials OR MetaAPI Account ID
+      if (useAdvanced && !metaapiAccountId.trim()) {
         toast.error('Please enter your MetaAPI Account ID');
+        return;
+      }
+      if (!useAdvanced && (!login || !password || !server)) {
+        toast.error('Please fill in all broker credentials');
         return;
       }
     }
@@ -242,37 +249,92 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
                   </>
                 )}
 
-                {/* MT4/MT5 Form - Default to Account ID since direct credentials require paid MetaAPI */}
-                {(platform === 'mt4' || platform === 'mt5') && (
+                {/* MT4/MT5/cTrader Form - Direct credentials for seamless experience */}
+                {(platform === 'mt4' || platform === 'mt5' || platform === 'ctrader') && (
                   <>
-                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                      <div className="flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                        <div className="text-sm text-amber-300">
-                          <p className="font-medium mb-1">MetaAPI Account ID Required</p>
-                          <p className="text-amber-300/80 text-xs">
-                            Create an account in your MetaAPI dashboard first, then paste the Account ID below.
+                    {!useAdvanced ? (
+                      <>
+                        <div className="space-y-2">
+                          <Label>Broker Name</Label>
+                          <Input
+                            placeholder="e.g., IC Markets, FTMO, Deriv"
+                            value={brokerName}
+                            onChange={(e) => setBrokerName(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Server</Label>
+                          <Input
+                            placeholder="e.g., ICMarketsSC-Live01"
+                            value={server}
+                            onChange={(e) => setServer(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Find this in your broker terminal: File → Login to Trade Account
                           </p>
                         </div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>MetaAPI Account ID</Label>
-                      <Input
-                        placeholder="e.g., 12345678-abcd-1234-efgh-..."
-                        value={metaapiAccountId}
-                        onChange={(e) => setMetaapiAccountId(e.target.value)}
-                      />
-                    </div>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="p-0 h-auto text-xs gap-1"
-                      onClick={() => window.open('https://app.metaapi.cloud/', '_blank')}
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      Open MetaAPI Dashboard to create account
-                    </Button>
+                        <div className="space-y-2">
+                          <Label>Login / Account Number</Label>
+                          <Input
+                            placeholder="e.g., 12345678"
+                            value={login}
+                            onChange={(e) => setLogin(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Password (Investor/Read-only recommended)</Label>
+                          <div className="relative">
+                            <Input
+                              type={showPassword ? 'text' : 'password'}
+                              placeholder="••••••••"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-0 top-0 h-full px-3"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Use your investor password for read-only access
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          className="p-0 h-auto text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => setUseAdvanced(true)}
+                        >
+                          Already have a MetaAPI account? Use Account ID →
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          <Label>MetaAPI Account ID</Label>
+                          <Input
+                            placeholder="e.g., 12345678-abcd-1234-efgh-..."
+                            value={metaapiAccountId}
+                            onChange={(e) => setMetaapiAccountId(e.target.value)}
+                          />
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          className="p-0 h-auto text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => setUseAdvanced(false)}
+                        >
+                          ← Use broker credentials instead
+                        </Button>
+                      </>
+                    )}
                   </>
                 )}
               </div>
