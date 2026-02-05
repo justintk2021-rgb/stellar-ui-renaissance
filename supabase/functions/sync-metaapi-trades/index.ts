@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 // ====================== INTERFACES ======================
@@ -296,7 +296,7 @@ serve(async (req) => {
       }
 
       // MT4/MT5 via MetaAPI Account ID
-      if (platform === 'mt4' || platform === 'mt5') {
+      if (platform === 'mt4' || platform === 'mt5' || platform === 'ctrader') {
         if (!metaApiToken) {
           return new Response(JSON.stringify({ error: 'MetaAPI token not configured. Please add METAAPI_TOKEN secret.' }), {
             status: 500,
@@ -304,7 +304,106 @@ serve(async (req) => {
           });
         }
 
-        // If user provides MetaAPI Account ID directly
+        // PRIORITY 1: Direct broker credentials (seamless experience - no MetaAPI account ID needed)
+        if (login && password && server && !metaapiAccountId) {
+          console.log(`Creating MetaAPI account with direct credentials for ${platform} - ${server} - ${login}`);
+          
+          try {
+            const createAccountResponse = await fetch(
+              'https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts',
+              {
+                method: 'POST',
+                headers: {
+                  'auth-token': metaApiToken,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  login: login,
+                  password: password,
+                  name: `${brokerName || platform.toUpperCase()}-${login}`,
+                  server: server,
+                  platform: platform === 'ctrader' ? 'ctrader' : platform,
+                  magic: 0,
+                  type: 'cloud-g2',
+                  region: 'new-york',
+                  copyFactoryRoles: [],
+                  resourceSlots: 1,
+                  reliability: 'regular',
+                }),
+              }
+            );
+
+            if (createAccountResponse.ok) {
+              const accountData = await createAccountResponse.json();
+              console.log('MetaAPI account created successfully:', accountData.id);
+
+              // Deploy the account
+              await fetch(
+                `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${accountData.id}/deploy`,
+                {
+                  method: 'POST',
+                  headers: { 'auth-token': metaApiToken },
+                }
+              );
+
+              const { data: connection, error: insertError } = await supabase
+                .from('broker_connections')
+                .insert({
+                  user_id: user.id,
+                  platform: platform,
+                  broker_name: brokerName || platform.toUpperCase(),
+                  server: server,
+                  login: login,
+                  metaapi_account_id: accountData.id,
+                  connection_status: 'connecting',
+                  last_connected_at: new Date().toISOString(),
+                })
+                .select()
+                .single();
+
+              if (insertError) {
+                console.error('Error saving connection:', insertError);
+                return new Response(JSON.stringify({ error: 'Failed to save connection' }), {
+                  status: 500,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                });
+              }
+
+              return new Response(JSON.stringify({ 
+                success: true, 
+                connection,
+                message: 'Broker connected! Trade data will sync in a few moments.',
+              }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            } else {
+              const errorText = await createAccountResponse.text();
+              console.error('MetaAPI create account error:', createAccountResponse.status, errorText);
+              
+              let userMessage = 'Failed to connect. Please check your credentials.';
+              if (errorText.includes('login') || errorText.includes('password') || errorText.includes('authentication') || errorText.includes('Invalid')) {
+                userMessage = 'Invalid broker credentials. Please check your login and password.';
+              } else if (errorText.includes('server') || errorText.includes('not found')) {
+                userMessage = 'Broker server not found. Please verify the server name.';
+              }
+              
+              return new Response(JSON.stringify({ error: userMessage }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+          } catch (fetchError) {
+            console.error('MetaAPI create account fetch error:', fetchError);
+            return new Response(JSON.stringify({ 
+              error: 'Connection issue. Please try again in a few moments.',
+            }), {
+              status: 503,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
+        // PRIORITY 2: User provides MetaAPI Account ID directly (fallback)
         if (metaapiAccountId) {
           console.log(`Using existing MetaAPI account: ${metaapiAccountId}`);
           
