@@ -41,6 +41,7 @@ const pageInfo: Record<string, { title: string; subtitle: string }> = {
   calendar: { title: 'Economic Calendar', subtitle: 'Live economic news and events' },
   playbook: { title: 'Playbook', subtitle: 'Your trading checklists and rules' },
   notebook: { title: 'Notebook', subtitle: 'Your personal trading notes and journal' },
+  community: { title: 'Community', subtitle: 'Chat with other traders' },
   settings: { title: 'Settings', subtitle: 'Customize your preferences' },
 };
 
