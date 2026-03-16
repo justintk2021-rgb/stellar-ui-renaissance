@@ -253,6 +253,140 @@ export type Database = {
         }
         Relationships: []
       }
+      community_channels: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
+      community_messages: {
+        Row: {
+          channel_id: string | null
+          content: string
+          created_at: string
+          id: string
+          image_url: string | null
+          parent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          channel_id?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          parent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          parent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "community_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_messages_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "community_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          id: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          id?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          id?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "community_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      direct_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          image_url: string | null
+          is_read: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_read?: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_read?: boolean | null
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
       notebook_entries: {
         Row: {
           category: string
