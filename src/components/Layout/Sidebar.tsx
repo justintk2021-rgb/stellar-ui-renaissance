@@ -19,6 +19,7 @@ const navItems = [
   { id: 'calendar', label: 'Economic Calendar', icon: CalendarClock },
   { id: 'playbook', label: 'Playbook', icon: ClipboardList },
   { id: 'notebook', label: 'Notebook', icon: NotebookPen },
+  { id: 'community', label: 'Community', icon: Users },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 

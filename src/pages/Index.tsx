@@ -587,6 +587,13 @@ const Index = () => {
                 <LotSizeCalculator />
               </div>
             )}
+
+            {/* Community Page */}
+            {currentPage === 'community' && (
+              <div className="animate-fade-in max-w-7xl mx-auto">
+                <CommunityView />
+              </div>
+            )}
           </div>
         </main>
 
