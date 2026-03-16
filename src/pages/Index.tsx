@@ -24,6 +24,7 @@ import { CustomChart } from "@/components/Chart/CustomChart";
 import { PlaybookView } from "@/components/Playbook/PlaybookView";
 import { EconomicCalendarView } from "@/components/EconomicCalendar/EconomicCalendarView";
 import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
+import { CommunityView } from "@/components/Community/CommunityView";
 import { AccountSelector } from "@/components/Dashboard/AccountSelector";
 import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
