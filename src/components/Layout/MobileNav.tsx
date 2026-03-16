@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList, CalendarClock, Calculator } from "lucide-react";
+import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList, CalendarClock, Calculator, Users } from "lucide-react";
 
 interface MobileNavProps {
   currentPage: string;
@@ -12,6 +12,7 @@ const navItems = [
   { id: 'chart', label: 'Chart', icon: BarChart3 },
   { id: 'calculator', label: 'Calc', icon: Calculator },
   { id: 'calendar', label: 'Calendar', icon: CalendarClock },
+  { id: 'community', label: 'Chat', icon: Users },
   { id: 'playbook', label: 'Playbook', icon: ClipboardList },
   { id: 'notebook', label: 'Notes', icon: NotebookPen },
   { id: 'settings', label: 'Settings', icon: Settings },
