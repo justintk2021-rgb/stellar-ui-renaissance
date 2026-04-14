@@ -161,10 +161,10 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
   const monthlyStats = useMemo(() => {
     let totalPnL = 0;
     let tradingDays = 0;
+    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
 
     Object.keys(dailyStats).forEach((dateStr) => {
-      const date = new Date(dateStr);
-      if (date.getFullYear() === year && date.getMonth() === month) {
+      if (dateStr.startsWith(monthPrefix)) {
         totalPnL += dailyStats[dateStr].pnl;
         tradingDays += 1;
       }
