@@ -489,8 +489,8 @@ const Index = () => {
                   <AccountSelector
                     accounts={accounts}
                     selectedAccount={selectedAccount}
-                    onSelectAccount={(id) => { setSelectedBrokerAccountId(null); setSelectedAccountId(id); }}
-                    onSelectBrokerAccount={setSelectedBrokerAccountId}
+                    onSelectAccount={(id) => { handleSetBrokerAccountId(null); setSelectedAccountId(id); }}
+                    onSelectBrokerAccount={handleSetBrokerAccountId}
                     onAddAccount={addAccount}
                     onUpdateAccount={updateAccount}
                     onDeleteAccount={deleteAccount}
@@ -532,8 +532,8 @@ const Index = () => {
                     <AccountSelector
                       accounts={accounts}
                       selectedAccount={selectedAccount}
-                      onSelectAccount={(id) => { setSelectedBrokerAccountId(null); setSelectedAccountId(id); }}
-                      onSelectBrokerAccount={setSelectedBrokerAccountId}
+                      onSelectAccount={(id) => { handleSetBrokerAccountId(null); setSelectedAccountId(id); }}
+                      onSelectBrokerAccount={handleSetBrokerAccountId}
                       onAddAccount={addAccount}
                       onUpdateAccount={updateAccount}
                       onDeleteAccount={deleteAccount}
