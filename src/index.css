@@ -403,18 +403,7 @@
     z-index: 1;
   }
 
-  /* Fallback theme transition class - added during transition only */
-  html.theme-transition,
-  html.theme-transition *,
-  html.theme-transition *::before,
-  html.theme-transition *::after {
-    transition: background-color 0.15s ease-out,
-                border-color 0.15s ease-out,
-                color 0.1s ease-out,
-                fill 0.15s ease-out,
-                stroke 0.15s ease-out,
-                box-shadow 0.15s ease-out !important;
-  }
+  /* Theme switches are now instant - no transition overhead */
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
