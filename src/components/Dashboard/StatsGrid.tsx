@@ -1,11 +1,13 @@
+import { useState, useEffect } from "react";
 import { Trade } from "@/types/trade";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Info, DollarSign, Percent, BarChart3, Scale } from "lucide-react";
+import { TrendingUp, TrendingDown, Info, DollarSign, Percent, BarChart3, Scale, Activity } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WinRatioCard } from "./WinRatioCard";
 import { RecentTrades } from "./RecentTrades";
 import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
 
 interface StatsGridProps {
   trades: Trade[];
