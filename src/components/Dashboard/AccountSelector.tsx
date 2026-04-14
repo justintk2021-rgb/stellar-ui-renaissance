@@ -282,9 +282,22 @@ export const AccountSelector = ({
                         </span>
                       </div>
                     </div>
-                    {selectedBrokerAccount === brokerId && (
-                      <Check className="w-4 h-4 text-primary shrink-0" />
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {selectedBrokerAccount === brokerId && (
+                        <Check className="w-4 h-4 text-primary" />
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openRenameBroker(broker);
+                        }}
+                      >
+                        <Settings className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </DropdownMenuItem>
                 );
               })}
