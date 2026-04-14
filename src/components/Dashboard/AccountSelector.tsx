@@ -442,6 +442,34 @@ export const AccountSelector = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rename Broker Account Dialog */}
+      <Dialog open={isRenameBrokerOpen} onOpenChange={setIsRenameBrokerOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Rename Broker Account</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="broker-name">Display Name</Label>
+              <Input
+                id="broker-name"
+                value={brokerDisplayName}
+                onChange={(e) => setBrokerDisplayName(e.target.value)}
+                placeholder="e.g., My Live Account"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRenameBrokerOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameBroker} disabled={!brokerDisplayName.trim()}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
