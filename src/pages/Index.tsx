@@ -62,8 +62,20 @@ const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [selectedBrokerAccountId, setSelectedBrokerAccountId] = useState<string | null>(null);
+  const [selectedBrokerAccountId, setSelectedBrokerAccountId] = useState<string | null>(() => {
+    return localStorage.getItem('selectedBrokerAccountId') || null;
+  });
   const [brokerBalance, setBrokerBalance] = useState<number | null>(null);
+
+  // Persist broker account selection
+  const handleSetBrokerAccountId = useCallback((id: string | null) => {
+    setSelectedBrokerAccountId(id);
+    if (id) {
+      localStorage.setItem('selectedBrokerAccountId', id);
+    } else {
+      localStorage.removeItem('selectedBrokerAccountId');
+    }
+  }, []);
   
   // Use trading accounts
   const {
