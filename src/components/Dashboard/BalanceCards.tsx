@@ -260,27 +260,30 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
       if (result > 0) {
         totalProfit += result;
       }
-      // Simulate fees as a small percentage of trade volume (for demo)
-      totalFees += Math.abs(result) * 0.01;
+      // Use actual fees from broker if available, otherwise estimate
+      const tradeFees = (Math.abs(trade.swap || 0)) + (Math.abs(trade.commission || 0));
+      totalFees += tradeFees > 0 ? tradeFees : Math.abs(result) * 0.01;
       highest = Math.max(highest, equity);
       equityPoints.push(equity);
     });
 
-    const change = equity - startBalance;
+    // If broker balance is available, use it as the current balance
+    const finalBalance = brokerBalance != null ? brokerBalance : equity;
+    const change = finalBalance - startBalance;
     const percentChange = startBalance > 0 ? (change / startBalance) * 100 : 0;
     const profitPct = startBalance > 0 ? (totalProfit / startBalance) * 100 : 0;
 
     return {
-      currentBalance: equity,
+      currentBalance: finalBalance,
       balanceChange: change,
       balancePercent: percentChange,
       profit: totalProfit,
       profitPercent: profitPct,
       fees: totalFees,
-      highestBalance: highest,
+      highestBalance: Math.max(highest, finalBalance),
       sparklineData: equityPoints.length > 1 ? equityPoints : [startBalance, startBalance],
     };
-  }, [trades, startBalance]);
+  }, [trades, startBalance, brokerBalance]);
 
   const isPositive = balanceChange >= 0;
   const isProfitPositive = profit >= 0;
