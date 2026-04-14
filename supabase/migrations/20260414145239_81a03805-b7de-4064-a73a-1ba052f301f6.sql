@@ -1,0 +1,1 @@
+ALTER TABLE public.broker_positions DROP CONSTRAINT broker_positions_type_check;
