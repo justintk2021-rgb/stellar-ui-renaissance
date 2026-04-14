@@ -96,6 +96,49 @@ const iconVariants = {
 // Removed animated glow variants to reduce visual interference
 
 export function StatsGrid({ trades }: StatsGridProps) {
+  const [openPositions, setOpenPositions] = useState<{ count: number; floatingPl: number }>({ count: 0, floatingPl: 0 });
+
+  useEffect(() => {
+    const fetchOpenPositions = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: connections } = await supabase
+        .from('broker_connections')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('connection_status', 'connected');
+
+      if (!connections?.length) {
+        setOpenPositions({ count: 0, floatingPl: 0 });
+        return;
+      }
+
+      const ids = connections.map(c => c.id);
+      const { data: positions } = await supabase
+        .from('broker_positions')
+        .select('floating_pl')
+        .in('broker_connection_id', ids)
+        .is('closed_at', null);
+
+      if (positions) {
+        setOpenPositions({
+          count: positions.length,
+          floatingPl: positions.reduce((sum, p) => sum + Number(p.floating_pl || 0), 0),
+        });
+      }
+    };
+
+    fetchOpenPositions();
+
+    const channel = supabase
+      .channel(`stats-positions-${Date.now()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'broker_positions' }, () => fetchOpenPositions())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [trades]);
+
   const stats = trades.reduce(
     (acc, trade) => {
       const pl = trade.result || 0;
@@ -145,6 +188,19 @@ export function StatsGrid({ trades }: StatsGridProps) {
       colorClass: stats.net >= 0 ? "text-primary" : "text-destructive",
       bgClass: stats.net >= 0 ? "bg-primary/10" : "bg-destructive/10",
       extra: `${trades.length} trades total`,
+    },
+    {
+      label: "Open Trades",
+      value: openPositions.floatingPl,
+      prefix: "$",
+      decimals: 2,
+      tooltip: "Currently open broker positions and their floating P&L",
+      icon: Activity,
+      isPositive: openPositions.floatingPl >= 0,
+      showTrend: true,
+      colorClass: openPositions.floatingPl >= 0 ? "text-primary" : "text-destructive",
+      bgClass: openPositions.floatingPl >= 0 ? "bg-primary/10" : "bg-destructive/10",
+      extra: `${openPositions.count} position${openPositions.count !== 1 ? 's' : ''} open`,
     },
     {
       label: "Profit Factor",
