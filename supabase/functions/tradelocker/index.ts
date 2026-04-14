@@ -57,6 +57,11 @@ function parseAccountState(data: any): Record<string, number> | null {
   for (let i = 0; i < ACCOUNT_DETAILS_COLUMNS.length && i < arr.length; i++) {
     result[ACCOUNT_DETAILS_COLUMNS[i]] = Number(arr[i]) || 0;
   }
+  // Add convenience aliases
+  result.equity = result.projectedBalance || 0;
+  result.freeMargin = result.availableFunds || 0;
+  result.usedMargin = result.initialMarginReq || 0;
+  result.unrealizedPl = result.openNetPnL || 0;
   return result;
 }
 
@@ -551,6 +556,19 @@ serve(async (req) => {
         const ordColumns = config?.ordersConfig?.columns || [];
         const ordHistColumns = config?.ordersHistoryConfig?.columns || [];
 
+        // 0b. Fetch instruments to resolve tradableInstrumentId → symbol name
+        const rawInstruments = await tlGetInstruments(accessToken, accountId, accNum, environment);
+        const instrumentMap: Record<string, string> = {};
+        for (const inst of rawInstruments) {
+          if (inst.tradableInstrumentId && inst.name) {
+            instrumentMap[String(inst.tradableInstrumentId)] = inst.name;
+          }
+        }
+        const resolveSymbol = (tradableId: any) => {
+          const id = String(tradableId);
+          return instrumentMap[id] || id;
+        };
+
         // 1. Sync account state (now properly parsed from columnar array)
         const state = await tlGetAccountState(accessToken, accountId, accNum, environment);
         if (state) {
@@ -589,7 +607,7 @@ serve(async (req) => {
           const posData = {
             broker_connection_id: connectionId,
             position_id: String(pos.id),
-            symbol: String(pos.tradableInstrumentId),
+            symbol: resolveSymbol(pos.tradableInstrumentId),
             type: pos.side === 'buy' ? 'POSITION_TYPE_BUY' : 'POSITION_TYPE_SELL',
             side: pos.side,
             volume: Number(pos.qty) || 0,
@@ -638,7 +656,7 @@ serve(async (req) => {
           const ordData = {
             broker_connection_id: connectionId,
             broker_order_id: String(ord.id),
-            symbol: String(ord.tradableInstrumentId),
+            symbol: resolveSymbol(ord.tradableInstrumentId),
             order_type: ord.type || 'limit',
             side: ord.side || 'buy',
             size: Number(ord.qty) || 0,
@@ -693,7 +711,7 @@ serve(async (req) => {
           
           if (!openOrder) continue; // Need at least an open order
 
-          const sym = String(openOrder.tradableInstrumentId);
+          const sym = resolveSymbol(openOrder.tradableInstrumentId);
           const side = openOrder.side || 'buy';
           const entryPrice = Number(openOrder.avgPrice) || 0;
           const exitPrice = closeOrder ? Number(closeOrder.avgPrice) || 0 : 0;
@@ -779,7 +797,7 @@ serve(async (req) => {
               broker_account_id: conn?.active_account_id,
               broker_acc_num: conn?.active_acc_num,
               broker_position_id: posId,
-              broker_order_id: trade.orderId ? String(trade.orderId) : null,
+              broker_order_id: String(openOrder.id),
               imported_from_broker: true,
               last_broker_sync_at: now,
               execution_type: 'market',
@@ -815,7 +833,7 @@ serve(async (req) => {
             if (posHist) continue;
           }
 
-          const sym = trade.instrument || String(trade.tradableInstrumentId);
+          const sym = trade.instrument || resolveSymbol(trade.tradableInstrumentId);
           const side = trade.side || 'buy';
           const realizedPl = trade.realizedPl || 0;
 
