@@ -68,8 +68,19 @@ export function useTradingAccounts(userId: string | undefined) {
 
       setAccounts(formattedAccounts);
       
-      // Set selected account to default or first account
-      if (!selectedAccountId || !formattedAccounts.find(a => a.id === selectedAccountId)) {
+      // Only auto-select default account on initial load when nothing is persisted
+      const persistedManual = localStorage.getItem('selectedManualAccountId');
+      const persistedBroker = localStorage.getItem('selectedBrokerAccountId');
+      
+      // If a broker account is persisted, don't override the manual selection
+      if (persistedBroker) {
+        // Keep current selectedAccountId as-is; broker account takes priority in the UI
+        if (!selectedAccountId && formattedAccounts.length > 0) {
+          const defaultAccount = formattedAccounts.find(a => a.is_default) || formattedAccounts[0];
+          if (defaultAccount) setSelectedAccountId(defaultAccount.id);
+        }
+      } else if (!persistedManual || !formattedAccounts.find(a => a.id === persistedManual)) {
+        // No valid persisted manual account — pick default
         const defaultAccount = formattedAccounts.find(a => a.is_default) || formattedAccounts[0];
         if (defaultAccount) {
           setSelectedAccountId(defaultAccount.id);
