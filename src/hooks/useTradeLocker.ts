@@ -261,7 +261,7 @@ export function useTradeLocker() {
     try {
       await invokeTradeLocker('modify-position', { connectionId: connection.id, positionId, stopLoss, takeProfit });
       toast.success('Position modified');
-      await fetchPositions();
+      await sync();
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -273,7 +273,7 @@ export function useTradeLocker() {
     try {
       await invokeTradeLocker('cancel-order', { connectionId: connection.id, orderId });
       toast.success('Order cancelled');
-      await fetchOrders();
+      await sync();
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -285,7 +285,7 @@ export function useTradeLocker() {
     try {
       await invokeTradeLocker('modify-order', { connectionId: connection.id, orderId, ...params });
       toast.success('Order modified');
-      await fetchOrders();
+      await sync();
     } catch (error: any) {
       toast.error(error.message);
     }

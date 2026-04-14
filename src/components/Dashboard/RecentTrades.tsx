@@ -57,43 +57,72 @@ const rowVariants = {
 export function RecentTrades({ trades }: RecentTradesProps) {
   const [positions, setPositions] = useState<OpenPosition[]>([]);
   const [orders, setOrders] = useState<PendingOrder[]>([]);
+  const [connIds, setConnIds] = useState<string[]>([]);
 
+  const fetchBrokerData = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: connections } = await supabase
+      .from('broker_connections')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('connection_status', 'connected');
+
+    if (!connections?.length) {
+      setConnIds([]);
+      setPositions([]);
+      setOrders([]);
+      return;
+    }
+    const ids = connections.map(c => c.id);
+    setConnIds(ids);
+
+    const [posRes, ordRes] = await Promise.all([
+      supabase.from('broker_positions').select('*').in('broker_connection_id', ids).is('closed_at', null),
+      supabase.from('broker_orders').select('*').in('broker_connection_id', ids).eq('status', 'pending'),
+    ]);
+
+    if (posRes.data) setPositions(posRes.data.map(p => ({
+      id: p.id, symbol: p.symbol, side: p.side, volume: p.volume,
+      open_price: Number(p.open_price), current_price: p.current_price ? Number(p.current_price) : null,
+      floating_pl: Number(p.floating_pl || 0), open_time: p.open_time,
+      stop_loss: p.stop_loss ? Number(p.stop_loss) : null,
+      take_profit: p.take_profit ? Number(p.take_profit) : null,
+    })));
+    if (ordRes.data) setOrders(ordRes.data.map(o => ({
+      id: o.id, symbol: o.symbol, side: o.side, size: Number(o.size),
+      order_type: o.order_type, entry_price: o.entry_price ? Number(o.entry_price) : null,
+      stop_loss: o.stop_loss ? Number(o.stop_loss) : null,
+      take_profit: o.take_profit ? Number(o.take_profit) : null,
+      status: o.status || 'pending', created_broker_at: o.created_broker_at,
+    })));
+  };
+
+  // Initial fetch
   useEffect(() => {
-    const fetchBrokerData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: connections } = await supabase
-        .from('broker_connections')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('connection_status', 'connected');
-
-      if (!connections?.length) return;
-      const connIds = connections.map(c => c.id);
-
-      const [posRes, ordRes] = await Promise.all([
-        supabase.from('broker_positions').select('*').in('broker_connection_id', connIds).is('closed_at', null),
-        supabase.from('broker_orders').select('*').in('broker_connection_id', connIds).eq('status', 'pending'),
-      ]);
-
-      if (posRes.data) setPositions(posRes.data.map(p => ({
-        id: p.id, symbol: p.symbol, side: p.side, volume: p.volume,
-        open_price: Number(p.open_price), current_price: p.current_price ? Number(p.current_price) : null,
-        floating_pl: Number(p.floating_pl || 0), open_time: p.open_time,
-        stop_loss: p.stop_loss ? Number(p.stop_loss) : null,
-        take_profit: p.take_profit ? Number(p.take_profit) : null,
-      })));
-      if (ordRes.data) setOrders(ordRes.data.map(o => ({
-        id: o.id, symbol: o.symbol, side: o.side, size: Number(o.size),
-        order_type: o.order_type, entry_price: o.entry_price ? Number(o.entry_price) : null,
-        stop_loss: o.stop_loss ? Number(o.stop_loss) : null,
-        take_profit: o.take_profit ? Number(o.take_profit) : null,
-        status: o.status || 'pending', created_broker_at: o.created_broker_at,
-      })));
-    };
     fetchBrokerData();
   }, [trades]);
+
+  // Realtime subscription for broker positions and orders
+  useEffect(() => {
+    const channel = supabase
+      .channel(`dashboard-broker-realtime-${Date.now()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'broker_positions' }, () => {
+        fetchBrokerData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'broker_orders' }, () => {
+        fetchBrokerData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, () => {
+        // trades list is managed by parent, but we refetch broker data in case sync added new trades
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const recentTrades = [...trades]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
