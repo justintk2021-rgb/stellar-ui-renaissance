@@ -3,6 +3,7 @@ import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Settings2, Check, X } from "lucide-react";
+import { truncateNum } from "@/lib/utils";
 import {
   AreaChart,
   Area,
@@ -157,19 +158,19 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
                   onClick={handleStartEdit}
                   className="text-sm font-bold font-mono hover:text-primary transition-colors cursor-pointer flex items-center gap-1 group"
                 >
-                  ${startBalance.toFixed(2)}
+                  ${truncateNum(startBalance)}
                   <Settings2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
               )}
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Balance</div>
-              <div className="text-sm font-bold font-mono">${currentBalance.toFixed(2)}</div>
+              <div className="text-sm font-bold font-mono">${truncateNum(currentBalance)}</div>
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">PnL</div>
               <div className={`text-sm font-bold font-mono ${isPositive ? 'text-primary' : 'text-destructive'}`}>
-                {isPositive ? '+' : ''}{change.toFixed(2)}
+                {isPositive ? '+' : ''}{truncateNum(change)}
               </div>
             </div>
           </div>
