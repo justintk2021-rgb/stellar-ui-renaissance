@@ -439,6 +439,11 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
                           {trade.session}
                         </span>
                       )}
+                      {trade.importedFromBroker && (
+                        <Badge variant="outline" className="text-[10px] px-2 py-0.5 font-medium border-blue-500/40 text-blue-400 bg-blue-500/5">
+                          Imported
+                        </Badge>
+                      )}
                       {checklist && (
                         <Badge
                           variant="secondary"
