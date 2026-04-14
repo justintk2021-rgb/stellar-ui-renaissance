@@ -26,32 +26,45 @@ function getSession(date: Date): string {
   return 'New York';
 }
 
+function mapDirection(side: string): 'Long' | 'Short' {
+  return side?.toLowerCase() === 'sell' ? 'Short' : 'Long';
+}
+
 // ====================== TRADELOCKER API HELPERS ======================
 
 async function tlAuth(email: string, password: string, server: string, environment: string) {
   const baseUrl = getBaseUrl(environment);
-  const res = await fetch(`${baseUrl}/auth/jwt/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, server }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('TL auth failed:', text);
+  try {
+    const res = await fetch(`${baseUrl}/auth/jwt/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, server }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('TL auth failed:', text);
+      return null;
+    }
+    return await res.json();
+  } catch (e) {
+    console.error('TL auth error:', e);
     return null;
   }
-  return await res.json();
 }
 
 async function tlRefresh(refreshToken: string, environment: string) {
   const baseUrl = getBaseUrl(environment);
-  const res = await fetch(`${baseUrl}/auth/jwt/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
-  });
-  if (!res.ok) return null;
-  return await res.json();
+  try {
+    const res = await fetch(`${baseUrl}/auth/jwt/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 async function tlGetAccounts(accessToken: string, environment: string) {
@@ -69,9 +82,13 @@ async function tlGetAccountState(accessToken: string, accountId: string, accNum:
   const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/state`, {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const t = await res.text();
+    console.error('TL state error:', res.status, t);
+    return null;
+  }
   const data = await res.json();
-  return data.d || null;
+  return data.d || data || null;
 }
 
 async function tlGetPositions(accessToken: string, accountId: string, accNum: number, environment: string) {
@@ -102,6 +119,16 @@ async function tlGetOrdersHistory(accessToken: string, accountId: string, accNum
   if (!res.ok) return [];
   const data = await res.json();
   return data.d?.ordersHistory || [];
+}
+
+async function tlGetPositionsHistory(accessToken: string, accountId: string, accNum: number, environment: string) {
+  const baseUrl = getBaseUrl(environment);
+  const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/positionsHistory`, {
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.d?.positions || [];
 }
 
 async function tlGetInstruments(accessToken: string, accountId: string, accNum: number, environment: string) {
@@ -187,7 +214,6 @@ async function tlModifyPosition(accessToken: string, accountId: string, accNum: 
 // ====================== TOKEN MANAGEMENT ======================
 
 async function getValidToken(supabase: any, connectionId: string): Promise<{ accessToken: string; environment: string; accountId: string; accNum: number } | null> {
-  // Tokens are stored as secrets in broker_connections.metaapi_account_id as JSON
   const { data: conn } = await supabase
     .from('broker_connections')
     .select('*')
@@ -209,11 +235,18 @@ async function getValidToken(supabase: any, connectionId: string): Promise<{ acc
 
   if (!tokenData.accessToken || !accountId || !accNum) return null;
 
-  // Check if token might be expired (stored expiry or try refresh)
+  // Check if token is expired
   if (conn.token_expiry && new Date(conn.token_expiry) < new Date()) {
-    // Try refresh
+    if (!tokenData.refreshToken) return null;
     const refreshResult = await tlRefresh(tokenData.refreshToken, environment);
-    if (!refreshResult) return null;
+    if (!refreshResult) {
+      // Mark as expired
+      await supabase
+        .from('broker_connections')
+        .update({ connection_status: 'expired', last_error: 'Token refresh failed automatically' })
+        .eq('id', connectionId);
+      return null;
+    }
 
     const newTokenData = {
       accessToken: refreshResult.accessToken,
@@ -224,7 +257,9 @@ async function getValidToken(supabase: any, connectionId: string): Promise<{ acc
       .from('broker_connections')
       .update({
         metaapi_account_id: JSON.stringify(newTokenData),
-        token_expiry: new Date(Date.now() + 20 * 60 * 1000).toISOString(), // ~20 min
+        token_expiry: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
+        connection_status: 'connected',
+        last_error: null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', connectionId);
@@ -270,43 +305,77 @@ serve(async (req) => {
       }
 
       const authResult = await tlAuth(email, password, server, environment);
-      if (!authResult) {
-        return jsonResponse({ error: 'Failed to authenticate with TradeLocker. Please check your credentials.' }, 400);
+      if (!authResult || !authResult.accessToken) {
+        return jsonResponse({ error: 'Failed to authenticate with TradeLocker. Check credentials and server name.' }, 400);
       }
 
-      // Get accounts
       const accounts = await tlGetAccounts(authResult.accessToken, environment);
       if (!accounts.length) {
         return jsonResponse({ error: 'No TradeLocker accounts found.' }, 400);
       }
 
-      // Store tokens securely
       const tokenData = JSON.stringify({
         accessToken: authResult.accessToken,
         refreshToken: authResult.refreshToken,
       });
 
-      // Create connection
-      const { data: connection, error: insertError } = await supabase
+      // Check for existing connection and update, or create new
+      const { data: existingConn } = await supabase
         .from('broker_connections')
-        .insert({
-          user_id: user.id,
-          platform: 'tradelocker',
-          broker_name: 'TradeLocker',
-          server,
-          login: email,
-          metaapi_account_id: tokenData,
-          connection_status: 'connected',
-          environment,
-          token_expiry: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
-          last_connected_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('platform', 'tradelocker')
+        .maybeSingle();
 
-      if (insertError) {
-        console.error('Insert error:', insertError);
-        return jsonResponse({ error: 'Failed to save connection' }, 500);
+      let connection;
+      if (existingConn) {
+        // Update existing connection
+        const { data, error } = await supabase
+          .from('broker_connections')
+          .update({
+            server,
+            login: email,
+            metaapi_account_id: tokenData,
+            connection_status: 'connected',
+            environment,
+            token_expiry: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
+            last_connected_at: new Date().toISOString(),
+            last_error: null,
+            active_account_id: null,
+            active_acc_num: null,
+          })
+          .eq('id', existingConn.id)
+          .select()
+          .single();
+        if (error) {
+          console.error('Update error:', error);
+          return jsonResponse({ error: 'Failed to update connection' }, 500);
+        }
+        connection = data;
+        // Clear old accounts
+        await supabase.from('broker_accounts').delete().eq('broker_connection_id', connection.id);
+      } else {
+        const { data, error } = await supabase
+          .from('broker_connections')
+          .insert({
+            user_id: user.id,
+            platform: 'tradelocker',
+            broker_name: 'TradeLocker',
+            server,
+            login: email,
+            metaapi_account_id: tokenData,
+            connection_status: 'connected',
+            environment,
+            token_expiry: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
+            last_connected_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+        if (error) {
+          console.error('Insert error:', error);
+          return jsonResponse({ error: 'Failed to save connection' }, 500);
+        }
+        connection = data;
       }
 
       // Store broker accounts
@@ -331,7 +400,6 @@ serve(async (req) => {
     if (action === 'select-account') {
       const { connectionId, accountId, accNum } = body;
 
-      // Mark all accounts inactive, then activate selected
       await supabase
         .from('broker_accounts')
         .update({ is_active: false })
@@ -343,7 +411,6 @@ serve(async (req) => {
         .eq('broker_connection_id', connectionId)
         .eq('account_id_external', accountId);
 
-      // Update connection with active account
       const { error } = await supabase
         .from('broker_connections')
         .update({
@@ -356,7 +423,7 @@ serve(async (req) => {
 
       if (error) return jsonResponse({ error: 'Failed to select account' }, 500);
 
-      // Fetch account state
+      // Fetch initial account state
       const tokenInfo = await getValidToken(supabase, connectionId);
       if (tokenInfo) {
         const state = await tlGetAccountState(tokenInfo.accessToken, accountId, accNum, tokenInfo.environment);
@@ -422,11 +489,11 @@ serve(async (req) => {
       // Create sync log
       const { data: syncLog } = await supabase
         .from('broker_sync_logs')
-        .insert({ broker_connection_id: connectionId, sync_type: 'full', status: 'running' })
+        .insert({ broker_connection_id: connectionId, sync_type: 'full', status: 'running', started_at: new Date().toISOString() })
         .select()
         .single();
 
-      let recordsProcessed = 0;
+      const stats = { positionsUpserted: 0, ordersUpserted: 0, historyInserted: 0, journalCreated: 0, journalUpdated: 0 };
 
       try {
         const { accessToken, environment, accountId, accNum } = tokenInfo;
@@ -446,12 +513,30 @@ serve(async (req) => {
             .eq('id', connectionId);
         }
 
-        // 2. Sync positions
+        // 2. Upsert positions (mark all as stale, then upsert current, delete stale)
         const positions = await tlGetPositions(accessToken, accountId, accNum, environment);
-        // Clear old positions for this connection
-        await supabase.from('broker_positions').delete().eq('broker_connection_id', connectionId);
+        const now = new Date().toISOString();
+
+        // Get current position IDs from broker
+        const currentPosIds = new Set(positions.map((p: any) => String(p.id)));
+
+        // Delete positions that no longer exist on broker
+        const { data: existingPositions } = await supabase
+          .from('broker_positions')
+          .select('id, position_id')
+          .eq('broker_connection_id', connectionId);
+
+        if (existingPositions) {
+          for (const ep of existingPositions) {
+            if (!currentPosIds.has(ep.position_id)) {
+              await supabase.from('broker_positions').delete().eq('id', ep.id);
+            }
+          }
+        }
+
+        // Upsert current positions
         for (const pos of positions) {
-          await supabase.from('broker_positions').insert({
+          const posData = {
             broker_connection_id: connectionId,
             position_id: String(pos.id),
             symbol: pos.instrument || String(pos.tradableInstrumentId),
@@ -459,83 +544,235 @@ serve(async (req) => {
             side: pos.side,
             volume: pos.qty,
             open_price: pos.avgPrice,
+            stop_loss: pos.stopLoss || null,
+            take_profit: pos.takeProfit || null,
+            current_price: pos.currentPrice || null,
             floating_pl: pos.unrealizedPl || 0,
-            open_time: pos.openTime || new Date().toISOString(),
-            last_seen_at: new Date().toISOString(),
+            open_time: pos.openTime || now,
+            last_seen_at: now,
             raw_payload: pos,
-          });
-          recordsProcessed++;
+          };
+
+          const { data: existingPos } = await supabase
+            .from('broker_positions')
+            .select('id')
+            .eq('broker_connection_id', connectionId)
+            .eq('position_id', String(pos.id))
+            .maybeSingle();
+
+          if (existingPos) {
+            await supabase.from('broker_positions').update(posData).eq('id', existingPos.id);
+          } else {
+            await supabase.from('broker_positions').insert(posData);
+          }
+          stats.positionsUpserted++;
         }
 
-        // 3. Sync pending orders
+        // 3. Upsert pending orders
         const orders = await tlGetOrders(accessToken, accountId, accNum, environment);
-        await supabase.from('broker_orders').delete().eq('broker_connection_id', connectionId);
-        for (const ord of orders) {
-          if (ord.status === 'working' || ord.status === 'pending' || ord.status === 'new') {
-            await supabase.from('broker_orders').insert({
-              broker_connection_id: connectionId,
-              broker_order_id: String(ord.id),
-              symbol: ord.instrument || String(ord.tradableInstrumentId),
-              order_type: ord.type || 'limit',
-              side: ord.side || 'buy',
-              size: ord.qty,
-              entry_price: ord.price || ord.stopPrice || 0,
-              stop_loss: ord.stopLoss,
-              take_profit: ord.takeProfit,
-              status: ord.status,
-              created_broker_at: ord.createdAt,
-              raw_payload: ord,
-              last_seen_at: new Date().toISOString(),
-            });
-            recordsProcessed++;
+        const currentOrdIds = new Set(orders.filter((o: any) => o.status === 'working' || o.status === 'pending' || o.status === 'new').map((o: any) => String(o.id)));
+
+        const { data: existingOrders } = await supabase
+          .from('broker_orders')
+          .select('id, broker_order_id')
+          .eq('broker_connection_id', connectionId);
+
+        if (existingOrders) {
+          for (const eo of existingOrders) {
+            if (!currentOrdIds.has(eo.broker_order_id)) {
+              await supabase.from('broker_orders').delete().eq('id', eo.id);
+            }
           }
         }
 
-        // 4. Sync trade history
-        const history = await tlGetOrdersHistory(accessToken, accountId, accNum, environment);
-        for (const trade of history) {
-          if (trade.status !== 'filled' && trade.status !== 'closed') continue;
+        for (const ord of orders) {
+          if (ord.status !== 'working' && ord.status !== 'pending' && ord.status !== 'new') continue;
 
-          // Check if already exists
-          const { data: existing } = await supabase
+          const ordData = {
+            broker_connection_id: connectionId,
+            broker_order_id: String(ord.id),
+            symbol: ord.instrument || String(ord.tradableInstrumentId),
+            order_type: ord.type || 'limit',
+            side: ord.side || 'buy',
+            size: ord.qty,
+            entry_price: ord.price || ord.stopPrice || 0,
+            stop_loss: ord.stopLoss || null,
+            take_profit: ord.takeProfit || null,
+            status: ord.status,
+            created_broker_at: ord.createdAt,
+            raw_payload: ord,
+            last_seen_at: now,
+          };
+
+          const { data: existingOrd } = await supabase
+            .from('broker_orders')
+            .select('id')
+            .eq('broker_connection_id', connectionId)
+            .eq('broker_order_id', String(ord.id))
+            .maybeSingle();
+
+          if (existingOrd) {
+            await supabase.from('broker_orders').update(ordData).eq('id', existingOrd.id);
+          } else {
+            await supabase.from('broker_orders').insert(ordData);
+          }
+          stats.ordersUpserted++;
+        }
+
+        // 4. Sync closed trade history (positions history is more reliable for P/L)
+        const positionsHistory = await tlGetPositionsHistory(accessToken, accountId, accNum, environment);
+        const ordersHistory = await tlGetOrdersHistory(accessToken, accountId, accNum, environment);
+
+        // Process positions history first (closed positions with realized P/L)
+        for (const trade of positionsHistory) {
+          const posId = String(trade.id);
+          const sym = trade.instrument || String(trade.tradableInstrumentId);
+          const side = trade.side || 'buy';
+          const realizedPl = trade.profit ?? trade.realizedPl ?? 0;
+          const fees = (trade.commission || 0) + (trade.swap || 0);
+
+          // Upsert into broker_trade_history
+          const { data: existingHist } = await supabase
             .from('broker_trade_history')
             .select('id')
             .eq('broker_connection_id', connectionId)
-            .eq('broker_order_id', String(trade.id))
+            .eq('broker_position_id', posId)
             .maybeSingle();
 
-          if (!existing) {
-            await supabase.from('broker_trade_history').insert({
-              broker_connection_id: connectionId,
-              broker_order_id: String(trade.id),
-              broker_position_id: trade.positionId ? String(trade.positionId) : null,
-              symbol: trade.instrument || String(trade.tradableInstrumentId),
-              side: trade.side || 'buy',
-              size: trade.filledQty || trade.qty,
-              entry_price: trade.avgFilledPrice || 0,
-              exit_price: trade.closePrice || trade.avgFilledPrice || 0,
-              realized_pl: trade.realizedPl || 0,
-              fees: (trade.commission || 0) + (trade.swap || 0),
-              opened_at: trade.createdAt || new Date().toISOString(),
-              closed_at: trade.filledAt || trade.closedAt || new Date().toISOString(),
-              raw_payload: trade,
-              synced_at: new Date().toISOString(),
-            });
-            recordsProcessed++;
+          const histData = {
+            broker_connection_id: connectionId,
+            broker_position_id: posId,
+            broker_order_id: trade.orderId ? String(trade.orderId) : null,
+            symbol: sym,
+            side,
+            size: trade.qty || trade.filledQty || 0,
+            entry_price: trade.avgPrice || trade.openPrice || 0,
+            exit_price: trade.closePrice || trade.avgClosePrice || 0,
+            realized_pl: realizedPl,
+            fees,
+            opened_at: trade.openTime || trade.createdAt || now,
+            closed_at: trade.closeTime || trade.closedAt || now,
+            raw_payload: trade,
+            synced_at: now,
+          };
 
-            // 5. Auto-journal this trade
+          if (existingHist) {
+            await supabase.from('broker_trade_history').update(histData).eq('id', existingHist.id);
+          } else {
+            await supabase.from('broker_trade_history').insert(histData);
+            stats.historyInserted++;
+          }
+
+          // Auto-journal: upsert journal entry
+          const tradeDate = new Date(trade.closeTime || trade.closedAt || trade.openTime || trade.createdAt || Date.now());
+          const dateStr = tradeDate.toISOString().split('T')[0];
+
+          const { data: conn } = await supabase
+            .from('broker_connections')
+            .select('environment, active_account_id, active_acc_num')
+            .eq('id', connectionId)
+            .single();
+
+          // Look up by broker_position_id first
+          const { data: existingJournal } = await supabase
+            .from('trades')
+            .select('id, notes, notebook, session, strategy')
+            .eq('user_id', user.id)
+            .eq('broker_position_id', posId)
+            .maybeSingle();
+
+          if (existingJournal) {
+            // Update existing - preserve user-written fields
+            await supabase.from('trades').update({
+              pair: sym,
+              direction: mapDirection(side),
+              result: realizedPl,
+              date: dateStr,
+              last_broker_sync_at: now,
+              execution_type: 'market',
+            }).eq('id', existingJournal.id);
+            stats.journalUpdated++;
+          } else {
+            await supabase.from('trades').insert({
+              user_id: user.id,
+              pair: sym,
+              direction: mapDirection(side),
+              result: realizedPl,
+              date: dateStr,
+              session: getSession(tradeDate),
+              broker_name: 'TradeLocker',
+              broker_environment: conn?.environment || 'demo',
+              broker_account_id: conn?.active_account_id,
+              broker_acc_num: conn?.active_acc_num,
+              broker_position_id: posId,
+              broker_order_id: trade.orderId ? String(trade.orderId) : null,
+              imported_from_broker: true,
+              last_broker_sync_at: now,
+              execution_type: 'market',
+            });
+            stats.journalCreated++;
+          }
+        }
+
+        // Also process orders history for trades not in positions history
+        for (const trade of ordersHistory) {
+          if (trade.status !== 'filled' && trade.status !== 'closed') continue;
+
+          const ordId = String(trade.id);
+          
+          // Skip if we already have this from positions history
+          const { data: alreadyExists } = await supabase
+            .from('broker_trade_history')
+            .select('id')
+            .eq('broker_connection_id', connectionId)
+            .eq('broker_order_id', ordId)
+            .maybeSingle();
+          
+          if (alreadyExists) continue;
+
+          // Also check if a position history entry covers this
+          if (trade.positionId) {
+            const { data: posHist } = await supabase
+              .from('broker_trade_history')
+              .select('id')
+              .eq('broker_connection_id', connectionId)
+              .eq('broker_position_id', String(trade.positionId))
+              .maybeSingle();
+            if (posHist) continue;
+          }
+
+          const sym = trade.instrument || String(trade.tradableInstrumentId);
+          const side = trade.side || 'buy';
+          const realizedPl = trade.realizedPl || 0;
+
+          await supabase.from('broker_trade_history').insert({
+            broker_connection_id: connectionId,
+            broker_order_id: ordId,
+            broker_position_id: trade.positionId ? String(trade.positionId) : null,
+            symbol: sym,
+            side,
+            size: trade.filledQty || trade.qty,
+            entry_price: trade.avgFilledPrice || 0,
+            exit_price: trade.closePrice || trade.avgFilledPrice || 0,
+            realized_pl: realizedPl,
+            fees: (trade.commission || 0) + (trade.swap || 0),
+            opened_at: trade.createdAt || now,
+            closed_at: trade.filledAt || trade.closedAt || now,
+            raw_payload: trade,
+            synced_at: now,
+          });
+          stats.historyInserted++;
+
+          // Journal entry for order-based trades
+          if (realizedPl !== 0) {
             const tradeDate = new Date(trade.filledAt || trade.closedAt || trade.createdAt || Date.now());
             const dateStr = tradeDate.toISOString().split('T')[0];
-            const sym = trade.instrument || String(trade.tradableInstrumentId);
-            const side = trade.side || 'buy';
-            const realizedPl = trade.realizedPl || 0;
 
-            // Check for existing journal entry
             const { data: existingJournal } = await supabase
               .from('trades')
               .select('id')
               .eq('user_id', user.id)
-              .eq('broker_order_id', String(trade.id))
+              .eq('broker_order_id', ordId)
               .maybeSingle();
 
             if (!existingJournal) {
@@ -548,7 +785,7 @@ serve(async (req) => {
               await supabase.from('trades').insert({
                 user_id: user.id,
                 pair: sym,
-                direction: side,
+                direction: mapDirection(side),
                 result: realizedPl,
                 date: dateStr,
                 session: getSession(tradeDate),
@@ -556,31 +793,37 @@ serve(async (req) => {
                 broker_environment: conn?.environment || 'demo',
                 broker_account_id: conn?.active_account_id,
                 broker_acc_num: conn?.active_acc_num,
-                broker_order_id: String(trade.id),
+                broker_order_id: ordId,
                 broker_position_id: trade.positionId ? String(trade.positionId) : null,
                 imported_from_broker: true,
-                last_broker_sync_at: new Date().toISOString(),
+                last_broker_sync_at: now,
                 execution_type: 'market',
               });
+              stats.journalCreated++;
             }
           }
         }
 
         // Update sync log
+        const totalRecords = stats.positionsUpserted + stats.ordersUpserted + stats.historyInserted + stats.journalCreated + stats.journalUpdated;
         if (syncLog) {
           await supabase
             .from('broker_sync_logs')
-            .update({ status: 'completed', ended_at: new Date().toISOString(), records_processed: recordsProcessed })
+            .update({
+              status: 'completed',
+              ended_at: now,
+              records_processed: totalRecords,
+              error_message: JSON.stringify(stats),
+            })
             .eq('id', syncLog.id);
         }
 
-        // Update last sync
         await supabase
           .from('broker_connections')
-          .update({ last_connected_at: new Date().toISOString() })
+          .update({ last_connected_at: now })
           .eq('id', connectionId);
 
-        return jsonResponse({ success: true, recordsProcessed, message: `Synced ${recordsProcessed} records` });
+        return jsonResponse({ success: true, stats, message: `Synced: ${stats.positionsUpserted} positions, ${stats.ordersUpserted} orders, ${stats.historyInserted} history, ${stats.journalCreated} new journal, ${stats.journalUpdated} updated journal` });
       } catch (e: any) {
         console.error('Sync error:', e);
         if (syncLog) {
@@ -593,6 +836,125 @@ serve(async (req) => {
       }
     }
 
+    // ====================== DIAGNOSTIC ======================
+    if (action === 'diagnostic') {
+      const { connectionId } = body;
+      const results: { step: string; status: 'pass' | 'fail'; detail: string }[] = [];
+
+      // 1. Check secrets
+      const hasUrl = !!Deno.env.get('SUPABASE_URL');
+      const hasKey = !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      results.push({ step: 'Backend secrets configured', status: hasUrl && hasKey ? 'pass' : 'fail', detail: hasUrl && hasKey ? 'SUPABASE_URL and SERVICE_ROLE_KEY present' : 'Missing backend secrets' });
+
+      if (!connectionId) {
+        results.push({ step: 'Connection exists', status: 'fail', detail: 'No connectionId provided' });
+        return jsonResponse({ results });
+      }
+
+      // 2. Check connection record
+      const { data: conn } = await supabase
+        .from('broker_connections')
+        .select('*')
+        .eq('id', connectionId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!conn) {
+        results.push({ step: 'Connection exists', status: 'fail', detail: 'Connection not found in database' });
+        return jsonResponse({ results });
+      }
+      results.push({ step: 'Connection exists', status: 'pass', detail: `Platform: ${conn.platform}, Status: ${conn.connection_status}` });
+
+      // 3. Check accountId and accNum
+      const hasAccount = !!conn.active_account_id && !!conn.active_acc_num;
+      results.push({ step: 'Account selected (accountId + accNum)', status: hasAccount ? 'pass' : 'fail', detail: hasAccount ? `accountId: ${conn.active_account_id}, accNum: ${conn.active_acc_num}` : 'No active account selected' });
+
+      // 4. Check tokens
+      let tokenData: any;
+      try {
+        tokenData = JSON.parse(conn.metaapi_account_id || '{}');
+        const hasTokens = !!tokenData.accessToken && !!tokenData.refreshToken;
+        results.push({ step: 'Tokens stored', status: hasTokens ? 'pass' : 'fail', detail: hasTokens ? 'Access and refresh tokens present' : 'Missing tokens' });
+      } catch {
+        results.push({ step: 'Tokens stored', status: 'fail', detail: 'Token data corrupted' });
+        return jsonResponse({ results });
+      }
+
+      // 5. Test token refresh
+      const refreshResult = await tlRefresh(tokenData.refreshToken, conn.environment || 'demo');
+      if (refreshResult) {
+        results.push({ step: 'Token refresh', status: 'pass', detail: 'Token refreshed successfully' });
+        // Save new tokens
+        await supabase.from('broker_connections').update({
+          metaapi_account_id: JSON.stringify({ accessToken: refreshResult.accessToken, refreshToken: refreshResult.refreshToken }),
+          token_expiry: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
+          connection_status: 'connected',
+          last_error: null,
+        }).eq('id', connectionId);
+        tokenData = refreshResult;
+      } else {
+        results.push({ step: 'Token refresh', status: 'fail', detail: 'Refresh failed - session expired, reconnect required' });
+        return jsonResponse({ results });
+      }
+
+      const accessToken = tokenData.accessToken;
+      const environment = conn.environment || 'demo';
+
+      // 6. Test fetch accounts
+      const accounts = await tlGetAccounts(accessToken, environment);
+      results.push({ step: 'Fetch accounts', status: accounts.length > 0 ? 'pass' : 'fail', detail: `Found ${accounts.length} accounts` });
+
+      if (!hasAccount) {
+        return jsonResponse({ results });
+      }
+
+      const accountId = conn.active_account_id;
+      const accNum = conn.active_acc_num;
+
+      // 7. Test account state
+      const state = await tlGetAccountState(accessToken, accountId, accNum, environment);
+      results.push({ step: 'Fetch account state', status: state ? 'pass' : 'fail', detail: state ? `Balance: ${state.balance}, Equity: ${state.equity}` : 'Failed to get state' });
+
+      // 8. Test positions
+      const positions = await tlGetPositions(accessToken, accountId, accNum, environment);
+      results.push({ step: 'Fetch positions', status: 'pass', detail: `${positions.length} open positions` });
+
+      // 9. Test orders
+      const orders = await tlGetOrders(accessToken, accountId, accNum, environment);
+      results.push({ step: 'Fetch orders', status: 'pass', detail: `${orders.length} pending orders` });
+
+      // 10. Test history
+      const posHistory = await tlGetPositionsHistory(accessToken, accountId, accNum, environment);
+      const ordHistory = await tlGetOrdersHistory(accessToken, accountId, accNum, environment);
+      results.push({ step: 'Fetch trade history', status: 'pass', detail: `${posHistory.length} closed positions, ${ordHistory.length} order history` });
+
+      // 11. Test instruments
+      const instruments = await tlGetInstruments(accessToken, accountId, accNum, environment);
+      results.push({ step: 'Fetch instruments', status: instruments.length > 0 ? 'pass' : 'fail', detail: `${instruments.length} instruments available` });
+
+      // 12. Check journal writes
+      const { count: journalCount } = await supabase
+        .from('trades')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('imported_from_broker', true);
+      results.push({ step: 'Journal entries from broker', status: 'pass', detail: `${journalCount || 0} imported journal entries` });
+
+      return jsonResponse({ results });
+    }
+
+    // ====================== SYNC LOGS ======================
+    if (action === 'sync-logs') {
+      const { connectionId } = body;
+      const { data } = await supabase
+        .from('broker_sync_logs')
+        .select('*')
+        .eq('broker_connection_id', connectionId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      return jsonResponse({ logs: data || [] });
+    }
+
     // ====================== ACCOUNT SUMMARY ======================
     if (action === 'account-summary') {
       const { connectionId } = body;
@@ -602,7 +964,6 @@ serve(async (req) => {
       const state = await tlGetAccountState(tokenInfo.accessToken, tokenInfo.accountId, tokenInfo.accNum, tokenInfo.environment);
       if (!state) return jsonResponse({ error: 'Failed to get account state' }, 500);
 
-      // Count positions and orders
       const { count: posCount } = await supabase.from('broker_positions').select('*', { count: 'exact', head: true }).eq('broker_connection_id', connectionId);
       const { count: ordCount } = await supabase.from('broker_orders').select('*', { count: 'exact', head: true }).eq('broker_connection_id', connectionId);
 
@@ -620,20 +981,14 @@ serve(async (req) => {
     // ====================== GET POSITIONS ======================
     if (action === 'positions') {
       const { connectionId } = body;
-      const { data } = await supabase
-        .from('broker_positions')
-        .select('*')
-        .eq('broker_connection_id', connectionId);
+      const { data } = await supabase.from('broker_positions').select('*').eq('broker_connection_id', connectionId);
       return jsonResponse({ positions: data || [] });
     }
 
     // ====================== GET ORDERS ======================
     if (action === 'orders') {
       const { connectionId } = body;
-      const { data } = await supabase
-        .from('broker_orders')
-        .select('*')
-        .eq('broker_connection_id', connectionId);
+      const { data } = await supabase.from('broker_orders').select('*').eq('broker_connection_id', connectionId);
       return jsonResponse({ orders: data || [] });
     }
 
@@ -655,21 +1010,13 @@ serve(async (req) => {
       const tokenInfo = await getValidToken(supabase, connectionId);
       if (!tokenInfo) return jsonResponse({ error: 'Invalid session' }, 401);
 
-      const orderPayload: any = {
-        tradableInstrumentId,
-        side,
-        type: type || 'market',
-        qty,
-      };
+      const orderPayload: any = { tradableInstrumentId, side, type: type || 'market', qty };
       if (price && type !== 'market') orderPayload.price = price;
       if (stopLoss) orderPayload.stopLoss = stopLoss;
       if (takeProfit) orderPayload.takeProfit = takeProfit;
 
       const result = await tlPlaceOrder(tokenInfo.accessToken, tokenInfo.accountId, tokenInfo.accNum, tokenInfo.environment, orderPayload);
-      if (!result.ok) {
-        return jsonResponse({ error: 'Failed to place order', details: result.data }, 400);
-      }
-
+      if (!result.ok) return jsonResponse({ error: 'Failed to place order', details: result.data }, 400);
       return jsonResponse({ success: true, order: result.data, message: 'Order placed successfully' });
     }
 
@@ -740,12 +1087,11 @@ serve(async (req) => {
     if (action === 'disconnect') {
       const { connectionId } = body;
 
-      // Delete related data
       await supabase.from('broker_positions').delete().eq('broker_connection_id', connectionId);
       await supabase.from('broker_orders').delete().eq('broker_connection_id', connectionId);
       await supabase.from('broker_trade_history').delete().eq('broker_connection_id', connectionId);
-      await supabase.from('broker_accounts').delete().eq('broker_connection_id', connectionId);
       await supabase.from('broker_sync_logs').delete().eq('broker_connection_id', connectionId);
+      await supabase.from('broker_accounts').delete().eq('broker_connection_id', connectionId);
       await supabase.from('broker_connections').delete().eq('id', connectionId).eq('user_id', user.id);
 
       return jsonResponse({ success: true, message: 'Broker disconnected' });
