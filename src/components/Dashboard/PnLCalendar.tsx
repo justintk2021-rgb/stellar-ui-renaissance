@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useCallback } from "react";
 import { Trade, DailyStats, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
-import { cn } from "@/lib/utils";
+import { cn, truncateNum } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote, Settings, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Link2, Quote, Plus } from "lucide-react";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { Button } from "@/components/ui/button";
