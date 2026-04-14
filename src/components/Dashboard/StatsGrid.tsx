@@ -248,7 +248,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
   return (
     <div className="space-y-5">
       {/* Top Row - Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {statCards.map((card, index) => (
           <motion.div
             key={card.label}
