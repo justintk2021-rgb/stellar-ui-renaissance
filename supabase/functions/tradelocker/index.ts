@@ -193,6 +193,49 @@ async function tlGetInstruments(accessToken: string, accountId: string, accNum: 
   return data.d?.instruments || [];
 }
 
+// Standard contract sizes by instrument type/name
+function getContractSize(symbol: string, instrumentType?: string): number {
+  const s = symbol.toUpperCase();
+  // Gold
+  if (s.includes('XAU')) return 100;
+  // Silver
+  if (s.includes('XAG')) return 5000;
+  // Platinum/Palladium
+  if (s.includes('XPT') || s.includes('XPD')) return 100;
+  // Oil
+  if (s.includes('USOIL') || s.includes('UKOIL') || s.includes('WTI') || s.includes('BRENT') || s.includes('CL') || s.includes('XTIUSD') || s.includes('XBRUSD')) return 1000;
+  // Natural Gas
+  if (s.includes('NGAS') || s.includes('XNGUSD')) return 10000;
+  // Crypto - typically 1 unit
+  if (instrumentType === 'CRYPTO' || s.includes('BTC') || s.includes('ETH') || s.includes('LTC') || s.includes('XRP') || s.includes('ADA') || s.includes('DOT') || s.includes('SOL') || s.includes('DOGE')) return 1;
+  // Indices (common CFD indices) - typically 1
+  if (instrumentType === 'INDEX' || s.includes('US30') || s.includes('US500') || s.includes('NAS') || s.includes('SPX') || s.includes('DAX') || s.includes('FTSE') || s.includes('NK225')) return 1;
+  // Forex - standard lot = 100,000 units
+  return 100000;
+}
+
+// Calculate P/L using contract size
+function calculateRealizedPl(
+  side: string, entryPrice: number, exitPrice: number, qty: number,
+  symbol: string, instrumentType?: string
+): number {
+  if (!entryPrice || !exitPrice || !qty) return 0;
+  const contractSize = getContractSize(symbol, instrumentType);
+  const priceDiff = side === 'buy' ? (exitPrice - entryPrice) : (entryPrice - exitPrice);
+  const rawPl = priceDiff * qty * contractSize;
+  
+  // For pairs where the quote currency is not USD, convert P/L to USD
+  const upperSym = symbol.toUpperCase();
+  if (upperSym.endsWith('JPY') || upperSym.endsWith('CHF') || upperSym.endsWith('CAD') ||
+      upperSym.endsWith('SEK') || upperSym.endsWith('NOK') || upperSym.endsWith('SGD') ||
+      upperSym.endsWith('HKD') || upperSym.endsWith('MXN') || upperSym.endsWith('ZAR') ||
+      upperSym.endsWith('TRY') || upperSym.endsWith('HUF') || upperSym.endsWith('PLN') ||
+      upperSym.endsWith('CZK') || upperSym.endsWith('DKK')) {
+    return rawPl / exitPrice;
+  }
+  return rawPl;
+}
+
 async function tlPlaceOrder(accessToken: string, accountId: string, accNum: number, environment: string, orderPayload: any) {
   const baseUrl = getBaseUrl(environment);
   const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/orders`, {
@@ -556,17 +599,22 @@ serve(async (req) => {
         const ordColumns = config?.ordersConfig?.columns || [];
         const ordHistColumns = config?.ordersHistoryConfig?.columns || [];
 
-        // 0b. Fetch instruments to resolve tradableInstrumentId → symbol name
+        // 0b. Fetch instruments to resolve tradableInstrumentId → symbol name + type
         const rawInstruments = await tlGetInstruments(accessToken, accountId, accNum, environment);
         const instrumentMap: Record<string, string> = {};
+        const instrumentTypeMap: Record<string, string> = {};
         for (const inst of rawInstruments) {
           if (inst.tradableInstrumentId && inst.name) {
             instrumentMap[String(inst.tradableInstrumentId)] = inst.name;
+            instrumentTypeMap[String(inst.tradableInstrumentId)] = inst.type || '';
           }
         }
         const resolveSymbol = (tradableId: any) => {
           const id = String(tradableId);
           return instrumentMap[id] || id;
+        };
+        const resolveType = (tradableId: any) => {
+          return instrumentTypeMap[String(tradableId)] || '';
         };
 
         // 1. Sync account state (now properly parsed from columnar array)
@@ -718,14 +766,11 @@ serve(async (req) => {
           const qty = Number(openOrder.filledQty || openOrder.qty) || 0;
           const isClosed = !!closeOrder;
 
-          // Calculate realized P/L for closed trades
+          // Calculate realized P/L for closed trades using contract size
           let realizedPl = 0;
           if (isClosed && entryPrice && exitPrice) {
-            if (side === 'buy') {
-              realizedPl = (exitPrice - entryPrice) * qty;
-            } else {
-              realizedPl = (entryPrice - exitPrice) * qty;
-            }
+            const instType = resolveType(openOrder.tradableInstrumentId);
+            realizedPl = calculateRealizedPl(side, entryPrice, exitPrice, qty, sym, instType);
           }
 
           const openedAt = openOrder.createdDate ? new Date(Number(openOrder.createdDate)).toISOString() : now;
@@ -1295,6 +1340,7 @@ serve(async (req) => {
         });
         rawResults.config = { status: res.status, body: res.ok ? await res.json() : await res.text() };
       } catch (e: any) { rawResults.config = { error: e.message }; }
+
 
       return jsonResponse({ rawResults });
     }
