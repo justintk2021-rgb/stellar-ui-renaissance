@@ -115,8 +115,8 @@ const Index = () => {
     fetchBrokerBalance();
   }, [selectedBrokerAccountId]);
 
-  // Use the account's starting balance (or broker balance when broker account selected)
-  const accountStartBalance = brokerBalance ?? (selectedAccount?.starting_balance || 10000);
+  // Use the account's starting balance (manual accounts only; broker accounts derive it)
+  const accountStartBalance = selectedAccount?.starting_balance || 10000;
   
   // Use database-backed notebook entries
   const { 
