@@ -161,14 +161,15 @@ export const AccountSelector = ({
 
   const handleSelectManualAccount = (accountId: string) => {
     setSelectedBrokerAccount(null);
+    onSelectBrokerAccount?.(null);
     onSelectAccount(accountId);
   };
 
   const handleSelectBrokerAccount = (broker: BrokerAccountInfo) => {
     const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
     setSelectedBrokerAccount(brokerId);
-    // We still select the default manual account for trades storage,
-    // but the UI will show broker account info
+    // Tell the parent to filter trades by this broker account
+    onSelectBrokerAccount?.(broker.accountId);
   };
 
   return (
