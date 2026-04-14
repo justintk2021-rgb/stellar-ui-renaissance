@@ -66,7 +66,10 @@ export function useTrades(userId: string | undefined, accountId: string | null =
       setTrades(formattedTrades);
     } catch (error: any) {
       console.error('Error fetching trades:', error);
-      toast.error('Failed to load trades');
+      // Only show error toast for genuine failures, not auth-init race conditions
+      if (error?.code !== 'PGRST301' && error?.message !== 'JWT expired') {
+        toast.error('Failed to load trades');
+      }
     } finally {
       setIsLoading(false);
     }

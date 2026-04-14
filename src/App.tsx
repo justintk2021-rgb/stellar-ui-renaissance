@@ -12,53 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient();
 
-// Component to handle session clearing on browser close
+// Lightweight session manager — no longer signs users out on reload
 function SessionManager() {
-  useEffect(() => {
-    // Mark session as active when page loads
-    sessionStorage.setItem('session-active', 'true');
-    
-    // Check if this is a fresh browser session (no session marker)
-    const wasSessionActive = sessionStorage.getItem('session-active');
-    
-    // If sessionStorage doesn't have our marker on first load, clear auth
-    // This happens when browser was closed and reopened
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        // Mark that we might be closing
-        localStorage.setItem('tab-closing', Date.now().toString());
-      }
-    };
-
-    // Clear session on page unload (browser/tab close)
-    const handleBeforeUnload = () => {
-      // Set a flag that indicates the page is unloading
-      localStorage.setItem('page-unloading', 'true');
-    };
-
-    // On page load, check if session should be cleared
-    const checkAndClearSession = () => {
-      const pageUnloading = localStorage.getItem('page-unloading');
-      if (pageUnloading === 'true') {
-        // Clear the flag
-        localStorage.removeItem('page-unloading');
-        // Sign out to clear session
-        supabase.auth.signOut();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    // Check on mount
-    checkAndClearSession();
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, []);
-
   return null;
 }
 
