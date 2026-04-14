@@ -742,7 +742,7 @@ const Index = () => {
                   <CommunityView />
                 </PageTransition>
               )}
-            )}
+            </AnimatePresence>
           </div>
         </main>
 
