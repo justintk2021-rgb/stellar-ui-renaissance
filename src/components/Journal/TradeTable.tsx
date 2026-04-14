@@ -414,8 +414,9 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 + tradeIndex * 0.05 }}
                     whileHover={{ backgroundColor: "hsl(var(--muted) / 0.3)" }}
-                    className="grid grid-cols-[1fr_80px_100px_auto] gap-4 px-5 py-3 pl-12 bg-card/20 transition-colors duration-200"
+                    className="px-5 py-3 pl-12 bg-card/20 transition-colors duration-200"
                   >
+                    <div className="grid grid-cols-[1fr_80px_100px_auto] gap-4">
                     <div className="flex items-center gap-3 flex-wrap">
                       <motion.span 
                         className="text-sm font-semibold"
@@ -503,6 +504,40 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
                         onConfirm={() => onDelete(trade.id)}
                       />
                     </div>
+                    </div>
+                    {/* Broker details row */}
+                    {trade.importedFromBroker && (trade.openPrice || trade.closePrice || trade.swap || trade.commission) && (
+                      <div className="flex items-center gap-4 mt-1.5 pl-0 flex-wrap">
+                        {trade.openPrice != null && (
+                          <span className="text-[11px] text-muted-foreground">
+                            <span className="opacity-60">Open:</span>{' '}
+                            <span className="font-mono font-medium text-foreground">{trade.openPrice.toFixed(trade.openPrice > 100 ? 2 : 5)}</span>
+                          </span>
+                        )}
+                        {trade.closePrice != null && (
+                          <span className="text-[11px] text-muted-foreground">
+                            <span className="opacity-60">Close:</span>{' '}
+                            <span className="font-mono font-medium text-foreground">{trade.closePrice.toFixed(trade.closePrice > 100 ? 2 : 5)}</span>
+                          </span>
+                        )}
+                        {(trade.swap != null && trade.swap !== 0) && (
+                          <span className="text-[11px] text-muted-foreground">
+                            <span className="opacity-60">Swap:</span>{' '}
+                            <span className={cn("font-mono font-medium", trade.swap < 0 ? "text-destructive" : "text-primary")}>
+                              {trade.swap < 0 ? '' : '+'}{trade.swap.toFixed(2)}
+                            </span>
+                          </span>
+                        )}
+                        {(trade.commission != null && trade.commission !== 0) && (
+                          <span className="text-[11px] text-muted-foreground">
+                            <span className="opacity-60">Commission:</span>{' '}
+                            <span className={cn("font-mono font-medium", trade.commission < 0 ? "text-destructive" : "text-foreground")}>
+                              {trade.commission.toFixed(2)}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}

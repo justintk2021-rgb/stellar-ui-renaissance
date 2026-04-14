@@ -819,6 +819,10 @@ serve(async (req) => {
             .eq('broker_position_id', posId)
             .maybeSingle();
 
+          // Extract swap/commission from raw order payloads
+          const orderSwap = Number(openOrder.swap || 0) + Number(closeOrder?.swap || 0);
+          const orderCommission = Number(openOrder.commission || 0) + Number(closeOrder?.commission || 0);
+
           if (existingJournal) {
             await supabase.from('trades').update({
               pair: sym,
@@ -827,6 +831,10 @@ serve(async (req) => {
               date: dateStr,
               last_broker_sync_at: now,
               execution_type: 'market',
+              open_price: entryPrice,
+              close_price: exitPrice || null,
+              swap: orderSwap,
+              commission: orderCommission,
             }).eq('id', existingJournal.id);
             stats.journalUpdated++;
           } else {
@@ -846,6 +854,10 @@ serve(async (req) => {
               imported_from_broker: true,
               last_broker_sync_at: now,
               execution_type: 'market',
+              open_price: entryPrice,
+              close_price: exitPrice || null,
+              swap: orderSwap,
+              commission: orderCommission,
             });
             stats.journalCreated++;
           }
@@ -935,6 +947,10 @@ serve(async (req) => {
                 imported_from_broker: true,
                 last_broker_sync_at: now,
                 execution_type: 'market',
+                open_price: trade.avgFilledPrice || 0,
+                close_price: trade.closePrice || null,
+                swap: trade.swap || 0,
+                commission: trade.commission || 0,
               });
               stats.journalCreated++;
             }
