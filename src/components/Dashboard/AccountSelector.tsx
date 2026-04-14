@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ChevronDown, Plus, Settings, Check, Trash2, Star } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronDown, Plus, Settings, Check, Trash2, Star, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -19,6 +20,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TradingAccount } from "@/hooks/useTradingAccounts";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+
+interface BrokerAccountInfo {
+  connectionId: string;
+  accountId: string;
+  accNum: number;
+  accountName: string;
+  environment: string;
+  brokerName: string;
+  balance: number | null;
+  currency: string;
+  status: string;
+}
 
 interface AccountSelectorProps {
   accounts: TradingAccount[];
@@ -45,6 +59,61 @@ export const AccountSelector = ({
   const [newAccountName, setNewAccountName] = useState("");
   const [newAccountBroker, setNewAccountBroker] = useState("");
   const [newAccountBalance, setNewAccountBalance] = useState("10000");
+  const [brokerAccounts, setBrokerAccounts] = useState<BrokerAccountInfo[]>([]);
+  const [selectedBrokerAccount, setSelectedBrokerAccount] = useState<string | null>(null);
+
+  // Fetch broker-connected accounts
+  useEffect(() => {
+    const fetchBrokerAccounts = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: connections } = await supabase
+        .from('broker_connections')
+        .select('id, broker_name, environment, connection_status, active_account_id, active_acc_num, account_balance, account_currency')
+        .eq('user_id', user.id)
+        .eq('connection_status', 'connected');
+
+      if (!connections?.length) {
+        setBrokerAccounts([]);
+        return;
+      }
+
+      const brokerAccs: BrokerAccountInfo[] = [];
+
+      for (const conn of connections) {
+        const { data: accs } = await supabase
+          .from('broker_accounts')
+          .select('account_id_external, acc_num, account_name, is_active')
+          .eq('broker_connection_id', conn.id);
+
+        if (accs) {
+          for (const acc of accs) {
+            brokerAccs.push({
+              connectionId: conn.id,
+              accountId: acc.account_id_external,
+              accNum: acc.acc_num,
+              accountName: acc.account_name || `Account ${acc.acc_num}`,
+              environment: conn.environment || 'demo',
+              brokerName: conn.broker_name,
+              balance: acc.is_active ? conn.account_balance : null,
+              currency: conn.account_currency || 'USD',
+              status: conn.connection_status || 'disconnected',
+            });
+          }
+        }
+      }
+
+      setBrokerAccounts(brokerAccs);
+    };
+
+    fetchBrokerAccounts();
+  }, []);
+
+  const isBrokerSelected = !!selectedBrokerAccount;
+  const displayName = isBrokerSelected
+    ? brokerAccounts.find(b => `broker-${b.connectionId}-${b.accNum}` === selectedBrokerAccount)?.accountName || "Broker Account"
+    : selectedAccount?.name || "Select Account";
 
   const handleAddAccount = async () => {
     if (!newAccountName.trim()) return;
@@ -60,6 +129,7 @@ export const AccountSelector = ({
       setNewAccountName("");
       setNewAccountBroker("");
       setNewAccountBalance("10000");
+      setSelectedBrokerAccount(null);
       onSelectAccount(result.id);
     }
   };
@@ -87,6 +157,18 @@ export const AccountSelector = ({
     setIsEditDialogOpen(true);
   };
 
+  const handleSelectManualAccount = (accountId: string) => {
+    setSelectedBrokerAccount(null);
+    onSelectAccount(accountId);
+  };
+
+  const handleSelectBrokerAccount = (broker: BrokerAccountInfo) => {
+    const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
+    setSelectedBrokerAccount(brokerId);
+    // We still select the default manual account for trades storage,
+    // but the UI will show broker account info
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -96,20 +178,26 @@ export const AccountSelector = ({
             className="gap-2 min-w-[180px] justify-between bg-background/50 border-border/50"
           >
             <div className="flex items-center gap-2 truncate">
-              {selectedAccount?.is_default && (
+              {isBrokerSelected ? (
+                <Link2 className="w-3 h-3 text-primary shrink-0" />
+              ) : selectedAccount?.is_default ? (
                 <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
-              )}
-              <span className="truncate">{selectedAccount?.name || "Select Account"}</span>
+              ) : null}
+              <span className="truncate">{displayName}</span>
             </div>
             <ChevronDown className="w-4 h-4 shrink-0 opacity-50" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-[240px] bg-popover border-border z-50">
+        <DropdownMenuContent align="start" className="w-[280px] bg-popover border-border z-50">
+          {/* Manual Trading Accounts */}
+          <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+            Manual Accounts
+          </DropdownMenuLabel>
           {accounts.map((account) => (
             <DropdownMenuItem
               key={account.id}
               className="flex items-center justify-between cursor-pointer"
-              onClick={() => onSelectAccount(account.id)}
+              onClick={() => handleSelectManualAccount(account.id)}
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 {account.is_default && (
@@ -121,7 +209,7 @@ export const AccountSelector = ({
                 )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {selectedAccount?.id === account.id && (
+                {!isBrokerSelected && selectedAccount?.id === account.id && (
                   <Check className="w-4 h-4 text-primary" />
                 )}
                 <Button
@@ -138,7 +226,42 @@ export const AccountSelector = ({
               </div>
             </DropdownMenuItem>
           ))}
-          
+
+          {/* Broker-Connected Accounts */}
+          {brokerAccounts.length > 0 && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal flex items-center gap-1.5">
+                <Link2 className="w-3 h-3" />
+                Broker Connected
+              </DropdownMenuLabel>
+              {brokerAccounts.map((broker) => {
+                const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
+                return (
+                  <DropdownMenuItem
+                    key={brokerId}
+                    className="flex items-center justify-between cursor-pointer"
+                    onClick={() => handleSelectBrokerAccount(broker)}
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Link2 className="w-3 h-3 text-primary shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="truncate text-sm">{broker.accountName}</span>
+                        <span className="text-[10px] text-muted-foreground truncate">
+                          {broker.brokerName} · {broker.environment.toUpperCase()}
+                          {broker.balance != null && ` · $${broker.balance.toLocaleString()}`}
+                        </span>
+                      </div>
+                    </div>
+                    {selectedBrokerAccount === brokerId && (
+                      <Check className="w-4 h-4 text-primary shrink-0" />
+                    )}
+                  </DropdownMenuItem>
+                );
+              })}
+            </>
+          )}
+
           <DropdownMenuSeparator />
           
           <DropdownMenuItem
@@ -234,7 +357,6 @@ export const AccountSelector = ({
             </div>
           </div>
           <DialogFooter className="flex-col gap-3 sm:flex-col">
-            {/* Action buttons row */}
             {editingAccount && (!editingAccount.is_default || accounts.length > 1) && (
               <div className="flex gap-2 w-full">
                 {!editingAccount.is_default && (
@@ -267,7 +389,6 @@ export const AccountSelector = ({
                 )}
               </div>
             )}
-            {/* Save/Cancel buttons row */}
             <div className="flex gap-2 w-full justify-end">
               <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                 Cancel
