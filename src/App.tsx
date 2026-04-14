@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,14 +7,8 @@ import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import { AuthPage } from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import { supabase } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient();
-
-// Lightweight session manager — no longer signs users out on reload
-function SessionManager() {
-  return null;
-}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
