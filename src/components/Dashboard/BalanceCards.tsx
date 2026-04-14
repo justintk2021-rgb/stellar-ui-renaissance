@@ -662,7 +662,7 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
                       ) : (
                         <motion.div key="display-profit-target" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-baseline gap-3">
                           <AnimatedValue value={profitTarget || 0} prefix="$" className="text-3xl font-bold font-mono" />
-                          {profitTarget && profitTarget > 0 && netProfit >= profitTarget && (
+                          {profitTarget && profitTarget > 0 && netPnL >= profitTarget && (
                             <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-sm font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
                               ✓ Hit
                             </motion.span>
