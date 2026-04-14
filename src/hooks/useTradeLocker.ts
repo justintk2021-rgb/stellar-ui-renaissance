@@ -320,6 +320,29 @@ export function useTradeLocker() {
     }
   };
 
+  // Run diagnostic
+  const runDiagnostic = async () => {
+    if (!connection) return null;
+    try {
+      const result = await invokeTradeLocker('diagnostic', { connectionId: connection.id });
+      return result.results || [];
+    } catch (error: any) {
+      toast.error('Diagnostic failed: ' + error.message);
+      return null;
+    }
+  };
+
+  // Fetch sync logs
+  const fetchSyncLogs = async () => {
+    if (!connection) return [];
+    try {
+      const result = await invokeTradeLocker('sync-logs', { connectionId: connection.id });
+      return result.logs || [];
+    } catch {
+      return [];
+    }
+  };
+
   // Update sync settings
   const updateSyncSettings = async (autoSyncEnabled: boolean, syncIntervalSeconds: number) => {
     if (!connection) return;
@@ -387,5 +410,7 @@ export function useTradeLocker() {
     modifyOrder,
     updateSyncSettings,
     fetchConnection,
+    runDiagnostic,
+    fetchSyncLogs,
   };
 }
