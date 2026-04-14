@@ -62,7 +62,9 @@ export const AccountSelector = ({
   const [newAccountBroker, setNewAccountBroker] = useState("");
   const [newAccountBalance, setNewAccountBalance] = useState("10000");
   const [brokerAccounts, setBrokerAccounts] = useState<BrokerAccountInfo[]>([]);
-  const [selectedBrokerAccount, setSelectedBrokerAccount] = useState<string | null>(null);
+  const [selectedBrokerAccount, setSelectedBrokerAccount] = useState<string | null>(() => {
+    return localStorage.getItem('selectedBrokerInternalId') || null;
+  });
   const [isRenameBrokerOpen, setIsRenameBrokerOpen] = useState(false);
   const [renamingBroker, setRenamingBroker] = useState<BrokerAccountInfo | null>(null);
   const [brokerDisplayName, setBrokerDisplayName] = useState("");
