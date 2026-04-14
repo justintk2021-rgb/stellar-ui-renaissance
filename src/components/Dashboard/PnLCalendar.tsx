@@ -695,22 +695,37 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
 
       {/* Trade Details Modal */}
       <Dialog open={!!selectedDate} onOpenChange={() => setSelectedDate(null)}>
-        <DialogContent className="sm:max-w-2xl glass border-border/50 bg-card/95 backdrop-blur-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl glass border-border/50 bg-card/95 backdrop-blur-xl max-h-[90vh] overflow-y-auto p-0 gap-0 data-[state=open]:animate-none data-[state=closed]:animate-none">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ type: "spring", stiffness: 350, damping: 30 }}
+            className="p-6 space-y-0"
+          >
           <DialogHeader className="pb-4 border-b border-border/30">
             <div className="flex items-center justify-between">
-              <div>
+              <motion.div
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1, duration: 0.3 }}
+              >
                 <DialogTitle className="text-lg font-bold">
                   {selectedDate && formatDate(selectedDate)}
                 </DialogTitle>
                 <p className="text-xs text-muted-foreground mt-1">Daily Trade Summary</p>
-              </div>
+              </motion.div>
             {selectedDate && selectedTrades.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.15, type: "spring", stiffness: 300, damping: 25 }}
+              >
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Open the first trade's notes dialog
                   if (selectedTrades.length > 0) {
                     openTradeNoteDialog(selectedTrades[0], e);
                   }
@@ -720,21 +735,31 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 <FileText className="w-3.5 h-3.5 mr-1" />
                 View Notes
               </Button>
+              </motion.div>
             )}
             </div>
           </DialogHeader>
 
           {dayMetrics && (
-            <div className="space-y-5">
+            <div className="space-y-5 pt-5">
               {/* Top Metrics Row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12, type: "spring", stiffness: 260, damping: 24 }}
+                className="grid grid-cols-2 md:grid-cols-4 gap-3"
+              >
                 {/* NET P&L */}
-                <div className={cn(
-                  "p-4 rounded-xl border",
-                  dayMetrics.netPnL >= 0 
-                    ? "bg-primary/10 border-primary/30" 
-                    : "bg-destructive/10 border-destructive/30"
-                )}>
+                <motion.div
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  className={cn(
+                    "p-4 rounded-xl border transition-shadow duration-200",
+                    dayMetrics.netPnL >= 0 
+                      ? "bg-primary/10 border-primary/30 hover:shadow-lg hover:shadow-primary/10" 
+                      : "bg-destructive/10 border-destructive/30 hover:shadow-lg hover:shadow-destructive/10"
+                  )}
+                >
                   <div className="flex items-center gap-1 mb-1">
                     <span className="text-xs text-muted-foreground">Net P&L</span>
                   </div>
@@ -751,10 +776,14 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                       <TrendingDown className="w-4 h-4 text-destructive" />
                     )}
                   </div>
-                </div>
+                </motion.div>
 
                 {/* Win Rate */}
-                <div className="p-4 rounded-xl border border-border/30 bg-muted/20">
+                <motion.div
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  className="p-4 rounded-xl border border-border/30 bg-muted/20 transition-shadow duration-200 hover:shadow-lg hover:shadow-foreground/5"
+                >
                   <div className="mb-1">
                     <span className="text-xs text-muted-foreground">Win Rate</span>
                   </div>
@@ -764,31 +793,44 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                   )}>
                     {dayMetrics.winRate.toFixed(1)}%
                   </span>
-                </div>
+                </motion.div>
 
                 {/* Avg Win */}
-                <div className="p-4 rounded-xl border-2 border-primary/40 bg-primary/5">
+                <motion.div
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  className="p-4 rounded-xl border-2 border-primary/40 bg-primary/5 transition-shadow duration-200 hover:shadow-lg hover:shadow-primary/10"
+                >
                   <div className="mb-1">
                     <span className="text-xs text-muted-foreground">Avg Win</span>
                   </div>
                   <span className="text-xl font-bold font-mono text-primary">
                     ${truncateNum(dayMetrics.avgWin)}
                   </span>
-                </div>
+                </motion.div>
 
                 {/* Avg Loss */}
-                <div className="p-4 rounded-xl border-2 border-destructive/40 bg-destructive/5">
+                <motion.div
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  className="p-4 rounded-xl border-2 border-destructive/40 bg-destructive/5 transition-shadow duration-200 hover:shadow-lg hover:shadow-destructive/10"
+                >
                   <div className="mb-1">
                     <span className="text-xs text-muted-foreground">Avg Loss</span>
                   </div>
                   <span className="text-xl font-bold font-mono text-destructive">
                     -${truncateNum(Math.abs(dayMetrics.avgLoss))}
                   </span>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
 
               {/* Main Content - Win Rate Circle + Chart */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 260, damping: 24 }}
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              >
                 {/* Win Rate Circular Display */}
                 <div className="p-4 rounded-xl border border-border/30 bg-muted/10">
                   <div className="mb-3">
@@ -808,20 +850,30 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                   </div>
                   <DayCumulativeChart trades={selectedTrades} />
                 </div>
-              </div>
+              </motion.div>
 
               {/* Metrics Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.28, type: "spring", stiffness: 260, damping: 24 }}
+                className="grid grid-cols-2 md:grid-cols-4 gap-3"
+              >
                 <MetricRow icon={BarChart3} label="Total Trades" value={dayMetrics.totalTrades.toString()} />
                 <MetricRow label="Wins" value={dayMetrics.wins.toString()} isPositive />
                 <MetricRow label="Losses" value={dayMetrics.losses.toString()} isNegative />
                 <MetricRow label="Breakeven" value={dayMetrics.breakeven.toString()} />
                 <MetricRow label="Gross Profit" value={`$${truncateNum(dayMetrics.grossProfit)}`} isPositive />
                 <MetricRow label="Gross Loss" value={`$${truncateNum(Math.abs(dayMetrics.grossLoss))}`} isNegative />
-              </div>
+              </motion.div>
 
               {/* Tags Section */}
-              <div className="space-y-3">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.34, type: "spring", stiffness: 260, damping: 24 }}
+                className="space-y-3"
+              >
                 {dayMetrics.pairs.length > 0 && (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-muted-foreground">Pairs:</span>
@@ -843,23 +895,31 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                     ))}
                   </div>
                 )}
-              </div>
-
+              </motion.div>
 
               {/* Individual Trades */}
-              <div className="space-y-2">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, type: "spring", stiffness: 260, damping: 24 }}
+                className="space-y-2"
+              >
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Trade Details</span>
                 <div className="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
-                  {selectedTrades.map((trade) => {
+                  {selectedTrades.map((trade, i) => {
                     const tradeChecklist = trade.checklistId 
                       ? checklists.find(c => c.id === trade.checklistId) 
                       : null;
                     const hasTradeNote = !!getTradeNotebookEntry(notebookEntries, trade.id);
                     
                     return (
-                      <div 
+                      <motion.div 
                         key={trade.id}
-                        className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-2"
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.44 + i * 0.05, type: "spring", stiffness: 300, damping: 25 }}
+                        whileHover={{ scale: 1.01, x: 4 }}
+                        className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-2 transition-shadow duration-200 hover:shadow-md hover:shadow-foreground/5 cursor-default"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -902,13 +962,14 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                             </Badge>
                           </div>
                         )}
-                      </div>
+                      </motion.div>
                     );
                   })}
                 </div>
-              </div>
+              </motion.div>
             </div>
           )}
+          </motion.div>
         </DialogContent>
       </Dialog>
 
