@@ -627,6 +627,94 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* DEBUG / LOGS */}
+        <TabsContent value="debug">
+          <Card className="border-border/50 bg-card/80">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Sync Diagnostic</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={runningDiagnostic}
+                  onClick={async () => {
+                    setRunningDiagnostic(true);
+                    const results = await runDiagnostic();
+                    setDiagnosticResults(results);
+                    setRunningDiagnostic(false);
+                  }}
+                >
+                  {runningDiagnostic ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Activity className="w-4 h-4 mr-1" />}
+                  Run Diagnostic
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {diagnosticResults && (
+                <div className="space-y-2">
+                  {diagnosticResults.map((r: any, i: number) => (
+                    <div key={i} className="flex items-center gap-3 p-2 rounded border border-border/50 bg-background/50">
+                      {r.status === 'pass' ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium">{r.step}</div>
+                        <div className="text-xs text-muted-foreground truncate">{r.detail}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium">Recent Sync Logs</h4>
+                <Button size="sm" variant="ghost" onClick={async () => {
+                  const logs = await fetchSyncLogs();
+                  setSyncLogs(logs);
+                }}>
+                  <RefreshCw className="w-3 h-3 mr-1" /> Refresh
+                </Button>
+              </div>
+              {syncLogs.length === 0 ? (
+                <div className="text-sm text-muted-foreground text-center py-4">No sync logs yet</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Records</TableHead>
+                        <TableHead>Started</TableHead>
+                        <TableHead>Details</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {syncLogs.map((log: any) => (
+                        <TableRow key={log.id}>
+                          <TableCell className="text-xs">{log.sync_type}</TableCell>
+                          <TableCell>
+                            <Badge className={log.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' : log.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}>
+                              {log.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs">{log.records_processed || 0}</TableCell>
+                          <TableCell className="text-xs">{formatDate(log.started_at)}</TableCell>
+                          <TableCell className="text-xs max-w-[200px] truncate">{log.error_message || '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Modify Position Dialog */}
