@@ -599,32 +599,22 @@ serve(async (req) => {
         const ordColumns = config?.ordersConfig?.columns || [];
         const ordHistColumns = config?.ordersHistoryConfig?.columns || [];
 
-        // 0b. Fetch instruments to resolve tradableInstrumentId → symbol name
+        // 0b. Fetch instruments to resolve tradableInstrumentId → symbol name + type
         const rawInstruments = await tlGetInstruments(accessToken, accountId, accNum, environment);
         const instrumentMap: Record<string, string> = {};
+        const instrumentTypeMap: Record<string, string> = {};
         for (const inst of rawInstruments) {
           if (inst.tradableInstrumentId && inst.name) {
             instrumentMap[String(inst.tradableInstrumentId)] = inst.name;
+            instrumentTypeMap[String(inst.tradableInstrumentId)] = inst.type || '';
           }
         }
         const resolveSymbol = (tradableId: any) => {
           const id = String(tradableId);
           return instrumentMap[id] || id;
         };
-
-        // 0c. Fetch instrument details for contract sizes (cached per tradableInstrumentId)
-        const instrumentDetailsCache: Record<string, any> = {};
-        const getInstrumentDetail = async (tradableId: any) => {
-          const id = String(tradableId);
-          if (instrumentDetailsCache[id]) return instrumentDetailsCache[id];
-          const details = await tlGetInstrumentDetails(accessToken, accountId, accNum, environment, id);
-          instrumentDetailsCache[id] = details;
-          return details;
-        };
-        const getLotSize = async (tradableId: any): Promise<number> => {
-          const details = await getInstrumentDetail(tradableId);
-          // TradeLocker returns lotSize in instrument details
-          return Number(details?.lotSize) || Number(details?.contractSize) || 100000;
+        const resolveType = (tradableId: any) => {
+          return instrumentTypeMap[String(tradableId)] || '';
         };
 
         // 1. Sync account state (now properly parsed from columnar array)
