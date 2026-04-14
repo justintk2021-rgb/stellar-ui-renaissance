@@ -137,6 +137,7 @@ export const AccountSelector = ({
       setNewAccountBroker("");
       setNewAccountBalance("10000");
       setSelectedBrokerAccount(null);
+      localStorage.removeItem('selectedBrokerInternalId');
       onSelectAccount(result.id);
     }
   };
@@ -166,6 +167,7 @@ export const AccountSelector = ({
 
   const handleSelectManualAccount = (accountId: string) => {
     setSelectedBrokerAccount(null);
+    localStorage.removeItem('selectedBrokerInternalId');
     onSelectBrokerAccount?.(null);
     onSelectAccount(accountId);
   };
@@ -173,6 +175,7 @@ export const AccountSelector = ({
   const handleSelectBrokerAccount = (broker: BrokerAccountInfo) => {
     const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
     setSelectedBrokerAccount(brokerId);
+    localStorage.setItem('selectedBrokerInternalId', brokerId);
     onSelectBrokerAccount?.(broker.accountId);
   };
 
