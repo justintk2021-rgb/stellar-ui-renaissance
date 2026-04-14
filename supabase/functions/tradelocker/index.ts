@@ -118,37 +118,54 @@ async function tlGetAccountState(accessToken: string, accountId: string, accNum:
     return null;
   }
   const data = await res.json();
-  return data.d || data || null;
+  return parseAccountState(data);
 }
 
-async function tlGetPositions(accessToken: string, accountId: string, accNum: number, environment: string) {
+async function tlGetConfig(accessToken: string, accNum: number, environment: string) {
+  const baseUrl = getBaseUrl(environment);
+  const res = await fetch(`${baseUrl}/trade/config`, {
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.d || null;
+}
+
+async function tlGetPositions(accessToken: string, accountId: string, accNum: number, environment: string, posColumns?: { id: string }[]) {
   const baseUrl = getBaseUrl(environment);
   const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/positions`, {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
   });
   if (!res.ok) return [];
   const data = await res.json();
-  return data.d?.positions || [];
+  const rows = data.d?.positions || [];
+  if (!posColumns || rows.length === 0) return rows;
+  // Convert columnar format to objects
+  return rows.map((row: any[]) => rowToObject(posColumns, row));
 }
 
-async function tlGetOrders(accessToken: string, accountId: string, accNum: number, environment: string) {
+async function tlGetOrders(accessToken: string, accountId: string, accNum: number, environment: string, ordColumns?: { id: string }[]) {
   const baseUrl = getBaseUrl(environment);
   const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/orders`, {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
   });
   if (!res.ok) return [];
   const data = await res.json();
-  return data.d?.orders || [];
+  const rows = data.d?.orders || [];
+  if (!ordColumns || rows.length === 0) return rows;
+  return rows.map((row: any[]) => rowToObject(ordColumns, row));
 }
 
-async function tlGetOrdersHistory(accessToken: string, accountId: string, accNum: number, environment: string) {
+async function tlGetOrdersHistory(accessToken: string, accountId: string, accNum: number, environment: string, columns?: { id: string }[]) {
   const baseUrl = getBaseUrl(environment);
   const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/ordersHistory`, {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
   });
   if (!res.ok) return [];
   const data = await res.json();
-  return data.d?.ordersHistory || [];
+  const rows = data.d?.ordersHistory || [];
+  if (!columns || rows.length === 0) return rows;
+  return rows.map((row: any[]) => rowToObject(columns, row));
 }
 
 async function tlGetPositionsHistory(accessToken: string, accountId: string, accNum: number, environment: string) {
@@ -156,7 +173,7 @@ async function tlGetPositionsHistory(accessToken: string, accountId: string, acc
   const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/positionsHistory`, {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
   });
-  if (!res.ok) return [];
+  if (!res.ok) return []; // Many servers return 404 for this endpoint
   const data = await res.json();
   return data.d?.positions || [];
 }
