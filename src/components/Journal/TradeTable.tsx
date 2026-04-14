@@ -504,6 +504,40 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
                         onConfirm={() => onDelete(trade.id)}
                       />
                     </div>
+                    </div>
+                    {/* Broker details row */}
+                    {trade.importedFromBroker && (trade.openPrice || trade.closePrice || trade.swap || trade.commission) && (
+                      <div className="flex items-center gap-4 mt-1.5 pl-0 flex-wrap">
+                        {trade.openPrice != null && (
+                          <span className="text-[11px] text-muted-foreground">
+                            <span className="opacity-60">Open:</span>{' '}
+                            <span className="font-mono font-medium text-foreground">{trade.openPrice.toFixed(trade.openPrice > 100 ? 2 : 5)}</span>
+                          </span>
+                        )}
+                        {trade.closePrice != null && (
+                          <span className="text-[11px] text-muted-foreground">
+                            <span className="opacity-60">Close:</span>{' '}
+                            <span className="font-mono font-medium text-foreground">{trade.closePrice.toFixed(trade.closePrice > 100 ? 2 : 5)}</span>
+                          </span>
+                        )}
+                        {(trade.swap != null && trade.swap !== 0) && (
+                          <span className="text-[11px] text-muted-foreground">
+                            <span className="opacity-60">Swap:</span>{' '}
+                            <span className={cn("font-mono font-medium", trade.swap < 0 ? "text-destructive" : "text-primary")}>
+                              {trade.swap < 0 ? '' : '+'}{trade.swap.toFixed(2)}
+                            </span>
+                          </span>
+                        )}
+                        {(trade.commission != null && trade.commission !== 0) && (
+                          <span className="text-[11px] text-muted-foreground">
+                            <span className="opacity-60">Commission:</span>{' '}
+                            <span className={cn("font-mono font-medium", trade.commission < 0 ? "text-destructive" : "text-foreground")}>
+                              {trade.commission.toFixed(2)}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}
