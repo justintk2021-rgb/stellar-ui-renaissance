@@ -350,8 +350,8 @@ const Index = () => {
       document.documentElement.style.removeProperty('--ring');
       document.documentElement.style.removeProperty('--sidebar-primary');
       document.documentElement.style.removeProperty('--sidebar-ring');
-    } else if (customGradient) {
-      // Apply custom gradient from database
+    } else {
+      // Apply custom color/gradient from database
       const hexToHsl = (hex: string): string => {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
         if (!result) return '158 64% 51%';
@@ -371,15 +371,25 @@ const Index = () => {
         }
         return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
       };
-      const fromHsl = hexToHsl(customGradient.from);
-      const toHsl = hexToHsl(customGradient.to);
-      document.documentElement.style.setProperty('--primary', fromHsl);
-      document.documentElement.style.setProperty('--primary-glow', toHsl);
-      document.documentElement.style.setProperty('--ring', fromHsl);
-      document.documentElement.style.setProperty('--sidebar-primary', fromHsl);
-      document.documentElement.style.setProperty('--sidebar-ring', fromHsl);
+
+      if (customGradient) {
+        const fromHsl = hexToHsl(customGradient.from);
+        const toHsl = hexToHsl(customGradient.to);
+        document.documentElement.style.setProperty('--primary', fromHsl);
+        document.documentElement.style.setProperty('--primary-glow', toHsl);
+        document.documentElement.style.setProperty('--ring', fromHsl);
+        document.documentElement.style.setProperty('--sidebar-primary', fromHsl);
+        document.documentElement.style.setProperty('--sidebar-ring', fromHsl);
+      } else if (customColor) {
+        const hsl = hexToHsl(customColor);
+        document.documentElement.style.setProperty('--primary', hsl);
+        document.documentElement.style.setProperty('--primary-glow', hsl);
+        document.documentElement.style.setProperty('--ring', hsl);
+        document.documentElement.style.setProperty('--sidebar-primary', hsl);
+        document.documentElement.style.setProperty('--sidebar-ring', hsl);
+      }
     }
-  }, [theme, accentColor, customGradient, settingsInitialized]);
+  }, [theme, accentColor, customColor, customGradient, settingsInitialized]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
