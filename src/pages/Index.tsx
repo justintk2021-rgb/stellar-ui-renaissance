@@ -105,42 +105,48 @@ const Index = () => {
     importTrades 
   } = useTrades(user?.id, selectedBrokerAccountId ? null : selectedAccountId, selectedBrokerAccountId);
 
-  // Auto-sync with broker when dashboard loads and user is authenticated
+  // Auto-sync with broker - on load, every 5 mins, and on page change
+  const brokerAutoSync = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const { data: connections } = await supabase
+        .from('broker_connections')
+        .select('id, connection_status')
+        .eq('user_id', user.id)
+        .eq('connection_status', 'connected');
+
+      if (!connections?.length) return;
+
+      setBrokerSyncing(true);
+      for (const conn of connections) {
+        try {
+          await supabase.functions.invoke('tradelocker', {
+            body: { action: 'sync', connectionId: conn.id },
+          });
+        } catch (e) {
+          console.warn('Auto-sync skipped for connection', conn.id, e);
+        }
+      }
+    } catch (e) {
+      console.warn('Auto broker sync check failed:', e);
+    } finally {
+      setBrokerSyncing(false);
+    }
+  }, [user?.id]);
+
+  // Initial sync + 5-minute interval
   useEffect(() => {
     if (!user?.id) return;
-    let cancelled = false;
+    const timer = setTimeout(brokerAutoSync, 1500);
+    const interval = setInterval(brokerAutoSync, 5 * 60 * 1000);
+    return () => { clearTimeout(timer); clearInterval(interval); };
+  }, [user?.id, brokerAutoSync]);
 
-    const autoSync = async () => {
-      try {
-        const { data: connections } = await supabase
-          .from('broker_connections')
-          .select('id, connection_status')
-          .eq('user_id', user.id)
-          .eq('connection_status', 'connected');
-
-        if (cancelled || !connections?.length) return;
-
-        setBrokerSyncing(true);
-        for (const conn of connections) {
-          if (cancelled) return;
-          try {
-            await supabase.functions.invoke('tradelocker', {
-              body: { action: 'sync', connectionId: conn.id },
-            });
-          } catch (e) {
-            console.warn('Auto-sync skipped for connection', conn.id, e);
-          }
-        }
-      } catch (e) {
-        console.warn('Auto broker sync check failed:', e);
-      } finally {
-        if (!cancelled) setBrokerSyncing(false);
-      }
-    };
-
-    const timer = setTimeout(autoSync, 1500);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [user?.id]);
+  // Sync on page change
+  useEffect(() => {
+    if (!user?.id) return;
+    brokerAutoSync();
+  }, [currentPage]);
 
   // Fetch broker balance when a broker account is selected + realtime updates
   useEffect(() => {
