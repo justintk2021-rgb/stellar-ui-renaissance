@@ -102,7 +102,44 @@ const Index = () => {
     clearAllTrades, 
     importTrades 
   } = useTrades(user?.id, selectedBrokerAccountId ? null : selectedAccountId, selectedBrokerAccountId);
-  
+
+  // Auto-sync with broker when dashboard loads and user is authenticated
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+
+    const autoSync = async () => {
+      try {
+        // Check if user has any connected broker
+        const { data: connections } = await supabase
+          .from('broker_connections')
+          .select('id, connection_status')
+          .eq('user_id', user.id)
+          .eq('connection_status', 'connected');
+
+        if (cancelled || !connections?.length) return;
+
+        // Trigger sync for each connected broker
+        for (const conn of connections) {
+          if (cancelled) return;
+          try {
+            await supabase.functions.invoke('tradelocker', {
+              body: { action: 'sync', connectionId: conn.id },
+            });
+          } catch (e) {
+            console.warn('Auto-sync skipped for connection', conn.id, e);
+          }
+        }
+      } catch (e) {
+        console.warn('Auto broker sync check failed:', e);
+      }
+    };
+
+    // Small delay to let auth fully settle
+    const timer = setTimeout(autoSync, 1500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [user?.id]);
+
   // Fetch broker balance when a broker account is selected + realtime updates
   useEffect(() => {
     if (!selectedBrokerAccountId) {
