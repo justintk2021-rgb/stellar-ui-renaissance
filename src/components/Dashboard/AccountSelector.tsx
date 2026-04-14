@@ -62,7 +62,9 @@ export const AccountSelector = ({
   const [newAccountBroker, setNewAccountBroker] = useState("");
   const [newAccountBalance, setNewAccountBalance] = useState("10000");
   const [brokerAccounts, setBrokerAccounts] = useState<BrokerAccountInfo[]>([]);
-  const [selectedBrokerAccount, setSelectedBrokerAccount] = useState<string | null>(null);
+  const [selectedBrokerAccount, setSelectedBrokerAccount] = useState<string | null>(() => {
+    return localStorage.getItem('selectedBrokerInternalId') || null;
+  });
   const [isRenameBrokerOpen, setIsRenameBrokerOpen] = useState(false);
   const [renamingBroker, setRenamingBroker] = useState<BrokerAccountInfo | null>(null);
   const [brokerDisplayName, setBrokerDisplayName] = useState("");
@@ -110,6 +112,20 @@ export const AccountSelector = ({
       }
 
       setBrokerAccounts(brokerAccs);
+
+      // Restore persisted broker selection
+      const persistedBrokerId = localStorage.getItem('selectedBrokerInternalId');
+      if (persistedBrokerId) {
+        const match = brokerAccs.find(b => `broker-${b.connectionId}-${b.accNum}` === persistedBrokerId);
+        if (match) {
+          setSelectedBrokerAccount(persistedBrokerId);
+          onSelectBrokerAccount?.(match.accountId);
+        } else {
+          // Persisted broker no longer exists, clear it
+          localStorage.removeItem('selectedBrokerInternalId');
+          setSelectedBrokerAccount(null);
+        }
+      }
     };
 
     fetchBrokerAccounts();
@@ -135,6 +151,7 @@ export const AccountSelector = ({
       setNewAccountBroker("");
       setNewAccountBalance("10000");
       setSelectedBrokerAccount(null);
+      localStorage.removeItem('selectedBrokerInternalId');
       onSelectAccount(result.id);
     }
   };
@@ -164,6 +181,7 @@ export const AccountSelector = ({
 
   const handleSelectManualAccount = (accountId: string) => {
     setSelectedBrokerAccount(null);
+    localStorage.removeItem('selectedBrokerInternalId');
     onSelectBrokerAccount?.(null);
     onSelectAccount(accountId);
   };
@@ -171,6 +189,7 @@ export const AccountSelector = ({
   const handleSelectBrokerAccount = (broker: BrokerAccountInfo) => {
     const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
     setSelectedBrokerAccount(brokerId);
+    localStorage.setItem('selectedBrokerInternalId', brokerId);
     onSelectBrokerAccount?.(broker.accountId);
   };
 
