@@ -17,6 +17,7 @@ interface BalanceCardsProps {
   startBalance: number;
   goalBalance: number | null;
   profitTarget: number | null;
+  brokerBalance?: number | null;
   onSetBalance: (balance: number) => void;
   onSetGoalBalance: (balance: number) => void;
   onSetProfitTarget: (target: number) => void;
@@ -119,7 +120,7 @@ const iconVariants = {
 
 // Removed animated glow variants to reduce visual interference
 
-export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, onSetBalance, onSetGoalBalance, onSetProfitTarget }: BalanceCardsProps) {
+export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, brokerBalance, onSetBalance, onSetGoalBalance, onSetProfitTarget }: BalanceCardsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [isEditingProfitTarget, setIsEditingProfitTarget] = useState(false);
