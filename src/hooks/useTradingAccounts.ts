@@ -18,7 +18,18 @@ export interface TradingAccount {
 
 export function useTradingAccounts(userId: string | undefined) {
   const [accounts, setAccounts] = useState<TradingAccount[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [selectedAccountId, setSelectedAccountIdState] = useState<string | null>(() => {
+    return localStorage.getItem('selectedManualAccountId') || null;
+  });
+
+  const setSelectedAccountId = useCallback((id: string | null) => {
+    setSelectedAccountIdState(id);
+    if (id) {
+      localStorage.setItem('selectedManualAccountId', id);
+    } else {
+      localStorage.removeItem('selectedManualAccountId');
+    }
+  }, []);
   const [isLoading, setIsLoading] = useState(true);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
