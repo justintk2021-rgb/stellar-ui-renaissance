@@ -242,36 +242,46 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
     if (e.key === "Escape") handleCancelProfitTarget();
   };
 
-  const { currentBalance, balanceChange, balancePercent, profit, profitPercent, fees, highestBalance, sparklineData } = useMemo(() => {
+  const { currentBalance, balanceChange, balancePercent, profit, profitPercent, fees, highestBalance, sparklineData, netPnL } = useMemo(() => {
     const sortedTrades = [...trades].sort((a, b) => {
       if (a.date === b.date) return parseInt(a.id) - parseInt(b.id);
       return a.date < b.date ? -1 : 1;
     });
 
-    let equity = startBalance;
-    let highest = startBalance;
+    // Calculate total net P&L from trades
+    let totalNetPnL = 0;
     let totalProfit = 0;
     let totalFees = 0;
-    const equityPoints: number[] = [startBalance];
-    
+
     sortedTrades.forEach((trade) => {
       const result = trade.result || 0;
-      equity += result;
+      totalNetPnL += result;
       if (result > 0) {
         totalProfit += result;
       }
-      // Use actual fees from broker if available, otherwise estimate
       const tradeFees = (Math.abs(trade.swap || 0)) + (Math.abs(trade.commission || 0));
-      totalFees += tradeFees > 0 ? tradeFees : Math.abs(result) * 0.01;
+      totalFees += tradeFees > 0 ? tradeFees : 0;
+    });
+
+    // Derive the effective starting balance
+    // If broker balance is available, starting balance = brokerBalance - totalNetPnL
+    const effectiveStart = brokerBalance != null ? brokerBalance - totalNetPnL : startBalance;
+    const finalBalance = brokerBalance != null ? brokerBalance : effectiveStart + totalNetPnL;
+
+    // Build equity curve from effective start
+    let equity = effectiveStart;
+    let highest = effectiveStart;
+    const equityPoints: number[] = [effectiveStart];
+    
+    sortedTrades.forEach((trade) => {
+      equity += trade.result || 0;
       highest = Math.max(highest, equity);
       equityPoints.push(equity);
     });
 
-    // If broker balance is available, use it as the current balance
-    const finalBalance = brokerBalance != null ? brokerBalance : equity;
-    const change = finalBalance - startBalance;
-    const percentChange = startBalance > 0 ? (change / startBalance) * 100 : 0;
-    const profitPct = startBalance > 0 ? (totalProfit / startBalance) * 100 : 0;
+    const change = finalBalance - effectiveStart;
+    const percentChange = effectiveStart > 0 ? (change / effectiveStart) * 100 : 0;
+    const profitPct = effectiveStart > 0 ? (totalProfit / effectiveStart) * 100 : 0;
 
     return {
       currentBalance: finalBalance,
@@ -280,16 +290,16 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
       profit: totalProfit,
       profitPercent: profitPct,
       fees: totalFees,
-      highestBalance: Math.max(highest, finalBalance),
-      sparklineData: equityPoints.length > 1 ? equityPoints : [startBalance, startBalance],
+      highestBalance: highest,
+      sparklineData: equityPoints.length > 1 ? equityPoints : [effectiveStart, effectiveStart],
+      netPnL: totalNetPnL,
     };
   }, [trades, startBalance, brokerBalance]);
 
   const isPositive = balanceChange >= 0;
   const isProfitPositive = profit >= 0;
   const goalProgress = goalBalance && goalBalance > 0 ? Math.min(100, (currentBalance / goalBalance) * 100) : 0;
-  const netProfit = currentBalance - startBalance;
-  const profitTargetProgress = profitTarget && profitTarget > 0 ? Math.min(100, (Math.max(0, netProfit) / profitTarget) * 100) : 0;
+  const profitTargetProgress = profitTarget && profitTarget > 0 ? Math.min(100, (Math.max(0, netPnL) / profitTarget) * 100) : 0;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -652,7 +662,7 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
                       ) : (
                         <motion.div key="display-profit-target" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-baseline gap-3">
                           <AnimatedValue value={profitTarget || 0} prefix="$" className="text-3xl font-bold font-mono" />
-                          {profitTarget && profitTarget > 0 && netProfit >= profitTarget && (
+                          {profitTarget && profitTarget > 0 && netPnL >= profitTarget && (
                             <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-sm font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
                               ✓ Hit
                             </motion.span>
