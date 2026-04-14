@@ -680,12 +680,50 @@ const Index = () => {
                     </motion.button>
                   </motion.div>
                   
+                  {/* Filter Tabs */}
+                  <motion.div variants={staggerItem} className="flex items-center gap-1 p-1 rounded-xl bg-muted/40 border border-border/30 w-fit">
+                    {(['all', 'wins', 'losses'] as const).map((filter) => {
+                      const isActive = journalFilter === filter;
+                      const count = filter === 'all' ? trades.length : filter === 'wins' ? trades.filter(t => t.result > 0).length : trades.filter(t => t.result < 0).length;
+                      return (
+                        <motion.button
+                          key={filter}
+                          onClick={() => setJournalFilter(filter)}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.97 }}
+                          className={cn(
+                            "relative px-4 py-1.5 rounded-lg text-xs font-medium transition-colors duration-200 flex items-center gap-1.5",
+                            isActive
+                              ? "text-primary-foreground"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {isActive && (
+                            <motion.div
+                              layoutId="journal-filter-bg"
+                              className={cn(
+                                "absolute inset-0 rounded-lg",
+                                filter === 'wins' ? "bg-primary" : filter === 'losses' ? "bg-destructive" : "bg-primary"
+                              )}
+                              transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                            />
+                          )}
+                          <span className="relative z-10 capitalize">{filter}</span>
+                          <span className={cn(
+                            "relative z-10 text-[10px] px-1.5 py-0.5 rounded-full font-mono",
+                            isActive ? "bg-white/20" : "bg-muted/60"
+                          )}>{count}</span>
+                        </motion.button>
+                      );
+                    })}
+                  </motion.div>
+
                   {/* Main Content with Calendar Sidebar */}
                   <motion.div variants={staggerItem} className="flex gap-6">
                     {/* Trade Table */}
                     <div className="flex-1 min-w-0">
                       <TradeTable
-                        trades={trades}
+                        trades={journalFilter === 'all' ? trades : journalFilter === 'wins' ? trades.filter(t => t.result > 0) : trades.filter(t => t.result < 0)}
                         notebookEntries={notebookEntries}
                         checklists={checklists}
                         onEdit={(trade) => {
