@@ -112,6 +112,20 @@ export const AccountSelector = ({
       }
 
       setBrokerAccounts(brokerAccs);
+
+      // Restore persisted broker selection
+      const persistedBrokerId = localStorage.getItem('selectedBrokerInternalId');
+      if (persistedBrokerId) {
+        const match = brokerAccs.find(b => `broker-${b.connectionId}-${b.accNum}` === persistedBrokerId);
+        if (match) {
+          setSelectedBrokerAccount(persistedBrokerId);
+          onSelectBrokerAccount?.(match.accountId);
+        } else {
+          // Persisted broker no longer exists, clear it
+          localStorage.removeItem('selectedBrokerInternalId');
+          setSelectedBrokerAccount(null);
+        }
+      }
     };
 
     fetchBrokerAccounts();
