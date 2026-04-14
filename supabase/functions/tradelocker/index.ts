@@ -600,6 +600,21 @@ serve(async (req) => {
           return instrumentMap[id] || id;
         };
 
+        // 0c. Fetch instrument details for contract sizes (cached per tradableInstrumentId)
+        const instrumentDetailsCache: Record<string, any> = {};
+        const getInstrumentDetail = async (tradableId: any) => {
+          const id = String(tradableId);
+          if (instrumentDetailsCache[id]) return instrumentDetailsCache[id];
+          const details = await tlGetInstrumentDetails(accessToken, accountId, accNum, environment, id);
+          instrumentDetailsCache[id] = details;
+          return details;
+        };
+        const getLotSize = async (tradableId: any): Promise<number> => {
+          const details = await getInstrumentDetail(tradableId);
+          // TradeLocker returns lotSize in instrument details
+          return Number(details?.lotSize) || Number(details?.contractSize) || 100000;
+        };
+
         // 1. Sync account state (now properly parsed from columnar array)
         const state = await tlGetAccountState(accessToken, accountId, accNum, environment);
         if (state) {
