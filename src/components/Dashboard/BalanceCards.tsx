@@ -16,8 +16,10 @@ interface BalanceCardsProps {
   trades: Trade[];
   startBalance: number;
   goalBalance: number | null;
+  profitTarget: number | null;
   onSetBalance: (balance: number) => void;
   onSetGoalBalance: (balance: number) => void;
+  onSetProfitTarget: (target: number) => void;
 }
 
 interface AnimatedValueProps {
@@ -117,13 +119,16 @@ const iconVariants = {
 
 // Removed animated glow variants to reduce visual interference
 
-export function BalanceCards({ trades, startBalance, goalBalance, onSetBalance, onSetGoalBalance }: BalanceCardsProps) {
+export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, onSetBalance, onSetGoalBalance, onSetProfitTarget }: BalanceCardsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [isEditingProfitTarget, setIsEditingProfitTarget] = useState(false);
   const [editValue, setEditValue] = useState(startBalance.toString());
   const [editGoalValue, setEditGoalValue] = useState((goalBalance || 0).toString());
+  const [editProfitTargetValue, setEditProfitTargetValue] = useState((profitTarget || 0).toString());
   const inputRef = useRef<HTMLInputElement>(null);
   const goalInputRef = useRef<HTMLInputElement>(null);
+  const profitTargetInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isEditing) {
@@ -138,6 +143,12 @@ export function BalanceCards({ trades, startBalance, goalBalance, onSetBalance, 
   }, [goalBalance, isEditingGoal]);
 
   useEffect(() => {
+    if (!isEditingProfitTarget) {
+      setEditProfitTargetValue((profitTarget || 0).toString());
+    }
+  }, [profitTarget, isEditingProfitTarget]);
+
+  useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
@@ -150,6 +161,13 @@ export function BalanceCards({ trades, startBalance, goalBalance, onSetBalance, 
       goalInputRef.current.select();
     }
   }, [isEditingGoal]);
+
+  useEffect(() => {
+    if (isEditingProfitTarget && profitTargetInputRef.current) {
+      profitTargetInputRef.current.focus();
+      profitTargetInputRef.current.select();
+    }
+  }, [isEditingProfitTarget]);
 
   const handleStartEdit = () => {
     setEditValue(startBalance.toString());
