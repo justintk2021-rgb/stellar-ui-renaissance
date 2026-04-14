@@ -193,26 +193,38 @@ async function tlGetInstruments(accessToken: string, accountId: string, accNum: 
   return data.d?.instruments || [];
 }
 
-async function tlGetInstrumentDetails(accessToken: string, accountId: string, accNum: number, environment: string, tradableInstrumentId: number | string) {
-  const baseUrl = getBaseUrl(environment);
-  const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/instruments/${tradableInstrumentId}`, {
-    headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.d || null;
+// Standard contract sizes by instrument type/name
+function getContractSize(symbol: string, instrumentType?: string): number {
+  const s = symbol.toUpperCase();
+  // Gold
+  if (s.includes('XAU')) return 100;
+  // Silver
+  if (s.includes('XAG')) return 5000;
+  // Platinum/Palladium
+  if (s.includes('XPT') || s.includes('XPD')) return 100;
+  // Oil
+  if (s.includes('USOIL') || s.includes('UKOIL') || s.includes('WTI') || s.includes('BRENT') || s.includes('CL') || s.includes('XTIUSD') || s.includes('XBRUSD')) return 1000;
+  // Natural Gas
+  if (s.includes('NGAS') || s.includes('XNGUSD')) return 10000;
+  // Crypto - typically 1 unit
+  if (instrumentType === 'CRYPTO' || s.includes('BTC') || s.includes('ETH') || s.includes('LTC') || s.includes('XRP') || s.includes('ADA') || s.includes('DOT') || s.includes('SOL') || s.includes('DOGE')) return 1;
+  // Indices (common CFD indices) - typically 1
+  if (instrumentType === 'INDEX' || s.includes('US30') || s.includes('US500') || s.includes('NAS') || s.includes('SPX') || s.includes('DAX') || s.includes('FTSE') || s.includes('NK225')) return 1;
+  // Forex - standard lot = 100,000 units
+  return 100000;
 }
 
-// Calculate P/L using contract size from instrument details
+// Calculate P/L using contract size
 function calculateRealizedPl(
   side: string, entryPrice: number, exitPrice: number, qty: number,
-  lotSize: number, symbol: string
+  symbol: string, instrumentType?: string
 ): number {
-  if (!entryPrice || !exitPrice || !qty || !lotSize) return 0;
+  if (!entryPrice || !exitPrice || !qty) return 0;
+  const contractSize = getContractSize(symbol, instrumentType);
   const priceDiff = side === 'buy' ? (exitPrice - entryPrice) : (entryPrice - exitPrice);
-  const rawPl = priceDiff * qty * lotSize;
+  const rawPl = priceDiff * qty * contractSize;
   
-  // For pairs where the quote currency is not USD, convert P/L to account currency
+  // For pairs where the quote currency is not USD, convert P/L to USD
   const upperSym = symbol.toUpperCase();
   if (upperSym.endsWith('JPY') || upperSym.endsWith('CHF') || upperSym.endsWith('CAD') ||
       upperSym.endsWith('SEK') || upperSym.endsWith('NOK') || upperSym.endsWith('SGD') ||
