@@ -45,6 +45,15 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         accountId: t.account_id || undefined,
         checklistId: t.checklist_id || undefined,
         checklistState: t.checklist_state || undefined,
+        brokerName: t.broker_name || undefined,
+        brokerEnvironment: t.broker_environment || undefined,
+        brokerAccountId: t.broker_account_id || undefined,
+        brokerAccNum: t.broker_acc_num || undefined,
+        brokerOrderId: t.broker_order_id || undefined,
+        brokerPositionId: t.broker_position_id || undefined,
+        importedFromBroker: t.imported_from_broker || false,
+        lastBrokerSyncAt: t.last_broker_sync_at || undefined,
+        executionType: t.execution_type || undefined,
       }));
 
       setTrades(formattedTrades);

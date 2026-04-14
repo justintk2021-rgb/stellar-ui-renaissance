@@ -34,10 +34,20 @@ export interface Trade {
   session?: string;
   notes?: string;
   notebook?: string;
-  chartImage?: string; // Base64 image of trade chart with entry/TP/SL
-  accountId?: string; // Trading account this trade belongs to
-  checklistId?: string; // Checklist used for this trade
-  checklistState?: ChecklistItemState[]; // State of checklist items at trade time
+  chartImage?: string;
+  accountId?: string;
+  checklistId?: string;
+  checklistState?: ChecklistItemState[];
+  // Broker fields
+  brokerName?: string;
+  brokerEnvironment?: string;
+  brokerAccountId?: string;
+  brokerAccNum?: number;
+  brokerOrderId?: string;
+  brokerPositionId?: string;
+  importedFromBroker?: boolean;
+  lastBrokerSyncAt?: string;
+  executionType?: string;
 }
 
 export interface DailyStats {

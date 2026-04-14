@@ -1,522 +1,712 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useBrokerConnections } from '@/hooks/useBrokerConnections';
-import { useTradingAccounts } from '@/hooks/useTradingAccounts';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTradeLocker } from '@/hooks/useTradeLocker';
 import { toast } from 'sonner';
-import { 
+import {
   Link2, Unlink, RefreshCw, Loader2, CheckCircle2, XCircle, AlertCircle,
-  TrendingUp, TrendingDown, Eye, EyeOff, DollarSign, Activity, HelpCircle, ExternalLink
+  TrendingUp, TrendingDown, Eye, EyeOff, DollarSign, Activity, Wallet,
+  BarChart3, Clock, ShieldCheck, ArrowUpRight, ArrowDownRight, X, Pencil, Send
 } from 'lucide-react';
-
-const PLATFORMS = [
-  { value: 'mt5', label: 'MetaTrader 5' },
-  { value: 'mt4', label: 'MetaTrader 4' },
-  { value: 'ctrader', label: 'cTrader' },
-  { value: 'tradelocker', label: 'TradeLocker' },
-];
 
 interface BrokerManagementProps {
   userId?: string;
 }
 
 export function BrokerManagement({ userId }: BrokerManagementProps) {
-  const { connections, positions, loading, connectBroker, disconnectBroker, checkStatus, refreshPositions, syncTrades, fetchPositions } = useBrokerConnections();
-  const { accounts } = useTradingAccounts(userId);
-  
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [positionsDialogOpen, setPositionsDialogOpen] = useState(false);
-  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
-  const [syncingId, setSyncingId] = useState<string | null>(null);
-  const [refreshingId, setRefreshingId] = useState<string | null>(null);
-  
-  // Form state
-  const [platform, setPlatform] = useState('');
-  const [brokerName, setBrokerName] = useState('');
-  const [server, setServer] = useState('');
-  const [login, setLogin] = useState('');
+  const {
+    connection, accounts, positions, orders, history, summary,
+    loading, syncing,
+    connect, selectAccount, sync, disconnect, reconnect,
+    placeOrder, closePosition, modifyPosition, cancelOrder, modifyOrder,
+    updateSyncSettings,
+  } = useTradeLocker();
+
+  // Connection form
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [metaapiAccountId, setMetaapiAccountId] = useState('');
-  const [useAdvanced, setUseAdvanced] = useState(false);
+  const [server, setServer] = useState('');
+  const [environment, setEnvironment] = useState<string>('demo');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
-  // Check connecting accounts periodically
-  useEffect(() => {
-    const connectingAccounts = connections.filter(c => c.connection_status === 'connecting');
-    if (connectingAccounts.length === 0) return;
+  // Reconnect
+  const [reconnectOpen, setReconnectOpen] = useState(false);
+  const [reconnectEmail, setReconnectEmail] = useState('');
+  const [reconnectPassword, setReconnectPassword] = useState('');
 
-    const interval = setInterval(() => {
-      connectingAccounts.forEach(c => checkStatus(c.id));
-    }, 5000);
+  // Modify dialogs
+  const [modifyPosOpen, setModifyPosOpen] = useState(false);
+  const [modifyPosId, setModifyPosId] = useState('');
+  const [modifySl, setModifySl] = useState('');
+  const [modifyTp, setModifyTp] = useState('');
 
-    return () => clearInterval(interval);
-  }, [connections, checkStatus]);
+  const [modifyOrdOpen, setModifyOrdOpen] = useState(false);
+  const [modifyOrdId, setModifyOrdId] = useState('');
+  const [modifyOrdSl, setModifyOrdSl] = useState('');
+  const [modifyOrdTp, setModifyOrdTp] = useState('');
+  const [modifyOrdPrice, setModifyOrdPrice] = useState('');
 
-  const resetForm = () => {
-    setPlatform('');
-    setBrokerName('');
-    setServer('');
-    setLogin('');
-    setPassword('');
-    setMetaapiAccountId('');
-    setUseAdvanced(false);
-  };
+  // Trade execution
+  const [tradeSymbol, setTradeSymbol] = useState('');
+  const [tradeSide, setTradeSide] = useState<string>('buy');
+  const [tradeType, setTradeType] = useState<string>('market');
+  const [tradeQty, setTradeQty] = useState('');
+  const [tradePrice, setTradePrice] = useState('');
+  const [tradeSl, setTradeSl] = useState('');
+  const [tradeTp, setTradeTp] = useState('');
+  const [tradableInstrumentId, setTradableInstrumentId] = useState('');
+  const [isPlacing, setIsPlacing] = useState(false);
 
   const handleConnect = async () => {
-    if (!platform) {
-      toast.error('Please select a platform');
+    if (!email || !password || !server) {
+      toast.error('Please fill all fields');
       return;
     }
-
-    // TradeLocker validation
-    if (platform === 'tradelocker') {
-      if (!login || !password || !server) {
-        toast.error('Please fill in all fields');
-        return;
-      }
-    } else {
-      // MT4/MT5/cTrader - require credentials OR MetaAPI Account ID
-      if (useAdvanced && !metaapiAccountId.trim()) {
-        toast.error('Please enter your MetaAPI Account ID');
-        return;
-      }
-      if (!useAdvanced && (!login || !password || !server)) {
-        toast.error('Please fill in all broker credentials');
-        return;
-      }
-    }
-
     setIsConnecting(true);
-    
-    const result = await connectBroker(
-      platform,
-      brokerName || (platform === 'tradelocker' ? 'TradeLocker' : platform.toUpperCase()),
-      server || 'metaapi',
-      login || 'metaapi',
-      password || 'metaapi',
-      metaapiAccountId || undefined
-    );
+    try {
+      const result = await connect(email, password, server, environment);
+      setEmail('');
+      setPassword('');
+      setServer('');
+    } catch {
+      // handled in hook
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
-    setIsConnecting(false);
+  const handleReconnect = async () => {
+    if (!reconnectEmail || !reconnectPassword) return;
+    await reconnect(reconnectEmail, reconnectPassword);
+    setReconnectOpen(false);
+    setReconnectEmail('');
+    setReconnectPassword('');
+  };
 
-    // Handle requiresAccountId response - just show error, form already shows Account ID input
-    if (result.requiresAccountId) {
-      toast.error('Please enter a valid MetaAPI Account ID', { duration: 6000 });
+  const handlePlaceOrder = async () => {
+    if (!tradeSymbol || !tradeQty || !tradableInstrumentId) {
+      toast.error('Fill symbol, instrument ID, and quantity');
       return;
     }
-
-    // Success - close dialog and reset
-    if (result.success) {
-      resetForm();
-      setDialogOpen(false);
+    setIsPlacing(true);
+    try {
+      await placeOrder({
+        symbol: tradeSymbol,
+        side: tradeSide,
+        type: tradeType,
+        qty: parseFloat(tradeQty),
+        price: tradePrice ? parseFloat(tradePrice) : undefined,
+        stopLoss: tradeSl ? parseFloat(tradeSl) : undefined,
+        takeProfit: tradeTp ? parseFloat(tradeTp) : undefined,
+        tradableInstrumentId: parseInt(tradableInstrumentId),
+      });
+      setTradeSymbol('');
+      setTradeQty('');
+      setTradePrice('');
+      setTradeSl('');
+      setTradeTp('');
+      setTradableInstrumentId('');
+    } catch {
+    } finally {
+      setIsPlacing(false);
     }
   };
 
-  const handleSync = async (connectionId: string) => {
-    setSyncingId(connectionId);
-    const defaultAccount = accounts.find(a => a.is_default);
-    await syncTrades(connectionId, defaultAccount?.id);
-    setSyncingId(null);
+  const formatCurrency = (val: number | null | undefined, currency = 'USD') => {
+    if (val === null || val === undefined) return '$0.00';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(val);
   };
 
-  const handleRefreshPositions = async (connectionId: string) => {
-    setRefreshingId(connectionId);
-    await refreshPositions(connectionId);
-    setRefreshingId(null);
+  const formatDate = (d: string | null) => {
+    if (!d) return '-';
+    return new Date(d).toLocaleString();
   };
 
-  const handleViewPositions = async (connectionId: string) => {
-    await fetchPositions(connectionId);
-    setSelectedConnectionId(connectionId);
-    setPositionsDialogOpen(true);
-  };
-
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | null) => {
     switch (status) {
       case 'connected':
-        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30"><CheckCircle2 className="w-3 h-3 mr-1" /> Connected</Badge>;
-      case 'connecting':
-        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30"><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Connecting</Badge>;
-      case 'error':
-        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30"><XCircle className="w-3 h-3 mr-1" /> Error</Badge>;
+        return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30"><CheckCircle2 className="w-3 h-3 mr-1" /> Connected</Badge>;
+      case 'expired':
+        return <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30"><AlertCircle className="w-3 h-3 mr-1" /> Expired</Badge>;
       default:
-        return <Badge variant="outline"><AlertCircle className="w-3 h-3 mr-1" /> Disconnected</Badge>;
+        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30"><XCircle className="w-3 h-3 mr-1" /> Disconnected</Badge>;
     }
   };
 
-  const formatCurrency = (value: number | null, currency = 'USD') => {
-    if (value === null || value === undefined) return '-';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-  const selectedPositions = positions.filter(p => p.broker_connection_id === selectedConnectionId);
+  // ===================== NO CONNECTION - SHOW CONNECT FORM =====================
+  if (!connection) {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto">
+        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Link2 className="w-5 h-5 text-primary" />
+              Connect TradeLocker
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Environment</Label>
+                <Select value={environment} onValueChange={setEnvironment}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="demo">Demo</SelectItem>
+                    <SelectItem value="live">Live</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Server Name</Label>
+                <Input placeholder="e.g. OSP-DEMO" value={server} onChange={(e) => setServer(e.target.value)} showNumberControls={false} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} showNumberControls={false} />
+            </div>
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  showNumberControls={false}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+            <Button onClick={handleConnect} disabled={isConnecting} className="w-full">
+              {isConnecting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Link2 className="w-4 h-4 mr-2" />}
+              Connect
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ===================== CONNECTED - ACCOUNT SELECTION =====================
+  if (!connection.active_account_id && accounts.length > 0) {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto">
+        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle>Select Trading Account</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {accounts.map((acc) => (
+              <Button
+                key={acc.id}
+                variant="outline"
+                className="w-full justify-between h-auto py-3"
+                onClick={() => selectAccount(acc.account_id_external, acc.acc_num)}
+              >
+                <span className="font-medium">{acc.account_name || `Account ${acc.acc_num}`}</span>
+                <Badge variant="secondary">accNum: {acc.acc_num}</Badge>
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ===================== FULL BROKER MANAGEMENT =====================
+  const isExpired = connection.connection_status === 'expired';
 
   return (
-    <Card className="border-border/50 bg-card/50">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-primary" />
-              Broker Connections
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Connect your trading accounts to automatically sync trades
-            </CardDescription>
-          </div>
-          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Link2 className="w-4 h-4" />
-                Add Account
+    <div className="space-y-6">
+      {/* Top Status Bar */}
+      <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+        <CardContent className="py-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              {getStatusBadge(connection.connection_status)}
+              <div className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">TradeLocker</span>
+                {' · '}
+                <Badge variant="outline" className="text-xs">{connection.environment?.toUpperCase()}</Badge>
+                {' · '}
+                {connection.server}
+              </div>
+              {connection.last_connected_at && (
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Last sync: {formatDate(connection.last_connected_at)}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={sync} disabled={syncing || isExpired}>
+                {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+                Sync
               </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Connect Trading Account</DialogTitle>
-                <DialogDescription>
-                  Enter your broker credentials to connect
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                {/* Platform Selection */}
-                <div className="space-y-2">
-                  <Label>Platform</Label>
-                  <Select value={platform} onValueChange={setPlatform}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select platform" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PLATFORMS.map(p => (
-                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+              {isExpired && (
+                <Button size="sm" variant="default" onClick={() => setReconnectOpen(true)}>
+                  <ShieldCheck className="w-4 h-4 mr-1" /> Reconnect
+                </Button>
+              )}
+              <Button size="sm" variant="destructive" onClick={disconnect}>
+                <Unlink className="w-4 h-4 mr-1" /> Disconnect
+              </Button>
+            </div>
+          </div>
+          {isExpired && (
+            <div className="mt-3 p-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              Session expired. Please reconnect to continue syncing.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Sync Settings */}
+      <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">Auto-Sync</Label>
+                <Switch
+                  checked={connection.auto_sync_enabled}
+                  onCheckedChange={(checked) => updateSyncSettings(checked, connection.sync_interval_seconds)}
+                />
+              </div>
+              {connection.auto_sync_enabled && (
+                <Select
+                  value={String(connection.sync_interval_seconds)}
+                  onValueChange={(v) => updateSyncSettings(true, parseInt(v))}
+                >
+                  <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">Every 30s</SelectItem>
+                    <SelectItem value="60">Every 1 min</SelectItem>
+                    <SelectItem value="300">Every 5 min</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            {connection.auto_sync_enabled && connection.sync_interval_seconds <= 30 && (
+              <span className="text-xs text-amber-400">⚠ Frequent syncing may hit rate limits</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Dashboard Cards */}
+      {summary && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <DashCard icon={<Wallet className="w-5 h-5" />} label="Balance" value={formatCurrency(summary.balance)} />
+          <DashCard icon={<Activity className="w-5 h-5" />} label="Equity" value={formatCurrency(summary.equity)} />
+          <DashCard icon={<DollarSign className="w-5 h-5" />} label="Free Margin" value={formatCurrency(summary.freeMargin)} />
+          <DashCard
+            icon={summary.floatingPl >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+            label="Floating P/L"
+            value={formatCurrency(summary.floatingPl)}
+            valueClass={summary.floatingPl >= 0 ? 'text-emerald-400' : 'text-red-400'}
+          />
+          <DashCard icon={<BarChart3 className="w-5 h-5" />} label="Margin Used" value={formatCurrency(summary.marginUsed)} />
+          <DashCard icon={<Activity className="w-5 h-5" />} label="Open Positions" value={String(summary.openPositions)} />
+          <DashCard icon={<Clock className="w-5 h-5" />} label="Pending Orders" value={String(summary.pendingOrders)} />
+          <DashCard icon={<ShieldCheck className="w-5 h-5" />} label="Connection" value={connection.connection_status || 'unknown'} />
+        </div>
+      )}
+
+      {/* Tabs */}
+      <Tabs defaultValue="positions" className="w-full">
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="positions">Positions ({positions.length})</TabsTrigger>
+          <TabsTrigger value="orders">Orders ({orders.length})</TabsTrigger>
+          <TabsTrigger value="history">History ({history.length})</TabsTrigger>
+          <TabsTrigger value="trade">Place Trade</TabsTrigger>
+        </TabsList>
+
+        {/* POSITIONS */}
+        <TabsContent value="positions">
+          <Card className="border-border/50 bg-card/80">
+            <CardContent className="p-0">
+              {positions.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">No open positions</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Symbol</TableHead>
+                        <TableHead>Side</TableHead>
+                        <TableHead>Size</TableHead>
+                        <TableHead>Entry</TableHead>
+                        <TableHead>SL</TableHead>
+                        <TableHead>TP</TableHead>
+                        <TableHead>P/L</TableHead>
+                        <TableHead>Opened</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {positions.map((pos) => (
+                        <TableRow key={pos.id}>
+                          <TableCell className="font-medium">{pos.symbol}</TableCell>
+                          <TableCell>
+                            <Badge className={pos.side === 'buy' || pos.type?.includes('BUY') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}>
+                              {pos.side || (pos.type?.includes('BUY') ? 'Buy' : 'Sell')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{pos.volume}</TableCell>
+                          <TableCell>{pos.open_price}</TableCell>
+                          <TableCell>{pos.stop_loss || '-'}</TableCell>
+                          <TableCell>{pos.take_profit || '-'}</TableCell>
+                          <TableCell className={pos.floating_pl >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                            {formatCurrency(pos.floating_pl)}
+                          </TableCell>
+                          <TableCell className="text-xs">{formatDate(pos.open_time)}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2"
+                                onClick={() => {
+                                  setModifyPosId(pos.position_id);
+                                  setModifySl(pos.stop_loss ? String(pos.stop_loss) : '');
+                                  setModifyTp(pos.take_profit ? String(pos.take_profit) : '');
+                                  setModifyPosOpen(true);
+                                }}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-red-400 hover:text-red-300"
+                                onClick={() => closePosition(pos.position_id)}
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ORDERS */}
+        <TabsContent value="orders">
+          <Card className="border-border/50 bg-card/80">
+            <CardContent className="p-0">
+              {orders.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">No pending orders</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Symbol</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Side</TableHead>
+                        <TableHead>Size</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead>SL</TableHead>
+                        <TableHead>TP</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {orders.map((ord) => (
+                        <TableRow key={ord.id}>
+                          <TableCell className="font-medium">{ord.symbol}</TableCell>
+                          <TableCell><Badge variant="outline">{ord.order_type}</Badge></TableCell>
+                          <TableCell>
+                            <Badge className={ord.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}>
+                              {ord.side}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{ord.size}</TableCell>
+                          <TableCell>{ord.entry_price || '-'}</TableCell>
+                          <TableCell>{ord.stop_loss || '-'}</TableCell>
+                          <TableCell>{ord.take_profit || '-'}</TableCell>
+                          <TableCell><Badge variant="secondary">{ord.status}</Badge></TableCell>
+                          <TableCell className="text-xs">{formatDate(ord.created_broker_at)}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2"
+                                onClick={() => {
+                                  setModifyOrdId(ord.broker_order_id);
+                                  setModifyOrdSl(ord.stop_loss ? String(ord.stop_loss) : '');
+                                  setModifyOrdTp(ord.take_profit ? String(ord.take_profit) : '');
+                                  setModifyOrdPrice(ord.entry_price ? String(ord.entry_price) : '');
+                                  setModifyOrdOpen(true);
+                                }}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-red-400 hover:text-red-300"
+                                onClick={() => cancelOrder(ord.broker_order_id)}
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* HISTORY */}
+        <TabsContent value="history">
+          <Card className="border-border/50 bg-card/80">
+            <CardContent className="p-0">
+              {history.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">No trade history yet. Sync to import.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Symbol</TableHead>
+                        <TableHead>Side</TableHead>
+                        <TableHead>Size</TableHead>
+                        <TableHead>Entry</TableHead>
+                        <TableHead>Exit</TableHead>
+                        <TableHead>P/L</TableHead>
+                        <TableHead>Fees</TableHead>
+                        <TableHead>Opened</TableHead>
+                        <TableHead>Closed</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {history.map((t) => (
+                        <TableRow key={t.id}>
+                          <TableCell className="font-medium">{t.symbol}</TableCell>
+                          <TableCell>
+                            <Badge className={t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}>
+                              {t.side}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{t.size}</TableCell>
+                          <TableCell>{t.entry_price}</TableCell>
+                          <TableCell>{t.exit_price || '-'}</TableCell>
+                          <TableCell className={t.realized_pl >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                            {formatCurrency(t.realized_pl)}
+                          </TableCell>
+                          <TableCell>{formatCurrency(t.fees)}</TableCell>
+                          <TableCell className="text-xs">{formatDate(t.opened_at)}</TableCell>
+                          <TableCell className="text-xs">{formatDate(t.closed_at)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* TRADE EXECUTION */}
+        <TabsContent value="trade">
+          <Card className="border-border/50 bg-card/80">
+            <CardContent className="py-6 space-y-4 max-w-md">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Symbol</Label>
+                  <Input placeholder="EURUSD" value={tradeSymbol} onChange={(e) => setTradeSymbol(e.target.value)} showNumberControls={false} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Instrument ID</Label>
+                  <Input placeholder="Tradable ID" value={tradableInstrumentId} onChange={(e) => setTradableInstrumentId(e.target.value)} showNumberControls={false} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Side</Label>
+                  <Select value={tradeSide} onValueChange={setTradeSide}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="buy">Buy</SelectItem>
+                      <SelectItem value="sell">Sell</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* TradeLocker Form */}
-                {platform === 'tradelocker' && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Email</Label>
-                      <Input
-                        type="email"
-                        placeholder="your@email.com"
-                        value={login}
-                        onChange={(e) => setLogin(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Password</Label>
-                      <div className="relative">
-                        <Input
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-0 top-0 h-full px-3"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Server</Label>
-                      <Select value={server} onValueChange={setServer}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select server" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="demo.tradelocker.com">Demo Server</SelectItem>
-                          <SelectItem value="live.tradelocker.com">Live Server</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </>
-                )}
-
-                {/* MT4/MT5/cTrader Form - Direct credentials for seamless experience */}
-                {(platform === 'mt4' || platform === 'mt5' || platform === 'ctrader') && (
-                  <>
-                    {!useAdvanced ? (
-                      <>
-                        <div className="space-y-2">
-                          <Label>Broker Name</Label>
-                          <Input
-                            placeholder="e.g., IC Markets, FTMO, Deriv"
-                            value={brokerName}
-                            onChange={(e) => setBrokerName(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Server</Label>
-                          <Input
-                            placeholder="e.g., ICMarketsSC-Live01"
-                            value={server}
-                            onChange={(e) => setServer(e.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Find this in your broker terminal: File → Login to Trade Account
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Login / Account Number</Label>
-                          <Input
-                            placeholder="e.g., 12345678"
-                            value={login}
-                            onChange={(e) => setLogin(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Password (Investor/Read-only recommended)</Label>
-                          <div className="relative">
-                            <Input
-                              type={showPassword ? 'text' : 'password'}
-                              placeholder="••••••••"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="absolute right-0 top-0 h-full px-3"
-                              onClick={() => setShowPassword(!showPassword)}
-                            >
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </Button>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Use your investor password for read-only access
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          type="button"
-                          className="p-0 h-auto text-xs text-muted-foreground hover:text-foreground"
-                          onClick={() => setUseAdvanced(true)}
-                        >
-                          Already have a MetaAPI account? Use Account ID →
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="space-y-2">
-                          <Label>MetaAPI Account ID</Label>
-                          <Input
-                            placeholder="e.g., 12345678-abcd-1234-efgh-..."
-                            value={metaapiAccountId}
-                            onChange={(e) => setMetaapiAccountId(e.target.value)}
-                          />
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          type="button"
-                          className="p-0 h-auto text-xs text-muted-foreground hover:text-foreground"
-                          onClick={() => setUseAdvanced(false)}
-                        >
-                          ← Use broker credentials instead
-                        </Button>
-                      </>
-                    )}
-                  </>
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select value={tradeType} onValueChange={setTradeType}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="market">Market</SelectItem>
+                      <SelectItem value="limit">Limit</SelectItem>
+                      <SelectItem value="stop">Stop</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Quantity</Label>
+                  <Input type="number" placeholder="0.01" value={tradeQty} onChange={(e) => setTradeQty(e.target.value)} />
+                </div>
+                {tradeType !== 'market' && (
+                  <div className="space-y-2">
+                    <Label>Price</Label>
+                    <Input type="number" placeholder="Price" value={tradePrice} onChange={(e) => setTradePrice(e.target.value)} />
+                  </div>
                 )}
               </div>
-              
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => { resetForm(); setDialogOpen(false); }}>
-                  Cancel
-                </Button>
-                <Button className="flex-1" onClick={handleConnect} disabled={isConnecting}>
-                  {isConnecting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Connecting...
-                    </>
-                  ) : (
-                    <>
-                      <Link2 className="w-4 h-4 mr-2" />
-                      Connect
-                    </>
-                  )}
-                </Button>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Stop Loss</Label>
+                  <Input type="number" placeholder="Optional" value={tradeSl} onChange={(e) => setTradeSl(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Take Profit</Label>
+                  <Input type="number" placeholder="Optional" value={tradeTp} onChange={(e) => setTradeTp(e.target.value)} />
+                </div>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : connections.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p className="font-medium">No broker accounts connected</p>
-            <p className="text-sm mt-1">Connect your trading account to auto-sync trades</p>
-          </div>
-        ) : (
+              <Button onClick={handlePlaceOrder} disabled={isPlacing || isExpired} className="w-full">
+                {isPlacing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+                Place Order
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Modify Position Dialog */}
+      <Dialog open={modifyPosOpen} onOpenChange={setModifyPosOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modify Position</DialogTitle>
+            <DialogDescription>Update stop loss and take profit</DialogDescription>
+          </DialogHeader>
           <div className="space-y-4">
-            {connections.map((conn) => (
-              <div key={conn.id} className="border rounded-lg p-4 space-y-3 bg-background/50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Activity className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <div className="font-medium">{conn.broker_name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {conn.platform.toUpperCase()} • {conn.login}
-                      </div>
-                    </div>
-                  </div>
-                  {getStatusBadge(conn.connection_status)}
-                </div>
-                
-                {conn.connection_status === 'connected' && (
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-muted-foreground" />
-                      <div>
-                        <div className="text-xs text-muted-foreground">Balance</div>
-                        <div className="font-medium">{formatCurrency(conn.account_balance, conn.account_currency)}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                      <div>
-                        <div className="text-xs text-muted-foreground">Equity</div>
-                        <div className="font-medium">{formatCurrency(conn.account_equity, conn.account_currency)}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {conn.last_error && (
-                  <div className="text-sm text-destructive bg-destructive/10 rounded p-2">
-                    {conn.last_error}
-                  </div>
-                )}
-                
-                <Separator />
-                
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleRefreshPositions(conn.id)}
-                    disabled={conn.connection_status !== 'connected' || refreshingId === conn.id}
-                  >
-                    {refreshingId === conn.id ? (
-                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 mr-1" />
-                    )}
-                    Refresh
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSync(conn.id)}
-                    disabled={conn.connection_status !== 'connected' || syncingId === conn.id}
-                  >
-                    {syncingId === conn.id ? (
-                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 mr-1" />
-                    )}
-                    Sync Trades
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleViewPositions(conn.id)}
-                    disabled={conn.connection_status !== 'connected'}
-                  >
-                    <Eye className="w-4 h-4 mr-1" />
-                    Positions
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => disconnectBroker(conn.id)}
-                  >
-                    <Unlink className="w-4 h-4 mr-1" />
-                    Disconnect
-                  </Button>
-                </div>
-              </div>
-            ))}
+            <div className="space-y-2">
+              <Label>Stop Loss</Label>
+              <Input type="number" value={modifySl} onChange={(e) => setModifySl(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Take Profit</Label>
+              <Input type="number" value={modifyTp} onChange={(e) => setModifyTp(e.target.value)} />
+            </div>
+            <Button onClick={async () => {
+              await modifyPosition(modifyPosId, modifySl ? parseFloat(modifySl) : undefined, modifyTp ? parseFloat(modifyTp) : undefined);
+              setModifyPosOpen(false);
+            }} className="w-full">Save Changes</Button>
           </div>
-        )}
+        </DialogContent>
+      </Dialog>
 
-        {/* Positions Dialog */}
-        <Dialog open={positionsDialogOpen} onOpenChange={setPositionsDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Open Positions</DialogTitle>
-              <DialogDescription>Current open positions for this account</DialogDescription>
-            </DialogHeader>
-            {selectedPositions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No open positions</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Symbol</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Volume</TableHead>
-                    <TableHead className="text-right">Open Price</TableHead>
-                    <TableHead className="text-right">P/L</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedPositions.map((pos) => (
-                    <TableRow key={pos.id}>
-                      <TableCell className="font-medium">{pos.symbol}</TableCell>
-                      <TableCell>
-                        <Badge variant={pos.type === 'buy' ? 'default' : 'secondary'}>
-                          {pos.type === 'buy' ? (
-                            <><TrendingUp className="w-3 h-3 mr-1" /> Buy</>
-                          ) : (
-                            <><TrendingDown className="w-3 h-3 mr-1" /> Sell</>
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">{pos.volume}</TableCell>
-                      <TableCell className="text-right font-mono">{pos.open_price}</TableCell>
-                      <TableCell className={`text-right font-mono ${pos.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {formatCurrency(pos.profit)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </DialogContent>
-        </Dialog>
+      {/* Modify Order Dialog */}
+      <Dialog open={modifyOrdOpen} onOpenChange={setModifyOrdOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modify Order</DialogTitle>
+            <DialogDescription>Update order parameters</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Price</Label>
+              <Input type="number" value={modifyOrdPrice} onChange={(e) => setModifyOrdPrice(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Stop Loss</Label>
+              <Input type="number" value={modifyOrdSl} onChange={(e) => setModifyOrdSl(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Take Profit</Label>
+              <Input type="number" value={modifyOrdTp} onChange={(e) => setModifyOrdTp(e.target.value)} />
+            </div>
+            <Button onClick={async () => {
+              await modifyOrder(modifyOrdId, {
+                price: modifyOrdPrice ? parseFloat(modifyOrdPrice) : undefined,
+                stopLoss: modifyOrdSl ? parseFloat(modifyOrdSl) : undefined,
+                takeProfit: modifyOrdTp ? parseFloat(modifyOrdTp) : undefined,
+              });
+              setModifyOrdOpen(false);
+            }} className="w-full">Save Changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reconnect Dialog */}
+      <Dialog open={reconnectOpen} onOpenChange={setReconnectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reconnect to TradeLocker</DialogTitle>
+            <DialogDescription>Re-enter your credentials to refresh the session</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" value={reconnectEmail} onChange={(e) => setReconnectEmail(e.target.value)} showNumberControls={false} />
+            </div>
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <Input type="password" value={reconnectPassword} onChange={(e) => setReconnectPassword(e.target.value)} showNumberControls={false} />
+            </div>
+            <Button onClick={handleReconnect} className="w-full">Reconnect</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Small dashboard card component
+function DashCard({ icon, label, value, valueClass }: { icon: React.ReactNode; label: string; value: string; valueClass?: string }) {
+  return (
+    <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+      <CardContent className="py-4 px-4">
+        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+          {icon}
+          <span className="text-xs">{label}</span>
+        </div>
+        <div className={`text-lg font-semibold ${valueClass || 'text-foreground'}`}>{value}</div>
       </CardContent>
     </Card>
   );
