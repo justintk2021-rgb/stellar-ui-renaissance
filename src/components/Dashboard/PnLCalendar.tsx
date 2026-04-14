@@ -743,7 +743,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                       "text-xl font-bold font-mono",
                       dayMetrics.netPnL >= 0 ? "text-primary" : "text-destructive"
                     )}>
-                      {dayMetrics.netPnL >= 0 ? '+' : ''}${dayMetrics.netPnL.toFixed(2)}
+                      {dayMetrics.netPnL >= 0 ? '+' : ''}${truncateNum(dayMetrics.netPnL)}
                     </span>
                     {dayMetrics.netPnL >= 0 ? (
                       <TrendingUp className="w-4 h-4 text-primary" />
@@ -772,7 +772,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                     <span className="text-xs text-muted-foreground">Avg Win</span>
                   </div>
                   <span className="text-xl font-bold font-mono text-primary">
-                    ${dayMetrics.avgWin.toFixed(2)}
+                    ${truncateNum(dayMetrics.avgWin)}
                   </span>
                 </div>
 
@@ -782,7 +782,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                     <span className="text-xs text-muted-foreground">Avg Loss</span>
                   </div>
                   <span className="text-xl font-bold font-mono text-destructive">
-                    -${Math.abs(dayMetrics.avgLoss).toFixed(2)}
+                    -${truncateNum(Math.abs(dayMetrics.avgLoss))}
                   </span>
                 </div>
               </div>
@@ -816,8 +816,8 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 <MetricRow label="Wins" value={dayMetrics.wins.toString()} isPositive />
                 <MetricRow label="Losses" value={dayMetrics.losses.toString()} isNegative />
                 <MetricRow label="Breakeven" value={dayMetrics.breakeven.toString()} />
-                <MetricRow label="Gross Profit" value={`$${dayMetrics.grossProfit.toFixed(2)}`} isPositive />
-                <MetricRow label="Gross Loss" value={`$${Math.abs(dayMetrics.grossLoss).toFixed(2)}`} isNegative />
+                <MetricRow label="Gross Profit" value={`$${truncateNum(dayMetrics.grossProfit)}`} isPositive />
+                <MetricRow label="Gross Loss" value={`$${truncateNum(Math.abs(dayMetrics.grossLoss))}`} isNegative />
               </div>
 
               {/* Tags Section */}
@@ -890,7 +890,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                               "text-sm font-bold font-mono",
                               trade.result >= 0 ? "text-primary" : "text-destructive"
                             )}>
-                              {trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}
+                              {trade.result >= 0 ? '+' : ''}${truncateNum(trade.result)}
                             </span>
                           </div>
                         </div>
@@ -1072,13 +1072,13 @@ function DayCumulativeChart({ trades }: { trades: Trade[] }) {
             "text-xs font-medium",
             data.result >= 0 ? "text-primary" : "text-destructive"
           )}>
-            {data.result >= 0 ? '+' : ''}${data.result.toFixed(2)}
+            {data.result >= 0 ? '+' : ''}${truncateNum(data.result)}
           </p>
           <p className={cn(
             "text-sm font-bold",
             data.value >= 0 ? "text-primary" : "text-destructive"
           )}>
-            Total: ${data.value.toFixed(2)}
+            Total: ${truncateNum(data.value)}
           </p>
         </div>
       );
