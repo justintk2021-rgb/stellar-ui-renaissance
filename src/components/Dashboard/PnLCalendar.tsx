@@ -44,13 +44,10 @@ const MONTH_NAMES = [
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// Format large numbers as K format
+// Format PnL with exact values (no rounding)
 const formatPnL = (value: number): string => {
   const absValue = Math.abs(value);
-  if (absValue >= 1000) {
-    return `${value < 0 ? '-' : ''}$${(absValue / 1000).toFixed(2)}K`;
-  }
-  return `${value < 0 ? '-' : ''}$${absValue.toFixed(0)}`;
+  return `${value < 0 ? '-' : ''}$${absValue.toFixed(2)}`;
 };
 
 export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSaveEntry, onAddTrade }: PnLCalendarProps) {
