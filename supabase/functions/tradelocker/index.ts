@@ -193,6 +193,37 @@ async function tlGetInstruments(accessToken: string, accountId: string, accNum: 
   return data.d?.instruments || [];
 }
 
+async function tlGetInstrumentDetails(accessToken: string, accountId: string, accNum: number, environment: string, tradableInstrumentId: number | string) {
+  const baseUrl = getBaseUrl(environment);
+  const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/instruments/${tradableInstrumentId}`, {
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.d || null;
+}
+
+// Calculate P/L using contract size from instrument details
+function calculateRealizedPl(
+  side: string, entryPrice: number, exitPrice: number, qty: number,
+  lotSize: number, symbol: string
+): number {
+  if (!entryPrice || !exitPrice || !qty || !lotSize) return 0;
+  const priceDiff = side === 'buy' ? (exitPrice - entryPrice) : (entryPrice - exitPrice);
+  const rawPl = priceDiff * qty * lotSize;
+  
+  // For pairs where the quote currency is not USD, convert P/L to account currency
+  const upperSym = symbol.toUpperCase();
+  if (upperSym.endsWith('JPY') || upperSym.endsWith('CHF') || upperSym.endsWith('CAD') ||
+      upperSym.endsWith('SEK') || upperSym.endsWith('NOK') || upperSym.endsWith('SGD') ||
+      upperSym.endsWith('HKD') || upperSym.endsWith('MXN') || upperSym.endsWith('ZAR') ||
+      upperSym.endsWith('TRY') || upperSym.endsWith('HUF') || upperSym.endsWith('PLN') ||
+      upperSym.endsWith('CZK') || upperSym.endsWith('DKK')) {
+    return rawPl / exitPrice;
+  }
+  return rawPl;
+}
+
 async function tlPlaceOrder(accessToken: string, accountId: string, accNum: number, environment: string, orderPayload: any) {
   const baseUrl = getBaseUrl(environment);
   const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/orders`, {
