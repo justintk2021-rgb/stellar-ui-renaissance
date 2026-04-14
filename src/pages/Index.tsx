@@ -178,6 +178,52 @@ const Index = () => {
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
 
+  // Auto-create notebook entries for broker-imported trades that don't have one
+  useEffect(() => {
+    if (!user?.id || tradesLoading || notebookLoading) return;
+    
+    const brokerTradesWithoutNotes = trades.filter(
+      t => t.importedFromBroker && !notebookEntries.some(e => e.tradeId === t.id && !e.isDeleted)
+    );
+    
+    if (brokerTradesWithoutNotes.length === 0) return;
+
+    const createMissingEntries = async () => {
+      for (const trade of brokerTradesWithoutNotes) {
+        const newEntry: NotebookEntry = {
+          id: crypto.randomUUID(),
+          title: `${trade.pair} - ${trade.direction} Trade`,
+          content: `<h2>📋 Trade Plan</h2>
+<ul>
+  <li>Why did I take this trade?</li>
+  <li>What was my setup/strategy?</li>
+</ul>
+
+<h2>⚙️ Execution</h2>
+<ul>
+  <li>Entry: ${trade.openPrice ?? 'N/A'} → Exit: ${trade.closePrice ?? 'N/A'}</li>
+  <li>Result: ${trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}</li>
+</ul>
+
+<h2>🧠 Post-Trade Review</h2>
+<ul>
+  <li>What went well?</li>
+  <li>What could be improved?</li>
+  <li>Key lessons learned</li>
+</ul>`,
+          category: "trade-notes",
+          date: trade.date,
+          tradeId: trade.id,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await saveNotebookEntry(newEntry);
+      }
+    };
+    
+    createMissingEntries();
+  }, [user?.id, trades, notebookEntries, tradesLoading, notebookLoading, saveNotebookEntry]);
+
   // Close sidebar when changing page
   const handlePageChange = useCallback((page: string) => {
     setCurrentPage(page);
@@ -299,7 +345,26 @@ const Index = () => {
 
   const handleAddTrade = useCallback(async (tradeData: Omit<Trade, 'id'>) => {
     if (editingTrade) {
-      const success = await updateTrade(editingTrade.id, tradeData);
+      // Preserve broker fields when editing an imported trade
+      const updateData: Partial<Trade> = {
+        ...tradeData,
+      };
+      if (editingTrade.importedFromBroker) {
+        updateData.brokerName = editingTrade.brokerName;
+        updateData.brokerEnvironment = editingTrade.brokerEnvironment;
+        updateData.brokerAccountId = editingTrade.brokerAccountId;
+        updateData.brokerAccNum = editingTrade.brokerAccNum;
+        updateData.brokerOrderId = editingTrade.brokerOrderId;
+        updateData.brokerPositionId = editingTrade.brokerPositionId;
+        updateData.importedFromBroker = editingTrade.importedFromBroker;
+        updateData.lastBrokerSyncAt = editingTrade.lastBrokerSyncAt;
+        updateData.executionType = editingTrade.executionType;
+        updateData.swap = editingTrade.swap;
+        updateData.commission = editingTrade.commission;
+        updateData.openPrice = editingTrade.openPrice;
+        updateData.closePrice = editingTrade.closePrice;
+      }
+      const success = await updateTrade(editingTrade.id, updateData);
       if (success) {
         // Update linked notebook entry if exists
         const linkedEntry = notebookEntries.find(e => e.tradeId === editingTrade.id);
