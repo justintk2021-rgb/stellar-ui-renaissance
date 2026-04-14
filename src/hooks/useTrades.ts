@@ -57,6 +57,10 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         importedFromBroker: t.imported_from_broker || false,
         lastBrokerSyncAt: t.last_broker_sync_at || undefined,
         executionType: t.execution_type || undefined,
+        swap: t.swap != null ? Number(t.swap) : undefined,
+        commission: t.commission != null ? Number(t.commission) : undefined,
+        openPrice: t.open_price != null ? Number(t.open_price) : undefined,
+        closePrice: t.close_price != null ? Number(t.close_price) : undefined,
       }));
 
       setTrades(formattedTrades);

@@ -48,6 +48,10 @@ export interface Trade {
   importedFromBroker?: boolean;
   lastBrokerSyncAt?: string;
   executionType?: string;
+  swap?: number;
+  commission?: number;
+  openPrice?: number;
+  closePrice?: number;
 }
 
 export interface DailyStats {
