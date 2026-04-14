@@ -218,6 +218,7 @@ const Index = () => {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
+  const [journalFilter, setJournalFilter] = useState<'all' | 'wins' | 'losses'>('all');
 
   // Auto-create notebook entries for broker-imported trades that don't have one
   useEffect(() => {
