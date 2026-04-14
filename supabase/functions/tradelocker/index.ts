@@ -764,14 +764,11 @@ serve(async (req) => {
           const qty = Number(openOrder.filledQty || openOrder.qty) || 0;
           const isClosed = !!closeOrder;
 
-          // Calculate realized P/L for closed trades
+          // Calculate realized P/L for closed trades using contract size
           let realizedPl = 0;
           if (isClosed && entryPrice && exitPrice) {
-            if (side === 'buy') {
-              realizedPl = (exitPrice - entryPrice) * qty;
-            } else {
-              realizedPl = (entryPrice - exitPrice) * qty;
-            }
+            const lotSize = await getLotSize(openOrder.tradableInstrumentId);
+            realizedPl = calculateRealizedPl(side, entryPrice, exitPrice, qty, lotSize, sym);
           }
 
           const openedAt = openOrder.createdDate ? new Date(Number(openOrder.createdDate)).toISOString() : now;
