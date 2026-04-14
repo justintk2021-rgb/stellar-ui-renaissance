@@ -833,7 +833,7 @@ serve(async (req) => {
             if (posHist) continue;
           }
 
-          const sym = trade.instrument || String(trade.tradableInstrumentId);
+          const sym = trade.instrument || resolveSymbol(trade.tradableInstrumentId);
           const side = trade.side || 'buy';
           const realizedPl = trade.realizedPl || 0;
 
