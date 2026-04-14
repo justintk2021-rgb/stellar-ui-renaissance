@@ -1144,6 +1144,69 @@ serve(async (req) => {
       return jsonResponse({ success: true, message: 'Reconnected successfully' });
     }
 
+    // ====================== DEBUG RAW ======================
+    if (action === 'debug-raw') {
+      const { connectionId } = body;
+      const tokenInfo = await getValidToken(supabase, connectionId);
+      if (!tokenInfo) return jsonResponse({ error: 'Invalid session' }, 401);
+
+      const { accessToken, environment, accountId, accNum } = tokenInfo;
+      const baseUrl = getBaseUrl(environment);
+
+      // Fetch raw responses
+      const rawResults: Record<string, any> = {};
+
+      // Account state
+      try {
+        const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/state`, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+        });
+        rawResults.accountState = { status: res.status, body: res.ok ? await res.json() : await res.text() };
+      } catch (e: any) { rawResults.accountState = { error: e.message }; }
+
+      // Positions
+      try {
+        const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/positions`, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+        });
+        rawResults.positions = { status: res.status, body: res.ok ? await res.json() : await res.text() };
+      } catch (e: any) { rawResults.positions = { error: e.message }; }
+
+      // Orders
+      try {
+        const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/orders`, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+        });
+        rawResults.orders = { status: res.status, body: res.ok ? await res.json() : await res.text() };
+      } catch (e: any) { rawResults.orders = { error: e.message }; }
+
+      // Orders history
+      try {
+        const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/ordersHistory`, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+        });
+        rawResults.ordersHistory = { status: res.status, body: res.ok ? await res.json() : await res.text() };
+      } catch (e: any) { rawResults.ordersHistory = { error: e.message }; }
+
+      // Positions history
+      try {
+        const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/positionsHistory`, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+        });
+        rawResults.positionsHistory = { status: res.status, body: res.ok ? await res.json() : await res.text() };
+      } catch (e: any) { rawResults.positionsHistory = { error: e.message }; }
+
+      // Config
+      try {
+        const res = await fetch(`${baseUrl}/trade/config`, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+        });
+        rawResults.config = { status: res.status, body: res.ok ? await res.json() : await res.text() };
+      } catch (e: any) { rawResults.config = { error: e.message }; }
+
+      return jsonResponse({ rawResults });
+    }
+
     return jsonResponse({ error: `Unknown action: ${action}` }, 400);
   } catch (e: any) {
     console.error('TradeLocker function error:', e);
