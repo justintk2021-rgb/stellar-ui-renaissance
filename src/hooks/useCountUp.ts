@@ -58,7 +58,10 @@ export function useCountUp({
     };
   }, [end, duration]);
 
-  const formattedValue = `${prefix}${count.toFixed(decimals)}${suffix}`;
+  // Truncate instead of rounding to show exact values
+  const factor = Math.pow(10, decimals);
+  const truncated = Math.trunc(count * factor) / factor;
+  const formattedValue = `${prefix}${truncated.toFixed(decimals)}${suffix}`;
 
   return { value: count, formattedValue, isAnimating };
 }
