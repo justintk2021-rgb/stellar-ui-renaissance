@@ -9,6 +9,7 @@ export interface TradingAccount {
   broker: string | null;
   starting_balance: number;
   goal_balance: number | null;
+  profit_target: number | null;
   currency: string;
   is_default: boolean;
   created_at: string;
@@ -47,6 +48,7 @@ export function useTradingAccounts(userId: string | undefined) {
         broker: a.broker,
         starting_balance: Number(a.starting_balance),
         goal_balance: a.goal_balance ? Number(a.goal_balance) : null,
+        profit_target: a.profit_target ? Number(a.profit_target) : null,
         currency: a.currency,
         is_default: a.is_default,
         created_at: a.created_at,
@@ -102,6 +104,7 @@ export function useTradingAccounts(userId: string | undefined) {
               broker: payload.new.broker,
               starting_balance: Number(payload.new.starting_balance),
               goal_balance: payload.new.goal_balance ? Number(payload.new.goal_balance) : null,
+              profit_target: payload.new.profit_target ? Number(payload.new.profit_target) : null,
               currency: payload.new.currency,
               is_default: payload.new.is_default,
               created_at: payload.new.created_at,
@@ -119,6 +122,7 @@ export function useTradingAccounts(userId: string | undefined) {
                 broker: payload.new.broker,
                 starting_balance: Number(payload.new.starting_balance),
                 goal_balance: payload.new.goal_balance ? Number(payload.new.goal_balance) : null,
+                profit_target: payload.new.profit_target ? Number(payload.new.profit_target) : null,
                 currency: payload.new.currency,
                 is_default: payload.new.is_default,
                 updated_at: payload.new.updated_at,
@@ -172,6 +176,7 @@ export function useTradingAccounts(userId: string | undefined) {
         broker: data.broker,
         starting_balance: Number(data.starting_balance),
         goal_balance: (data as any).goal_balance ? Number((data as any).goal_balance) : null,
+        profit_target: (data as any).profit_target ? Number((data as any).profit_target) : null,
         currency: data.currency,
         is_default: data.is_default,
         created_at: data.created_at,
@@ -198,6 +203,7 @@ export function useTradingAccounts(userId: string | undefined) {
       if (accountData.broker !== undefined) updateData.broker = accountData.broker;
       if (accountData.starting_balance !== undefined) updateData.starting_balance = accountData.starting_balance;
       if (accountData.goal_balance !== undefined) updateData.goal_balance = accountData.goal_balance;
+      if (accountData.profit_target !== undefined) updateData.profit_target = accountData.profit_target;
       if (accountData.currency !== undefined) updateData.currency = accountData.currency;
 
       const { error } = await supabase

@@ -557,6 +557,7 @@ export type Database = {
           id: string
           is_default: boolean
           name: string
+          profit_target: number | null
           starting_balance: number
           updated_at: string
           user_id: string
@@ -569,6 +570,7 @@ export type Database = {
           id?: string
           is_default?: boolean
           name: string
+          profit_target?: number | null
           starting_balance?: number
           updated_at?: string
           user_id: string
@@ -581,6 +583,7 @@ export type Database = {
           id?: string
           is_default?: boolean
           name?: string
+          profit_target?: number | null
           starting_balance?: number
           updated_at?: string
           user_id?: string

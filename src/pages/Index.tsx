@@ -331,6 +331,12 @@ const Index = () => {
     }
   }, [selectedAccountId, updateAccount]);
 
+  const handleSetProfitTarget = useCallback(async (value: number) => {
+    if (selectedAccountId) {
+      await updateAccount(selectedAccountId, { profit_target: value });
+    }
+  }, [selectedAccountId, updateAccount]);
+
   const handleSaveNotes = useCallback(async (id: string, notes: string) => {
     await updateTrade(id, { notebook: notes });
   }, [updateTrade]);
@@ -436,8 +442,10 @@ const Index = () => {
                   trades={trades}
                   startBalance={accountStartBalance}
                   goalBalance={selectedAccount?.goal_balance || null}
+                  profitTarget={selectedAccount?.profit_target || null}
                   onSetBalance={handleSetBalance}
                   onSetGoalBalance={handleSetGoalBalance}
+                  onSetProfitTarget={handleSetProfitTarget}
                 />
                 
                 <StatsGrid trades={trades} />
