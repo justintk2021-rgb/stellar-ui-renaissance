@@ -89,12 +89,14 @@ const Index = () => {
     importTrades 
   } = useTrades(user?.id, selectedBrokerAccountId ? null : selectedAccountId, selectedBrokerAccountId);
   
-  // Fetch broker balance when a broker account is selected
+  // Fetch broker balance when a broker account is selected + realtime updates
   useEffect(() => {
     if (!selectedBrokerAccountId) {
       setBrokerBalance(null);
       return;
     }
+    let brokerConnectionId: string | null = null;
+
     const fetchBrokerBalance = async () => {
       const { data } = await supabase
         .from('broker_accounts')
@@ -102,6 +104,7 @@ const Index = () => {
         .eq('account_id_external', selectedBrokerAccountId)
         .maybeSingle();
       if (data?.broker_connection_id) {
+        brokerConnectionId = data.broker_connection_id;
         const { data: conn } = await supabase
           .from('broker_connections')
           .select('account_balance')
@@ -113,6 +116,22 @@ const Index = () => {
       }
     };
     fetchBrokerBalance();
+
+    // Subscribe to broker_connections changes to auto-update balance
+    const channel = supabase
+      .channel(`dashboard-broker-balance-${selectedBrokerAccountId}-${Date.now()}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'broker_connections' }, (payload) => {
+        if (brokerConnectionId && payload.new.id === brokerConnectionId) {
+          if (payload.new.account_balance != null) {
+            setBrokerBalance(Number(payload.new.account_balance));
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [selectedBrokerAccountId]);
 
   // Use the account's starting balance (manual accounts only; broker accounts derive it)
