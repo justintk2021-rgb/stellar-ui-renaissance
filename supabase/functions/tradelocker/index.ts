@@ -545,14 +545,20 @@ serve(async (req) => {
       try {
         const { accessToken, environment, accountId, accNum } = tokenInfo;
 
-        // 1. Sync account state
+        // 0. Fetch config for column definitions
+        const config = await tlGetConfig(accessToken, accNum, environment);
+        const posColumns = config?.positionsConfig?.columns || [];
+        const ordColumns = config?.ordersConfig?.columns || [];
+        const ordHistColumns = config?.ordersHistoryConfig?.columns || [];
+
+        // 1. Sync account state (now properly parsed from columnar array)
         const state = await tlGetAccountState(accessToken, accountId, accNum, environment);
         if (state) {
           await supabase
             .from('broker_connections')
             .update({
               account_balance: state.balance,
-              account_equity: state.equity,
+              account_equity: state.projectedBalance,
               last_connected_at: new Date().toISOString(),
               connection_status: 'connected',
               last_error: null,
