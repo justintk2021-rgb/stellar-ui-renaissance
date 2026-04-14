@@ -63,6 +63,9 @@ export const AccountSelector = ({
   const [newAccountBalance, setNewAccountBalance] = useState("10000");
   const [brokerAccounts, setBrokerAccounts] = useState<BrokerAccountInfo[]>([]);
   const [selectedBrokerAccount, setSelectedBrokerAccount] = useState<string | null>(null);
+  const [isRenameBrokerOpen, setIsRenameBrokerOpen] = useState(false);
+  const [renamingBroker, setRenamingBroker] = useState<BrokerAccountInfo | null>(null);
+  const [brokerDisplayName, setBrokerDisplayName] = useState("");
 
   // Fetch broker-connected accounts
   useEffect(() => {
