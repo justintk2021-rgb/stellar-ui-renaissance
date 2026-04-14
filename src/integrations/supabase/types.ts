@@ -631,7 +631,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      ensure_default_account: { Args: { p_user_id: string }; Returns: string }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
