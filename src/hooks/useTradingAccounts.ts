@@ -176,6 +176,7 @@ export function useTradingAccounts(userId: string | undefined) {
         broker: data.broker,
         starting_balance: Number(data.starting_balance),
         goal_balance: (data as any).goal_balance ? Number((data as any).goal_balance) : null,
+        profit_target: (data as any).profit_target ? Number((data as any).profit_target) : null,
         currency: data.currency,
         is_default: data.is_default,
         created_at: data.created_at,
