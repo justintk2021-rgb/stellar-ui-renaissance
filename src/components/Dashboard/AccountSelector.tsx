@@ -38,6 +38,7 @@ interface AccountSelectorProps {
   accounts: TradingAccount[];
   selectedAccount: TradingAccount | null;
   onSelectAccount: (accountId: string) => void;
+  onSelectBrokerAccount?: (brokerAccountId: string | null) => void;
   onAddAccount: (data: { name: string; broker?: string; starting_balance?: number }) => Promise<TradingAccount | null>;
   onUpdateAccount: (id: string, data: Partial<TradingAccount>) => Promise<boolean>;
   onDeleteAccount: (id: string) => Promise<boolean>;
@@ -48,6 +49,7 @@ export const AccountSelector = ({
   accounts,
   selectedAccount,
   onSelectAccount,
+  onSelectBrokerAccount,
   onAddAccount,
   onUpdateAccount,
   onDeleteAccount,
