@@ -739,6 +739,8 @@ export type Database = {
           chart_image: string | null
           checklist_id: string | null
           checklist_state: Json | null
+          close_price: number | null
+          commission: number | null
           created_at: string
           date: string
           direction: string
@@ -748,10 +750,12 @@ export type Database = {
           last_broker_sync_at: string | null
           notebook: string | null
           notes: string | null
+          open_price: number | null
           pair: string
           result: number
           session: string | null
           strategy: string | null
+          swap: number | null
           updated_at: string
           user_id: string
         }
@@ -766,6 +770,8 @@ export type Database = {
           chart_image?: string | null
           checklist_id?: string | null
           checklist_state?: Json | null
+          close_price?: number | null
+          commission?: number | null
           created_at?: string
           date: string
           direction: string
@@ -775,10 +781,12 @@ export type Database = {
           last_broker_sync_at?: string | null
           notebook?: string | null
           notes?: string | null
+          open_price?: number | null
           pair: string
           result: number
           session?: string | null
           strategy?: string | null
+          swap?: number | null
           updated_at?: string
           user_id: string
         }
@@ -793,6 +801,8 @@ export type Database = {
           chart_image?: string | null
           checklist_id?: string | null
           checklist_state?: Json | null
+          close_price?: number | null
+          commission?: number | null
           created_at?: string
           date?: string
           direction?: string
@@ -802,10 +812,12 @@ export type Database = {
           last_broker_sync_at?: string | null
           notebook?: string | null
           notes?: string | null
+          open_price?: number | null
           pair?: string
           result?: number
           session?: string | null
           strategy?: string | null
+          swap?: number | null
           updated_at?: string
           user_id?: string
         }
