@@ -394,7 +394,7 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
                         isPositive ? 'bg-primary/15 text-primary' : 'bg-destructive/15 text-destructive'
                       )}
                     >
-                      {isPositive ? '+' : ''}{balancePercent.toFixed(2)}%
+                      {isPositive ? '+' : ''}{Math.trunc(balancePercent * 100) / 100}%
                     </motion.span>
                   </motion.div>
                 )}
@@ -459,7 +459,7 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
                 transition={{ delay: 0.6 }}
                 className="text-sm font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary"
               >
-                +{profitPercent.toFixed(2)}%
+                +{Math.trunc(profitPercent * 100) / 100}%
               </motion.span>
             </div>
             
@@ -475,7 +475,7 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
                   "text-sm font-semibold font-mono",
                   isPositive ? "text-primary" : "text-destructive"
                 )}>
-                  {isPositive ? '+' : ''}${balanceChange.toFixed(2)}
+                  {isPositive ? '+' : ''}${(Math.trunc(balanceChange * 100) / 100).toFixed(2)}
                 </span>
               </div>
             </motion.div>

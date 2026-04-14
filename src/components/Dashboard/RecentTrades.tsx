@@ -2,7 +2,7 @@ import { Trade } from "@/types/trade";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { Filter, TrendingUp, TrendingDown, Activity, CircleDot, ClipboardList } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, truncateNum } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -219,12 +219,12 @@ export function RecentTrades({ trades }: RecentTradesProps) {
                           </td>
                           <td className="py-3 text-right">
                             <span className="text-xs font-mono text-muted-foreground">
-                              {trade.openPrice != null ? trade.openPrice.toFixed(trade.openPrice < 10 ? 5 : 2) : '—'}
+                              {trade.openPrice != null ? truncateNum(trade.openPrice, trade.openPrice < 10 ? 5 : 2) : '—'}
                             </span>
                           </td>
                           <td className="py-3 text-right">
                             <span className="text-xs font-mono text-muted-foreground">
-                              {trade.closePrice != null ? trade.closePrice.toFixed(trade.closePrice < 10 ? 5 : 2) : '—'}
+                              {trade.closePrice != null ? truncateNum(trade.closePrice, trade.closePrice < 10 ? 5 : 2) : '—'}
                             </span>
                           </td>
                           <td className="py-3 text-right">
@@ -232,7 +232,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
                               "text-xs font-mono font-semibold",
                               isProfit ? "text-primary" : isLoss ? "text-destructive" : "text-muted-foreground"
                             )}>
-                              {isProfit ? '+' : ''}{trade.result.toFixed(2)}
+                              {isProfit ? '+' : ''}{truncateNum(trade.result)}
                             </span>
                           </td>
                           <td className="py-3 text-center pr-2">
@@ -300,16 +300,16 @@ export function RecentTrades({ trades }: RecentTradesProps) {
                           </div>
                         </td>
                         <td className="py-3 text-right text-xs font-mono text-muted-foreground">{pos.volume}</td>
-                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{pos.open_price.toFixed(decimals)}</td>
-                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{pos.current_price?.toFixed(decimals) ?? '—'}</td>
-                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{pos.stop_loss?.toFixed(decimals) ?? '—'}</td>
-                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{pos.take_profit?.toFixed(decimals) ?? '—'}</td>
+                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{truncateNum(pos.open_price, decimals)}</td>
+                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{(pos.current_price != null ? truncateNum(pos.current_price, decimals) : null) ?? '—'}</td>
+                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{(pos.stop_loss != null ? truncateNum(pos.stop_loss, decimals) : null) ?? '—'}</td>
+                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{(pos.take_profit != null ? truncateNum(pos.take_profit, decimals) : null) ?? '—'}</td>
                         <td className="py-3 text-right pr-2">
                           <span className={cn(
                             "text-xs font-mono font-semibold",
                             isProfit ? "text-primary" : isLoss ? "text-destructive" : "text-muted-foreground"
                           )}>
-                            {isProfit ? '+' : ''}{pos.floating_pl.toFixed(2)}
+                            {isProfit ? '+' : ''}{truncateNum(pos.floating_pl)}
                           </span>
                         </td>
                       </motion.tr>
@@ -368,9 +368,9 @@ export function RecentTrades({ trades }: RecentTradesProps) {
                           <Badge variant="outline" className="text-[10px] border-border/50">{ord.order_type}</Badge>
                         </td>
                         <td className="py-3 text-right text-xs font-mono text-muted-foreground">{ord.size}</td>
-                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{ord.entry_price?.toFixed(decimals) ?? '—'}</td>
-                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{ord.stop_loss?.toFixed(decimals) ?? '—'}</td>
-                        <td className="py-3 text-right pr-2 text-xs font-mono text-muted-foreground">{ord.take_profit?.toFixed(decimals) ?? '—'}</td>
+                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{(ord.entry_price != null ? truncateNum(ord.entry_price, decimals) : null) ?? '—'}</td>
+                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{(ord.stop_loss != null ? truncateNum(ord.stop_loss, decimals) : null) ?? '—'}</td>
+                        <td className="py-3 text-right pr-2 text-xs font-mono text-muted-foreground">{(ord.take_profit != null ? truncateNum(ord.take_profit, decimals) : null) ?? '—'}</td>
                       </motion.tr>
                     );
                   })}
