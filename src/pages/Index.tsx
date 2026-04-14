@@ -68,6 +68,7 @@ const Index = () => {
     return localStorage.getItem('selectedBrokerAccountId') || null;
   });
   const [brokerBalance, setBrokerBalance] = useState<number | null>(null);
+  const [brokerSyncing, setBrokerSyncing] = useState(false);
 
   // Persist broker account selection
   const handleSetBrokerAccountId = useCallback((id: string | null) => {
@@ -110,7 +111,6 @@ const Index = () => {
 
     const autoSync = async () => {
       try {
-        // Check if user has any connected broker
         const { data: connections } = await supabase
           .from('broker_connections')
           .select('id, connection_status')
@@ -119,7 +119,7 @@ const Index = () => {
 
         if (cancelled || !connections?.length) return;
 
-        // Trigger sync for each connected broker
+        setBrokerSyncing(true);
         for (const conn of connections) {
           if (cancelled) return;
           try {
@@ -132,10 +132,11 @@ const Index = () => {
         }
       } catch (e) {
         console.warn('Auto broker sync check failed:', e);
+      } finally {
+        if (!cancelled) setBrokerSyncing(false);
       }
     };
 
-    // Small delay to let auth fully settle
     const timer = setTimeout(autoSync, 1500);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [user?.id]);
