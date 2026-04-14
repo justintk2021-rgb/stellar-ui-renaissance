@@ -99,7 +99,7 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
         <div className="bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 shadow-xl">
           <p className="text-xs text-muted-foreground">{data.name}</p>
           <p className="text-sm font-bold font-mono text-foreground">
-            ${data.value.toFixed(2)}
+            ${(Math.trunc(data.value * 100) / 100).toFixed(2)}
           </p>
           {data.date && (
             <p className="text-xs text-muted-foreground mt-1">{data.date}</p>
