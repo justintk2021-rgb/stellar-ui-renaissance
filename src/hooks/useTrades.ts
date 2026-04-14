@@ -66,7 +66,7 @@ export function useTrades(userId: string | undefined, accountId: string | null =
     } finally {
       setIsLoading(false);
     }
-  }, [userId, accountId]);
+  }, [userId, accountId, brokerAccountId]);
 
   // Set up realtime subscription
   useEffect(() => {
