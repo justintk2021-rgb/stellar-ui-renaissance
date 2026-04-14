@@ -63,6 +63,7 @@ const Index = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedBrokerAccountId, setSelectedBrokerAccountId] = useState<string | null>(null);
+  const [brokerBalance, setBrokerBalance] = useState<number | null>(null);
   
   // Use trading accounts
   const {
