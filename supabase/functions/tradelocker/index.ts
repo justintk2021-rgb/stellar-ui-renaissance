@@ -607,7 +607,7 @@ serve(async (req) => {
           const posData = {
             broker_connection_id: connectionId,
             position_id: String(pos.id),
-            symbol: String(pos.tradableInstrumentId),
+            symbol: resolveSymbol(pos.tradableInstrumentId),
             type: pos.side === 'buy' ? 'POSITION_TYPE_BUY' : 'POSITION_TYPE_SELL',
             side: pos.side,
             volume: Number(pos.qty) || 0,
@@ -656,7 +656,7 @@ serve(async (req) => {
           const ordData = {
             broker_connection_id: connectionId,
             broker_order_id: String(ord.id),
-            symbol: String(ord.tradableInstrumentId),
+            symbol: resolveSymbol(ord.tradableInstrumentId),
             order_type: ord.type || 'limit',
             side: ord.side || 'buy',
             size: Number(ord.qty) || 0,
@@ -711,7 +711,7 @@ serve(async (req) => {
           
           if (!openOrder) continue; // Need at least an open order
 
-          const sym = String(openOrder.tradableInstrumentId);
+          const sym = resolveSymbol(openOrder.tradableInstrumentId);
           const side = openOrder.side || 'buy';
           const entryPrice = Number(openOrder.avgPrice) || 0;
           const exitPrice = closeOrder ? Number(closeOrder.avgPrice) || 0 : 0;
@@ -797,7 +797,7 @@ serve(async (req) => {
               broker_account_id: conn?.active_account_id,
               broker_acc_num: conn?.active_acc_num,
               broker_position_id: posId,
-              broker_order_id: trade.orderId ? String(trade.orderId) : null,
+              broker_order_id: String(openOrder.id),
               imported_from_broker: true,
               last_broker_sync_at: now,
               execution_type: 'market',
