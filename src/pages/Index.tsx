@@ -740,8 +740,9 @@ const Index = () => {
                     <div className="hidden lg:block w-64 flex-shrink-0">
                       <MiniCalendar 
                         dayPnLs={(() => {
+                          const filteredTrades = journalFilter === 'all' ? trades : journalFilter === 'wins' ? trades.filter(t => t.result > 0) : trades.filter(t => t.result < 0);
                           const pnlByDate: Record<string, number> = {};
-                          trades.forEach(t => {
+                          filteredTrades.forEach(t => {
                             pnlByDate[t.date] = (pnlByDate[t.date] || 0) + (t.result || 0);
                           });
                           return Object.entries(pnlByDate).map(([date, pnl]) => ({ date, pnl }));
