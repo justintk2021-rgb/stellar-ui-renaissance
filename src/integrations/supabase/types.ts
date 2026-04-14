@@ -14,14 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      broker_accounts: {
+        Row: {
+          acc_num: number
+          account_id_external: string
+          account_name: string | null
+          broker_connection_id: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          acc_num: number
+          account_id_external: string
+          account_name?: string | null
+          broker_connection_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          acc_num?: number
+          account_id_external?: string
+          account_name?: string | null
+          broker_connection_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broker_accounts_broker_connection_id_fkey"
+            columns: ["broker_connection_id"]
+            isOneToOne: false
+            referencedRelation: "broker_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       broker_connections: {
         Row: {
           account_balance: number | null
           account_currency: string | null
           account_equity: number | null
+          active_acc_num: number | null
+          active_account_id: string | null
+          auto_sync_enabled: boolean | null
           broker_name: string
           connection_status: string | null
           created_at: string
+          environment: string | null
           id: string
           last_connected_at: string | null
           last_error: string | null
@@ -29,6 +74,8 @@ export type Database = {
           metaapi_account_id: string | null
           platform: string
           server: string
+          sync_interval_seconds: number | null
+          token_expiry: string | null
           updated_at: string
           user_id: string
         }
@@ -36,9 +83,13 @@ export type Database = {
           account_balance?: number | null
           account_currency?: string | null
           account_equity?: number | null
+          active_acc_num?: number | null
+          active_account_id?: string | null
+          auto_sync_enabled?: boolean | null
           broker_name: string
           connection_status?: string | null
           created_at?: string
+          environment?: string | null
           id?: string
           last_connected_at?: string | null
           last_error?: string | null
@@ -46,6 +97,8 @@ export type Database = {
           metaapi_account_id?: string | null
           platform: string
           server: string
+          sync_interval_seconds?: number | null
+          token_expiry?: string | null
           updated_at?: string
           user_id: string
         }
@@ -53,9 +106,13 @@ export type Database = {
           account_balance?: number | null
           account_currency?: string | null
           account_equity?: number | null
+          active_acc_num?: number | null
+          active_account_id?: string | null
+          auto_sync_enabled?: boolean | null
           broker_name?: string
           connection_status?: string | null
           created_at?: string
+          environment?: string | null
           id?: string
           last_connected_at?: string | null
           last_error?: string | null
@@ -63,24 +120,96 @@ export type Database = {
           metaapi_account_id?: string | null
           platform?: string
           server?: string
+          sync_interval_seconds?: number | null
+          token_expiry?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: []
       }
+      broker_orders: {
+        Row: {
+          broker_connection_id: string
+          broker_order_id: string
+          created_at: string
+          created_broker_at: string | null
+          entry_price: number | null
+          id: string
+          last_seen_at: string | null
+          order_type: string
+          raw_payload: Json | null
+          side: string
+          size: number
+          status: string | null
+          stop_loss: number | null
+          symbol: string
+          take_profit: number | null
+          updated_at: string
+        }
+        Insert: {
+          broker_connection_id: string
+          broker_order_id: string
+          created_at?: string
+          created_broker_at?: string | null
+          entry_price?: number | null
+          id?: string
+          last_seen_at?: string | null
+          order_type: string
+          raw_payload?: Json | null
+          side: string
+          size: number
+          status?: string | null
+          stop_loss?: number | null
+          symbol: string
+          take_profit?: number | null
+          updated_at?: string
+        }
+        Update: {
+          broker_connection_id?: string
+          broker_order_id?: string
+          created_at?: string
+          created_broker_at?: string | null
+          entry_price?: number | null
+          id?: string
+          last_seen_at?: string | null
+          order_type?: string
+          raw_payload?: Json | null
+          side?: string
+          size?: number
+          status?: string | null
+          stop_loss?: number | null
+          symbol?: string
+          take_profit?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broker_orders_broker_connection_id_fkey"
+            columns: ["broker_connection_id"]
+            isOneToOne: false
+            referencedRelation: "broker_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       broker_positions: {
         Row: {
           broker_connection_id: string
+          closed_at: string | null
           comment: string | null
           commission: number | null
           created_at: string
           current_price: number | null
+          floating_pl: number | null
           id: string
+          last_seen_at: string | null
           magic_number: number | null
           open_price: number
           open_time: string
           position_id: string
           profit: number | null
+          raw_payload: Json | null
+          side: string | null
           stop_loss: number | null
           swap: number | null
           symbol: string
@@ -91,16 +220,21 @@ export type Database = {
         }
         Insert: {
           broker_connection_id: string
+          closed_at?: string | null
           comment?: string | null
           commission?: number | null
           created_at?: string
           current_price?: number | null
+          floating_pl?: number | null
           id?: string
+          last_seen_at?: string | null
           magic_number?: number | null
           open_price: number
           open_time: string
           position_id: string
           profit?: number | null
+          raw_payload?: Json | null
+          side?: string | null
           stop_loss?: number | null
           swap?: number | null
           symbol: string
@@ -111,16 +245,21 @@ export type Database = {
         }
         Update: {
           broker_connection_id?: string
+          closed_at?: string | null
           comment?: string | null
           commission?: number | null
           created_at?: string
           current_price?: number | null
+          floating_pl?: number | null
           id?: string
+          last_seen_at?: string | null
           magic_number?: number | null
           open_price?: number
           open_time?: string
           position_id?: string
           profit?: number | null
+          raw_payload?: Json | null
+          side?: string | null
           stop_loss?: number | null
           swap?: number | null
           symbol?: string
@@ -132,6 +271,118 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "broker_positions_broker_connection_id_fkey"
+            columns: ["broker_connection_id"]
+            isOneToOne: false
+            referencedRelation: "broker_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      broker_sync_logs: {
+        Row: {
+          broker_connection_id: string
+          created_at: string
+          ended_at: string | null
+          error_message: string | null
+          id: string
+          records_processed: number | null
+          started_at: string | null
+          status: string
+          sync_type: string
+        }
+        Insert: {
+          broker_connection_id: string
+          created_at?: string
+          ended_at?: string | null
+          error_message?: string | null
+          id?: string
+          records_processed?: number | null
+          started_at?: string | null
+          status?: string
+          sync_type: string
+        }
+        Update: {
+          broker_connection_id?: string
+          created_at?: string
+          ended_at?: string | null
+          error_message?: string | null
+          id?: string
+          records_processed?: number | null
+          started_at?: string | null
+          status?: string
+          sync_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broker_sync_logs_broker_connection_id_fkey"
+            columns: ["broker_connection_id"]
+            isOneToOne: false
+            referencedRelation: "broker_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      broker_trade_history: {
+        Row: {
+          broker_connection_id: string
+          broker_order_id: string | null
+          broker_position_id: string | null
+          closed_at: string | null
+          created_at: string
+          entry_price: number
+          exit_price: number | null
+          fees: number | null
+          id: string
+          opened_at: string
+          raw_payload: Json | null
+          realized_pl: number | null
+          side: string
+          size: number
+          symbol: string
+          synced_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          broker_connection_id: string
+          broker_order_id?: string | null
+          broker_position_id?: string | null
+          closed_at?: string | null
+          created_at?: string
+          entry_price: number
+          exit_price?: number | null
+          fees?: number | null
+          id?: string
+          opened_at: string
+          raw_payload?: Json | null
+          realized_pl?: number | null
+          side: string
+          size: number
+          symbol: string
+          synced_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          broker_connection_id?: string
+          broker_order_id?: string | null
+          broker_position_id?: string | null
+          closed_at?: string | null
+          created_at?: string
+          entry_price?: number
+          exit_price?: number | null
+          fees?: number | null
+          id?: string
+          opened_at?: string
+          raw_payload?: Json | null
+          realized_pl?: number | null
+          side?: string
+          size?: number
+          symbol?: string
+          synced_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broker_trade_history_broker_connection_id_fkey"
             columns: ["broker_connection_id"]
             isOneToOne: false
             referencedRelation: "broker_connections"
@@ -479,13 +730,22 @@ export type Database = {
       trades: {
         Row: {
           account_id: string | null
+          broker_acc_num: number | null
+          broker_account_id: string | null
+          broker_environment: string | null
+          broker_name: string | null
+          broker_order_id: string | null
+          broker_position_id: string | null
           chart_image: string | null
           checklist_id: string | null
           checklist_state: Json | null
           created_at: string
           date: string
           direction: string
+          execution_type: string | null
           id: string
+          imported_from_broker: boolean | null
+          last_broker_sync_at: string | null
           notebook: string | null
           notes: string | null
           pair: string
@@ -497,13 +757,22 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          broker_acc_num?: number | null
+          broker_account_id?: string | null
+          broker_environment?: string | null
+          broker_name?: string | null
+          broker_order_id?: string | null
+          broker_position_id?: string | null
           chart_image?: string | null
           checklist_id?: string | null
           checklist_state?: Json | null
           created_at?: string
           date: string
           direction: string
+          execution_type?: string | null
           id?: string
+          imported_from_broker?: boolean | null
+          last_broker_sync_at?: string | null
           notebook?: string | null
           notes?: string | null
           pair: string
@@ -515,13 +784,22 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          broker_acc_num?: number | null
+          broker_account_id?: string | null
+          broker_environment?: string | null
+          broker_name?: string | null
+          broker_order_id?: string | null
+          broker_position_id?: string | null
           chart_image?: string | null
           checklist_id?: string | null
           checklist_state?: Json | null
           created_at?: string
           date?: string
           direction?: string
+          execution_type?: string | null
           id?: string
+          imported_from_broker?: boolean | null
+          last_broker_sync_at?: string | null
           notebook?: string | null
           notes?: string | null
           pair?: string
