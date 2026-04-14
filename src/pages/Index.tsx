@@ -32,6 +32,8 @@ import { User, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
+import { AnimatePresence, motion } from "framer-motion";
 
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
@@ -546,54 +548,12 @@ const Index = () => {
           )}>
             {!isChartPage && <TopBar title={title} subtitle={subtitle} theme={theme} onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)} trades={trades} showRank={currentPage === 'dashboard'} />}
 
-            {/* Dashboard Page */}
-            {currentPage === 'dashboard' && (
-              <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
-                {/* Account Selector */}
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <AccountSelector
-                    accounts={accounts}
-                    selectedAccount={selectedAccount}
-                    onSelectAccount={(id) => { handleSetBrokerAccountId(null); setSelectedAccountId(id); }}
-                    onSelectBrokerAccount={handleSetBrokerAccountId}
-                    onAddAccount={addAccount}
-                    onUpdateAccount={updateAccount}
-                    onDeleteAccount={deleteAccount}
-                    onSetDefault={setDefaultAccount}
-                  />
-                </div>
-                
-                <BalanceCards
-                  trades={trades}
-                  startBalance={accountStartBalance}
-                  goalBalance={selectedAccount?.goal_balance || null}
-                  profitTarget={selectedAccount?.profit_target || null}
-                  brokerBalance={brokerBalance}
-                  onSetBalance={handleSetBalance}
-                  onSetGoalBalance={handleSetGoalBalance}
-                  onSetProfitTarget={handleSetProfitTarget}
-                />
-                
-                <StatsGrid trades={trades} />
-                <PnLCalendar 
-                  trades={trades} 
-                  onUpdateTrade={async (id, updates) => {
-                    await updateTrade(id, updates);
-                  }}
-                  notebookEntries={notebookEntries}
-                  onSaveEntry={handleSaveEntry}
-                  onAddTrade={handleAddTrade}
-                />
-              </div>
-            )}
-
-            {/* Journal Page */}
-            {currentPage === 'journal' && (
-              <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
-                {/* Header with Account Selector and Add Trade Button */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-muted-foreground">Trading Account:</span>
+            <AnimatePresence mode="wait">
+              {/* Dashboard Page */}
+              {currentPage === 'dashboard' && (
+                <PageTransition key="dashboard" className="space-y-6 max-w-7xl mx-auto">
+                  {/* Account Selector */}
+                  <motion.div variants={staggerItem} className="flex items-center justify-between flex-wrap gap-4">
                     <AccountSelector
                       accounts={accounts}
                       selectedAccount={selectedAccount}
@@ -604,131 +564,185 @@ const Index = () => {
                       onDeleteAccount={deleteAccount}
                       onSetDefault={setDefaultAccount}
                     />
-                  </div>
-                  <button
-                    onClick={() => setIsTradeFormOpen(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground font-medium text-sm shadow-glow-sm hover:opacity-90 transition-opacity"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                    Add New Trade
-                  </button>
-                </div>
-                
-                {/* Main Content with Calendar Sidebar */}
-                <div className="flex gap-6">
-                  {/* Trade Table */}
-                  <div className="flex-1 min-w-0">
-                    <TradeTable
-                      trades={trades}
-                      notebookEntries={notebookEntries}
-                      checklists={checklists}
-                      onEdit={(trade) => {
-                        setEditingTrade(trade);
-                        setIsTradeFormOpen(true);
-                      }}
-                      onDelete={handleDeleteTrade}
-                      onSelectForNotebook={handleSelectForNotebook}
-                      onClearAll={handleClearAll}
-                    />
-                  </div>
+                  </motion.div>
                   
-                  {/* Mini Calendar Sidebar */}
-                  <div className="hidden lg:block w-64 flex-shrink-0">
-                    <MiniCalendar 
-                      dayPnLs={(() => {
-                        const pnlByDate: Record<string, number> = {};
-                        trades.forEach(t => {
-                          pnlByDate[t.date] = (pnlByDate[t.date] || 0) + (t.result || 0);
-                        });
-                        return Object.entries(pnlByDate).map(([date, pnl]) => ({ date, pnl }));
-                      })()}
+                  <motion.div variants={staggerItem}>
+                    <BalanceCards
+                      trades={trades}
+                      startBalance={accountStartBalance}
+                      goalBalance={selectedAccount?.goal_balance || null}
+                      profitTarget={selectedAccount?.profit_target || null}
+                      brokerBalance={brokerBalance}
+                      onSetBalance={handleSetBalance}
+                      onSetGoalBalance={handleSetGoalBalance}
+                      onSetProfitTarget={handleSetProfitTarget}
                     />
-                  </div>
-                </div>
+                  </motion.div>
+                  
+                  <motion.div variants={staggerItem}>
+                    <StatsGrid trades={trades} />
+                  </motion.div>
+                  <motion.div variants={staggerItem}>
+                    <PnLCalendar 
+                      trades={trades} 
+                      onUpdateTrade={async (id, updates) => {
+                        await updateTrade(id, updates);
+                      }}
+                      notebookEntries={notebookEntries}
+                      onSaveEntry={handleSaveEntry}
+                      onAddTrade={handleAddTrade}
+                    />
+                  </motion.div>
+                </PageTransition>
+              )}
 
-                {/* Trade Form Modal */}
-                <TradeFormModal
-                  isOpen={isTradeFormOpen}
-                  onClose={() => {
-                    setIsTradeFormOpen(false);
-                    setEditingTrade(null);
-                  }}
-                  editingTrade={editingTrade}
-                  onSubmit={handleAddTrade}
-                  onCancelEdit={() => setEditingTrade(null)}
-                />
-              </div>
-            )}
+              {/* Journal Page */}
+              {currentPage === 'journal' && (
+                <PageTransition key="journal" className="space-y-6 max-w-7xl mx-auto">
+                  {/* Header with Account Selector and Add Trade Button */}
+                  <motion.div variants={staggerItem} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm text-muted-foreground">Trading Account:</span>
+                      <AccountSelector
+                        accounts={accounts}
+                        selectedAccount={selectedAccount}
+                        onSelectAccount={(id) => { handleSetBrokerAccountId(null); setSelectedAccountId(id); }}
+                        onSelectBrokerAccount={handleSetBrokerAccountId}
+                        onAddAccount={addAccount}
+                        onUpdateAccount={updateAccount}
+                        onDeleteAccount={deleteAccount}
+                        onSetDefault={setDefaultAccount}
+                      />
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => setIsTradeFormOpen(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground font-medium text-sm shadow-glow-sm hover:opacity-90 transition-opacity"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                      Add New Trade
+                    </motion.button>
+                  </motion.div>
+                  
+                  {/* Main Content with Calendar Sidebar */}
+                  <motion.div variants={staggerItem} className="flex gap-6">
+                    {/* Trade Table */}
+                    <div className="flex-1 min-w-0">
+                      <TradeTable
+                        trades={trades}
+                        notebookEntries={notebookEntries}
+                        checklists={checklists}
+                        onEdit={(trade) => {
+                          setEditingTrade(trade);
+                          setIsTradeFormOpen(true);
+                        }}
+                        onDelete={handleDeleteTrade}
+                        onSelectForNotebook={handleSelectForNotebook}
+                        onClearAll={handleClearAll}
+                      />
+                    </div>
+                    
+                    {/* Mini Calendar Sidebar */}
+                    <div className="hidden lg:block w-64 flex-shrink-0">
+                      <MiniCalendar 
+                        dayPnLs={(() => {
+                          const pnlByDate: Record<string, number> = {};
+                          trades.forEach(t => {
+                            pnlByDate[t.date] = (pnlByDate[t.date] || 0) + (t.result || 0);
+                          });
+                          return Object.entries(pnlByDate).map(([date, pnl]) => ({ date, pnl }));
+                        })()}
+                      />
+                    </div>
+                  </motion.div>
 
-            {/* Notebook Page */}
-            {currentPage === 'notebook' && (
-              <div className="animate-fade-in">
-                <NotebookView
-                  trades={trades}
-                  selectedTradeId={selectedTradeId}
-                  onSelectTrade={setSelectedTradeId}
-                  onSaveNotes={handleSaveNotes}
-                  notebookEntries={notebookEntries}
-                  onSaveEntry={handleSaveEntry}
-                  onDeleteEntry={handleDeleteEntry}
-                  notebookFont={notebookFont}
-                  onFontChange={setNotebookFont}
-                />
-              </div>
-            )}
+                  {/* Trade Form Modal */}
+                  <TradeFormModal
+                    isOpen={isTradeFormOpen}
+                    onClose={() => {
+                      setIsTradeFormOpen(false);
+                      setEditingTrade(null);
+                    }}
+                    editingTrade={editingTrade}
+                    onSubmit={handleAddTrade}
+                    onCancelEdit={() => setEditingTrade(null)}
+                  />
+                </PageTransition>
+              )}
 
-            {/* Playbook Page */}
-            {currentPage === 'playbook' && (
-              <div className="max-w-7xl mx-auto">
-                <PlaybookView />
-              </div>
-            )}
+              {/* Notebook Page */}
+              {currentPage === 'notebook' && (
+                <PageTransition key="notebook">
+                  <NotebookView
+                    trades={trades}
+                    selectedTradeId={selectedTradeId}
+                    onSelectTrade={setSelectedTradeId}
+                    onSaveNotes={handleSaveNotes}
+                    notebookEntries={notebookEntries}
+                    onSaveEntry={handleSaveEntry}
+                    onDeleteEntry={handleDeleteEntry}
+                    notebookFont={notebookFont}
+                    onFontChange={setNotebookFont}
+                  />
+                </PageTransition>
+              )}
 
-            {/* Economic Calendar Page */}
-            {currentPage === 'calendar' && (
-              <div className="max-w-7xl mx-auto">
-                <EconomicCalendarView />
-              </div>
-            )}
+              {/* Playbook Page */}
+              {currentPage === 'playbook' && (
+                <PageTransition key="playbook" className="max-w-7xl mx-auto">
+                  <PlaybookView />
+                </PageTransition>
+              )}
 
-            {/* Settings Page */}
-            {currentPage === 'settings' && (
-              <div className="max-w-7xl mx-auto">
-                <SettingsView 
-                  theme={theme} 
-                  onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)}
-                  accentColor={accentColor}
-                  onAccentColorChange={setAccentColor}
-                  userProfile={userProfile}
-                  onLogout={handleLogout}
-                  customColor={customColor}
-                  onCustomColorChange={setCustomColor}
-                  customGradient={customGradient}
-                  onCustomGradientChange={setCustomGradient}
-                />
-              </div>
-            )}
+              {/* Economic Calendar Page */}
+              {currentPage === 'calendar' && (
+                <PageTransition key="calendar" className="max-w-7xl mx-auto">
+                  <EconomicCalendarView />
+                </PageTransition>
+              )}
 
-            {/* Chart Page */}
-            {currentPage === 'chart' && (
-              <CustomChart />
-            )}
+              {/* Settings Page */}
+              {currentPage === 'settings' && (
+                <PageTransition key="settings" className="max-w-7xl mx-auto">
+                  <SettingsView 
+                    theme={theme} 
+                    onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)}
+                    accentColor={accentColor}
+                    onAccentColorChange={setAccentColor}
+                    userProfile={userProfile}
+                    onLogout={handleLogout}
+                    customColor={customColor}
+                    onCustomColorChange={setCustomColor}
+                    customGradient={customGradient}
+                    onCustomGradientChange={setCustomGradient}
+                  />
+                </PageTransition>
+              )}
 
-            {/* Calculator Page */}
-            {currentPage === 'calculator' && (
-              <div className="max-w-4xl mx-auto animate-fade-in">
-                <LotSizeCalculator />
-              </div>
-            )}
+              {/* Chart Page */}
+              {currentPage === 'chart' && (
+                <PageTransition key="chart">
+                  <CustomChart />
+                </PageTransition>
+              )}
 
-            {/* Community Page */}
-            {currentPage === 'community' && (
-              <div className="animate-fade-in max-w-7xl mx-auto">
-                <CommunityView />
-              </div>
-            )}
+              {/* Calculator Page */}
+              {currentPage === 'calculator' && (
+                <PageTransition key="calculator" className="max-w-4xl mx-auto">
+                  <LotSizeCalculator />
+                </PageTransition>
+              )}
+
+              {/* Community Page */}
+              {currentPage === 'community' && (
+                <PageTransition key="community" className="max-w-7xl mx-auto">
+                  <CommunityView />
+                </PageTransition>
+              )}
+            </AnimatePresence>
           </div>
         </main>
 
