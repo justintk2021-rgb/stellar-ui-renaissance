@@ -38,6 +38,7 @@ interface AccountSelectorProps {
   accounts: TradingAccount[];
   selectedAccount: TradingAccount | null;
   onSelectAccount: (accountId: string) => void;
+  onSelectBrokerAccount?: (brokerAccountId: string | null) => void;
   onAddAccount: (data: { name: string; broker?: string; starting_balance?: number }) => Promise<TradingAccount | null>;
   onUpdateAccount: (id: string, data: Partial<TradingAccount>) => Promise<boolean>;
   onDeleteAccount: (id: string) => Promise<boolean>;
@@ -48,6 +49,7 @@ export const AccountSelector = ({
   accounts,
   selectedAccount,
   onSelectAccount,
+  onSelectBrokerAccount,
   onAddAccount,
   onUpdateAccount,
   onDeleteAccount,
@@ -159,14 +161,15 @@ export const AccountSelector = ({
 
   const handleSelectManualAccount = (accountId: string) => {
     setSelectedBrokerAccount(null);
+    onSelectBrokerAccount?.(null);
     onSelectAccount(accountId);
   };
 
   const handleSelectBrokerAccount = (broker: BrokerAccountInfo) => {
     const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
     setSelectedBrokerAccount(brokerId);
-    // We still select the default manual account for trades storage,
-    // but the UI will show broker account info
+    // Tell the parent to filter trades by this broker account
+    onSelectBrokerAccount?.(broker.accountId);
   };
 
   return (

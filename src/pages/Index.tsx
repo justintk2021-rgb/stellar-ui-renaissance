@@ -62,6 +62,7 @@ const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [selectedBrokerAccountId, setSelectedBrokerAccountId] = useState<string | null>(null);
   
   // Use trading accounts
   const {
@@ -76,7 +77,7 @@ const Index = () => {
     setDefaultAccount,
   } = useTradingAccounts(user?.id);
   
-  // Use database-backed trades filtered by selected account
+  // Use database-backed trades filtered by selected account or broker account
   const { 
     trades, 
     isLoading: tradesLoading, 
@@ -85,7 +86,7 @@ const Index = () => {
     deleteTrade, 
     clearAllTrades, 
     importTrades 
-  } = useTrades(user?.id, selectedAccountId);
+  } = useTrades(user?.id, selectedBrokerAccountId ? null : selectedAccountId, selectedBrokerAccountId);
   
   // Use the account's starting balance
   const accountStartBalance = selectedAccount?.starting_balance || 10000;
@@ -430,7 +431,8 @@ const Index = () => {
                   <AccountSelector
                     accounts={accounts}
                     selectedAccount={selectedAccount}
-                    onSelectAccount={setSelectedAccountId}
+                    onSelectAccount={(id) => { setSelectedBrokerAccountId(null); setSelectedAccountId(id); }}
+                    onSelectBrokerAccount={setSelectedBrokerAccountId}
                     onAddAccount={addAccount}
                     onUpdateAccount={updateAccount}
                     onDeleteAccount={deleteAccount}
@@ -471,7 +473,8 @@ const Index = () => {
                     <AccountSelector
                       accounts={accounts}
                       selectedAccount={selectedAccount}
-                      onSelectAccount={setSelectedAccountId}
+                      onSelectAccount={(id) => { setSelectedBrokerAccountId(null); setSelectedAccountId(id); }}
+                      onSelectBrokerAccount={setSelectedBrokerAccountId}
                       onAddAccount={addAccount}
                       onUpdateAccount={updateAccount}
                       onDeleteAccount={deleteAccount}
