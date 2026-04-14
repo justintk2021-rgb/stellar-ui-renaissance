@@ -18,7 +18,7 @@ const pageVariants = {
     filter: "blur(0px)",
     transition: {
       duration: 0.4,
-      ease: [0.25, 0.46, 0.45, 0.94],
+      ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number],
       staggerChildren: 0.06,
     },
   },
@@ -28,7 +28,7 @@ const pageVariants = {
     filter: "blur(4px)",
     transition: {
       duration: 0.25,
-      ease: [0.55, 0, 1, 0.45],
+      ease: [0.55, 0, 1, 0.45] as [number, number, number, number],
     },
   },
 };
