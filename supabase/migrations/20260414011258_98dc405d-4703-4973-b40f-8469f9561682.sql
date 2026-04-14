@@ -1,0 +1,1 @@
+ALTER TABLE public.trading_accounts ADD COLUMN profit_target numeric DEFAULT NULL;
