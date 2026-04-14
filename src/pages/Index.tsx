@@ -472,6 +472,7 @@ const Index = () => {
                   startBalance={accountStartBalance}
                   goalBalance={selectedAccount?.goal_balance || null}
                   profitTarget={selectedAccount?.profit_target || null}
+                  brokerBalance={brokerBalance}
                   onSetBalance={handleSetBalance}
                   onSetGoalBalance={handleSetGoalBalance}
                   onSetProfitTarget={handleSetProfitTarget}
