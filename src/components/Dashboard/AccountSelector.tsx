@@ -63,6 +63,9 @@ export const AccountSelector = ({
   const [newAccountBalance, setNewAccountBalance] = useState("10000");
   const [brokerAccounts, setBrokerAccounts] = useState<BrokerAccountInfo[]>([]);
   const [selectedBrokerAccount, setSelectedBrokerAccount] = useState<string | null>(null);
+  const [isRenameBrokerOpen, setIsRenameBrokerOpen] = useState(false);
+  const [renamingBroker, setRenamingBroker] = useState<BrokerAccountInfo | null>(null);
+  const [brokerDisplayName, setBrokerDisplayName] = useState("");
 
   // Fetch broker-connected accounts
   useEffect(() => {
@@ -168,8 +171,31 @@ export const AccountSelector = ({
   const handleSelectBrokerAccount = (broker: BrokerAccountInfo) => {
     const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
     setSelectedBrokerAccount(brokerId);
-    // Tell the parent to filter trades by this broker account
     onSelectBrokerAccount?.(broker.accountId);
+  };
+
+  const openRenameBroker = (broker: BrokerAccountInfo) => {
+    setRenamingBroker(broker);
+    setBrokerDisplayName(broker.accountName);
+    setIsRenameBrokerOpen(true);
+  };
+
+  const handleRenameBroker = async () => {
+    if (!renamingBroker || !brokerDisplayName.trim()) return;
+    const { error } = await supabase
+      .from('broker_accounts')
+      .update({ account_name: brokerDisplayName.trim() })
+      .eq('broker_connection_id', renamingBroker.connectionId)
+      .eq('acc_num', renamingBroker.accNum);
+    if (!error) {
+      setBrokerAccounts(prev => prev.map(b =>
+        b.connectionId === renamingBroker.connectionId && b.accNum === renamingBroker.accNum
+          ? { ...b, accountName: brokerDisplayName.trim() }
+          : b
+      ));
+      setIsRenameBrokerOpen(false);
+      setRenamingBroker(null);
+    }
   };
 
   return (
@@ -256,9 +282,22 @@ export const AccountSelector = ({
                         </span>
                       </div>
                     </div>
-                    {selectedBrokerAccount === brokerId && (
-                      <Check className="w-4 h-4 text-primary shrink-0" />
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {selectedBrokerAccount === brokerId && (
+                        <Check className="w-4 h-4 text-primary" />
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openRenameBroker(broker);
+                        }}
+                      >
+                        <Settings className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </DropdownMenuItem>
                 );
               })}
@@ -400,6 +439,34 @@ export const AccountSelector = ({
                 Save
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Broker Account Dialog */}
+      <Dialog open={isRenameBrokerOpen} onOpenChange={setIsRenameBrokerOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Rename Broker Account</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="broker-name">Display Name</Label>
+              <Input
+                id="broker-name"
+                value={brokerDisplayName}
+                onChange={(e) => setBrokerDisplayName(e.target.value)}
+                placeholder="e.g., My Live Account"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRenameBrokerOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameBroker} disabled={!brokerDisplayName.trim()}>
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
