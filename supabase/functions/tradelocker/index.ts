@@ -30,6 +30,36 @@ function mapDirection(side: string): 'Long' | 'Short' {
   return side?.toLowerCase() === 'sell' ? 'Short' : 'Long';
 }
 
+// TradeLocker returns data in columnar format: arrays of arrays.
+// This helper converts an array row into an object using column definitions.
+function rowToObject(columns: { id: string }[], row: any[]): Record<string, any> {
+  const obj: Record<string, any> = {};
+  for (let i = 0; i < columns.length && i < row.length; i++) {
+    obj[columns[i].id] = row[i];
+  }
+  return obj;
+}
+
+// Account details column indices (from /trade/config accountDetailsConfig)
+const ACCOUNT_DETAILS_COLUMNS = [
+  'balance', 'projectedBalance', 'availableFunds', 'blockedBalance',
+  'cashBalance', 'unsettledCash', 'withdrawalAvailable', 'stocksValue',
+  'optionValue', 'initialMarginReq', 'maintMarginReq', 'marginWarningLevel',
+  'blockedForStocks', 'stockOrdersReq', 'stopOutLevel', 'warningMarginReq',
+  'marginBeforeWarning', 'todayGross', 'todayNet', 'todayFees', 'todayVolume',
+  'todayTradesCount', 'openGrossPnL', 'openNetPnL', 'positionsCount', 'ordersCount'
+];
+
+function parseAccountState(data: any): Record<string, number> | null {
+  const arr = data?.d?.accountDetailsData;
+  if (!Array.isArray(arr)) return null;
+  const result: Record<string, number> = {};
+  for (let i = 0; i < ACCOUNT_DETAILS_COLUMNS.length && i < arr.length; i++) {
+    result[ACCOUNT_DETAILS_COLUMNS[i]] = Number(arr[i]) || 0;
+  }
+  return result;
+}
+
 // ====================== TRADELOCKER API HELPERS ======================
 
 async function tlAuth(email: string, password: string, server: string, environment: string) {
@@ -88,37 +118,54 @@ async function tlGetAccountState(accessToken: string, accountId: string, accNum:
     return null;
   }
   const data = await res.json();
-  return data.d || data || null;
+  return parseAccountState(data);
 }
 
-async function tlGetPositions(accessToken: string, accountId: string, accNum: number, environment: string) {
+async function tlGetConfig(accessToken: string, accNum: number, environment: string) {
+  const baseUrl = getBaseUrl(environment);
+  const res = await fetch(`${baseUrl}/trade/config`, {
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.d || null;
+}
+
+async function tlGetPositions(accessToken: string, accountId: string, accNum: number, environment: string, posColumns?: { id: string }[]) {
   const baseUrl = getBaseUrl(environment);
   const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/positions`, {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
   });
   if (!res.ok) return [];
   const data = await res.json();
-  return data.d?.positions || [];
+  const rows = data.d?.positions || [];
+  if (!posColumns || rows.length === 0) return rows;
+  // Convert columnar format to objects
+  return rows.map((row: any[]) => rowToObject(posColumns, row));
 }
 
-async function tlGetOrders(accessToken: string, accountId: string, accNum: number, environment: string) {
+async function tlGetOrders(accessToken: string, accountId: string, accNum: number, environment: string, ordColumns?: { id: string }[]) {
   const baseUrl = getBaseUrl(environment);
   const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/orders`, {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
   });
   if (!res.ok) return [];
   const data = await res.json();
-  return data.d?.orders || [];
+  const rows = data.d?.orders || [];
+  if (!ordColumns || rows.length === 0) return rows;
+  return rows.map((row: any[]) => rowToObject(ordColumns, row));
 }
 
-async function tlGetOrdersHistory(accessToken: string, accountId: string, accNum: number, environment: string) {
+async function tlGetOrdersHistory(accessToken: string, accountId: string, accNum: number, environment: string, columns?: { id: string }[]) {
   const baseUrl = getBaseUrl(environment);
   const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/ordersHistory`, {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
   });
   if (!res.ok) return [];
   const data = await res.json();
-  return data.d?.ordersHistory || [];
+  const rows = data.d?.ordersHistory || [];
+  if (!columns || rows.length === 0) return rows;
+  return rows.map((row: any[]) => rowToObject(columns, row));
 }
 
 async function tlGetPositionsHistory(accessToken: string, accountId: string, accNum: number, environment: string) {
@@ -126,7 +173,7 @@ async function tlGetPositionsHistory(accessToken: string, accountId: string, acc
   const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/positionsHistory`, {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
   });
-  if (!res.ok) return [];
+  if (!res.ok) return []; // Many servers return 404 for this endpoint
   const data = await res.json();
   return data.d?.positions || [];
 }
@@ -498,14 +545,20 @@ serve(async (req) => {
       try {
         const { accessToken, environment, accountId, accNum } = tokenInfo;
 
-        // 1. Sync account state
+        // 0. Fetch config for column definitions
+        const config = await tlGetConfig(accessToken, accNum, environment);
+        const posColumns = config?.positionsConfig?.columns || [];
+        const ordColumns = config?.ordersConfig?.columns || [];
+        const ordHistColumns = config?.ordersHistoryConfig?.columns || [];
+
+        // 1. Sync account state (now properly parsed from columnar array)
         const state = await tlGetAccountState(accessToken, accountId, accNum, environment);
         if (state) {
           await supabase
             .from('broker_connections')
             .update({
               account_balance: state.balance,
-              account_equity: state.equity,
+              account_equity: state.projectedBalance,
               last_connected_at: new Date().toISOString(),
               connection_status: 'connected',
               last_error: null,
@@ -513,14 +566,12 @@ serve(async (req) => {
             .eq('id', connectionId);
         }
 
-        // 2. Upsert positions (mark all as stale, then upsert current, delete stale)
-        const positions = await tlGetPositions(accessToken, accountId, accNum, environment);
+        // 2. Upsert positions (columnar format now parsed via config)
+        const positions = await tlGetPositions(accessToken, accountId, accNum, environment, posColumns);
         const now = new Date().toISOString();
 
-        // Get current position IDs from broker
         const currentPosIds = new Set(positions.map((p: any) => String(p.id)));
 
-        // Delete positions that no longer exist on broker
         const { data: existingPositions } = await supabase
           .from('broker_positions')
           .select('id, position_id')
@@ -534,21 +585,19 @@ serve(async (req) => {
           }
         }
 
-        // Upsert current positions
         for (const pos of positions) {
           const posData = {
             broker_connection_id: connectionId,
             position_id: String(pos.id),
-            symbol: pos.instrument || String(pos.tradableInstrumentId),
+            symbol: String(pos.tradableInstrumentId),
             type: pos.side === 'buy' ? 'POSITION_TYPE_BUY' : 'POSITION_TYPE_SELL',
             side: pos.side,
-            volume: pos.qty,
-            open_price: pos.avgPrice,
-            stop_loss: pos.stopLoss || null,
-            take_profit: pos.takeProfit || null,
-            current_price: pos.currentPrice || null,
-            floating_pl: pos.unrealizedPl || 0,
-            open_time: pos.openTime || now,
+            volume: Number(pos.qty) || 0,
+            open_price: Number(pos.avgPrice) || 0,
+            stop_loss: null,
+            take_profit: null,
+            floating_pl: Number(pos.unrealizedPl) || 0,
+            open_time: pos.openDate ? new Date(Number(pos.openDate)).toISOString() : now,
             last_seen_at: now,
             raw_payload: pos,
           };
@@ -568,9 +617,9 @@ serve(async (req) => {
           stats.positionsUpserted++;
         }
 
-        // 3. Upsert pending orders
-        const orders = await tlGetOrders(accessToken, accountId, accNum, environment);
-        const currentOrdIds = new Set(orders.filter((o: any) => o.status === 'working' || o.status === 'pending' || o.status === 'new').map((o: any) => String(o.id)));
+        // 3. Upsert pending orders (columnar format)
+        const orders = await tlGetOrders(accessToken, accountId, accNum, environment, ordColumns);
+        const currentOrdIds = new Set(orders.map((o: any) => String(o.id)));
 
         const { data: existingOrders } = await supabase
           .from('broker_orders')
@@ -586,20 +635,18 @@ serve(async (req) => {
         }
 
         for (const ord of orders) {
-          if (ord.status !== 'working' && ord.status !== 'pending' && ord.status !== 'new') continue;
-
           const ordData = {
             broker_connection_id: connectionId,
             broker_order_id: String(ord.id),
-            symbol: ord.instrument || String(ord.tradableInstrumentId),
+            symbol: String(ord.tradableInstrumentId),
             order_type: ord.type || 'limit',
             side: ord.side || 'buy',
-            size: ord.qty,
-            entry_price: ord.price || ord.stopPrice || 0,
-            stop_loss: ord.stopLoss || null,
-            take_profit: ord.takeProfit || null,
+            size: Number(ord.qty) || 0,
+            entry_price: Number(ord.price) || Number(ord.stopPrice) || 0,
+            stop_loss: ord.stopLoss ? Number(ord.stopLoss) : null,
+            take_profit: ord.takeProfit ? Number(ord.takeProfit) : null,
             status: ord.status,
-            created_broker_at: ord.createdAt,
+            created_broker_at: ord.createdDate ? new Date(Number(ord.createdDate)).toISOString() : null,
             raw_payload: ord,
             last_seen_at: now,
           };
@@ -619,17 +666,52 @@ serve(async (req) => {
           stats.ordersUpserted++;
         }
 
-        // 4. Sync closed trade history (positions history is more reliable for P/L)
-        const positionsHistory = await tlGetPositionsHistory(accessToken, accountId, accNum, environment);
-        const ordersHistory = await tlGetOrdersHistory(accessToken, accountId, accNum, environment);
+        // 4. Sync trade history from ordersHistory (columnar format)
+        // Group filled orders by positionId to reconstruct trades
+        const ordersHistory = await tlGetOrdersHistory(accessToken, accountId, accNum, environment, ordHistColumns);
+        
+        // Build trade pairs: group by positionId, find open (isOpen=true) and close (isOpen=false) orders
+        const positionGroups: Record<string, any[]> = {};
+        for (const oh of ordersHistory) {
+          if (oh.status !== 'Filled') continue;
+          const posId = oh.positionId ? String(oh.positionId) : null;
+          if (!posId) continue;
+          if (!positionGroups[posId]) positionGroups[posId] = [];
+          positionGroups[posId].push(oh);
+        }
 
-        // Process positions history first (closed positions with realized P/L)
-        for (const trade of positionsHistory) {
-          const posId = String(trade.id);
-          const sym = trade.instrument || String(trade.tradableInstrumentId);
-          const side = trade.side || 'buy';
-          const realizedPl = trade.profit ?? trade.realizedPl ?? 0;
-          const fees = (trade.commission || 0) + (trade.swap || 0);
+        const { data: conn } = await supabase
+          .from('broker_connections')
+          .select('environment, active_account_id, active_acc_num')
+          .eq('id', connectionId)
+          .single();
+
+        for (const [posId, filledOrders] of Object.entries(positionGroups)) {
+          // Find open order (isOpen === "true") and close order (isOpen === "false")
+          const openOrder = filledOrders.find((o: any) => o.isOpen === 'true' || o.isOpen === true);
+          const closeOrder = filledOrders.find((o: any) => o.isOpen === 'false' || o.isOpen === false);
+          
+          if (!openOrder) continue; // Need at least an open order
+
+          const sym = String(openOrder.tradableInstrumentId);
+          const side = openOrder.side || 'buy';
+          const entryPrice = Number(openOrder.avgPrice) || 0;
+          const exitPrice = closeOrder ? Number(closeOrder.avgPrice) || 0 : 0;
+          const qty = Number(openOrder.filledQty || openOrder.qty) || 0;
+          const isClosed = !!closeOrder;
+
+          // Calculate realized P/L for closed trades
+          let realizedPl = 0;
+          if (isClosed && entryPrice && exitPrice) {
+            if (side === 'buy') {
+              realizedPl = (exitPrice - entryPrice) * qty;
+            } else {
+              realizedPl = (entryPrice - exitPrice) * qty;
+            }
+          }
+
+          const openedAt = openOrder.createdDate ? new Date(Number(openOrder.createdDate)).toISOString() : now;
+          const closedAt = closeOrder?.lastModified ? new Date(Number(closeOrder.lastModified)).toISOString() : (isClosed ? now : null);
 
           // Upsert into broker_trade_history
           const { data: existingHist } = await supabase
@@ -642,17 +724,17 @@ serve(async (req) => {
           const histData = {
             broker_connection_id: connectionId,
             broker_position_id: posId,
-            broker_order_id: trade.orderId ? String(trade.orderId) : null,
+            broker_order_id: String(openOrder.id),
             symbol: sym,
             side,
-            size: trade.qty || trade.filledQty || 0,
-            entry_price: trade.avgPrice || trade.openPrice || 0,
-            exit_price: trade.closePrice || trade.avgClosePrice || 0,
+            size: qty,
+            entry_price: entryPrice,
+            exit_price: exitPrice || null,
             realized_pl: realizedPl,
-            fees,
-            opened_at: trade.openTime || trade.createdAt || now,
-            closed_at: trade.closeTime || trade.closedAt || now,
-            raw_payload: trade,
+            fees: 0,
+            opened_at: openedAt,
+            closed_at: closedAt,
+            raw_payload: { openOrder, closeOrder },
             synced_at: now,
           };
 
@@ -663,17 +745,10 @@ serve(async (req) => {
             stats.historyInserted++;
           }
 
-          // Auto-journal: upsert journal entry
-          const tradeDate = new Date(trade.closeTime || trade.closedAt || trade.openTime || trade.createdAt || Date.now());
+          // Auto-journal: create/update journal entry
+          const tradeDate = new Date(closedAt || openedAt);
           const dateStr = tradeDate.toISOString().split('T')[0];
 
-          const { data: conn } = await supabase
-            .from('broker_connections')
-            .select('environment, active_account_id, active_acc_num')
-            .eq('id', connectionId)
-            .single();
-
-          // Look up by broker_position_id first
           const { data: existingJournal } = await supabase
             .from('trades')
             .select('id, notes, notebook, session, strategy')
@@ -682,7 +757,6 @@ serve(async (req) => {
             .maybeSingle();
 
           if (existingJournal) {
-            // Update existing - preserve user-written fields
             await supabase.from('trades').update({
               pair: sym,
               direction: mapDirection(side),
@@ -1142,6 +1216,69 @@ serve(async (req) => {
         .eq('id', connectionId);
 
       return jsonResponse({ success: true, message: 'Reconnected successfully' });
+    }
+
+    // ====================== DEBUG RAW ======================
+    if (action === 'debug-raw') {
+      const { connectionId } = body;
+      const tokenInfo = await getValidToken(supabase, connectionId);
+      if (!tokenInfo) return jsonResponse({ error: 'Invalid session' }, 401);
+
+      const { accessToken, environment, accountId, accNum } = tokenInfo;
+      const baseUrl = getBaseUrl(environment);
+
+      // Fetch raw responses
+      const rawResults: Record<string, any> = {};
+
+      // Account state
+      try {
+        const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/state`, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+        });
+        rawResults.accountState = { status: res.status, body: res.ok ? await res.json() : await res.text() };
+      } catch (e: any) { rawResults.accountState = { error: e.message }; }
+
+      // Positions
+      try {
+        const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/positions`, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+        });
+        rawResults.positions = { status: res.status, body: res.ok ? await res.json() : await res.text() };
+      } catch (e: any) { rawResults.positions = { error: e.message }; }
+
+      // Orders
+      try {
+        const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/orders`, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+        });
+        rawResults.orders = { status: res.status, body: res.ok ? await res.json() : await res.text() };
+      } catch (e: any) { rawResults.orders = { error: e.message }; }
+
+      // Orders history
+      try {
+        const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/ordersHistory`, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+        });
+        rawResults.ordersHistory = { status: res.status, body: res.ok ? await res.json() : await res.text() };
+      } catch (e: any) { rawResults.ordersHistory = { error: e.message }; }
+
+      // Positions history
+      try {
+        const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/positionsHistory`, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+        });
+        rawResults.positionsHistory = { status: res.status, body: res.ok ? await res.json() : await res.text() };
+      } catch (e: any) { rawResults.positionsHistory = { error: e.message }; }
+
+      // Config
+      try {
+        const res = await fetch(`${baseUrl}/trade/config`, {
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+        });
+        rawResults.config = { status: res.status, body: res.ok ? await res.json() : await res.text() };
+      } catch (e: any) { rawResults.config = { error: e.message }; }
+
+      return jsonResponse({ rawResults });
     }
 
     return jsonResponse({ error: `Unknown action: ${action}` }, 400);
