@@ -28,8 +28,13 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
     loading, syncing,
     connect, selectAccount, sync, disconnect, reconnect,
     placeOrder, closePosition, modifyPosition, cancelOrder, modifyOrder,
-    updateSyncSettings,
+    updateSyncSettings, runDiagnostic, fetchSyncLogs,
   } = useTradeLocker();
+
+  const [diagnosticResults, setDiagnosticResults] = useState<any[] | null>(null);
+  const [runningDiagnostic, setRunningDiagnostic] = useState(false);
+  const [syncLogs, setSyncLogs] = useState<any[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
 
   // Connection form
   const [email, setEmail] = useState('');
