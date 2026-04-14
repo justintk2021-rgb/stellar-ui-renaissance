@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,6 +123,7 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [isEditingProfitTarget, setIsEditingProfitTarget] = useState(false);
+  const [projectionTab, setProjectionTab] = useState<'goal' | 'profit'>('goal');
   const [editValue, setEditValue] = useState(startBalance.toString());
   const [editGoalValue, setEditGoalValue] = useState((goalBalance || 0).toString());
   const [editProfitTargetValue, setEditProfitTargetValue] = useState((profitTarget || 0).toString());
@@ -468,7 +469,7 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
         </div>
       </motion.div>
 
-      {/* Goal Balance Card */}
+      {/* Account Projection Card */}
       <motion.div
         variants={cardVariants}
         initial="hidden"
@@ -477,8 +478,8 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
         custom={2}
         className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
       >
-        
         <div className="relative">
+          {/* Header with tab switcher */}
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
               <motion.div
@@ -489,206 +490,196 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
               >
                 <Target className="w-5 h-5 text-primary" />
               </motion.div>
-              <span className="text-sm font-medium text-muted-foreground">Goal Balance</span>
+              <span className="text-sm font-medium text-muted-foreground">Account Projection</span>
             </div>
             <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
               <Button 
                 variant="ghost" 
                 size="icon" 
                 className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                onClick={handleStartEditGoal}
+                onClick={projectionTab === 'goal' ? handleStartEditGoal : handleStartEditProfitTarget}
               >
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
             </motion.div>
           </div>
+
+          {/* Tab switcher pills */}
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/20 mb-5">
+            <button
+              onClick={() => setProjectionTab('goal')}
+              className={cn(
+                "flex-1 text-xs font-medium py-1.5 px-3 rounded-md transition-all duration-200",
+                projectionTab === 'goal'
+                  ? "bg-primary/15 text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Goal Balance
+            </button>
+            <button
+              onClick={() => setProjectionTab('profit')}
+              className={cn(
+                "flex-1 text-xs font-medium py-1.5 px-3 rounded-md transition-all duration-200",
+                projectionTab === 'profit'
+                  ? "bg-primary/15 text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Profit Target
+            </button>
+          </div>
           
           <div className="space-y-4">
-            <div className="flex items-baseline gap-3">
-              <AnimatePresence mode="wait">
-                {isEditingGoal ? (
-                  <motion.div
-                    key="editing-goal"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="flex items-center gap-2"
-                  >
-                    <span className="text-3xl font-bold font-mono">$</span>
-                    <Input
-                      ref={goalInputRef}
-                      type="number"
-                      value={editGoalValue}
-                      onChange={(e) => setEditGoalValue(e.target.value)}
-                      onKeyDown={handleKeyDownGoal}
-                      className="w-36 h-10 text-2xl font-bold font-mono px-2 py-0 bg-background/50 border-primary/50"
-                    />
-                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-primary hover:bg-primary/20"
-                        onClick={handleConfirmGoal}
-                      >
-                        <Check className="w-4 h-4" />
-                      </Button>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
-                        onClick={handleCancelGoal}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </motion.div>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="display-goal"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex items-baseline gap-3"
-                  >
-                    <AnimatedValue 
-                      value={goalBalance || 0} 
-                      prefix="$" 
-                      className="text-3xl font-bold font-mono"
-                    />
-                    {goalBalance && goalBalance > 0 && currentBalance >= goalBalance && (
-                      <motion.span
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="text-sm font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary"
-                      >
-                        ✓ Reached
-                      </motion.span>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-            
-            {/* Goal Balance Progress */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <div className="text-xs text-muted-foreground mb-2">Goal Progress</div>
-              {goalBalance && goalBalance > 0 ? (
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-3 bg-muted/30 rounded-full overflow-hidden">
-                    <motion.div 
-                      className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${goalProgress}%` }}
-                      transition={{ duration: 1, delay: 0.8, ease: "easeOut" }}
-                    />
-                  </div>
-                  <span className="text-sm font-bold font-mono text-primary">
-                    {goalProgress.toFixed(0)}%
-                  </span>
-                </div>
-              ) : (
-                <span className="text-sm font-medium text-muted-foreground">
-                  Set a goal to track progress
-                </span>
-              )}
-            </motion.div>
-
-            {/* Profit Target Section */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
-              className="pt-3 border-t border-border/20"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-3.5 h-3.5 text-accent-foreground" />
-                  <span className="text-xs font-medium text-muted-foreground">Profit Target</span>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={handleStartEditProfitTarget}
+            <AnimatePresence mode="wait">
+              {projectionTab === 'goal' ? (
+                <motion.div
+                  key="goal-tab"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-4"
                 >
-                  <MoreHorizontal className="w-3 h-3" />
-                </Button>
-              </div>
-
-              <AnimatePresence mode="wait">
-                {isEditingProfitTarget ? (
-                  <motion.div
-                    key="editing-profit-target"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="flex items-center gap-2 mb-2"
-                  >
-                    <span className="text-lg font-bold font-mono">$</span>
-                    <Input
-                      ref={profitTargetInputRef}
-                      type="number"
-                      value={editProfitTargetValue}
-                      onChange={(e) => setEditProfitTargetValue(e.target.value)}
-                      onKeyDown={handleKeyDownProfitTarget}
-                      className="w-28 h-8 text-lg font-bold font-mono px-2 py-0 bg-background/50 border-primary/50"
-                    />
-                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                      <Button size="icon" variant="ghost" className="h-6 w-6 text-primary hover:bg-primary/20" onClick={handleConfirmProfitTarget}>
-                        <Check className="w-3 h-3" />
-                      </Button>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                      <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:bg-destructive/20 hover:text-destructive" onClick={handleCancelProfitTarget}>
-                        <X className="w-3 h-3" />
-                      </Button>
-                    </motion.div>
-                  </motion.div>
-                ) : (
-                  <motion.div key="display-profit-target" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-baseline gap-2 mb-2">
-                    <AnimatedValue 
-                      value={profitTarget || 0} 
-                      prefix="$" 
-                      className="text-lg font-bold font-mono"
-                    />
-                    {profitTarget && profitTarget > 0 && netProfit >= profitTarget && (
-                      <motion.span
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary"
-                      >
-                        ✓ Hit
-                      </motion.span>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {profitTarget && profitTarget > 0 ? (
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-2.5 bg-muted/30 rounded-full overflow-hidden">
-                    <motion.div 
-                      className="h-full bg-gradient-to-r from-accent to-primary rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${profitTargetProgress}%` }}
-                      transition={{ duration: 1, delay: 0.9, ease: "easeOut" }}
-                    />
+                  {/* Goal Balance value */}
+                  <div className="flex items-baseline gap-3">
+                    <AnimatePresence mode="wait">
+                      {isEditingGoal ? (
+                        <motion.div
+                          key="editing-goal"
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          className="flex items-center gap-2"
+                        >
+                          <span className="text-3xl font-bold font-mono">$</span>
+                          <Input
+                            ref={goalInputRef}
+                            type="number"
+                            value={editGoalValue}
+                            onChange={(e) => setEditGoalValue(e.target.value)}
+                            onKeyDown={handleKeyDownGoal}
+                            className="w-36 h-10 text-2xl font-bold font-mono px-2 py-0 bg-background/50 border-primary/50"
+                          />
+                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-primary hover:bg-primary/20" onClick={handleConfirmGoal}>
+                              <Check className="w-4 h-4" />
+                            </Button>
+                          </motion.div>
+                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:bg-destructive/20 hover:text-destructive" onClick={handleCancelGoal}>
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </motion.div>
+                        </motion.div>
+                      ) : (
+                        <motion.div key="display-goal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-baseline gap-3">
+                          <AnimatedValue value={goalBalance || 0} prefix="$" className="text-3xl font-bold font-mono" />
+                          {goalBalance && goalBalance > 0 && currentBalance >= goalBalance && (
+                            <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-sm font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                              ✓ Reached
+                            </motion.span>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                  <span className="text-xs font-bold font-mono text-primary">
-                    {profitTargetProgress.toFixed(0)}%
-                  </span>
-                </div>
+
+                  {/* Goal Progress */}
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-2">Progress</div>
+                    {goalBalance && goalBalance > 0 ? (
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-3 bg-muted/30 rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${goalProgress}%` }}
+                            transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
+                          />
+                        </div>
+                        <span className="text-sm font-bold font-mono text-primary">{goalProgress.toFixed(0)}%</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm font-medium text-muted-foreground">Set a goal to track progress</span>
+                    )}
+                  </div>
+                </motion.div>
               ) : (
-                <span className="text-xs font-medium text-muted-foreground">
-                  Set a profit target to track
-                </span>
+                <motion.div
+                  key="profit-tab"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-4"
+                >
+                  {/* Profit Target value */}
+                  <div className="flex items-baseline gap-3">
+                    <AnimatePresence mode="wait">
+                      {isEditingProfitTarget ? (
+                        <motion.div
+                          key="editing-profit-target"
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          className="flex items-center gap-2"
+                        >
+                          <span className="text-3xl font-bold font-mono">$</span>
+                          <Input
+                            ref={profitTargetInputRef}
+                            type="number"
+                            value={editProfitTargetValue}
+                            onChange={(e) => setEditProfitTargetValue(e.target.value)}
+                            onKeyDown={handleKeyDownProfitTarget}
+                            className="w-36 h-10 text-2xl font-bold font-mono px-2 py-0 bg-background/50 border-primary/50"
+                          />
+                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-primary hover:bg-primary/20" onClick={handleConfirmProfitTarget}>
+                              <Check className="w-4 h-4" />
+                            </Button>
+                          </motion.div>
+                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:bg-destructive/20 hover:text-destructive" onClick={handleCancelProfitTarget}>
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </motion.div>
+                        </motion.div>
+                      ) : (
+                        <motion.div key="display-profit-target" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-baseline gap-3">
+                          <AnimatedValue value={profitTarget || 0} prefix="$" className="text-3xl font-bold font-mono" />
+                          {profitTarget && profitTarget > 0 && netProfit >= profitTarget && (
+                            <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-sm font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                              ✓ Hit
+                            </motion.span>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Profit Target Progress */}
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-2">Progress</div>
+                    {profitTarget && profitTarget > 0 ? (
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-3 bg-muted/30 rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-gradient-to-r from-accent to-primary rounded-full"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${profitTargetProgress}%` }}
+                            transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
+                          />
+                        </div>
+                        <span className="text-sm font-bold font-mono text-primary">{profitTargetProgress.toFixed(0)}%</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm font-medium text-muted-foreground">Set a profit target to track</span>
+                    )}
+                  </div>
+                </motion.div>
               )}
-            </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </motion.div>
