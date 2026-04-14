@@ -171,8 +171,31 @@ export const AccountSelector = ({
   const handleSelectBrokerAccount = (broker: BrokerAccountInfo) => {
     const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
     setSelectedBrokerAccount(brokerId);
-    // Tell the parent to filter trades by this broker account
     onSelectBrokerAccount?.(broker.accountId);
+  };
+
+  const openRenameBroker = (broker: BrokerAccountInfo) => {
+    setRenamingBroker(broker);
+    setBrokerDisplayName(broker.accountName);
+    setIsRenameBrokerOpen(true);
+  };
+
+  const handleRenameBroker = async () => {
+    if (!renamingBroker || !brokerDisplayName.trim()) return;
+    const { error } = await supabase
+      .from('broker_accounts')
+      .update({ account_name: brokerDisplayName.trim() })
+      .eq('broker_connection_id', renamingBroker.connectionId)
+      .eq('acc_num', renamingBroker.accNum);
+    if (!error) {
+      setBrokerAccounts(prev => prev.map(b =>
+        b.connectionId === renamingBroker.connectionId && b.accNum === renamingBroker.accNum
+          ? { ...b, accountName: brokerDisplayName.trim() }
+          : b
+      ));
+      setIsRenameBrokerOpen(false);
+      setRenamingBroker(null);
+    }
   };
 
   return (
