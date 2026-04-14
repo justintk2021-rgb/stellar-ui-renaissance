@@ -32,6 +32,8 @@ import { User, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
+import { AnimatePresence, motion } from "framer-motion";
 
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
