@@ -30,6 +30,36 @@ function mapDirection(side: string): 'Long' | 'Short' {
   return side?.toLowerCase() === 'sell' ? 'Short' : 'Long';
 }
 
+// TradeLocker returns data in columnar format: arrays of arrays.
+// This helper converts an array row into an object using column definitions.
+function rowToObject(columns: { id: string }[], row: any[]): Record<string, any> {
+  const obj: Record<string, any> = {};
+  for (let i = 0; i < columns.length && i < row.length; i++) {
+    obj[columns[i].id] = row[i];
+  }
+  return obj;
+}
+
+// Account details column indices (from /trade/config accountDetailsConfig)
+const ACCOUNT_DETAILS_COLUMNS = [
+  'balance', 'projectedBalance', 'availableFunds', 'blockedBalance',
+  'cashBalance', 'unsettledCash', 'withdrawalAvailable', 'stocksValue',
+  'optionValue', 'initialMarginReq', 'maintMarginReq', 'marginWarningLevel',
+  'blockedForStocks', 'stockOrdersReq', 'stopOutLevel', 'warningMarginReq',
+  'marginBeforeWarning', 'todayGross', 'todayNet', 'todayFees', 'todayVolume',
+  'todayTradesCount', 'openGrossPnL', 'openNetPnL', 'positionsCount', 'ordersCount'
+];
+
+function parseAccountState(data: any): Record<string, number> | null {
+  const arr = data?.d?.accountDetailsData;
+  if (!Array.isArray(arr)) return null;
+  const result: Record<string, number> = {};
+  for (let i = 0; i < ACCOUNT_DETAILS_COLUMNS.length && i < arr.length; i++) {
+    result[ACCOUNT_DETAILS_COLUMNS[i]] = Number(arr[i]) || 0;
+  }
+  return result;
+}
+
 // ====================== TRADELOCKER API HELPERS ======================
 
 async function tlAuth(email: string, password: string, server: string, environment: string) {
