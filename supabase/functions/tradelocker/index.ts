@@ -57,6 +57,11 @@ function parseAccountState(data: any): Record<string, number> | null {
   for (let i = 0; i < ACCOUNT_DETAILS_COLUMNS.length && i < arr.length; i++) {
     result[ACCOUNT_DETAILS_COLUMNS[i]] = Number(arr[i]) || 0;
   }
+  // Add convenience aliases
+  result.equity = result.projectedBalance || 0;
+  result.freeMargin = result.availableFunds || 0;
+  result.usedMargin = result.initialMarginReq || 0;
+  result.unrealizedPl = result.openNetPnL || 0;
   return result;
 }
 
