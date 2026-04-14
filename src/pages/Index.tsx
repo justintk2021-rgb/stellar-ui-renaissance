@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
 import { AnimatePresence, motion } from "framer-motion";
+import { RefreshCw } from "lucide-react";
 
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
@@ -68,6 +69,7 @@ const Index = () => {
     return localStorage.getItem('selectedBrokerAccountId') || null;
   });
   const [brokerBalance, setBrokerBalance] = useState<number | null>(null);
+  const [brokerSyncing, setBrokerSyncing] = useState(false);
 
   // Persist broker account selection
   const handleSetBrokerAccountId = useCallback((id: string | null) => {
@@ -110,7 +112,6 @@ const Index = () => {
 
     const autoSync = async () => {
       try {
-        // Check if user has any connected broker
         const { data: connections } = await supabase
           .from('broker_connections')
           .select('id, connection_status')
@@ -119,7 +120,7 @@ const Index = () => {
 
         if (cancelled || !connections?.length) return;
 
-        // Trigger sync for each connected broker
+        setBrokerSyncing(true);
         for (const conn of connections) {
           if (cancelled) return;
           try {
@@ -132,10 +133,11 @@ const Index = () => {
         }
       } catch (e) {
         console.warn('Auto broker sync check failed:', e);
+      } finally {
+        if (!cancelled) setBrokerSyncing(false);
       }
     };
 
-    // Small delay to let auth fully settle
     const timer = setTimeout(autoSync, 1500);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [user?.id]);
@@ -601,6 +603,19 @@ const Index = () => {
                       onDeleteAccount={deleteAccount}
                       onSetDefault={setDefaultAccount}
                     />
+                    <AnimatePresence>
+                      {brokerSyncing && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5 text-primary animate-spin" />
+                          <span className="text-xs font-medium text-primary">Syncing broker…</span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </motion.div>
                   
                   <motion.div variants={staggerItem}>
