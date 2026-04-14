@@ -23,6 +23,8 @@ interface BrokerManagementProps {
 }
 
 export function BrokerManagement({ userId }: BrokerManagementProps) {
+  const [activePlatform, setActivePlatform] = useState<string>('tradelocker');
+
   const {
     connection, accounts, positions, orders, history, summary,
     loading, syncing,
@@ -148,13 +150,14 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const renderTradeLocker = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      );
+    }
 
   // ===================== NO CONNECTION - SHOW CONNECT FORM =====================
   if (!connection) {
@@ -793,6 +796,59 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+  };
+
+  const renderMT5 = () => {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto">
+        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Link2 className="w-5 h-5 text-primary" />
+              MetaTrader 5 (MT5)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-center py-8 space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+                <Activity className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">MT5 Integration Coming Soon</h3>
+                <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+                  Connect your MetaTrader 5 account to sync trades, positions, and history automatically.
+                  You'll need a self-hosted VPS running the MT5 bridge for this feature.
+                </p>
+              </div>
+              <div className="flex flex-wrap justify-center gap-2 mt-4">
+                <Badge variant="outline" className="text-muted-foreground">Auto-sync trades</Badge>
+                <Badge variant="outline" className="text-muted-foreground">Position tracking</Badge>
+                <Badge variant="outline" className="text-muted-foreground">Deal history</Badge>
+                <Badge variant="outline" className="text-muted-foreground">Journal integration</Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <Tabs value={activePlatform} onValueChange={setActivePlatform}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="tradelocker">TradeLocker</TabsTrigger>
+          <TabsTrigger value="mt5">MT5</TabsTrigger>
+        </TabsList>
+        <TabsContent value="tradelocker">
+          {renderTradeLocker()}
+        </TabsContent>
+        <TabsContent value="mt5">
+          {renderMT5()}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
