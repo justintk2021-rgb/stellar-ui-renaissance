@@ -150,13 +150,14 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const renderTradeLocker = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      );
+    }
 
   // ===================== NO CONNECTION - SHOW CONNECT FORM =====================
   if (!connection) {
