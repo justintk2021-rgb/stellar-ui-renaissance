@@ -348,11 +348,18 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
 
       {/* Tabs */}
       <Tabs defaultValue="positions" className="w-full">
-        <TabsList className="w-full justify-start">
+        <TabsList className="w-full justify-start flex-wrap">
           <TabsTrigger value="positions">Positions ({positions.length})</TabsTrigger>
           <TabsTrigger value="orders">Orders ({orders.length})</TabsTrigger>
           <TabsTrigger value="history">History ({history.length})</TabsTrigger>
           <TabsTrigger value="trade">Place Trade</TabsTrigger>
+          <TabsTrigger value="debug" onClick={async () => {
+            if (!showDebug) {
+              setShowDebug(true);
+              const logs = await fetchSyncLogs();
+              setSyncLogs(logs);
+            }
+          }}>Debug / Logs</TabsTrigger>
         </TabsList>
 
         {/* POSITIONS */}
