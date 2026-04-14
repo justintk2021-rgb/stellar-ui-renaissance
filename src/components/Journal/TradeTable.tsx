@@ -414,8 +414,9 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 + tradeIndex * 0.05 }}
                     whileHover={{ backgroundColor: "hsl(var(--muted) / 0.3)" }}
-                    className="grid grid-cols-[1fr_80px_100px_auto] gap-4 px-5 py-3 pl-12 bg-card/20 transition-colors duration-200"
+                    className="px-5 py-3 pl-12 bg-card/20 transition-colors duration-200"
                   >
+                    <div className="grid grid-cols-[1fr_80px_100px_auto] gap-4">
                     <div className="flex items-center gap-3 flex-wrap">
                       <motion.span 
                         className="text-sm font-semibold"
