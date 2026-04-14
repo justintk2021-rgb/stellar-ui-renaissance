@@ -1341,15 +1341,6 @@ serve(async (req) => {
         rawResults.config = { status: res.status, body: res.ok ? await res.json() : await res.text() };
       } catch (e: any) { rawResults.config = { error: e.message }; }
 
-      // Instrument details test (tradableInstrumentId 283=USDJPY, 314=XAUUSD)
-      try {
-        for (const testId of ['283', '314']) {
-          const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/instruments/${testId}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
-          });
-          rawResults[`instrumentDetails_${testId}`] = { status: res.status, body: res.ok ? await res.json() : await res.text() };
-        }
-      } catch (e: any) { rawResults.instrumentDetails = { error: e.message }; }
 
       return jsonResponse({ rawResults });
     }
