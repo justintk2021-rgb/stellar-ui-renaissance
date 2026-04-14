@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Trade } from '@/types/trade';
 import { toast } from 'sonner';
 
-export function useTrades(userId: string | undefined, accountId: string | null = null) {
+export function useTrades(userId: string | undefined, accountId: string | null = null, brokerAccountId: string | null = null) {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -23,8 +23,11 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         .eq('user_id', userId)
         .order('date', { ascending: false });
       
-      // Filter by account if specified
-      if (accountId) {
+      // Filter by broker account if specified
+      if (brokerAccountId) {
+        query = query.eq('broker_account_id', brokerAccountId).eq('imported_from_broker', true);
+      } else if (accountId) {
+        // Filter by manual account if specified
         query = query.eq('account_id', accountId);
       }
 
