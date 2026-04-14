@@ -299,8 +299,7 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
   const isPositive = balanceChange >= 0;
   const isProfitPositive = profit >= 0;
   const goalProgress = goalBalance && goalBalance > 0 ? Math.min(100, (currentBalance / goalBalance) * 100) : 0;
-  const netProfit = currentBalance - startBalance;
-  const profitTargetProgress = profitTarget && profitTarget > 0 ? Math.min(100, (Math.max(0, netProfit) / profitTarget) * 100) : 0;
+  const profitTargetProgress = profitTarget && profitTarget > 0 ? Math.min(100, (Math.max(0, netPnL) / profitTarget) * 100) : 0;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
