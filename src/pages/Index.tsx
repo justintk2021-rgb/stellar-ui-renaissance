@@ -89,8 +89,34 @@ const Index = () => {
     importTrades 
   } = useTrades(user?.id, selectedBrokerAccountId ? null : selectedAccountId, selectedBrokerAccountId);
   
-  // Use the account's starting balance
-  const accountStartBalance = selectedAccount?.starting_balance || 10000;
+  // Fetch broker balance when a broker account is selected
+  useEffect(() => {
+    if (!selectedBrokerAccountId) {
+      setBrokerBalance(null);
+      return;
+    }
+    const fetchBrokerBalance = async () => {
+      const { data } = await supabase
+        .from('broker_accounts')
+        .select('broker_connection_id')
+        .eq('account_id_external', selectedBrokerAccountId)
+        .maybeSingle();
+      if (data?.broker_connection_id) {
+        const { data: conn } = await supabase
+          .from('broker_connections')
+          .select('account_balance')
+          .eq('id', data.broker_connection_id)
+          .single();
+        if (conn?.account_balance != null) {
+          setBrokerBalance(Number(conn.account_balance));
+        }
+      }
+    };
+    fetchBrokerBalance();
+  }, [selectedBrokerAccountId]);
+
+  // Use the account's starting balance (or broker balance when broker account selected)
+  const accountStartBalance = brokerBalance ?? (selectedAccount?.starting_balance || 10000);
   
   // Use database-backed notebook entries
   const { 
