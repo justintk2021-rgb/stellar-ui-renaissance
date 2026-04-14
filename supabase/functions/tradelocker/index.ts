@@ -556,6 +556,19 @@ serve(async (req) => {
         const ordColumns = config?.ordersConfig?.columns || [];
         const ordHistColumns = config?.ordersHistoryConfig?.columns || [];
 
+        // 0b. Fetch instruments to resolve tradableInstrumentId → symbol name
+        const rawInstruments = await tlGetInstruments(accessToken, accountId, accNum, environment);
+        const instrumentMap: Record<string, string> = {};
+        for (const inst of rawInstruments) {
+          if (inst.tradableInstrumentId && inst.name) {
+            instrumentMap[String(inst.tradableInstrumentId)] = inst.name;
+          }
+        }
+        const resolveSymbol = (tradableId: any) => {
+          const id = String(tradableId);
+          return instrumentMap[id] || id;
+        };
+
         // 1. Sync account state (now properly parsed from columnar array)
         const state = await tlGetAccountState(accessToken, accountId, accNum, environment);
         if (state) {
