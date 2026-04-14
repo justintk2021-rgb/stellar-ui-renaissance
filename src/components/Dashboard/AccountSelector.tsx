@@ -251,7 +251,7 @@ export const AccountSelector = ({
                     Set Default
                   </Button>
                 )}
-                {accounts.length > 1 && (
+                {accounts.length > 0 && (
                   <Button
                     variant="destructive"
                     size="sm"
