@@ -2123,49 +2123,38 @@ export function NotebookView({
             transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
           >
             {/* All Notes Header */}
-            <div className="px-6 lg:px-10 py-4 border-b border-border/20">
+            <div className="px-6 lg:px-10 py-5 border-b border-border/20">
               <motion.div 
                 initial={{ opacity: 0, y: -15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className="flex items-center justify-between"
+                className="flex items-center justify-between gap-4"
               >
-                {/* Category Filter Tabs with sliding indicator */}
+                {/* Category Filter Tabs */}
                 <motion.div 
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: 0.1 }}
-                  className="relative flex items-center gap-1 p-1 rounded-lg bg-muted/40"
+                  className="flex items-center gap-1 overflow-x-auto scrollbar-hide"
                 >
-                  {/* Sliding background pill */}
-                  <motion.div
-                    className="absolute top-1 bottom-1 rounded-md bg-primary shadow-sm"
-                    initial={false}
-                    animate={{
-                      x: selectedCategory === 'all' ? 0 : 'calc(100% + 4px)',
-                      width: selectedCategory === 'all' ? 'calc(50% - 2px)' : 'calc(50% - 2px)',
-                    }}
-                    transition={{
-                      type: "spring",
-                      stiffness: 400,
-                      damping: 30,
-                    }}
-                    style={{ left: 4 }}
-                  />
                   {[
                     { id: 'all', label: 'All' },
+                    { id: 'daily-journal', label: 'Journal' },
                     { id: 'trading-plan', label: 'Plans' },
+                    { id: 'trade-notes', label: 'Trades' },
+                    { id: 'goals', label: 'Goals' },
+                    { id: 'general', label: 'General' },
                   ].map((tab) => (
                     <motion.button
                       key={tab.id}
                       onClick={() => setSelectedCategory(tab.id)}
                       whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                      whileTap={{ scale: 0.97 }}
                       className={cn(
-                        "relative z-10 px-6 py-2 text-sm font-medium rounded-md transition-colors duration-200",
+                        "relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap",
                         selectedCategory === tab.id
-                          ? "text-primary-foreground" 
-                          : "text-muted-foreground hover:text-foreground"
+                          ? "bg-primary text-primary-foreground shadow-sm" 
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                       )}
                     >
                       {tab.label}
@@ -2177,7 +2166,7 @@ export function NotebookView({
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-                  className="flex items-center gap-3"
+                  className="flex items-center gap-3 shrink-0"
                 >
                   {/* Search */}
                   <div className="relative">
@@ -2187,263 +2176,216 @@ export function NotebookView({
                       placeholder="Search notes..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-48 pl-9 h-9 bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/50"
+                      className="w-48 pl-9 h-9 bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/50 rounded-lg"
                     />
                   </div>
                   {/* View Toggle */}
-                  <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/40">
-                    <motion.button
+                  <div className="flex items-center gap-0.5 p-1 rounded-lg bg-muted/40">
+                    <button
                       onClick={() => { setViewMode('grid'); localStorage.setItem('notebook-view-mode', 'grid'); }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
                       className={cn(
-                        "p-2 rounded-md transition-all duration-200",
+                        "p-1.5 rounded-md transition-all duration-200",
                         viewMode === 'grid' 
                           ? "bg-background shadow-sm text-foreground" 
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
                       <LayoutGrid className="w-4 h-4" />
-                    </motion.button>
-                    <motion.button
+                    </button>
+                    <button
                       onClick={() => { setViewMode('list'); localStorage.setItem('notebook-view-mode', 'list'); }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
                       className={cn(
-                        "p-2 rounded-md transition-all duration-200",
+                        "p-1.5 rounded-md transition-all duration-200",
                         viewMode === 'list' 
                           ? "bg-background shadow-sm text-foreground" 
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
                       <LayoutList className="w-4 h-4" />
-                    </motion.button>
+                    </button>
                   </div>
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Button
-                      onClick={handleNewNote}
-                      variant="ghost"
-                      className="text-primary hover:text-primary hover:bg-primary/5 font-medium"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add new note
-                    </Button>
-                  </motion.div>
+                  <Button
+                    onClick={handleNewNote}
+                    variant="ghost"
+                    className="text-primary hover:text-primary hover:bg-primary/5 font-medium"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add new note
+                  </Button>
                 </motion.div>
               </motion.div>
             </div>
 
             {/* Notes Grid/List */}
             <ScrollArea className="flex-1 px-6 lg:px-10 py-6">
-              {notebookEntries.filter(e => {
-                if (e.isDeleted) return false;
-                if (selectedCategory !== "all" && e.category !== selectedCategory) return false;
-                if (searchQuery) {
-                  const query = searchQuery.toLowerCase();
-                  return e.title.toLowerCase().includes(query) || 
-                         e.content.toLowerCase().includes(query);
+              {(() => {
+                const visibleEntries = notebookEntries
+                  .filter(e => {
+                    if (e.isDeleted) return false;
+                    if (selectedCategory !== "all" && e.category !== selectedCategory) return false;
+                    if (searchQuery) {
+                      const query = searchQuery.toLowerCase();
+                      return e.title.toLowerCase().includes(query) || 
+                             e.content.toLowerCase().includes(query);
+                    }
+                    return true;
+                  })
+                  .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+                if (visibleEntries.length === 0) {
+                  return (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      className="flex flex-col items-center justify-center py-20 text-muted-foreground"
+                    >
+                      <motion.div
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 0.15 }}
+                        transition={{ duration: 0.8, delay: 0.2 }}
+                      >
+                        {searchQuery ? <Search className="w-14 h-14 mb-4" /> : <BookOpen className="w-14 h-14 mb-4" />}
+                      </motion.div>
+                      <p className="text-base font-medium">{searchQuery ? 'No matching notes' : 'No notes yet'}</p>
+                      <p className="text-sm mt-1 text-muted-foreground/70">{searchQuery ? 'Try a different search term' : 'Create your first note to get started'}</p>
+                    </motion.div>
+                  );
                 }
-                return true;
-              }).length === 0 ? (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-                  className="flex flex-col items-center justify-center py-20 text-muted-foreground"
-                >
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 0.2 }}
-                    transition={{ duration: 0.8, delay: 0.2 }}
-                  >
-                    {searchQuery ? <Search className="w-16 h-16 mb-4" /> : <BookOpen className="w-16 h-16 mb-4" />}
-                  </motion.div>
-                  <p className="text-lg font-medium">{searchQuery ? 'No matching notes' : 'No notes yet'}</p>
-                  <p className="text-sm mt-1">{searchQuery ? 'Try a different search term' : 'Create your first note to get started'}</p>
-                </motion.div>
-              ) : (
-                <AnimatePresence mode="wait">
-                  <motion.div 
-                    key={selectedCategory}
-                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                    transition={{ 
-                      duration: 0.25,
-                      ease: [0.25, 0.46, 0.45, 0.94]
-                    }}
-                    className={cn(
-                      viewMode === 'grid' 
-                        ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5" 
-                        : "flex flex-col gap-3"
-                    )}
-                  >
-                  {notebookEntries
-                    .filter(e => {
-                      if (e.isDeleted) return false;
-                      if (selectedCategory !== "all" && e.category !== selectedCategory) return false;
-                      if (searchQuery) {
-                        const query = searchQuery.toLowerCase();
-                        return e.title.toLowerCase().includes(query) || 
-                               e.content.toLowerCase().includes(query);
-                      }
-                      return true;
-                    })
-                    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-                    .map((entry, index) => {
-                      const colors = getNoteCardColor(entry.category, index);
-                      const plainText = entry.content.replace(/<[^>]*>/g, '').slice(0, 200);
-                      const contentLines = plainText.split(/[.!?]\s+/).filter(s => s.trim()).slice(0, 3);
-                      const isDark = document.documentElement.classList.contains('dark');
-                      
-                      return (
-                        <motion.button
-                          key={entry.id}
-                          variants={{
-                            hidden: { 
-                              opacity: 0, 
-                              y: 15,
-                              scale: 0.98
-                            },
-                            visible: { 
+
+                return (
+                  <AnimatePresence mode="wait">
+                    <motion.div 
+                      key={selectedCategory + viewMode}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      className={cn(
+                        viewMode === 'grid' 
+                          ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
+                          : "flex flex-col gap-2"
+                      )}
+                    >
+                      {visibleEntries.map((entry, index) => {
+                        const colors = getNoteCardColor(entry.category, index);
+                        const plainText = entry.content.replace(/<[^>]*>/g, '').trim();
+                        const contentLines = plainText.split(/[.!?\n]+/).filter(s => s.trim()).slice(0, 3);
+                        const isDark = document.documentElement.classList.contains('dark');
+                        
+                        return (
+                          <motion.button
+                            key={entry.id}
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ 
                               opacity: 1, 
                               y: 0,
-                              scale: 1,
                               transition: {
+                                delay: index * 0.03,
                                 type: "spring",
                                 stiffness: 400,
                                 damping: 28
                               }
-                            }
-                          }}
-                          whileHover={{ 
-                            y: -3,
-                            transition: { 
-                              type: "spring", 
-                              stiffness: 500, 
-                              damping: 25 
-                            } 
-                          }}
-                          whileTap={{ scale: 0.99 }}
-                          onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
-                          className={cn(
-                            "text-left bg-card rounded-xl overflow-hidden group relative",
-                            "shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)]",
-                            "transition-shadow duration-300",
-                            viewMode === 'grid' 
-                              ? "p-0 min-h-[200px] flex flex-col" 
-                              : "p-4 flex items-start gap-4 border border-border/30"
-                          )}
-                        >
-                          {viewMode === 'grid' ? (
-                            <>
-                              {/* Color accent bar - left side */}
-                              <motion.div 
-                                className="absolute top-0 left-0 w-1 h-full"
-                                style={{ backgroundColor: colors.accent }}
-                                initial={{ scaleY: 0, originY: 0 }}
-                                animate={{ scaleY: 1 }}
-                                transition={{ duration: 0.5, delay: index * 0.02, ease: [0.25, 0.46, 0.45, 0.94] }}
-                              />
-                              
-                              <div className="p-4 pl-5 flex flex-col flex-1">
-                                {/* Date Header */}
-                                <motion.p 
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  transition={{ delay: 0.1 + index * 0.02 }}
-                                  className="text-xs text-muted-foreground mb-2 font-medium"
-                                >
-                                  {new Date(entry.date).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                </motion.p>
+                            }}
+                            whileHover={{ 
+                              y: viewMode === 'grid' ? -4 : 0,
+                              transition: { type: "spring", stiffness: 500, damping: 25 } 
+                            }}
+                            whileTap={{ scale: 0.99 }}
+                            onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
+                            className={cn(
+                              "text-left rounded-xl overflow-hidden group relative border transition-all duration-300",
+                              viewMode === 'grid' 
+                                ? "flex flex-col" 
+                                : "flex items-start gap-4 p-4"
+                            )}
+                            style={{
+                              backgroundColor: isDark ? colors.bgDark : colors.bg,
+                              borderColor: isDark ? colors.borderDark : colors.border,
+                            }}
+                          >
+                            {viewMode === 'grid' ? (
+                              <>
+                                {/* Color accent bar - top */}
+                                <div 
+                                  className="h-1 w-full"
+                                  style={{ backgroundColor: colors.accent }}
+                                />
                                 
-                                {/* Title with accent dot */}
-                                <div className="flex items-start gap-2 mb-3">
-                                  <motion.div 
-                                    className="w-1.5 h-1.5 rounded-full mt-2 shrink-0"
-                                    style={{ backgroundColor: colors.accent }}
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    transition={{ delay: 0.15 + index * 0.02, type: "spring", stiffness: 500 }}
-                                  />
-                                  <h3 className="font-semibold text-foreground leading-tight line-clamp-2">
+                                <div className="p-4 flex flex-col flex-1 gap-2">
+                                  {/* Date */}
+                                  <p className="text-[11px] text-muted-foreground font-medium">
+                                    {new Date(entry.date).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                  </p>
+                                  
+                                  {/* Title */}
+                                  <h3 className="font-semibold text-foreground leading-snug line-clamp-2 text-[15px]">
                                     {entry.title || 'Untitled'}
                                   </h3>
-                                </div>
-                                
-                                {/* Content Preview as bullet points */}
-                                <div className="flex-1 space-y-1.5">
-                                  {contentLines.length > 0 ? (
-                                    contentLines.map((line, i) => (
-                                      <motion.div 
-                                        key={i}
-                                        initial={{ opacity: 0, x: -5 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: 0.2 + i * 0.05 }}
-                                        className="flex items-start gap-2 text-sm text-muted-foreground"
-                                      >
-                                        <span className="text-muted-foreground/40 mt-0.5">•</span>
-                                        <span className="line-clamp-1">{line.trim()}</span>
-                                      </motion.div>
-                                    ))
-                                  ) : (
-                                    <p className="text-sm text-muted-foreground/60 italic">No content...</p>
-                                  )}
-                                </div>
-                                
-                                {/* Optional: Trade indicator badge */}
-                                {entry.tradeId && (
-                                  <motion.div 
-                                    initial={{ opacity: 0, y: 5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.3 }}
-                                    className="mt-3 pt-2"
-                                  >
-                                    <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-background/80 border-border/50">
-                                      <TrendingUp className="w-2.5 h-2.5 mr-1" />
-                                      Linked Trade
-                                    </Badge>
-                                  </motion.div>
-                                )}
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              {/* List View - accent bar */}
-                              <motion.div 
-                                className="w-1 h-14 rounded-full shrink-0"
-                                style={{ backgroundColor: colors.accent }}
-                                initial={{ scaleY: 0 }}
-                                animate={{ scaleY: 1 }}
-                                transition={{ duration: 0.3, delay: index * 0.02 }}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h3 className="font-semibold text-foreground truncate">
-                                    {entry.title || 'Untitled'}
-                                  </h3>
+                                  
+                                  {/* Content Preview */}
+                                  <div className="flex-1 space-y-1 mt-1">
+                                    {contentLines.length > 0 ? (
+                                      contentLines.map((line, i) => (
+                                        <div 
+                                          key={i}
+                                          className="flex items-start gap-2 text-[13px] text-muted-foreground leading-relaxed"
+                                        >
+                                          <span className="text-muted-foreground/50 mt-0.5 shrink-0">•</span>
+                                          <span className="line-clamp-1">{line.trim()}</span>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <p className="text-[13px] text-muted-foreground/50 italic">No content...</p>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Trade indicator */}
                                   {entry.tradeId && (
-                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50 shrink-0">
-                                      <TrendingUp className="w-2.5 h-2.5 mr-1" />
-                                      Trade
-                                    </Badge>
+                                    <div className="mt-2 pt-2 border-t" style={{ borderColor: isDark ? colors.borderDark : colors.border }}>
+                                      <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-border/50 bg-background/50">
+                                        <TrendingUp className="w-2.5 h-2.5 mr-1" />
+                                        Linked Trade
+                                      </Badge>
+                                    </div>
                                   )}
                                 </div>
-                                <p className="text-sm text-muted-foreground line-clamp-1">
-                                  {plainText || 'No content...'}
-                                </p>
-                              </div>
-                              <div className="text-xs text-muted-foreground shrink-0">
-                                {new Date(entry.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
-                              </div>
-                            </>
-                          )}
-                        </motion.button>
-                      );
-                    })}
-                  </motion.div>
-                </AnimatePresence>
-              )}
+                              </>
+                            ) : (
+                              <>
+                                {/* List View */}
+                                <div 
+                                  className="w-1 h-12 rounded-full shrink-0 self-center"
+                                  style={{ backgroundColor: colors.accent }}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-0.5">
+                                    <h3 className="font-semibold text-foreground truncate text-sm">
+                                      {entry.title || 'Untitled'}
+                                    </h3>
+                                    {entry.tradeId && (
+                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50 shrink-0 border-border/50">
+                                        <TrendingUp className="w-2.5 h-2.5 mr-1" />
+                                        Trade
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-[13px] text-muted-foreground line-clamp-1">
+                                    {plainText || 'No content...'}
+                                  </p>
+                                </div>
+                                <div className="text-xs text-muted-foreground shrink-0">
+                                  {new Date(entry.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
+                                </div>
+                              </>
+                            )}
+                          </motion.button>
+                        );
+                      })}
+                    </motion.div>
+                  </AnimatePresence>
+                );
+              })()}
             </ScrollArea>
           </motion.div>
         )}
