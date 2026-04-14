@@ -216,6 +216,30 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
     if (e.key === "Escape") handleCancelGoal();
   };
 
+  // Profit target handlers
+  const handleStartEditProfitTarget = () => {
+    setEditProfitTargetValue((profitTarget || 0).toString());
+    setIsEditingProfitTarget(true);
+  };
+
+  const handleConfirmProfitTarget = () => {
+    const value = parseFloat(editProfitTargetValue);
+    if (!isNaN(value) && value >= 0) {
+      onSetProfitTarget(value);
+    }
+    setIsEditingProfitTarget(false);
+  };
+
+  const handleCancelProfitTarget = () => {
+    setEditProfitTargetValue((profitTarget || 0).toString());
+    setIsEditingProfitTarget(false);
+  };
+
+  const handleKeyDownProfitTarget = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleConfirmProfitTarget();
+    if (e.key === "Escape") handleCancelProfitTarget();
+  };
+
   const { currentBalance, balanceChange, balancePercent, profit, profitPercent, fees, highestBalance, sparklineData } = useMemo(() => {
     const sortedTrades = [...trades].sort((a, b) => {
       if (a.date === b.date) return parseInt(a.id) - parseInt(b.id);
