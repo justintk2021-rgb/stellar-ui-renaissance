@@ -23,6 +23,8 @@ interface BrokerManagementProps {
 }
 
 export function BrokerManagement({ userId }: BrokerManagementProps) {
+  const [activePlatform, setActivePlatform] = useState<string>('tradelocker');
+
   const {
     connection, accounts, positions, orders, history, summary,
     loading, syncing,
