@@ -30,14 +30,6 @@ export function useTradingAccounts(userId: string | undefined) {
     }
 
     try {
-      // First, ensure user has a default account
-      const { data: ensuredAccountId, error: ensureError } = await supabase
-        .rpc('ensure_default_account', { p_user_id: userId });
-
-      if (ensureError) {
-        console.error('Error ensuring default account:', ensureError);
-      }
-
       // Fetch all accounts
       const { data, error } = await supabase
         .from('trading_accounts')
@@ -231,12 +223,6 @@ export function useTradingAccounts(userId: string | undefined) {
   // Delete an account
   const deleteAccount = useCallback(async (id: string) => {
     if (!userId) return false;
-
-    // Don't allow deleting the only account
-    if (accounts.length <= 1) {
-      toast.error('Cannot delete the only account');
-      return false;
-    }
 
     try {
       const { error } = await supabase
