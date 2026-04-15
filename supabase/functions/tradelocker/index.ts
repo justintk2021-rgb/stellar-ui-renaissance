@@ -414,17 +414,19 @@ serve(async (req) => {
         refreshToken: authResult.refreshToken,
       });
 
-      // Check for existing connection and update, or create new
+      // Check for existing connection with same server+email to update, otherwise create new
       const { data: existingConn } = await supabase
         .from('broker_connections')
         .select('id')
         .eq('user_id', user.id)
         .eq('platform', 'tradelocker')
+        .eq('server', server)
+        .eq('login', email)
         .maybeSingle();
 
       let connection;
       if (existingConn) {
-        // Update existing connection
+        // Update existing connection with same credentials
         const { data, error } = await supabase
           .from('broker_connections')
           .update({
@@ -450,6 +452,7 @@ serve(async (req) => {
         // Clear old accounts
         await supabase.from('broker_accounts').delete().eq('broker_connection_id', connection.id);
       } else {
+        // Create new connection
         const { data, error } = await supabase
           .from('broker_connections')
           .insert({
