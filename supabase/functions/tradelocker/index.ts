@@ -426,7 +426,7 @@ serve(async (req) => {
 
       let connection;
       if (existingConn) {
-        // Update existing connection with same credentials
+        // Update existing connection with same credentials - preserve active account selection
         const { data, error } = await supabase
           .from('broker_connections')
           .update({
@@ -438,8 +438,6 @@ serve(async (req) => {
             token_expiry: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
             last_connected_at: new Date().toISOString(),
             last_error: null,
-            active_account_id: null,
-            active_acc_num: null,
           })
           .eq('id', existingConn.id)
           .select()
@@ -449,7 +447,7 @@ serve(async (req) => {
           return jsonResponse({ error: 'Failed to update connection' }, 500);
         }
         connection = data;
-        // Clear old accounts
+        // Refresh broker accounts list
         await supabase.from('broker_accounts').delete().eq('broker_connection_id', connection.id);
       } else {
         // Create new connection
