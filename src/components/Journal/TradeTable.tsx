@@ -253,7 +253,7 @@ interface TradeRowGroupProps {
   checklists: Checklist[];
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
-  onViewNotes: (trade: Trade) => void;
+  onViewNotes: (trade: Trade, allDayTrades?: Trade[]) => void;
   index: number;
   isExpanded: boolean;
   onToggle: () => void;
