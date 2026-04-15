@@ -98,27 +98,34 @@ const iconVariants = {
 export function StatsGrid({ trades }: StatsGridProps) {
   const [openPositions, setOpenPositions] = useState<{ count: number; floatingPl: number }>({ count: 0, floatingPl: 0 });
 
+  const [activeBrokerConnId, setActiveBrokerConnId] = useState<string | null>(
+    localStorage.getItem('activeBrokerConnectionId')
+  );
+
+  // Poll for active broker connection changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const current = localStorage.getItem('activeBrokerConnectionId');
+      setActiveBrokerConnId(prev => prev !== current ? current : prev);
+    }, 1000);
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'activeBrokerConnectionId') setActiveBrokerConnId(e.newValue);
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => { clearInterval(interval); window.removeEventListener('storage', handleStorage); };
+  }, []);
+
   useEffect(() => {
     const fetchOpenPositions = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: connections } = await supabase
-        .from('broker_connections')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('connection_status', 'connected');
-
-      if (!connections?.length) {
+      if (!activeBrokerConnId) {
         setOpenPositions({ count: 0, floatingPl: 0 });
         return;
       }
 
-      const ids = connections.map(c => c.id);
       const { data: positions } = await supabase
         .from('broker_positions')
         .select('floating_pl')
-        .in('broker_connection_id', ids)
+        .eq('broker_connection_id', activeBrokerConnId)
         .is('closed_at', null);
 
       if (positions) {
@@ -126,6 +133,8 @@ export function StatsGrid({ trades }: StatsGridProps) {
           count: positions.length,
           floatingPl: positions.reduce((sum, p) => sum + Number(p.floating_pl || 0), 0),
         });
+      } else {
+        setOpenPositions({ count: 0, floatingPl: 0 });
       }
     };
 
@@ -137,7 +146,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [trades]);
+  }, [trades, activeBrokerConnId]);
 
   const stats = trades.reduce(
     (acc, trade) => {
