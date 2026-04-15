@@ -119,6 +119,7 @@ export const AccountSelector = ({
         const match = brokerAccs.find(b => `broker-${b.connectionId}-${b.accNum}` === persistedBrokerId);
         if (match) {
           setSelectedBrokerAccount(persistedBrokerId);
+          localStorage.setItem('activeBrokerConnectionId', match.connectionId);
           onSelectBrokerAccount?.(match.accountId);
         } else {
           // Persisted broker no longer exists, clear it
