@@ -320,9 +320,9 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
           </Badge>
         </div>
 
-        {/* Quick Actions for single trade */}
+        {/* Quick Actions */}
         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          {trades.length === 1 && (
+          {trades.length === 1 ? (
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
                 variant="ghost"
@@ -332,6 +332,18 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
               >
                 <FileText className="w-3.5 h-3.5" />
                 View Note
+              </Button>
+            </motion.div>
+          ) : (
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onViewNotes(trades[0])}
+                className="h-8 px-3 text-xs gap-1.5 text-primary hover:bg-primary/10 hover:text-primary"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                View Notes ({trades.length})
               </Button>
             </motion.div>
           )}
