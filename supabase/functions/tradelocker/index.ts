@@ -478,11 +478,12 @@ serve(async (req) => {
 
       // Store broker accounts
       for (const acc of accounts) {
+        const parsedAccNum = typeof acc.accNum === 'string' ? parseInt(acc.accNum, 10) : acc.accNum;
         await supabase.from('broker_accounts').insert({
           broker_connection_id: connection.id,
           account_id_external: String(acc.id),
-          acc_num: acc.accNum,
-          account_name: acc.name || `Account ${acc.accNum}`,
+          acc_num: parsedAccNum,
+          account_name: acc.name || `Account ${parsedAccNum}`,
         });
       }
 
