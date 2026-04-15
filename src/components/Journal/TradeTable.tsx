@@ -11,6 +11,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Checklist {
@@ -322,7 +327,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
 
         {/* Quick Actions */}
         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          {trades.length === 1 ? (
+           {trades.length === 1 ? (
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
                 variant="ghost"
@@ -335,17 +340,58 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
               </Button>
             </motion.div>
           ) : (
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onViewNotes(trades[0])}
-                className="h-8 px-3 text-xs gap-1.5 text-primary hover:bg-primary/10 hover:text-primary"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                View Notes ({trades.length})
-              </Button>
-            </motion.div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-3 text-xs gap-1.5 text-primary hover:bg-primary/10 hover:text-primary"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    View Notes ({trades.length})
+                  </Button>
+                </motion.div>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 p-2" onClick={(e) => e.stopPropagation()}>
+                <p className="text-xs text-muted-foreground px-2 py-1.5 font-medium">Select a trade to view notes</p>
+                <div className="space-y-0.5">
+                  {trades.map((trade) => {
+                    const pl = trade.result || 0;
+                    const isProfit = pl >= 0;
+                    return (
+                      <button
+                        key={trade.id}
+                        onClick={() => onViewNotes(trade)}
+                        className="w-full flex items-center justify-between gap-2 px-2 py-2 rounded-lg text-left hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="text-sm font-medium">{trade.pair}</span>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[9px] px-1.5 py-0 font-medium",
+                              trade.direction === 'Long'
+                                ? "border-primary/40 text-primary"
+                                : "border-destructive/40 text-destructive"
+                            )}
+                          >
+                            {trade.direction}
+                          </Badge>
+                        </div>
+                        <span className={cn(
+                          "text-xs font-mono font-bold",
+                          isProfit ? "text-primary" : "text-destructive"
+                        )}>
+                          {isProfit ? '+' : ''}{pl.toFixed(2)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
           )}
         </div>
       </motion.div>
