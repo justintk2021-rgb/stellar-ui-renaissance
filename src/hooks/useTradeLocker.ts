@@ -215,14 +215,17 @@ export function useTradeLocker() {
 
   // Sync
   const sync = async () => {
-    if (!connection) return;
+    if (!connection || !connection.active_account_id) return;
     setSyncing(true);
     try {
       const result = await invokeTradeLocker('sync', { connectionId: connection.id });
       toast.success(result.message || 'Synced');
       await Promise.all([fetchPositions(), fetchOrders(), fetchHistory(), fetchSummary(), fetchConnections()]);
     } catch (error: any) {
-      toast.error(error.message);
+      // Suppress sync errors when session is expired - don't show toast for background syncs
+      if (!error.message?.includes('expired')) {
+        toast.error(error.message);
+      }
     } finally {
       setSyncing(false);
     }
