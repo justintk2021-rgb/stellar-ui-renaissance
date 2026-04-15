@@ -550,6 +550,8 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
 export function TradeTable({ trades, notebookEntries = [], checklists = [], onEdit, onDelete, onSelectForNotebook, onClearAll }: TradeTableProps) {
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const [dayTrades, setDayTrades] = useState<Trade[] | null>(null);
+  const [notesView, setNotesView] = useState<'list' | 'note'>('list');
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -577,9 +579,37 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
     setExpandedDate(null);
   };
 
-  const handleViewNotes = (trade: Trade) => {
+  const handleViewNotes = (trade: Trade, allDayTrades?: Trade[]) => {
+    if (allDayTrades && allDayTrades.length > 1) {
+      setDayTrades(allDayTrades);
+      setSelectedTrade(null);
+      setNotesView('list');
+      setNotesModalOpen(true);
+    } else {
+      setDayTrades(null);
+      setSelectedTrade(trade);
+      setNotesView('note');
+      setNotesModalOpen(true);
+    }
+  };
+
+  const handleSelectTradeFromList = (trade: Trade) => {
     setSelectedTrade(trade);
-    setNotesModalOpen(true);
+    setNotesView('note');
+  };
+
+  const handleBackToList = () => {
+    setSelectedTrade(null);
+    setNotesView('list');
+  };
+
+  const handleCloseModal = () => {
+    setNotesModalOpen(false);
+    setTimeout(() => {
+      setSelectedTrade(null);
+      setDayTrades(null);
+      setNotesView('list');
+    }, 200);
   };
 
   const selectedTradeNote = selectedTrade 
@@ -659,55 +689,166 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
         </div>
       </motion.div>
 
-      {/* Notes Modal */}
-      <Dialog open={notesModalOpen} onOpenChange={setNotesModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <FileText className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <span className="block">Trade Notes</span>
-                <span className="text-sm font-normal text-muted-foreground">
-                  {selectedTrade?.pair} • {selectedTrade?.date}
-                </span>
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto mt-4 p-4 rounded-lg bg-muted/20">
-            {selectedTradeNote ? (
-              <div 
-                className="prose prose-sm dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: selectedTradeNote.content }}
-              />
-            ) : selectedTrade?.notes ? (
-              <p className="text-sm text-foreground whitespace-pre-wrap">{selectedTrade.notes}</p>
-            ) : (
-              <div className="text-center py-8">
-                <FileText className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-                <p className="text-sm text-muted-foreground italic">No notes for this trade.</p>
-              </div>
-            )}
-          </div>
-          <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border/40 flex-shrink-0">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (selectedTrade) {
-                  onSelectForNotebook(selectedTrade.id);
-                  setNotesModalOpen(false);
-                }
-              }}
-              className="gap-2"
-            >
-              <Pencil className="w-4 h-4" />
-              Edit in Notebook
-            </Button>
-            <Button onClick={() => setNotesModalOpen(false)}>
-              Close
-            </Button>
-          </div>
+      {/* Notes Modal - supports both single trade and multi-trade day views */}
+      <Dialog open={notesModalOpen} onOpenChange={(open) => { if (!open) handleCloseModal(); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+          <AnimatePresence mode="wait">
+            {notesView === 'list' && dayTrades ? (
+              <motion.div
+                key="trade-list"
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -30 }}
+                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                className="flex flex-col flex-1 min-h-0"
+              >
+                <DialogHeader className="flex-shrink-0">
+                  <DialogTitle className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <FileText className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <span className="block">Trade Notes</span>
+                      <span className="text-sm font-normal text-muted-foreground">
+                        {dayTrades[0]?.date} • {dayTrades.length} trades
+                      </span>
+                    </div>
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="flex-1 overflow-y-auto mt-4 space-y-2">
+                  {dayTrades.map((trade, i) => {
+                    const pl = trade.result || 0;
+                    const isProfit = pl >= 0;
+                    const hasNote = !!getTradeNote(notebookEntries, trade.id) || !!trade.notes;
+                    return (
+                      <motion.button
+                        key={trade.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        onClick={() => handleSelectTradeFromList(trade)}
+                        className="w-full flex items-center justify-between gap-3 p-4 rounded-xl bg-muted/20 hover:bg-muted/40 border border-border/20 hover:border-border/40 transition-all group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-10 h-10 rounded-lg flex items-center justify-center",
+                            isProfit ? "bg-primary/10" : "bg-destructive/10"
+                          )}>
+                            {isProfit ? (
+                              <TrendingUp className="w-5 h-5 text-primary" />
+                            ) : (
+                              <TrendingDown className="w-5 h-5 text-destructive" />
+                            )}
+                          </div>
+                          <div className="text-left">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold">{trade.pair}</span>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[9px] px-1.5 py-0 font-medium",
+                                  trade.direction === 'Long'
+                                    ? "border-primary/40 text-primary"
+                                    : "border-destructive/40 text-destructive"
+                                )}
+                              >
+                                {trade.direction}
+                              </Badge>
+                              {trade.session && (
+                                <span className="text-[10px] text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+                                  {trade.session}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className={cn(
+                                "text-xs font-mono font-bold",
+                                isProfit ? "text-primary" : "text-destructive"
+                              )}>
+                                {isProfit ? '+' : ''}{pl.toFixed(2)}
+                              </span>
+                              {hasNote && (
+                                <span className="text-[10px] text-primary/70 flex items-center gap-0.5">
+                                  <FileText className="w-2.5 h-2.5" /> Has note
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            ) : notesView === 'note' && selectedTrade ? (
+              <motion.div
+                key="trade-note"
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 30 }}
+                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                className="flex flex-col flex-1 min-h-0"
+              >
+                <DialogHeader className="flex-shrink-0">
+                  <DialogTitle className="flex items-center gap-3">
+                    {dayTrades && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleBackToList}
+                        className="w-8 h-8 rounded-lg hover:bg-muted/50 -ml-1"
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                      </Button>
+                    )}
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <FileText className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <span className="block">Trade Notes</span>
+                      <span className="text-sm font-normal text-muted-foreground">
+                        {selectedTrade.pair} • {selectedTrade.direction} • {selectedTrade.date}
+                      </span>
+                    </div>
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="flex-1 overflow-y-auto mt-4 p-4 rounded-lg bg-muted/20">
+                  {selectedTradeNote ? (
+                    <div 
+                      className="prose prose-sm dark:prose-invert max-w-none"
+                      dangerouslySetInnerHTML={{ __html: selectedTradeNote.content }}
+                    />
+                  ) : selectedTrade.notes ? (
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{selectedTrade.notes}</p>
+                  ) : (
+                    <div className="text-center py-8">
+                      <FileText className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+                      <p className="text-sm text-muted-foreground italic">No notes for this trade.</p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border/40 flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (selectedTrade) {
+                        onSelectForNotebook(selectedTrade.id);
+                        handleCloseModal();
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Edit in Notebook
+                  </Button>
+                  <Button onClick={handleCloseModal}>
+                    Close
+                  </Button>
+                </div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </DialogContent>
       </Dialog>
     </>
