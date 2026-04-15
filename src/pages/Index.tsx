@@ -607,7 +607,7 @@ const Index = () => {
             <AnimatePresence mode="wait">
               {/* Dashboard Page */}
               {currentPage === 'dashboard' && (
-                <PageTransition key="dashboard" className="space-y-6 max-w-7xl mx-auto">
+                <PageTransition key="dashboard" className="space-y-6">
                   {/* Account Selector */}
                   <motion.div variants={staggerItem} className="flex items-center justify-between flex-wrap gap-4">
                     <AccountSelector
@@ -667,7 +667,7 @@ const Index = () => {
 
               {/* Journal Page */}
               {currentPage === 'journal' && (
-                <PageTransition key="journal" className="space-y-6 max-w-7xl mx-auto">
+                <PageTransition key="journal" className="space-y-6">
                   {/* Header with Account Selector and Add Trade Button */}
                   <motion.div variants={staggerItem} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
@@ -800,21 +800,21 @@ const Index = () => {
 
               {/* Playbook Page */}
               {currentPage === 'playbook' && (
-                <PageTransition key="playbook" className="max-w-7xl mx-auto">
+                <PageTransition key="playbook">
                   <PlaybookView />
                 </PageTransition>
               )}
 
               {/* Economic Calendar Page */}
               {currentPage === 'calendar' && (
-                <PageTransition key="calendar" className="max-w-7xl mx-auto">
+                <PageTransition key="calendar">
                   <EconomicCalendarView />
                 </PageTransition>
               )}
 
               {/* Settings Page */}
               {currentPage === 'settings' && (
-                <PageTransition key="settings" className="max-w-7xl mx-auto">
+                <PageTransition key="settings">
                   <SettingsView 
                     theme={theme} 
                     onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)}
@@ -839,14 +839,14 @@ const Index = () => {
 
               {/* Calculator Page */}
               {currentPage === 'calculator' && (
-                <PageTransition key="calculator" className="max-w-4xl mx-auto">
+                <PageTransition key="calculator" className="max-w-5xl mx-auto">
                   <LotSizeCalculator />
                 </PageTransition>
               )}
 
               {/* Community Page */}
               {currentPage === 'community' && (
-                <PageTransition key="community" className="max-w-7xl mx-auto">
+                <PageTransition key="community">
                   <CommunityView />
                 </PageTransition>
               )}
