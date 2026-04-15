@@ -63,24 +63,39 @@ export function RecentTrades({ trades }: RecentTradesProps) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: connections } = await supabase
-      .from('broker_connections')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('connection_status', 'connected');
-
-    if (!connections?.length) {
+    // Only show data for the active broker connection
+    const activeBrokerConnId = localStorage.getItem('activeBrokerConnectionId');
+    
+    if (!activeBrokerConnId) {
+      // Fallback: no active connection selected, show nothing
       setConnIds([]);
       setPositions([]);
       setOrders([]);
       return;
     }
-    const ids = connections.map(c => c.id);
+
+    // Verify this connection belongs to the user and is connected
+    const { data: conn } = await supabase
+      .from('broker_connections')
+      .select('id')
+      .eq('id', activeBrokerConnId)
+      .eq('user_id', user.id)
+      .eq('connection_status', 'connected')
+      .maybeSingle();
+
+    if (!conn) {
+      setConnIds([]);
+      setPositions([]);
+      setOrders([]);
+      return;
+    }
+
+    const ids = [conn.id];
     setConnIds(ids);
 
     const [posRes, ordRes] = await Promise.all([
-      supabase.from('broker_positions').select('*').in('broker_connection_id', ids).is('closed_at', null),
-      supabase.from('broker_orders').select('*').in('broker_connection_id', ids).eq('status', 'pending'),
+      supabase.from('broker_positions').select('*').eq('broker_connection_id', conn.id).is('closed_at', null),
+      supabase.from('broker_orders').select('*').eq('broker_connection_id', conn.id).eq('status', 'pending'),
     ]);
 
     if (posRes.data) setPositions(posRes.data.map(p => ({
@@ -104,6 +119,29 @@ export function RecentTrades({ trades }: RecentTradesProps) {
     fetchBrokerData();
   }, [trades]);
 
+  // Re-fetch when active broker connection changes
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'activeBrokerConnectionId') {
+        fetchBrokerData();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also poll localStorage on a short interval to catch same-tab changes
+    const interval = setInterval(() => {
+      const current = localStorage.getItem('activeBrokerConnectionId');
+      if (!connIds.includes(current || '')) {
+        fetchBrokerData();
+      }
+    }, 2000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [connIds]);
+
   // Realtime subscription for broker positions and orders
   useEffect(() => {
     const channel = supabase
@@ -113,9 +151,6 @@ export function RecentTrades({ trades }: RecentTradesProps) {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'broker_orders' }, () => {
         fetchBrokerData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, () => {
-        // trades list is managed by parent, but we refetch broker data in case sync added new trades
       })
       .subscribe();
 
