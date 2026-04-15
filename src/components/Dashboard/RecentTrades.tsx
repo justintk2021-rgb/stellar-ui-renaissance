@@ -119,6 +119,29 @@ export function RecentTrades({ trades }: RecentTradesProps) {
     fetchBrokerData();
   }, [trades]);
 
+  // Re-fetch when active broker connection changes
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'activeBrokerConnectionId') {
+        fetchBrokerData();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also poll localStorage on a short interval to catch same-tab changes
+    const interval = setInterval(() => {
+      const current = localStorage.getItem('activeBrokerConnectionId');
+      if (!connIds.includes(current || '')) {
+        fetchBrokerData();
+      }
+    }, 2000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [connIds]);
+
   // Realtime subscription for broker positions and orders
   useEffect(() => {
     const channel = supabase
@@ -128,9 +151,6 @@ export function RecentTrades({ trades }: RecentTradesProps) {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'broker_orders' }, () => {
         fetchBrokerData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, () => {
-        // trades list is managed by parent, but we refetch broker data in case sync added new trades
       })
       .subscribe();
 
