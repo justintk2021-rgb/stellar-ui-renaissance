@@ -3,7 +3,7 @@ import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, Trophy, Target, ClipboardCheck } from "lucide-react";
+import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, Trophy, Target, ClipboardCheck, ArrowLeft } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
@@ -11,11 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Checklist {
