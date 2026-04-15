@@ -102,7 +102,10 @@ async function invokeTradeLocker(action: string, body: Record<string, unknown> =
 }
 
 export function useTradeLocker() {
-  const [connection, setConnection] = useState<BrokerConnection | null>(null);
+  const [connections, setConnections] = useState<BrokerConnection[]>([]);
+  const [activeConnectionId, setActiveConnectionId] = useState<string | null>(() => {
+    return localStorage.getItem('activeBrokerConnectionId') || null;
+  });
   const [accounts, setAccounts] = useState<BrokerAccount[]>([]);
   const [positions, setPositions] = useState<BrokerPosition[]>([]);
   const [orders, setOrders] = useState<BrokerOrder[]>([]);
@@ -112,8 +115,26 @@ export function useTradeLocker() {
   const [syncing, setSyncing] = useState(false);
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch connection
-  const fetchConnection = useCallback(async () => {
+  // Derived active connection
+  const connection = connections.find(c => c.id === activeConnectionId) || null;
+
+  // Persist active connection
+  const selectConnection = useCallback((connectionId: string | null) => {
+    setActiveConnectionId(connectionId);
+    if (connectionId) {
+      localStorage.setItem('activeBrokerConnectionId', connectionId);
+    } else {
+      localStorage.removeItem('activeBrokerConnectionId');
+    }
+    // Reset connection-specific data
+    setPositions([]);
+    setOrders([]);
+    setHistory([]);
+    setSummary(null);
+  }, []);
+
+  // Fetch all connections
+  const fetchConnections = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -123,34 +144,56 @@ export function useTradeLocker() {
         .select('*')
         .eq('user_id', user.id)
         .eq('platform', 'tradelocker')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setConnection(data as unknown as BrokerConnection | null);
+      const conns = (data || []) as unknown as BrokerConnection[];
+      setConnections(conns);
 
-      if (data) {
-        // Fetch accounts
-        const { data: accs } = await supabase
-          .from('broker_accounts')
-          .select('*')
-          .eq('broker_connection_id', data.id);
-        setAccounts((accs || []) as unknown as BrokerAccount[]);
+      // Auto-select if needed
+      if (conns.length > 0) {
+        const persisted = localStorage.getItem('activeBrokerConnectionId');
+        const match = conns.find(c => c.id === persisted);
+        if (!match) {
+          selectConnection(conns[0].id);
+        }
+      } else {
+        selectConnection(null);
       }
     } catch (error) {
-      console.error('Error fetching connection:', error);
+      console.error('Error fetching connections:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectConnection]);
+
+  // Fetch accounts for active connection
+  const fetchAccounts = useCallback(async () => {
+    if (!activeConnectionId) {
+      setAccounts([]);
+      return;
+    }
+    try {
+      const { data: accs } = await supabase
+        .from('broker_accounts')
+        .select('*')
+        .eq('broker_connection_id', activeConnectionId);
+      setAccounts((accs || []) as unknown as BrokerAccount[]);
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+    }
+  }, [activeConnectionId]);
 
   // Connect
   const connect = async (email: string, password: string, server: string, environment: string) => {
     try {
       const result = await invokeTradeLocker('connect', { email, password, server, environment });
       toast.success(result.message || 'Connected!');
-      await fetchConnection();
+      await fetchConnections();
+      // Select the newly created connection
+      if (result.connectionId) {
+        selectConnection(result.connectionId);
+      }
       return result;
     } catch (error: any) {
       toast.error(error.message);
@@ -158,13 +201,13 @@ export function useTradeLocker() {
     }
   };
 
-  // Select account
+  // Select account within a connection
   const selectAccount = async (accountId: string, accNum: number) => {
     if (!connection) return;
     try {
       await invokeTradeLocker('select-account', { connectionId: connection.id, accountId, accNum });
       toast.success('Account selected');
-      await fetchConnection();
+      await fetchConnections();
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -177,7 +220,7 @@ export function useTradeLocker() {
     try {
       const result = await invokeTradeLocker('sync', { connectionId: connection.id });
       toast.success(result.message || 'Synced');
-      await Promise.all([fetchPositions(), fetchOrders(), fetchHistory(), fetchSummary(), fetchConnection()]);
+      await Promise.all([fetchPositions(), fetchOrders(), fetchHistory(), fetchSummary(), fetchConnections()]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -194,7 +237,7 @@ export function useTradeLocker() {
     } catch (error) {
       console.error('Error fetching positions:', error);
     }
-  }, [connection]);
+  }, [connection?.id]);
 
   // Fetch orders
   const fetchOrders = useCallback(async () => {
@@ -205,7 +248,7 @@ export function useTradeLocker() {
     } catch (error) {
       console.error('Error fetching orders:', error);
     }
-  }, [connection]);
+  }, [connection?.id]);
 
   // Fetch history
   const fetchHistory = useCallback(async () => {
@@ -216,7 +259,7 @@ export function useTradeLocker() {
     } catch (error) {
       console.error('Error fetching history:', error);
     }
-  }, [connection]);
+  }, [connection?.id]);
 
   // Fetch summary
   const fetchSummary = useCallback(async () => {
@@ -227,7 +270,7 @@ export function useTradeLocker() {
     } catch (error) {
       console.error('Error fetching summary:', error);
     }
-  }, [connection]);
+  }, [connection?.id]);
 
   // Place order
   const placeOrder = async (params: { symbol: string; side: string; type: string; qty: number; price?: number; stopLoss?: number; takeProfit?: number; tradableInstrumentId: number }) => {
@@ -297,7 +340,10 @@ export function useTradeLocker() {
     try {
       await invokeTradeLocker('disconnect', { connectionId: connection.id });
       toast.success('Disconnected');
-      setConnection(null);
+      // Remove from local list and select another
+      const remaining = connections.filter(c => c.id !== connection.id);
+      setConnections(remaining);
+      selectConnection(remaining[0]?.id || null);
       setAccounts([]);
       setPositions([]);
       setOrders([]);
@@ -314,7 +360,7 @@ export function useTradeLocker() {
     try {
       await invokeTradeLocker('reconnect', { connectionId: connection.id, email, password });
       toast.success('Reconnected');
-      await fetchConnection();
+      await fetchConnections();
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -349,7 +395,7 @@ export function useTradeLocker() {
     try {
       await invokeTradeLocker('update-sync-settings', { connectionId: connection.id, autoSyncEnabled, syncIntervalSeconds });
       toast.success('Sync settings updated');
-      await fetchConnection();
+      await fetchConnections();
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -357,8 +403,13 @@ export function useTradeLocker() {
 
   // Initial load
   useEffect(() => {
-    fetchConnection();
-  }, [fetchConnection]);
+    fetchConnections();
+  }, [fetchConnections]);
+
+  // Fetch accounts when active connection changes
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
 
   // Load data when connection is active
   useEffect(() => {
@@ -390,7 +441,10 @@ export function useTradeLocker() {
   }, [connection?.auto_sync_enabled, connection?.sync_interval_seconds, connection?.connection_status, connection?.active_account_id]);
 
   return {
+    connections,
     connection,
+    activeConnectionId,
+    selectConnection,
     accounts,
     positions,
     orders,
@@ -409,7 +463,7 @@ export function useTradeLocker() {
     cancelOrder,
     modifyOrder,
     updateSyncSettings,
-    fetchConnection,
+    fetchConnection: fetchConnections,
     runDiagnostic,
     fetchSyncLogs,
   };
