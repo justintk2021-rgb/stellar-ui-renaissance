@@ -488,6 +488,7 @@ serve(async (req) => {
 
       return jsonResponse({
         success: true,
+        connectionId: connection.id,
         connection: { ...connection, metaapi_account_id: undefined },
         accounts: accounts.map((a: any) => ({ id: String(a.id), accNum: a.accNum, name: a.name || `Account ${a.accNum}` })),
         message: 'TradeLocker connected successfully!',
