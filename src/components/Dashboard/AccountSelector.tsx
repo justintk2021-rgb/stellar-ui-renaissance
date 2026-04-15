@@ -119,6 +119,7 @@ export const AccountSelector = ({
         const match = brokerAccs.find(b => `broker-${b.connectionId}-${b.accNum}` === persistedBrokerId);
         if (match) {
           setSelectedBrokerAccount(persistedBrokerId);
+          localStorage.setItem('activeBrokerConnectionId', match.connectionId);
           onSelectBrokerAccount?.(match.accountId);
         } else {
           // Persisted broker no longer exists, clear it
@@ -182,6 +183,7 @@ export const AccountSelector = ({
   const handleSelectManualAccount = (accountId: string) => {
     setSelectedBrokerAccount(null);
     localStorage.removeItem('selectedBrokerInternalId');
+    localStorage.removeItem('activeBrokerConnectionId');
     onSelectBrokerAccount?.(null);
     onSelectAccount(accountId);
   };
@@ -190,6 +192,7 @@ export const AccountSelector = ({
     const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
     setSelectedBrokerAccount(brokerId);
     localStorage.setItem('selectedBrokerInternalId', brokerId);
+    localStorage.setItem('activeBrokerConnectionId', broker.connectionId);
     onSelectBrokerAccount?.(broker.accountId);
   };
 
