@@ -195,7 +195,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
 
         {/* Recent Trades Tab */}
         <TabsContent value="recent" className="flex-1 mt-0">
-          <ScrollArea className="flex-1 -mx-2 px-2">
+          <ScrollArea className="h-[420px] -mx-2 px-2">
             <AnimatePresence>
               {recentTrades.length > 0 ? (
                 <table className="w-full">
@@ -292,7 +292,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
 
         {/* Open Positions Tab */}
         <TabsContent value="positions" className="flex-1 mt-0">
-          <ScrollArea className="flex-1 -mx-2 px-2">
+          <ScrollArea className="h-[420px] -mx-2 px-2">
             {positions.length > 0 ? (
               <table className="w-full">
                 <thead>
@@ -360,7 +360,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
 
         {/* Orders Tab */}
         <TabsContent value="orders" className="flex-1 mt-0">
-          <ScrollArea className="flex-1 -mx-2 px-2">
+          <ScrollArea className="h-[420px] -mx-2 px-2">
             {orders.length > 0 ? (
               <table className="w-full">
                 <thead>
