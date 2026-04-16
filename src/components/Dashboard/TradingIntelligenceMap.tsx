@@ -210,24 +210,41 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.4 }}
-      className={`rounded-2xl bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl overflow-hidden ${compact ? "flex flex-col flex-1 min-h-0" : ""}`}
+      transition={{ delay: 0.4, duration: 0.5 }}
+      className={`group relative rounded-2xl bg-gradient-to-br from-card/60 via-card/40 to-card/20 backdrop-blur-xl border border-border/40 shadow-xl overflow-hidden ${compact ? "flex flex-col flex-1 min-h-0" : ""}`}
     >
+      {/* Ambient gradient glow */}
+      <div className="pointer-events-none absolute -top-20 -left-20 w-64 h-64 rounded-full bg-primary/10 blur-3xl opacity-60" />
+      <div className="pointer-events-none absolute -bottom-20 -right-20 w-64 h-64 rounded-full bg-primary/5 blur-3xl opacity-60" />
+
       {/* Header */}
-      <div className={compact ? "flex items-center justify-between p-3 pb-2" : "flex items-center justify-between p-5 pb-3"}>
-        <div className="flex items-center gap-2">
-          <div className={compact ? "w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center" : "w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"}>
-            <Brain className={compact ? "w-3.5 h-3.5 text-primary" : "w-5 h-5 text-primary"} />
-          </div>
+      <div className={`relative flex items-center justify-between ${compact ? "px-3 pt-3 pb-2" : "px-5 pt-5 pb-3"}`}>
+        <div className="flex items-center gap-2.5">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            className={`relative ${compact ? "w-8 h-8 rounded-lg" : "w-10 h-10 rounded-xl"} bg-primary/10 flex items-center justify-center overflow-hidden`}
+          >
+            <Brain className={compact ? "w-4 h-4 text-primary relative z-10" : "w-5 h-5 text-primary relative z-10"} />
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-tr from-primary/0 via-primary/20 to-primary/0"
+              animate={{ x: ["-100%", "100%"] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            />
+          </motion.div>
           <div>
-            <h3 className={compact ? "text-xs font-semibold text-foreground leading-tight" : "text-base font-semibold text-foreground"}>
-              Intelligence Map
-            </h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className={compact ? "text-xs font-semibold text-foreground leading-tight" : "text-base font-semibold text-foreground"}>
+                Intelligence Map
+              </h3>
+              <Sparkles className={compact ? "w-2.5 h-2.5 text-primary/60" : "w-3 h-3 text-primary/60"} />
+            </div>
             {!compact && <p className="text-xs text-muted-foreground">Your trading mind, visualized</p>}
           </div>
         </div>
         {!compact && (
-          <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="hidden md:flex items-center gap-3 text-xs text-muted-foreground">
             <Legend color={COLORS.positive} label="Profitable" />
             <Legend color={COLORS.negative} label="Losing" />
             <Legend color={COLORS.neutral} label="Setup" />
@@ -238,19 +255,30 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
       {/* Canvas */}
       <div
         ref={containerRef}
-        className={`relative w-full ${compact ? "flex-1 min-h-[200px]" : "h-[420px]"} bg-gradient-to-b from-background/40 to-background/10`}
+        className={`relative w-full ${compact ? "flex-1 min-h-[200px]" : "h-[420px]"} overflow-hidden`}
         onClick={() => setSelectedId(null)}
       >
+        {/* Subtle grid backdrop */}
+        <div
+          className="absolute inset-0 opacity-[0.04] pointer-events-none"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, hsl(var(--foreground)) 1px, transparent 0)",
+            backgroundSize: "24px 24px",
+          }}
+        />
+
         <svg width={size.w} height={size.h} className="absolute inset-0">
           <defs>
             {(["positive", "negative", "neutral"] as NodeSentiment[]).map((s) => (
               <radialGradient key={s} id={`grad-${s}`} cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor={COLORS[s]} stopOpacity="0.95" />
-                <stop offset="100%" stopColor={COLORS[s]} stopOpacity="0.4" />
+                <stop offset="0%" stopColor={COLORS[s]} stopOpacity="1" />
+                <stop offset="60%" stopColor={COLORS[s]} stopOpacity="0.6" />
+                <stop offset="100%" stopColor={COLORS[s]} stopOpacity="0.2" />
               </radialGradient>
             ))}
-            <filter id="node-glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="3" result="blur" />
+            <filter id="node-glow" x="-100%" y="-100%" width="300%" height="300%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
@@ -264,50 +292,65 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
             const b = nodeById[e.to];
             if (!a || !b) return null;
             const isActive = activeId === e.from || activeId === e.to;
-            const stroke = b.sentiment === "negative" || a.sentiment === "negative"
-              ? COLORS.negative
-              : b.sentiment === "positive" || a.sentiment === "positive"
-              ? COLORS.positive
-              : COLORS.neutral;
+            const isDimmed = activeId && !isActive;
+            const stroke =
+              b.sentiment === "negative" || a.sentiment === "negative"
+                ? COLORS.negative
+                : b.sentiment === "positive" || a.sentiment === "positive"
+                ? COLORS.positive
+                : COLORS.neutral;
+            const x1 = toX(a.x);
+            const y1 = toY(a.y);
+            const x2 = toX(b.x);
+            const y2 = toY(b.y);
             return (
               <g key={`edge-${i}`}>
                 <line
-                  x1={toX(a.x)}
-                  y1={toY(a.y)}
-                  x2={toX(b.x)}
-                  y2={toY(b.y)}
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
                   stroke={stroke}
-                  strokeOpacity={isActive ? 0.6 : 0.18}
-                  strokeWidth={isActive ? 1.5 : 1}
-                  strokeDasharray="4 6"
-                  style={{
-                    transition: "stroke-opacity 200ms ease, stroke-width 200ms ease",
-                  }}
-                >
-                  <animate
-                    attributeName="stroke-dashoffset"
-                    from="0"
-                    to="-20"
-                    dur={`${4 + (i % 3)}s`}
+                  strokeOpacity={isActive ? 0.7 : isDimmed ? 0.06 : 0.2}
+                  strokeWidth={isActive ? 1.6 : 1}
+                  strokeLinecap="round"
+                  style={{ transition: "stroke-opacity 300ms ease, stroke-width 300ms ease" }}
+                />
+                {/* Traveling pulse dot */}
+                <circle r={isActive ? 2.5 : 1.6} fill={stroke} opacity={isDimmed ? 0.1 : 0.85}>
+                  <animateMotion
+                    dur={`${5 + (i % 4)}s`}
                     repeatCount="indefinite"
+                    path={`M ${x1} ${y1} L ${x2} ${y2}`}
                   />
-                </line>
+                </circle>
               </g>
             );
           })}
 
           {/* Nodes */}
-          {nodes.map((n) => {
+          {nodes.map((n, idx) => {
             const cx = toX(n.x);
             const cy = toY(n.y);
             const isActive = activeId === n.id;
+            const isDimmed = activeId && !isActive;
             const isCore = n.id === "core";
             const sizeFactor = compact ? 0.6 : 1;
             const r = Math.max(4, n.size * sizeFactor);
+            const driftDur = 6 + (idx % 5);
+            const driftAmt = isCore ? 0 : 3;
             return (
-              <g
+              <motion.g
                 key={n.id}
-                style={{ cursor: "pointer" }}
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: isDimmed ? 0.35 : 1, scale: 1 }}
+                transition={{
+                  delay: 0.15 + idx * 0.04,
+                  type: "spring",
+                  stiffness: 180,
+                  damping: 14,
+                }}
+                style={{ cursor: "pointer", transformOrigin: `${cx}px ${cy}px` }}
                 onMouseEnter={() => setHoveredId(n.id)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={(ev) => {
@@ -315,95 +358,147 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                   setSelectedId((prev) => (prev === n.id ? null : n.id));
                 }}
               >
-                {/* Soft halo */}
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={r + (isActive ? 8 : 5)}
-                  fill={COLORS[n.sentiment]}
-                  opacity={isActive ? 0.18 : 0.08}
-                  style={{ transition: "all 220ms ease" }}
-                />
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={r}
-                  fill={`url(#grad-${n.sentiment})`}
-                  stroke={COLORS[n.sentiment]}
-                  strokeOpacity={0.7}
-                  strokeWidth={1}
-                  filter="url(#node-glow)"
-                >
-                  {isCore && (
-                    <animate
-                      attributeName="r"
-                      values={`${r};${r + 1.5};${r}`}
-                      dur="3.5s"
+                <g>
+                  {/* Drift wrapper via SMIL */}
+                  {!isCore && (
+                    <animateTransform
+                      attributeName="transform"
+                      type="translate"
+                      values={`0,0; ${driftAmt},${-driftAmt}; 0,0; ${-driftAmt},${driftAmt}; 0,0`}
+                      dur={`${driftDur}s`}
                       repeatCount="indefinite"
                     />
                   )}
-                </circle>
-                {/* Label - hidden in compact mode unless active */}
-                {(!compact || isActive) && (
-                  <text
-                    x={cx}
-                    y={cy + r + (compact ? 10 : 14)}
-                    textAnchor="middle"
-                    fill="hsl(var(--foreground))"
-                    fillOpacity={isActive ? 1 : 0.7}
-                    fontSize={compact ? 8 : isCore ? 12 : 10}
-                    fontWeight={isCore ? 600 : 500}
-                    style={{ transition: "fill-opacity 200ms ease", pointerEvents: "none" }}
+                  {/* Outer pulse ring on active */}
+                  {isActive && (
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={r}
+                      fill="none"
+                      stroke={COLORS[n.sentiment]}
+                      strokeOpacity={0.6}
+                      strokeWidth={1.5}
+                    >
+                      <animate attributeName="r" values={`${r};${r + 14}`} dur="1.4s" repeatCount="indefinite" />
+                      <animate attributeName="stroke-opacity" values="0.6;0" dur="1.4s" repeatCount="indefinite" />
+                    </circle>
+                  )}
+                  {/* Soft halo */}
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={r + (isActive ? 10 : 6)}
+                    fill={COLORS[n.sentiment]}
+                    opacity={isActive ? 0.22 : 0.1}
+                    style={{ transition: "all 250ms ease" }}
+                  />
+                  {/* Core node */}
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={isActive ? r + 1.5 : r}
+                    fill={`url(#grad-${n.sentiment})`}
+                    stroke={COLORS[n.sentiment]}
+                    strokeOpacity={isActive ? 1 : 0.7}
+                    strokeWidth={isActive ? 1.5 : 1}
+                    filter="url(#node-glow)"
+                    style={{ transition: "all 250ms ease" }}
                   >
-                    {n.label}
-                  </text>
-                )}
-              </g>
+                    {isCore && (
+                      <animate
+                        attributeName="r"
+                        values={`${r};${r + 2};${r}`}
+                        dur="3s"
+                        repeatCount="indefinite"
+                      />
+                    )}
+                  </circle>
+                  {/* Label */}
+                  {(!compact || isActive || isCore) && (
+                    <text
+                      x={cx}
+                      y={cy + r + (compact ? 10 : 14)}
+                      textAnchor="middle"
+                      fill="hsl(var(--foreground))"
+                      fillOpacity={isActive ? 1 : isDimmed ? 0.3 : 0.75}
+                      fontSize={compact ? (isCore ? 9 : 8) : isCore ? 12 : 10}
+                      fontWeight={isCore ? 600 : 500}
+                      style={{ transition: "fill-opacity 200ms ease", pointerEvents: "none" }}
+                    >
+                      {n.label}
+                    </text>
+                  )}
+                </g>
+              </motion.g>
             );
           })}
         </svg>
-
       </div>
 
       {/* Detail / hint footer - outside canvas so it never blocks nodes */}
-      <div className={`border-t border-border/30 ${compact ? "px-3 py-2 min-h-[44px]" : "px-5 py-3 min-h-[56px]"} flex items-center`}>
-        {activeNode ? (
-          <motion.div
-            key={activeNode.id}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2.5 w-full min-w-0"
-          >
-            <div
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: COLORS[activeNode.sentiment] }}
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-2 min-w-0">
-                <p className="text-xs font-semibold text-foreground truncate">{activeNode.label}</p>
-                <span className="text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">
-                  {activeNode.type}
-                </span>
+      <div
+        className={`relative border-t border-border/30 bg-background/30 backdrop-blur-sm ${
+          compact ? "px-3 py-2 min-h-[48px]" : "px-5 py-3 min-h-[60px]"
+        } flex items-center`}
+      >
+        <AnimatePresence mode="wait">
+          {activeNode ? (
+            <motion.div
+              key={activeNode.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18 }}
+              className="flex items-center gap-2.5 w-full min-w-0"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{
+                  backgroundColor: COLORS[activeNode.sentiment],
+                  boxShadow: `0 0 10px ${COLORS[activeNode.sentiment]}`,
+                }}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2 min-w-0">
+                  <p className="text-xs font-semibold text-foreground truncate">{activeNode.label}</p>
+                  <span className="text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">
+                    {activeNode.type}
+                  </span>
+                </div>
+                {activeNode.meta.detail && (
+                  <p className="text-[10px] text-muted-foreground truncate">{activeNode.meta.detail}</p>
+                )}
               </div>
-              {activeNode.meta.detail && (
-                <p className="text-[10px] text-muted-foreground truncate">{activeNode.meta.detail}</p>
+              {typeof activeNode.meta.pnl === "number" && (
+                <motion.span
+                  initial={{ opacity: 0, x: 4 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="text-[11px] font-mono font-semibold shrink-0 px-2 py-0.5 rounded-md"
+                  style={{
+                    color: activeNode.meta.pnl >= 0 ? COLORS.positive : COLORS.negative,
+                    backgroundColor: `${activeNode.meta.pnl >= 0 ? COLORS.positive : COLORS.negative}1a`,
+                  }}
+                >
+                  {activeNode.meta.pnl >= 0 ? "+" : ""}${activeNode.meta.pnl.toFixed(2)}
+                </motion.span>
               )}
-            </div>
-            {typeof activeNode.meta.pnl === "number" && (
-              <span
-                className="text-[10px] font-mono font-semibold shrink-0"
-                style={{ color: activeNode.meta.pnl >= 0 ? COLORS.positive : COLORS.negative }}
-              >
-                {activeNode.meta.pnl >= 0 ? "+" : ""}${activeNode.meta.pnl.toFixed(2)}
-              </span>
-            )}
-          </motion.div>
-        ) : (
-          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
-            <Info className="w-3 h-3" />
-            Hover a node to inspect
-          </div>
-        )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="hint"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70"
+            >
+              <MousePointerClick className="w-3 h-3" />
+              Hover a node to inspect
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
@@ -412,7 +507,10 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
 function Legend({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }} />
+      <span
+        className="w-2 h-2 rounded-full"
+        style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }}
+      />
       <span>{label}</span>
     </div>
   );
