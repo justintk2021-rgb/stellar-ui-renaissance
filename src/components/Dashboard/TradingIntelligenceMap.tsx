@@ -302,6 +302,8 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
             const cy = toY(n.y);
             const isActive = activeId === n.id;
             const isCore = n.id === "core";
+            const sizeFactor = compact ? 0.6 : 1;
+            const r = Math.max(4, n.size * sizeFactor);
             return (
               <g
                 key={n.id}
@@ -317,7 +319,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                 <circle
                   cx={cx}
                   cy={cy}
-                  r={n.size + (isActive ? 10 : 6)}
+                  r={r + (isActive ? 8 : 5)}
                   fill={COLORS[n.sentiment]}
                   opacity={isActive ? 0.18 : 0.08}
                   style={{ transition: "all 220ms ease" }}
@@ -325,7 +327,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                 <circle
                   cx={cx}
                   cy={cy}
-                  r={n.size}
+                  r={r}
                   fill={`url(#grad-${n.sentiment})`}
                   stroke={COLORS[n.sentiment]}
                   strokeOpacity={0.7}
@@ -335,70 +337,71 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                   {isCore && (
                     <animate
                       attributeName="r"
-                      values={`${n.size};${n.size + 2};${n.size}`}
+                      values={`${r};${r + 1.5};${r}`}
                       dur="3.5s"
                       repeatCount="indefinite"
                     />
                   )}
                 </circle>
-                {/* Label */}
-                <text
-                  x={cx}
-                  y={cy + n.size + 14}
-                  textAnchor="middle"
-                  fill="hsl(var(--foreground))"
-                  fillOpacity={isActive ? 1 : 0.7}
-                  fontSize={isCore ? 12 : 10}
-                  fontWeight={isCore ? 600 : 500}
-                  style={{ transition: "fill-opacity 200ms ease", pointerEvents: "none" }}
-                >
-                  {n.label}
-                </text>
+                {/* Label - hidden in compact mode unless active */}
+                {(!compact || isActive) && (
+                  <text
+                    x={cx}
+                    y={cy + r + (compact ? 10 : 14)}
+                    textAnchor="middle"
+                    fill="hsl(var(--foreground))"
+                    fillOpacity={isActive ? 1 : 0.7}
+                    fontSize={compact ? 8 : isCore ? 12 : 10}
+                    fontWeight={isCore ? 600 : 500}
+                    style={{ transition: "fill-opacity 200ms ease", pointerEvents: "none" }}
+                  >
+                    {n.label}
+                  </text>
+                )}
               </g>
             );
           })}
         </svg>
 
-        {/* Detail panel */}
-        {activeNode && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="absolute bottom-4 left-4 right-4 md:right-auto md:max-w-sm rounded-xl border border-border/40 bg-background/80 backdrop-blur-xl p-4 shadow-2xl"
-          >
-            <div className="flex items-start gap-3">
-              <div
-                className="w-2.5 h-2.5 rounded-full mt-1.5 shrink-0"
-                style={{ backgroundColor: COLORS[activeNode.sentiment] }}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground truncate">{activeNode.label}</p>
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    {activeNode.type}
-                  </span>
-                </div>
-                {activeNode.meta.detail && (
-                  <p className="text-xs text-muted-foreground mt-1">{activeNode.meta.detail}</p>
-                )}
-                {typeof activeNode.meta.pnl === "number" && (
-                  <p
-                    className="text-xs font-mono mt-1"
-                    style={{ color: activeNode.meta.pnl >= 0 ? COLORS.positive : COLORS.negative }}
-                  >
-                    Net P&L: {activeNode.meta.pnl >= 0 ? "+" : ""}${activeNode.meta.pnl.toFixed(2)}
-                  </p>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
+      </div>
 
-        {/* Empty hint */}
-        {!activeNode && (
-          <div className="absolute bottom-4 left-4 flex items-center gap-2 text-xs text-muted-foreground/70 pointer-events-none">
-            <Info className="w-3.5 h-3.5" />
-            Hover or tap a node to inspect
+      {/* Detail / hint footer - outside canvas so it never blocks nodes */}
+      <div className={`border-t border-border/30 ${compact ? "px-3 py-2 min-h-[44px]" : "px-5 py-3 min-h-[56px]"} flex items-center`}>
+        {activeNode ? (
+          <motion.div
+            key={activeNode.id}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2.5 w-full min-w-0"
+          >
+            <div
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ backgroundColor: COLORS[activeNode.sentiment] }}
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <p className="text-xs font-semibold text-foreground truncate">{activeNode.label}</p>
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">
+                  {activeNode.type}
+                </span>
+              </div>
+              {activeNode.meta.detail && (
+                <p className="text-[10px] text-muted-foreground truncate">{activeNode.meta.detail}</p>
+              )}
+            </div>
+            {typeof activeNode.meta.pnl === "number" && (
+              <span
+                className="text-[10px] font-mono font-semibold shrink-0"
+                style={{ color: activeNode.meta.pnl >= 0 ? COLORS.positive : COLORS.negative }}
+              >
+                {activeNode.meta.pnl >= 0 ? "+" : ""}${activeNode.meta.pnl.toFixed(2)}
+              </span>
+            )}
+          </motion.div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
+            <Info className="w-3 h-3" />
+            Hover a node to inspect
           </div>
         )}
       </div>
