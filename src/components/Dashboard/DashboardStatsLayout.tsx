@@ -177,7 +177,7 @@ export function DashboardStatsLayout({
   return (
     <div className="space-y-6">
       {/* 3-column layout: stats | calendar | stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch">
         {/* Left column */}
         <div className="lg:col-span-3 flex flex-col gap-5">
           {leftCards.map((card, i) => (
