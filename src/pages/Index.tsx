@@ -11,6 +11,7 @@ import { Sidebar } from "@/components/Layout/Sidebar";
 import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
 import { StatsGrid } from "@/components/Dashboard/StatsGrid";
+import { DashboardStatsLayout } from "@/components/Dashboard/DashboardStatsLayout";
 import { BalanceCards } from "@/components/Dashboard/BalanceCards";
 import { AnimatedBackground } from "@/components/Layout/AnimatedBackground";
 
@@ -651,19 +652,16 @@ const Index = () => {
                     />
                   </motion.div>
                   
-                  <motion.div variants={staggerItem} className="mx-auto w-full max-w-6xl">
-                    <PnLCalendar 
-                      trades={trades} 
+                  <motion.div variants={staggerItem}>
+                    <DashboardStatsLayout
+                      trades={trades}
+                      notebookEntries={notebookEntries}
                       onUpdateTrade={async (id, updates) => {
                         await updateTrade(id, updates);
                       }}
-                      notebookEntries={notebookEntries}
                       onSaveEntry={handleSaveEntry}
                       onAddTrade={handleAddTrade}
                     />
-                  </motion.div>
-                  <motion.div variants={staggerItem}>
-                    <StatsGrid trades={trades} />
                   </motion.div>
                 </PageTransition>
               )}
