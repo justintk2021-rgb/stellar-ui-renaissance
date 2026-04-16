@@ -602,6 +602,9 @@ const Index = () => {
             "glass-strong rounded-2xl min-h-[calc(100vh-120px)]",
             isChartPage ? "p-4 lg:min-h-[calc(100vh-100px)]" : "p-5 lg:p-6 lg:min-h-[calc(100vh-60px)]"
           )}>
+            <div className={cn(
+              !isChartPage && "mx-auto w-full max-w-[1440px] px-2 sm:px-4 lg:px-6"
+            )}>
             {!isChartPage && <TopBar title={title} subtitle={subtitle} theme={theme} onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)} trades={trades} showRank={currentPage === 'dashboard'} />}
 
             <AnimatePresence mode="wait">
@@ -851,6 +854,7 @@ const Index = () => {
                 </PageTransition>
               )}
             </AnimatePresence>
+            </div>
           </div>
         </main>
 
