@@ -5,6 +5,7 @@ import { Brain, Info } from "lucide-react";
 
 interface TradingIntelligenceMapProps {
   trades: Trade[];
+  compact?: boolean;
 }
 
 type NodeType = "trade" | "setup" | "behavior";
