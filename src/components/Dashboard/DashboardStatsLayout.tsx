@@ -201,6 +201,7 @@ export function DashboardStatsLayout({
           {rightCards.map((card, i) => (
             <StatCard key={card.label} {...card} index={i} />
           ))}
+          <TradingIntelligenceMap trades={trades} compact />
         </div>
       </div>
 
@@ -223,9 +224,6 @@ export function DashboardStatsLayout({
           <RecentTrades trades={trades} />
         </motion.div>
       </div>
-
-      {/* Trading Intelligence Map */}
-      <TradingIntelligenceMap trades={trades} />
     </div>
   );
 }
