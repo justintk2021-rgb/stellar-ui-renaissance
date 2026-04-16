@@ -1,7 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Trade } from "@/types/trade";
-import { Brain, Info } from "lucide-react";
+import { Brain, Sparkles, MousePointerClick } from "lucide-react";
 
 interface TradingIntelligenceMapProps {
   trades: Trade[];
