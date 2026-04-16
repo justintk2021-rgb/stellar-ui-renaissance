@@ -223,6 +223,9 @@ export function DashboardStatsLayout({
           <RecentTrades trades={trades} />
         </motion.div>
       </div>
+
+      {/* Trading Intelligence Map */}
+      <TradingIntelligenceMap trades={trades} />
     </div>
   );
 }
