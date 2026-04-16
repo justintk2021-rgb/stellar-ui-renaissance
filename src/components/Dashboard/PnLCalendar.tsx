@@ -522,34 +522,38 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
             </AnimatePresence>
           </div>
 
-          {/* Weekly Stats Sidebar */}
-          <div className="w-32 border-l border-border/30 p-3 space-y-2">
-            {weeklyStats.map((week, index) => (
-              <div 
-                key={index} 
-                className={cn(
-                  "p-2 rounded-lg border text-center",
-                  week.pnl > 0 
-                    ? "bg-emerald-500/10 border-emerald-500/20" 
-                    : week.pnl < 0 
-                    ? "bg-rose-500/10 border-rose-500/20"
-                    : "bg-muted/20 border-border/30"
-                )}
-              >
-                <div className="text-[10px] text-muted-foreground mb-1">
-                  Week {index + 1}
+          {/* Weekly Stats Sidebar - aligned with calendar rows */}
+          <div className="w-32 border-l border-border/30 p-4 flex flex-col">
+            {/* Spacer to match the day-name header height + border + mb-2 */}
+            <div className="h-[34px] mb-2" />
+            <div className="grid gap-2 flex-1" style={{ gridAutoRows: 'minmax(90px, 1fr)' }}>
+              {weeklyStats.map((week, index) => (
+                <div
+                  key={index}
+                  className={cn(
+                    "p-2 rounded-xl border flex flex-col items-center justify-center text-center",
+                    week.pnl > 0
+                      ? "bg-emerald-500/10 border-emerald-500/20"
+                      : week.pnl < 0
+                      ? "bg-rose-500/10 border-rose-500/20"
+                      : "bg-muted/20 border-border/30"
+                  )}
+                >
+                  <div className="text-[10px] text-muted-foreground mb-1">
+                    Week {index + 1}
+                  </div>
+                  <div className={cn(
+                    "text-sm font-bold font-mono",
+                    week.pnl > 0 ? "text-emerald-600 dark:text-emerald-400" : week.pnl < 0 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"
+                  )}>
+                    {formatPnL(week.pnl)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {week.days} day{week.days !== 1 ? 's' : ''}
+                  </div>
                 </div>
-                <div className={cn(
-                  "text-sm font-bold font-mono",
-                  week.pnl > 0 ? "text-emerald-600 dark:text-emerald-400" : week.pnl < 0 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"
-                )}>
-                  {formatPnL(week.pnl)}
-                </div>
-                <div className="text-[10px] text-muted-foreground">
-                  {week.days} day{week.days !== 1 ? 's' : ''}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
