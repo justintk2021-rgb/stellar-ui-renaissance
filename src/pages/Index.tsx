@@ -854,6 +854,7 @@ const Index = () => {
                 </PageTransition>
               )}
             </AnimatePresence>
+            </div>
           </div>
         </main>
 
