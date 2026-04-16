@@ -185,7 +185,7 @@ export function DashboardStatsLayout({
         </div>
 
         {/* Center column - Calendar */}
-        <div className="lg:col-span-6">
+        <div className="lg:col-span-7">
           <PnLCalendar
             trades={trades}
             onUpdateTrade={onUpdateTrade}
@@ -195,8 +195,8 @@ export function DashboardStatsLayout({
           />
         </div>
 
-        {/* Right column */}
-        <div className="lg:col-span-3 flex flex-col gap-5">
+        {/* Right column - smaller */}
+        <div className="lg:col-span-2 flex flex-col gap-4">
           {rightCards.map((card, i) => (
             <StatCard key={card.label} {...card} index={i} />
           ))}
