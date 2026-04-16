@@ -7,6 +7,7 @@ import { StatCard } from "./StatCard";
 import { PnLCalendar } from "./PnLCalendar";
 import { WinRatioCard } from "./WinRatioCard";
 import { RecentTrades } from "./RecentTrades";
+import { TradingIntelligenceMap } from "./TradingIntelligenceMap";
 import { NotebookEntry } from "@/types/trade";
 
 interface DashboardStatsLayoutProps {
@@ -222,6 +223,9 @@ export function DashboardStatsLayout({
           <RecentTrades trades={trades} />
         </motion.div>
       </div>
+
+      {/* Trading Intelligence Map */}
+      <TradingIntelligenceMap trades={trades} />
     </div>
   );
 }
