@@ -204,12 +204,12 @@ export function DashboardStatsLayout({
       </div>
 
       {/* Win ratio + Recent trades below */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="rounded-2xl p-6 bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl flex flex-col min-h-[340px]"
+          className="rounded-2xl p-5 bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl flex flex-col min-h-[280px]"
         >
           <WinRatioCard trades={trades} />
         </motion.div>
@@ -217,7 +217,7 @@ export function DashboardStatsLayout({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="lg:col-span-2"
+          className="lg:col-span-3"
         >
           <RecentTrades trades={trades} />
         </motion.div>
