@@ -654,7 +654,7 @@ const Index = () => {
                   <motion.div variants={staggerItem}>
                     <StatsGrid trades={trades} />
                   </motion.div>
-                  <motion.div variants={staggerItem}>
+                  <motion.div variants={staggerItem} className="mx-auto w-full max-w-6xl">
                     <PnLCalendar 
                       trades={trades} 
                       onUpdateTrade={async (id, updates) => {
