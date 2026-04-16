@@ -11,6 +11,7 @@ import { Sidebar } from "@/components/Layout/Sidebar";
 import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
 import { StatsGrid } from "@/components/Dashboard/StatsGrid";
+import { DashboardStatsLayout } from "@/components/Dashboard/DashboardStatsLayout";
 import { BalanceCards } from "@/components/Dashboard/BalanceCards";
 import { AnimatedBackground } from "@/components/Layout/AnimatedBackground";
 
