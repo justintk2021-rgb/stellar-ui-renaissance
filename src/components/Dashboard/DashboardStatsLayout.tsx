@@ -197,7 +197,7 @@ export function DashboardStatsLayout({
         </div>
 
         {/* Right column - smaller */}
-        <div className="lg:col-span-2 flex flex-col gap-4">
+        <div className="lg:col-span-2 flex flex-col gap-4 self-stretch">
           {rightCards.map((card, i) => (
             <StatCard key={card.label} {...card} index={i} />
           ))}
