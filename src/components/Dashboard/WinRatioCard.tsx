@@ -20,11 +20,10 @@ function AnimatedPercentage({ value }: { value: number }) {
     decimals: 0,
   });
 
-  return (
-    <span className="text-4xl font-bold text-primary">
-      {formattedValue}%
-    </span>
-  );
+  const colorClass =
+    value < 50 ? "text-destructive" : value > 75 ? "text-[hsl(142_76%_46%)]" : "text-primary";
+
+  return <span className={cn("text-4xl font-bold", colorClass)}>{formattedValue}%</span>;
 }
 
 export function WinRatioCard({ trades }: WinRatioCardProps) {
