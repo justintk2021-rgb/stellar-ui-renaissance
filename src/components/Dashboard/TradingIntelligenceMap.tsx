@@ -180,7 +180,7 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
   return { nodes, edges };
 }
 
-export function TradingIntelligenceMap({ trades }: TradingIntelligenceMapProps) {
+export function TradingIntelligenceMap({ trades, compact = false }: TradingIntelligenceMapProps) {
   const { nodes, edges } = useMemo(() => buildGraph(trades), [trades]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
