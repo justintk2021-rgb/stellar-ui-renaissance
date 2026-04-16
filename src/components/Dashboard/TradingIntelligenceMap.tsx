@@ -302,6 +302,8 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
             const cy = toY(n.y);
             const isActive = activeId === n.id;
             const isCore = n.id === "core";
+            const sizeFactor = compact ? 0.6 : 1;
+            const r = Math.max(4, n.size * sizeFactor);
             return (
               <g
                 key={n.id}
@@ -317,7 +319,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                 <circle
                   cx={cx}
                   cy={cy}
-                  r={n.size + (isActive ? 10 : 6)}
+                  r={r + (isActive ? 8 : 5)}
                   fill={COLORS[n.sentiment]}
                   opacity={isActive ? 0.18 : 0.08}
                   style={{ transition: "all 220ms ease" }}
@@ -325,7 +327,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                 <circle
                   cx={cx}
                   cy={cy}
-                  r={n.size}
+                  r={r}
                   fill={`url(#grad-${n.sentiment})`}
                   stroke={COLORS[n.sentiment]}
                   strokeOpacity={0.7}
@@ -335,25 +337,27 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                   {isCore && (
                     <animate
                       attributeName="r"
-                      values={`${n.size};${n.size + 2};${n.size}`}
+                      values={`${r};${r + 1.5};${r}`}
                       dur="3.5s"
                       repeatCount="indefinite"
                     />
                   )}
                 </circle>
-                {/* Label */}
-                <text
-                  x={cx}
-                  y={cy + n.size + 14}
-                  textAnchor="middle"
-                  fill="hsl(var(--foreground))"
-                  fillOpacity={isActive ? 1 : 0.7}
-                  fontSize={isCore ? 12 : 10}
-                  fontWeight={isCore ? 600 : 500}
-                  style={{ transition: "fill-opacity 200ms ease", pointerEvents: "none" }}
-                >
-                  {n.label}
-                </text>
+                {/* Label - hidden in compact mode unless active */}
+                {(!compact || isActive) && (
+                  <text
+                    x={cx}
+                    y={cy + r + (compact ? 10 : 14)}
+                    textAnchor="middle"
+                    fill="hsl(var(--foreground))"
+                    fillOpacity={isActive ? 1 : 0.7}
+                    fontSize={compact ? 8 : isCore ? 12 : 10}
+                    fontWeight={isCore ? 600 : 500}
+                    style={{ transition: "fill-opacity 200ms ease", pointerEvents: "none" }}
+                  >
+                    {n.label}
+                  </text>
+                )}
               </g>
             );
           })}
