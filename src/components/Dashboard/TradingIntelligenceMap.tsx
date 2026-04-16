@@ -238,7 +238,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
       {/* Canvas */}
       <div
         ref={containerRef}
-        className={`relative w-full ${compact ? "h-[200px]" : "h-[420px]"} bg-gradient-to-b from-background/40 to-background/10`}
+        className={`relative w-full ${compact ? "flex-1 min-h-[200px]" : "h-[420px]"} bg-gradient-to-b from-background/40 to-background/10`}
         onClick={() => setSelectedId(null)}
       >
         <svg width={size.w} height={size.h} className="absolute inset-0">
