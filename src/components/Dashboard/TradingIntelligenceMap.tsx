@@ -211,7 +211,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4 }}
-      className="rounded-2xl bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl overflow-hidden"
+      className={`rounded-2xl bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl overflow-hidden ${compact ? "flex flex-col flex-1 min-h-0" : ""}`}
     >
       {/* Header */}
       <div className={compact ? "flex items-center justify-between p-3 pb-2" : "flex items-center justify-between p-5 pb-3"}>
@@ -238,7 +238,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
       {/* Canvas */}
       <div
         ref={containerRef}
-        className={`relative w-full ${compact ? "h-[200px]" : "h-[420px]"} bg-gradient-to-b from-background/40 to-background/10`}
+        className={`relative w-full ${compact ? "flex-1 min-h-[200px]" : "h-[420px]"} bg-gradient-to-b from-background/40 to-background/10`}
         onClick={() => setSelectedId(null)}
       >
         <svg width={size.w} height={size.h} className="absolute inset-0">
