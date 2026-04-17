@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Json } from '@/integrations/supabase/types';
+import { applySettingsToDocument, writeSettingsCache } from './useApplyGlobalSettings';
 
 export type AccentColor = 'emerald' | 'blue' | 'purple' | 'pink' | 'red' | 'orange' | 'yellow' | 'cyan' | 'custom';
 
