@@ -194,7 +194,7 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
               cx={size / 2}
               cy={size / 2}
               r={radius}
-              stroke={animatedValue < 50 ? "hsl(var(--destructive))" : animatedValue > 75 ? "hsl(142 76% 46%)" : "hsl(var(--primary))"}
+              stroke={animatedValue < 50 ? "hsl(var(--destructive))" : "hsl(var(--primary))"}
               strokeWidth={strokeWidth}
               fill="none"
               strokeLinecap="round"
