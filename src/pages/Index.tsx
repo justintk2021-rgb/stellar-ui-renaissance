@@ -278,51 +278,7 @@ const Index = () => {
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
   const [journalFilter, setJournalFilter] = useState<'all' | 'wins' | 'losses'>('all');
 
-  // Auto-create notebook entries for broker-imported trades that don't have one
-  useEffect(() => {
-    if (!user?.id || tradesLoading || notebookLoading) return;
-    
-    const brokerTradesWithoutNotes = trades.filter(
-      t => t.importedFromBroker && !notebookEntries.some(e => e.tradeId === t.id && !e.isDeleted)
-    );
-    
-    if (brokerTradesWithoutNotes.length === 0) return;
-
-    const createMissingEntries = async () => {
-      for (const trade of brokerTradesWithoutNotes) {
-        const newEntry: NotebookEntry = {
-          id: crypto.randomUUID(),
-          title: `${trade.pair} - ${trade.direction} Trade`,
-          content: `<h2>📋 Trade Plan</h2>
-<ul>
-  <li>Why did I take this trade?</li>
-  <li>What was my setup/strategy?</li>
-</ul>
-
-<h2>⚙️ Execution</h2>
-<ul>
-  <li>Entry: ${trade.openPrice ?? 'N/A'} → Exit: ${trade.closePrice ?? 'N/A'}</li>
-  <li>Result: ${trade.result >= 0 ? '+' : ''}${trade.result.toFixed(2)}</li>
-</ul>
-
-<h2>🧠 Post-Trade Review</h2>
-<ul>
-  <li>What went well?</li>
-  <li>What could be improved?</li>
-  <li>Key lessons learned</li>
-</ul>`,
-          category: "trade-notes",
-          date: trade.date,
-          tradeId: trade.id,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        await saveNotebookEntry(newEntry);
-      }
-    };
-    
-    createMissingEntries();
-  }, [user?.id, trades, notebookEntries, tradesLoading, notebookLoading, saveNotebookEntry]);
+  // Notes are now manually created only — no automatic generation for trades
 
   // Close sidebar when changing page
   const handlePageChange = useCallback((page: string) => {
@@ -492,37 +448,7 @@ const Index = () => {
       const newTrade = await addTrade(tradeData);
       if (newTrade) {
         setSelectedTradeId(newTrade.id);
-        
-        // Auto-create notebook entry for this trade
-        const newEntry: NotebookEntry = {
-          id: crypto.randomUUID(),
-          title: `${tradeData.pair} - ${tradeData.direction} Trade`,
-          content: `<h2>📋 Trade Plan</h2>
-<ul>
-  <li>Why did I take this trade?</li>
-  <li>What was my setup/strategy?</li>
-</ul>
-
-<h2>⚙️ Execution</h2>
-<ul>
-  <li>Entry point and reasoning</li>
-  <li>Trade management</li>
-  <li>Exit point</li>
-</ul>
-
-<h2>🧠 Post-Trade Review</h2>
-<ul>
-  <li>What went well?</li>
-  <li>What could be improved?</li>
-  <li>Key lessons learned</li>
-</ul>`,
-          category: "trade-notes",
-          date: tradeData.date,
-          tradeId: newTrade.id,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        await saveNotebookEntry(newEntry);
+        // Notes are created manually by the user via the "Note" button on the Trade Log
       }
     }
   }, [editingTrade, addTrade, updateTrade, notebookEntries, saveNotebookEntry]);
