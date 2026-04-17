@@ -185,7 +185,9 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 420 });
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -199,6 +201,26 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
     return () => ro.disconnect();
   }, []);
 
+  // Pause expensive animations when off-screen for perf
+  useEffect(() => {
+    if (!wrapperRef.current) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) setIsVisible(e.isIntersecting);
+      },
+      { threshold: 0.05 }
+    );
+    io.observe(wrapperRef.current);
+    return () => io.disconnect();
+  }, []);
+
+  // Respect reduced motion preference
+  const prefersReducedMotion = useMemo(
+    () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+    []
+  );
+  const animationsEnabled = isVisible && !prefersReducedMotion;
+
   const nodeById = useMemo(() => Object.fromEntries(nodes.map((n) => [n.id, n])), [nodes]);
   const activeId = hoveredId || selectedId;
   const activeNode = activeId ? nodeById[activeId] : null;
@@ -208,6 +230,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
 
   return (
     <motion.div
+      ref={wrapperRef}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4, duration: 0.5 }}
@@ -277,13 +300,6 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                 <stop offset="100%" stopColor={COLORS[s]} stopOpacity="0.2" />
               </radialGradient>
             ))}
-            <filter id="node-glow" x="-100%" y="-100%" width="300%" height="300%">
-              <feGaussianBlur stdDeviation="4" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
           </defs>
 
           {/* Edges */}
@@ -316,14 +332,12 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                   strokeLinecap="round"
                   style={{ transition: "stroke-opacity 300ms ease, stroke-width 300ms ease" }}
                 />
-                {/* Traveling pulse dot */}
-                <circle r={isActive ? 2.5 : 1.6} fill={stroke} opacity={isDimmed ? 0.1 : 0.85}>
-                  <animateMotion
-                    dur={`${5 + (i % 4)}s`}
-                    repeatCount="indefinite"
-                    path={`M ${x1} ${y1} L ${x2} ${y2}`}
-                  />
-                </circle>
+                {/* Pulse only on the active edges to keep things lightweight */}
+                {isActive && animationsEnabled && (
+                  <circle r={2.5} fill={stroke} opacity={0.9}>
+                    <animateMotion dur="2.4s" repeatCount="indefinite" path={`M ${x1} ${y1} L ${x2} ${y2}`} />
+                  </circle>
+                )}
               </g>
             );
           })}
@@ -337,8 +351,6 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
             const isCore = n.id === "core";
             const sizeFactor = compact ? 0.6 : 1;
             const r = Math.max(4, n.size * sizeFactor);
-            const driftDur = 6 + (idx % 5);
-            const driftAmt = isCore ? 0 : 3;
             return (
               <motion.g
                 key={n.id}
@@ -359,18 +371,8 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                 }}
               >
                 <g>
-                  {/* Drift wrapper via SMIL */}
-                  {!isCore && (
-                    <animateTransform
-                      attributeName="transform"
-                      type="translate"
-                      values={`0,0; ${driftAmt},${-driftAmt}; 0,0; ${-driftAmt},${driftAmt}; 0,0`}
-                      dur={`${driftDur}s`}
-                      repeatCount="indefinite"
-                    />
-                  )}
-                  {/* Outer pulse ring on active */}
-                  {isActive && (
+                  {/* Outer pulse ring on active only — no continuous per-node animations */}
+                  {isActive && animationsEnabled && (
                     <circle
                       cx={cx}
                       cy={cy}
@@ -393,7 +395,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                     opacity={isActive ? 0.22 : 0.1}
                     style={{ transition: "all 250ms ease" }}
                   />
-                  {/* Core node */}
+                  {/* Core node (no SVG blur filter — too expensive for paint) */}
                   <circle
                     cx={cx}
                     cy={cy}
@@ -402,18 +404,8 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                     stroke={COLORS[n.sentiment]}
                     strokeOpacity={isActive ? 1 : 0.7}
                     strokeWidth={isActive ? 1.5 : 1}
-                    filter="url(#node-glow)"
                     style={{ transition: "all 250ms ease" }}
-                  >
-                    {isCore && (
-                      <animate
-                        attributeName="r"
-                        values={`${r};${r + 2};${r}`}
-                        dur="3s"
-                        repeatCount="indefinite"
-                      />
-                    )}
-                  </circle>
+                  />
                   {/* Label */}
                   {(!compact || isActive || isCore) && (
                     <text

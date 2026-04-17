@@ -49,7 +49,6 @@ const rowVariants = {
   }),
   hover: {
     x: 4,
-    backgroundColor: "hsl(var(--muted) / 0.3)",
     transition: { type: "spring" as const, stiffness: 400, damping: 25 },
   },
 };
@@ -222,7 +221,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
                           animate="visible"
                           whileHover="hover"
                           custom={index}
-                          className="border-b border-border/20 cursor-pointer rounded-lg"
+                          className="border-b border-border/20 cursor-pointer rounded-lg hover:bg-muted/30 transition-colors"
                         >
                           <td className="py-3 pl-2">
                             <div className="flex items-center gap-2">
@@ -321,7 +320,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
                         animate="visible"
                         whileHover="hover"
                         custom={index}
-                        className="border-b border-border/20"
+                        className="border-b border-border/20 hover:bg-muted/30 transition-colors"
                       >
                         <td className="py-3 pl-2">
                           <span className="text-sm font-semibold">{pos.symbol}</span>
@@ -386,7 +385,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
                         animate="visible"
                         whileHover="hover"
                         custom={index}
-                        className="border-b border-border/20"
+                        className="border-b border-border/20 hover:bg-muted/30 transition-colors"
                       >
                         <td className="py-3 pl-2">
                           <span className="text-sm font-semibold">{ord.symbol}</span>
