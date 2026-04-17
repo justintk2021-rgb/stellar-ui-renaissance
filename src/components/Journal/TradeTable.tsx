@@ -720,13 +720,16 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                     const isProfit = pl >= 0;
                     const hasNote = !!getTradeNote(notebookEntries, trade.id) || !!trade.notes;
                     return (
-                      <motion.button
+                      <motion.div
                         key={trade.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.05 }}
-                        onClick={() => handleSelectTradeFromList(trade)}
-                        className="w-full flex items-center justify-between gap-3 p-4 rounded-xl bg-muted/20 hover:bg-muted/40 border border-border/20 hover:border-border/40 transition-all group"
+                        onClick={() => { if (hasNote) handleSelectTradeFromList(trade); }}
+                        className={cn(
+                          "w-full flex items-center justify-between gap-3 p-4 rounded-xl bg-muted/20 border border-border/20 transition-all group",
+                          hasNote && "hover:bg-muted/40 hover:border-border/40 cursor-pointer"
+                        )}
                       >
                         <div className="flex items-center gap-3">
                           <div className={cn(
@@ -774,8 +777,24 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                             </div>
                           </div>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                      </motion.button>
+                        {hasNote ? (
+                          <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectForNotebook(trade.id);
+                              handleCloseModal();
+                            }}
+                            className="gap-1.5 h-8"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            Create Note
+                          </Button>
+                        )}
+                      </motion.div>
                     );
                   })}
                 </div>
