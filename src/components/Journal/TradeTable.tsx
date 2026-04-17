@@ -824,9 +824,9 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                       <FileText className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <span className="block">Trade Notes</span>
+                      <span className="block">{selectedTrade.pair} • {selectedTrade.direction}</span>
                       <span className="text-sm font-normal text-muted-foreground">
-                        {selectedTrade.pair} • {selectedTrade.direction} • {selectedTrade.date}
+                        {selectedTrade.date}
                       </span>
                     </div>
                   </DialogTitle>
