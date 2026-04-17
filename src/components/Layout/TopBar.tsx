@@ -26,15 +26,15 @@ interface TopBarProps {
 
 export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], showRank = false, greetingName, showGreeting = false, rightSlot }: TopBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 mb-6">
-      <div>
+    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 pb-3 sm:pb-4 mb-4 sm:mb-6">
+      <div className="min-w-0">
         {showGreeting && <Greeting name={greetingName} />}
-        <h2 className={showGreeting ? "text-xl font-semibold tracking-wide mt-5" : "text-xl font-semibold tracking-wide"}>{title}</h2>
+        <h2 className={cn("text-lg sm:text-xl font-semibold tracking-wide truncate", showGreeting && "mt-4 sm:mt-5")}>{title}</h2>
         {!showGreeting && (
-          <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">{subtitle}</p>
         )}
       </div>
-      <div className="flex items-center gap-3 flex-wrap justify-end">
+      <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:justify-end">
         {rightSlot}
         {showRank && (
           <RankBadge trades={trades} />
@@ -46,7 +46,7 @@ export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], sho
             size="sm"
           />
         )}
-        <Badge variant="secondary" className="px-3 py-1 text-xs font-medium text-muted-foreground">
+        <Badge variant="secondary" className="px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium text-muted-foreground hidden sm:inline-flex">
           ATP • Private
         </Badge>
       </div>
