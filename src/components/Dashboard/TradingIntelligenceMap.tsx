@@ -332,14 +332,12 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                   strokeLinecap="round"
                   style={{ transition: "stroke-opacity 300ms ease, stroke-width 300ms ease" }}
                 />
-                {/* Traveling pulse dot */}
-                <circle r={isActive ? 2.5 : 1.6} fill={stroke} opacity={isDimmed ? 0.1 : 0.85}>
-                  <animateMotion
-                    dur={`${5 + (i % 4)}s`}
-                    repeatCount="indefinite"
-                    path={`M ${x1} ${y1} L ${x2} ${y2}`}
-                  />
-                </circle>
+                {/* Pulse only on the active edges to keep things lightweight */}
+                {isActive && animationsEnabled && (
+                  <circle r={2.5} fill={stroke} opacity={0.9}>
+                    <animateMotion dur="2.4s" repeatCount="indefinite" path={`M ${x1} ${y1} L ${x2} ${y2}`} />
+                  </circle>
+                )}
               </g>
             );
           })}
