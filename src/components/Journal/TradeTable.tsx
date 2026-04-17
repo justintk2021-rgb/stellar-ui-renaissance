@@ -769,11 +769,6 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                               )}>
                                 {isProfit ? '+' : ''}{pl.toFixed(2)}
                               </span>
-                              {hasNote && (
-                                <span className="text-[10px] text-primary/70 flex items-center gap-0.5">
-                                  <FileText className="w-2.5 h-2.5" /> Has note
-                                </span>
-                              )}
                             </div>
                           </div>
                         </div>
