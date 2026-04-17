@@ -330,7 +330,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
               className="h-8 px-3 text-xs gap-1.5 text-primary hover:bg-primary/10 hover:text-primary"
             >
               <FileText className="w-3.5 h-3.5" />
-              {trades.length === 1 ? 'View Note' : `View Notes (${trades.length})`}
+              {trades.length === 1 ? 'Note' : `Notes (${trades.length})`}
             </Button>
           </motion.div>
         </div>
@@ -467,7 +467,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
                           className="h-7 px-3 text-xs gap-1.5 text-primary hover:bg-primary/10"
                         >
                           <FileText className="w-3 h-3" />
-                          View Note
+                          Note
                         </Button>
                       </motion.div>
                     </div>
