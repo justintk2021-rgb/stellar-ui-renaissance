@@ -185,7 +185,9 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 420 });
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -198,6 +200,26 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
     ro.observe(containerRef.current);
     return () => ro.disconnect();
   }, []);
+
+  // Pause expensive animations when off-screen for perf
+  useEffect(() => {
+    if (!wrapperRef.current) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) setIsVisible(e.isIntersecting);
+      },
+      { threshold: 0.05 }
+    );
+    io.observe(wrapperRef.current);
+    return () => io.disconnect();
+  }, []);
+
+  // Respect reduced motion preference
+  const prefersReducedMotion = useMemo(
+    () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+    []
+  );
+  const animationsEnabled = isVisible && !prefersReducedMotion;
 
   const nodeById = useMemo(() => Object.fromEntries(nodes.map((n) => [n.id, n])), [nodes]);
   const activeId = hoveredId || selectedId;
