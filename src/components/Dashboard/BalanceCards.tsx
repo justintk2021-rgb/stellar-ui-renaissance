@@ -2,7 +2,7 @@ import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, X, MoreHorizontal, Target, TrendingUp, Wallet, Trophy } from "lucide-react";
+import { Check, X, MoreHorizontal, Target, TrendingUp, Wallet, Trophy, Activity, Radio } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
