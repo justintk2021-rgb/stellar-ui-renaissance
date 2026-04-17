@@ -657,14 +657,18 @@ const Index = () => {
             <div className={cn(
               !isChartPage && "w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16"
             )}>
-            {!isChartPage && <TopBar title={title} subtitle={subtitle} theme={theme} onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)} trades={trades} showRank={currentPage === 'dashboard'} showGreeting={currentPage === 'dashboard'} greetingName={userProfile?.first_name || (user?.email ? user.email.split('@')[0] : null)} />}
-
-            <AnimatePresence mode="wait">
-              {/* Dashboard Page */}
-              {currentPage === 'dashboard' && (
-                <PageTransition key="dashboard" className="space-y-6">
-                  {/* Account Selector */}
-                  <motion.div variants={staggerItem} className="flex items-center justify-between flex-wrap gap-4">
+            {!isChartPage && (
+              <TopBar
+                title={title}
+                subtitle={subtitle}
+                theme={theme}
+                onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)}
+                trades={trades}
+                showRank={currentPage === 'dashboard'}
+                showGreeting={currentPage === 'dashboard'}
+                greetingName={userProfile?.first_name || (user?.email ? user.email.split('@')[0] : null)}
+                rightSlot={currentPage === 'dashboard' ? (
+                  <div className="flex items-center gap-3">
                     <AccountSelector
                       accounts={accounts}
                       selectedAccount={selectedAccount}
@@ -688,8 +692,15 @@ const Index = () => {
                         </motion.div>
                       )}
                     </AnimatePresence>
-                  </motion.div>
-                  
+                  </div>
+                ) : undefined}
+              />
+            )}
+
+            <AnimatePresence mode="wait">
+              {/* Dashboard Page */}
+              {currentPage === 'dashboard' && (
+                <PageTransition key="dashboard" className="space-y-6">
                   <motion.div variants={staggerItem}>
                     <BalanceCards
                       trades={trades}
