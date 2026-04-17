@@ -823,13 +823,14 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                   ) : (
                     <div className="text-center py-8">
                       <FileText className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-                      <p className="text-sm text-muted-foreground italic">No notes for this trade.</p>
+                      <p className="text-sm text-muted-foreground italic">No note for this trade yet.</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1">Click "Create Note" below to add one.</p>
                     </div>
                   )}
                 </div>
                 <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border/40 flex-shrink-0">
                   <Button
-                    variant="outline"
+                    variant={selectedTradeNote ? "outline" : "default"}
                     onClick={() => {
                       if (selectedTrade) {
                         onSelectForNotebook(selectedTrade.id);
@@ -839,9 +840,9 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                     className="gap-2"
                   >
                     <Pencil className="w-4 h-4" />
-                    Edit in Notebook
+                    {selectedTradeNote ? 'Edit in Notebook' : 'Create Note'}
                   </Button>
-                  <Button onClick={handleCloseModal}>
+                  <Button variant={selectedTradeNote ? "default" : "outline"} onClick={handleCloseModal}>
                     Close
                   </Button>
                 </div>
