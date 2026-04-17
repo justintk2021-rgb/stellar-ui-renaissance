@@ -172,6 +172,21 @@ export function AuthPage() {
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+  const handleForgotPassword = async () => {
+    if (!formData.email || !formData.email.includes("@")) {
+      toast.error("Enter your email above first, then click Forgot password");
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password reset email sent. Check your inbox.");
+    }
+  };
+
   useEffect(() => {
     // Force dark theme for auth page
     document.documentElement.classList.remove('light');
