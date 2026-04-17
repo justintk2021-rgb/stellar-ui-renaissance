@@ -145,11 +145,11 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
 
   // Behavior nodes at the bottom
   const behaviors: { label: string; sentiment: NodeSentiment; visible: boolean; detail: string }[] = [
-    { label: "Discipline", sentiment: "positive", visible: winRate >= 50, detail: `Strong win rate of ${winRate.toFixed(1)}%` },
-    { label: "Risk Control", sentiment: "positive", visible: avgWin >= avgLoss && avgLoss > 0, detail: `Avg win ($${avgWin.toFixed(0)}) ≥ avg loss ($${avgLoss.toFixed(0)})` },
-    { label: "Overtrading", sentiment: "negative", visible: trades.length > 50 && winRate < 45, detail: "High volume with low win rate" },
-    { label: "Cut Winners Early", sentiment: "negative", visible: avgWin > 0 && avgLoss > 0 && avgWin < avgLoss, detail: "Avg loss exceeds avg win" },
-    { label: "Consistency", sentiment: "positive", visible: trades.length >= 10 && winRate >= 55, detail: "Sustained edge over many trades" },
+    { label: "Discipline", sentiment: "positive" as NodeSentiment, visible: winRate >= 50, detail: `Strong win rate of ${winRate.toFixed(1)}%` },
+    { label: "Risk Control", sentiment: "positive" as NodeSentiment, visible: avgWin >= avgLoss && avgLoss > 0, detail: `Avg win ($${avgWin.toFixed(0)}) ≥ avg loss ($${avgLoss.toFixed(0)})` },
+    { label: "Overtrading", sentiment: "negative" as NodeSentiment, visible: trades.length > 50 && winRate < 45, detail: "High volume with low win rate" },
+    { label: "Cut Winners Early", sentiment: "negative" as NodeSentiment, visible: avgWin > 0 && avgLoss > 0 && avgWin < avgLoss, detail: "Avg loss exceeds avg win" },
+    { label: "Consistency", sentiment: "positive" as NodeSentiment, visible: trades.length >= 10 && winRate >= 55, detail: "Sustained edge over many trades" },
   ].filter((b) => b.visible);
 
   behaviors.forEach((b, i) => {

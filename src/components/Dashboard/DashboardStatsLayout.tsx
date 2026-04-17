@@ -175,18 +175,18 @@ export function DashboardStatsLayout({
   ];
 
   return (
-    <div className="space-y-6">
-      {/* 3-column layout: stats | calendar | stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch">
-        {/* Left column */}
-        <div className="lg:col-span-3 flex flex-col gap-5">
+    <div className="space-y-5 md:space-y-6">
+      {/* Responsive layout: tablet uses 2-col, desktop uses 3-col split */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 md:gap-5 lg:gap-8 items-stretch">
+        {/* Left column - stats */}
+        <div className="md:col-span-1 lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 md:grid-cols-1 gap-4 md:gap-5">
           {leftCards.map((card, i) => (
             <StatCard key={card.label} {...card} index={i} />
           ))}
         </div>
 
         {/* Center column - Calendar */}
-        <div className="lg:col-span-7">
+        <div className="md:col-span-2 lg:col-span-7 order-first md:order-none">
           <PnLCalendar
             trades={trades}
             onUpdateTrade={onUpdateTrade}
@@ -197,7 +197,7 @@ export function DashboardStatsLayout({
         </div>
 
         {/* Right column - smaller */}
-        <div className="lg:col-span-2 flex flex-col gap-4 self-stretch">
+        <div className="md:col-span-2 lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-1 gap-4 self-stretch">
           {rightCards.map((card, i) => (
             <StatCard key={card.label} {...card} index={i} />
           ))}
@@ -206,12 +206,12 @@ export function DashboardStatsLayout({
       </div>
 
       {/* Win ratio + Recent trades below */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-5">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="rounded-2xl p-5 bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl flex flex-col min-h-[280px]"
+          className="rounded-2xl p-4 md:p-5 bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl flex flex-col min-h-[260px] md:min-h-[280px]"
         >
           <WinRatioCard trades={trades} />
         </motion.div>
@@ -219,7 +219,7 @@ export function DashboardStatsLayout({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="lg:col-span-3"
+          className="lg:col-span-3 min-w-0"
         >
           <RecentTrades trades={trades} />
         </motion.div>
