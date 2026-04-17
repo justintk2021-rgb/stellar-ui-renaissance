@@ -2,7 +2,7 @@ import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, X, MoreHorizontal, Target, TrendingUp, Wallet, Trophy } from "lucide-react";
+import { Check, X, MoreHorizontal, Target, TrendingUp, Wallet, Trophy, Activity, Radio } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,9 @@ interface BalanceCardsProps {
   goalBalance: number | null;
   profitTarget: number | null;
   brokerBalance?: number | null;
+  brokerEquity?: number | null;
+  brokerFloatingPl?: number;
+  brokerHasOpenPositions?: boolean;
   onSetBalance: (balance: number) => void;
   onSetGoalBalance: (balance: number) => void;
   onSetProfitTarget: (target: number) => void;
@@ -120,7 +123,7 @@ const iconVariants = {
 
 // Removed animated glow variants to reduce visual interference
 
-export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, brokerBalance, onSetBalance, onSetGoalBalance, onSetProfitTarget }: BalanceCardsProps) {
+export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, brokerBalance, brokerEquity, brokerFloatingPl = 0, brokerHasOpenPositions = false, onSetBalance, onSetGoalBalance, onSetProfitTarget }: BalanceCardsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [isEditingProfitTarget, setIsEditingProfitTarget] = useState(false);
@@ -420,68 +423,121 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
         </div>
       </motion.div>
 
-      {/* Profit Card */}
-      <motion.div
-        variants={cardVariants}
-        initial="hidden"
-        animate="visible"
-        whileHover="hover"
-        custom={1}
-        className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
-      >
-        
-        <div className="relative">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <motion.div
-                variants={iconVariants}
-                initial="initial"
-                whileHover="hover"
-                className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center"
-              >
-                <TrendingUp className="w-5 h-5 text-primary" />
-              </motion.div>
-              <span className="text-sm font-medium text-muted-foreground">Total Profit</span>
-            </div>
-            <Sparkline data={sparklineData} isPositive={isProfitPositive} />
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex items-baseline gap-3">
-              <AnimatedValue 
-                value={profit} 
-                prefix="$" 
-                className="text-3xl font-bold font-mono"
-              />
-              <motion.span
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.6 }}
-                className="text-sm font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary"
-              >
-                +{Math.trunc(profitPercent * 100) / 100}%
-              </motion.span>
-            </div>
-            
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="flex items-center gap-4"
-            >
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Net Change</div>
-                <span className={cn(
-                  "text-sm font-semibold font-mono",
-                  isPositive ? "text-primary" : "text-destructive"
-                )}>
-                  {isPositive ? '+' : ''}${(Math.trunc(balanceChange * 100) / 100).toFixed(2)}
-                </span>
+      {/* Equity Card (live broker equity) */}
+      {(() => {
+        // Live equity = brokerEquity (from broker) OR derived as balance + floating P&L
+        const hasBroker = brokerBalance != null || brokerEquity != null;
+        const liveEquity = hasBroker
+          ? (brokerEquity != null
+              ? brokerEquity
+              : (brokerBalance ?? 0) + (brokerFloatingPl ?? 0))
+          : currentBalance;
+        const baseBalance = brokerBalance ?? currentBalance;
+        const equityChange = liveEquity - baseBalance;
+        const equityPositive = equityChange >= 0;
+        const isLive = brokerHasOpenPositions && hasBroker;
+
+        return (
+          <motion.div
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            whileHover="hover"
+            custom={1}
+            className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
+          >
+            <div className="relative">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <motion.div
+                    variants={iconVariants}
+                    initial="initial"
+                    whileHover="hover"
+                    className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center",
+                      equityPositive ? "bg-primary/15" : "bg-destructive/15"
+                    )}
+                  >
+                    <Activity className={cn("w-5 h-5", equityPositive ? "text-primary" : "text-destructive")} />
+                  </motion.div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-muted-foreground">Equity</span>
+                    {isLive && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex items-center gap-1 mt-0.5"
+                      >
+                        <motion.span
+                          animate={{ opacity: [0.4, 1, 0.4] }}
+                          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                          className="w-1.5 h-1.5 rounded-full bg-primary"
+                        />
+                        <span className="text-[10px] font-semibold tracking-wide text-primary uppercase">Live</span>
+                      </motion.div>
+                    )}
+                  </div>
+                </div>
+                <Sparkline data={sparklineData} isPositive={equityPositive} />
               </div>
-            </motion.div>
-          </div>
-        </div>
-      </motion.div>
+
+              <div className="space-y-4">
+                <div className="flex items-baseline gap-3">
+                  <AnimatedValue
+                    value={liveEquity}
+                    prefix="$"
+                    className="text-3xl font-bold font-mono"
+                  />
+                  {hasBroker && (
+                    <motion.span
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.6 }}
+                      className={cn(
+                        "text-sm font-semibold px-2 py-0.5 rounded-full",
+                        equityPositive ? "bg-primary/15 text-primary" : "bg-destructive/15 text-destructive"
+                      )}
+                    >
+                      {equityPositive ? '+' : ''}${(Math.trunc(equityChange * 100) / 100).toFixed(2)}
+                    </motion.span>
+                  )}
+                </div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="flex items-center gap-4"
+                >
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">
+                      {isLive ? 'Floating P&L' : 'Account balance'}
+                    </div>
+                    {isLive ? (
+                      <span className={cn(
+                        "text-sm font-semibold font-mono",
+                        (brokerFloatingPl ?? 0) >= 0 ? "text-primary" : "text-destructive"
+                      )}>
+                        {(brokerFloatingPl ?? 0) >= 0 ? '+' : ''}${(Math.trunc((brokerFloatingPl ?? 0) * 100) / 100).toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-sm font-semibold font-mono text-foreground">
+                        ${(Math.trunc(baseBalance * 100) / 100).toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                  {!hasBroker && (
+                    <div className="text-xs text-muted-foreground italic">
+                      Connect a broker for live equity
+                    </div>
+                  )}
+                </motion.div>
+              </div>
+            </div>
+          </motion.div>
+        );
+      })()}
+
 
       {/* Account Projection Card */}
       <motion.div
