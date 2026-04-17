@@ -20,8 +20,7 @@ function AnimatedPercentage({ value }: { value: number }) {
     decimals: 0,
   });
 
-  const colorClass =
-    value < 50 ? "text-destructive" : value > 75 ? "text-[hsl(142_76%_46%)]" : "text-primary";
+  const colorClass = value < 50 ? "text-destructive" : "text-primary";
 
   return <span className={cn("text-4xl font-bold", colorClass)}>{formattedValue}%</span>;
 }
