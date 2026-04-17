@@ -300,13 +300,6 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                 <stop offset="100%" stopColor={COLORS[s]} stopOpacity="0.2" />
               </radialGradient>
             ))}
-            <filter id="node-glow" x="-100%" y="-100%" width="300%" height="300%">
-              <feGaussianBlur stdDeviation="4" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
           </defs>
 
           {/* Edges */}
