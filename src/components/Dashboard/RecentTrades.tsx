@@ -221,7 +221,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
                           animate="visible"
                           whileHover="hover"
                           custom={index}
-                          className="border-b border-border/20 cursor-pointer rounded-lg"
+                          className="border-b border-border/20 cursor-pointer rounded-lg hover:bg-muted/30 transition-colors"
                         >
                           <td className="py-3 pl-2">
                             <div className="flex items-center gap-2">
