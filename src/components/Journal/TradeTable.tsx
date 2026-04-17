@@ -413,7 +413,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
                     transition={{ delay: 0.2 + tradeIndex * 0.05 }}
                     className="px-5 py-3 pl-12 bg-card/20 hover:bg-muted/30 transition-colors duration-200"
                   >
-                    <div className="grid grid-cols-[1fr_80px_100px_auto] gap-4">
+                    <div className="grid grid-cols-[1fr_80px_auto] gap-4">
                     <div className="flex items-center gap-3 flex-wrap">
                       <motion.span 
                         className="text-sm font-semibold"
@@ -457,19 +457,6 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
                       tradeIsProfit ? "text-primary" : "text-destructive"
                     )}>
                       {tradeIsProfit ? '+' : ''}{pl.toFixed(2)}
-                    </div>
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onViewNotes(trade)}
-                          className="h-7 px-3 text-xs gap-1.5 text-primary hover:bg-primary/10"
-                        >
-                          <FileText className="w-3 h-3" />
-                          Note
-                        </Button>
-                      </motion.div>
                     </div>
                     <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                       <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
