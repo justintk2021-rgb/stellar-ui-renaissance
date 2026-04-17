@@ -320,7 +320,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
                         animate="visible"
                         whileHover="hover"
                         custom={index}
-                        className="border-b border-border/20"
+                        className="border-b border-border/20 hover:bg-muted/30 transition-colors"
                       >
                         <td className="py-3 pl-2">
                           <span className="text-sm font-semibold">{pos.symbol}</span>
@@ -385,7 +385,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
                         animate="visible"
                         whileHover="hover"
                         custom={index}
-                        className="border-b border-border/20"
+                        className="border-b border-border/20 hover:bg-muted/30 transition-colors"
                       >
                         <td className="py-3 pl-2">
                           <span className="text-sm font-semibold">{ord.symbol}</span>
