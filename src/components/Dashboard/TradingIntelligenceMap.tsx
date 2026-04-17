@@ -230,6 +230,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
 
   return (
     <motion.div
+      ref={wrapperRef}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4, duration: 0.5 }}
