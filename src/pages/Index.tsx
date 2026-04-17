@@ -509,10 +509,28 @@ const Index = () => {
     await deleteNotebookEntry(id);
   }, [deleteNotebookEntry]);
 
-  const handleSelectForNotebook = useCallback((id: string) => {
+  const handleSelectForNotebook = useCallback(async (id: string) => {
+    // If no note exists for this trade yet, create a blank one so the user can write
+    const existing = notebookEntries.find(e => e.tradeId === id && !e.isDeleted);
+    if (!existing) {
+      const trade = trades.find(t => t.id === id);
+      if (trade) {
+        const newEntry: NotebookEntry = {
+          id: crypto.randomUUID(),
+          title: `${trade.pair} - ${trade.direction} Trade`,
+          content: '',
+          category: 'trade-notes',
+          date: trade.date,
+          tradeId: trade.id,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await saveNotebookEntry(newEntry);
+      }
+    }
     setSelectedTradeId(id);
     setCurrentPage('notebook');
-  }, []);
+  }, [notebookEntries, trades, saveNotebookEntry]);
 
   const { title, subtitle } = pageInfo[currentPage];
 
