@@ -354,26 +354,63 @@ export function NotebookView({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullWidth]);
 
-  // Auto-save in fullscreen mode (every 30 seconds)
+  // Auto-save (every 5 seconds) — works in both fullscreen and normal mode
   useEffect(() => {
-    if (!isFullWidth || !selectedEntry || isLocked) return;
+    if (!selectedEntry || isLocked) return;
 
     const autoSaveInterval = setInterval(() => {
-      if (fullscreenEditorRef.current && fullscreenTitleRef.current) {
-        const content = fullscreenEditorRef.current.innerHTML;
-        const title = fullscreenTitleRef.current.value || "Untitled Note";
-        
-        onSaveEntry({
-          ...selectedEntry,
-          title,
-          content,
-          updatedAt: new Date().toISOString(),
-        });
-        toast.success("Auto-saved", { duration: 1500 });
-      }
-    }, 30000); // 30 seconds
+      const currentEditorRef = isFullWidth ? fullscreenEditorRef : editorRef;
+      const currentTitleRef = isFullWidth ? fullscreenTitleRef : titleRef;
+      if (!currentEditorRef.current) return;
+
+      const content = currentEditorRef.current.innerHTML;
+      const title = currentTitleRef.current?.value || selectedEntry.title || "Untitled Note";
+
+      // Only save if something actually changed
+      if (content === selectedEntry.content && title === selectedEntry.title) return;
+
+      onSaveEntry({
+        ...selectedEntry,
+        title,
+        content,
+        updatedAt: new Date().toISOString(),
+      });
+    }, 5000);
 
     return () => clearInterval(autoSaveInterval);
+  }, [isFullWidth, selectedEntry, isLocked, onSaveEntry]);
+
+  // Save on blur (when user leaves the editor) for instant persistence
+  useEffect(() => {
+    if (!selectedEntry || isLocked) return;
+
+    const handleBlur = () => {
+      const currentEditorRef = isFullWidth ? fullscreenEditorRef : editorRef;
+      const currentTitleRef = isFullWidth ? fullscreenTitleRef : titleRef;
+      if (!currentEditorRef.current) return;
+
+      const content = currentEditorRef.current.innerHTML;
+      const title = currentTitleRef.current?.value || selectedEntry.title || "Untitled Note";
+
+      if (content === selectedEntry.content && title === selectedEntry.title) return;
+
+      onSaveEntry({
+        ...selectedEntry,
+        title,
+        content,
+        updatedAt: new Date().toISOString(),
+      });
+    };
+
+    const editorEl = (isFullWidth ? fullscreenEditorRef : editorRef).current;
+    const titleEl = (isFullWidth ? fullscreenTitleRef : titleRef).current;
+    editorEl?.addEventListener('blur', handleBlur);
+    titleEl?.addEventListener('blur', handleBlur);
+
+    return () => {
+      editorEl?.removeEventListener('blur', handleBlur);
+      titleEl?.removeEventListener('blur', handleBlur);
+    };
   }, [isFullWidth, selectedEntry, isLocked, onSaveEntry]);
 
   const closeFoldersPanel = () => {
