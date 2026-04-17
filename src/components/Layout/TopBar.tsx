@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { RankBadge } from "@/components/Dashboard/RankBadge";
+import { Greeting } from "@/components/Layout/Greeting";
 
 interface Trade {
   id: string;
@@ -17,12 +18,15 @@ interface TopBarProps {
   onThemeChange?: (theme: 'dark' | 'light') => void;
   trades?: Trade[];
   showRank?: boolean;
+  greetingName?: string | null;
+  showGreeting?: boolean;
 }
 
-export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], showRank = false }: TopBarProps) {
+export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], showRank = false, greetingName, showGreeting = false }: TopBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-6">
+    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 mb-6">
       <div>
+        {showGreeting && <Greeting name={greetingName} />}
         <h2 className="text-xl font-semibold tracking-wide">{title}</h2>
         <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
       </div>
