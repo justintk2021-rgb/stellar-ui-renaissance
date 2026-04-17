@@ -236,7 +236,20 @@ export function useUserSettings(userId: string | undefined) {
   ) => {
     setSettings(prev => {
       const newSettings = { ...prev, [key]: value };
-      
+
+      // Apply visual settings immediately + cache for cross-page sync
+      const visualKeys: Array<keyof UserSettings> = ['theme', 'accentColor', 'customColor', 'customGradient'];
+      if (visualKeys.includes(key)) {
+        const applied = {
+          theme: newSettings.theme,
+          accentColor: newSettings.accentColor,
+          customColor: newSettings.customColor,
+          customGradient: newSettings.customGradient,
+        };
+        applySettingsToDocument(applied);
+        writeSettingsCache(applied);
+      }
+
       // Clear existing timeout
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
