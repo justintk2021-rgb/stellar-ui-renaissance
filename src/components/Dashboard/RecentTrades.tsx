@@ -49,7 +49,6 @@ const rowVariants = {
   }),
   hover: {
     x: 4,
-    backgroundColor: "hsl(var(--muted) / 0.3)",
     transition: { type: "spring" as const, stiffness: 400, damping: 25 },
   },
 };
