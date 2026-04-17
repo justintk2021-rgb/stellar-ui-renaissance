@@ -831,12 +831,24 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                     </div>
                   </DialogTitle>
                 </DialogHeader>
-                <div className="flex-1 overflow-y-auto mt-4 p-4 rounded-lg bg-muted/20">
+                <div className="flex-1 overflow-y-auto mt-4 p-5 rounded-lg bg-muted/20">
                   {selectedTradeNote ? (
-                    <div 
-                      className="prose prose-sm dark:prose-invert max-w-none"
-                      dangerouslySetInnerHTML={{ __html: selectedTradeNote.content }}
-                    />
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between pb-3 border-b border-border/30">
+                        <h4 className="text-base font-semibold text-foreground">{selectedTradeNote.title}</h4>
+                        <span className="text-[11px] text-muted-foreground">
+                          {new Date(selectedTradeNote.updatedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {extractPlainText(selectedTradeNote.content).trim().length > 0 ? (
+                        <div 
+                          className="prose prose-sm dark:prose-invert max-w-none [&_*]:text-foreground"
+                          dangerouslySetInnerHTML={{ __html: selectedTradeNote.content }}
+                        />
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">This note is empty. Click "Edit in Notebook" to add content.</p>
+                      )}
+                    </div>
                   ) : selectedTrade.notes ? (
                     <p className="text-sm text-foreground whitespace-pre-wrap">{selectedTrade.notes}</p>
                   ) : (
