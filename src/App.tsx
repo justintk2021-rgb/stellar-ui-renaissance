@@ -7,13 +7,19 @@ import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import { AuthPage } from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import { useApplyGlobalSettings } from "./hooks/useApplyGlobalSettings";
 
 const queryClient = new QueryClient();
+
+const GlobalSettingsApplier = () => {
+  useApplyGlobalSettings();
+  return null;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      
+      <GlobalSettingsApplier />
       <Toaster />
       <Sonner />
       <BrowserRouter>
