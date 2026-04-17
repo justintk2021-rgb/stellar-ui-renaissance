@@ -18,6 +18,9 @@ interface BalanceCardsProps {
   goalBalance: number | null;
   profitTarget: number | null;
   brokerBalance?: number | null;
+  brokerEquity?: number | null;
+  brokerFloatingPl?: number;
+  brokerHasOpenPositions?: boolean;
   onSetBalance: (balance: number) => void;
   onSetGoalBalance: (balance: number) => void;
   onSetProfitTarget: (target: number) => void;
