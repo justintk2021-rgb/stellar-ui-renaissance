@@ -561,20 +561,20 @@ const Index = () => {
       />
 
       <div className={cn(
-        "min-h-screen flex flex-col gap-4 p-4 pb-24 transition-all duration-300 w-full",
+        "min-h-screen flex flex-col gap-3 p-2 sm:p-3 pb-24 transition-all duration-300 w-full",
         !isChartPage && "lg:p-5 lg:pb-5"
       )}>
         {/* Mobile Header */}
         {!isChartPage && (
-          <div className="lg:hidden glass-strong rounded-2xl p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center glow-primary">
+          <div className="lg:hidden glass-strong rounded-2xl p-3 sm:p-4 flex items-center gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center glow-primary shrink-0">
               <svg className="w-5 h-5 text-primary-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="22,7 13.5,15.5 8.5,10.5 2,17" />
                 <polyline points="16,7 22,7 22,13" />
               </svg>
             </div>
-            <div>
-              <h1 className="text-base font-bold gradient-text">NSYNC JOURNAL</h1>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-bold gradient-text truncate">NSYNC JOURNAL</h1>
               <p className="text-[10px] text-muted-foreground">Personal Journal</p>
             </div>
           </div>
@@ -591,15 +591,15 @@ const Index = () => {
         )}
 
         <main className={cn(
-          "flex-1 transition-all duration-300",
+          "flex-1 transition-all duration-300 min-w-0",
           !isChartPage && sidebarCollapsed && "lg:ml-24"
         )}>
           <div className={cn(
             "glass-strong rounded-2xl min-h-[calc(100vh-120px)]",
-            isChartPage ? "p-4 lg:min-h-[calc(100vh-100px)]" : "p-5 lg:p-6 lg:min-h-[calc(100vh-60px)]"
+            isChartPage ? "p-3 sm:p-4 lg:min-h-[calc(100vh-100px)]" : "p-3 sm:p-4 lg:p-6 lg:min-h-[calc(100vh-60px)]"
           )}>
             <div className={cn(
-              !isChartPage && "w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16"
+              !isChartPage && "w-full px-0 sm:px-2 lg:px-8 xl:px-12 2xl:px-16"
             )}>
             {!isChartPage && (
               <TopBar
