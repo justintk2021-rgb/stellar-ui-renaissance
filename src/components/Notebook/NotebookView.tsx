@@ -2147,11 +2147,12 @@ export function NotebookView({
               </div>
             </ScrollArea>
 
-            {/* Floating Add Note Button */}
+            {/* Floating Add Note Button — positioned bottom-right so it doesn't cover note text */}
             {!isViewingTrash && (
               <Button
                 onClick={handleNewNote}
-                className="absolute bottom-6 left-6 w-12 h-12 rounded-full bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all duration-300 group"
+                className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all duration-300 group z-30"
+                title="New note"
               >
                 <Plus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
               </Button>
