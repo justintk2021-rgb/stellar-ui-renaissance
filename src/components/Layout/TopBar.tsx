@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { RankBadge } from "@/components/Dashboard/RankBadge";
@@ -20,9 +21,10 @@ interface TopBarProps {
   showRank?: boolean;
   greetingName?: string | null;
   showGreeting?: boolean;
+  rightSlot?: ReactNode;
 }
 
-export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], showRank = false, greetingName, showGreeting = false }: TopBarProps) {
+export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], showRank = false, greetingName, showGreeting = false, rightSlot }: TopBarProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 mb-6">
       <div>
@@ -32,7 +34,8 @@ export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], sho
           <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
         )}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap justify-end">
+        {rightSlot}
         {showRank && (
           <RankBadge trades={trades} />
         )}
