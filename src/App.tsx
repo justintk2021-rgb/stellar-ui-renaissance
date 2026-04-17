@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import { AuthPage } from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import ResetPassword from "./pages/ResetPassword";
 import { useApplyGlobalSettings } from "./hooks/useApplyGlobalSettings";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/dashboard" element={<Index />} />
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
