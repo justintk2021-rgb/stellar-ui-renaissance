@@ -831,31 +831,37 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                     </div>
                   </DialogTitle>
                 </DialogHeader>
-                <div className="flex-1 overflow-y-auto mt-4 p-5 rounded-lg bg-muted/20">
+                <div className="flex-1 min-h-0 mt-4 rounded-lg bg-muted/20 flex flex-col overflow-hidden">
                   {selectedTradeNote ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between pb-3 border-b border-border/30">
-                        <h4 className="text-base font-semibold text-foreground">{selectedTradeNote.title}</h4>
-                        <span className="text-[11px] text-muted-foreground">
+                    <>
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 flex-shrink-0 bg-muted/30">
+                        <h4 className="text-base font-semibold text-foreground truncate pr-3">{selectedTradeNote.title}</h4>
+                        <span className="text-[11px] text-muted-foreground flex-shrink-0">
                           {new Date(selectedTradeNote.updatedAt).toLocaleDateString()}
                         </span>
                       </div>
-                      {extractPlainText(selectedTradeNote.content).trim().length > 0 ? (
-                        <div 
-                          className="prose prose-sm dark:prose-invert max-w-none [&_*]:text-foreground"
-                          dangerouslySetInnerHTML={{ __html: selectedTradeNote.content }}
-                        />
-                      ) : (
-                        <p className="text-sm text-muted-foreground italic">This note is empty. Click "Edit in Notebook" to add content.</p>
-                      )}
-                    </div>
+                      <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
+                        {extractPlainText(selectedTradeNote.content).trim().length > 0 ? (
+                          <div 
+                            className="prose prose-sm dark:prose-invert max-w-none break-words"
+                            dangerouslySetInnerHTML={{ __html: selectedTradeNote.content }}
+                          />
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">This note is empty. Click "Edit in Notebook" to add content.</p>
+                        )}
+                      </div>
+                    </>
                   ) : selectedTrade.notes ? (
-                    <p className="text-sm text-foreground whitespace-pre-wrap">{selectedTrade.notes}</p>
+                    <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
+                      <p className="text-sm text-foreground whitespace-pre-wrap break-words">{selectedTrade.notes}</p>
+                    </div>
                   ) : (
-                    <div className="text-center py-8">
-                      <FileText className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-                      <p className="text-sm text-muted-foreground italic">No note for this trade yet.</p>
-                      <p className="text-xs text-muted-foreground/70 mt-1">Click "Create Note" below to add one.</p>
+                    <div className="flex-1 flex items-center justify-center px-5 py-8">
+                      <div className="text-center">
+                        <FileText className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+                        <p className="text-sm text-muted-foreground italic">No note for this trade yet.</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">Click "Create Note" below to add one.</p>
+                      </div>
                     </div>
                   )}
                 </div>
