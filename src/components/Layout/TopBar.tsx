@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { RankBadge } from "@/components/Dashboard/RankBadge";
 import { Greeting } from "@/components/Layout/Greeting";
+import { cn } from "@/lib/utils";
 
 interface Trade {
   id: string;
