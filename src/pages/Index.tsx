@@ -146,6 +146,26 @@ const Index = () => {
     return () => { clearTimeout(timer); clearInterval(interval); };
   }, [user?.id, brokerAutoSync]);
 
+  // Scroll-triggered sync on the dashboard (throttled to once per minute)
+  const lastScrollSyncRef = useRef<number>(0);
+  useEffect(() => {
+    if (!user?.id || currentPage !== 'dashboard') return;
+    const handleScroll = () => {
+      const now = Date.now();
+      if (now - lastScrollSyncRef.current >= 60_000) {
+        lastScrollSyncRef.current = now;
+        brokerAutoSync();
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    // Also catch scroll on inner scrollable containers
+    document.addEventListener('scroll', handleScroll, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('scroll', handleScroll, { capture: true } as any);
+    };
+  }, [user?.id, currentPage, brokerAutoSync]);
+
   // Sync on page change
   useEffect(() => {
     if (!user?.id) return;
