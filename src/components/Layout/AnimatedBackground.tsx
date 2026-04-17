@@ -76,8 +76,8 @@ export function AnimatedBackground() {
 
   if (reduced) return null;
 
-  const particleCount = isSmall ? 60 : 100;
-  const starCount = isSmall ? 800 : 1400;
+  const particleCount = isSmall ? 30 : 50;
+  const starCount = isSmall ? 400 : 700;
 
   return (
     <div className="fixed inset-0 z-0 pointer-events-none">
