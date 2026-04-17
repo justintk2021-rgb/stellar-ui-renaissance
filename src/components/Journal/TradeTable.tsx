@@ -459,16 +459,18 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
                       {tradeIsProfit ? '+' : ''}{pl.toFixed(2)}
                     </div>
                     <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                      <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onEdit(trade)}
-                          className="w-7 h-7 rounded-lg hover:bg-primary/10 hover:text-primary"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                      </motion.div>
+                      {!trade.importedFromBroker && (
+                        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onEdit(trade)}
+                            className="w-7 h-7 rounded-lg hover:bg-primary/10 hover:text-primary"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                        </motion.div>
+                      )}
                       <ConfirmDialog
                         trigger={
                           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
