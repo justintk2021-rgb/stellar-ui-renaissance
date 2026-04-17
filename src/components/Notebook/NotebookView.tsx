@@ -294,14 +294,19 @@ export function NotebookView({
 
   const sortedDates = Object.keys(groupedEntries).sort((a, b) => b.localeCompare(a));
 
-  // Load entry content into editor
+  // Load entry content into editor — ONLY when switching to a different entry
+  // (not on every save). This prevents cursor reset and scroll-to-top while typing.
   useEffect(() => {
     if (editorRef.current && selectedEntry) {
-      editorRef.current.innerHTML = selectedEntry.content || "";
+      // Only replace innerHTML if it differs (i.e. switched note), not on auto-save updates
+      if (editorRef.current.innerHTML !== (selectedEntry.content || "")) {
+        editorRef.current.innerHTML = selectedEntry.content || "";
+      }
     } else if (editorRef.current && isCreatingNew) {
       editorRef.current.innerHTML = "";
     }
-  }, [selectedEntry, isCreatingNew]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEntry?.id, isCreatingNew]);
 
   // Sync content when entering fullscreen
   useEffect(() => {
