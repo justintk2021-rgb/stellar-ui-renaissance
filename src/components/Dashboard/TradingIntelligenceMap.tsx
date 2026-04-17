@@ -351,8 +351,6 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
             const isCore = n.id === "core";
             const sizeFactor = compact ? 0.6 : 1;
             const r = Math.max(4, n.size * sizeFactor);
-            const driftDur = 6 + (idx % 5);
-            const driftAmt = isCore ? 0 : 3;
             return (
               <motion.g
                 key={n.id}
@@ -373,18 +371,8 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                 }}
               >
                 <g>
-                  {/* Drift wrapper via SMIL */}
-                  {!isCore && (
-                    <animateTransform
-                      attributeName="transform"
-                      type="translate"
-                      values={`0,0; ${driftAmt},${-driftAmt}; 0,0; ${-driftAmt},${driftAmt}; 0,0`}
-                      dur={`${driftDur}s`}
-                      repeatCount="indefinite"
-                    />
-                  )}
-                  {/* Outer pulse ring on active */}
-                  {isActive && (
+                  {/* Outer pulse ring on active only — no continuous per-node animations */}
+                  {isActive && animationsEnabled && (
                     <circle
                       cx={cx}
                       cy={cy}
@@ -407,7 +395,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                     opacity={isActive ? 0.22 : 0.1}
                     style={{ transition: "all 250ms ease" }}
                   />
-                  {/* Core node */}
+                  {/* Core node (no SVG blur filter — too expensive for paint) */}
                   <circle
                     cx={cx}
                     cy={cy}
@@ -416,18 +404,8 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
                     stroke={COLORS[n.sentiment]}
                     strokeOpacity={isActive ? 1 : 0.7}
                     strokeWidth={isActive ? 1.5 : 1}
-                    filter="url(#node-glow)"
                     style={{ transition: "all 250ms ease" }}
-                  >
-                    {isCore && (
-                      <animate
-                        attributeName="r"
-                        values={`${r};${r + 2};${r}`}
-                        dur="3s"
-                        repeatCount="indefinite"
-                      />
-                    )}
-                  </circle>
+                  />
                   {/* Label */}
                   {(!compact || isActive || isCore) && (
                     <text
