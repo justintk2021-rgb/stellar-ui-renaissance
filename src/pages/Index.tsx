@@ -70,6 +70,9 @@ const Index = () => {
     return localStorage.getItem('selectedBrokerAccountId') || null;
   });
   const [brokerBalance, setBrokerBalance] = useState<number | null>(null);
+  const [brokerEquity, setBrokerEquity] = useState<number | null>(null);
+  const [brokerFloatingPl, setBrokerFloatingPl] = useState<number>(0);
+  const [brokerHasOpenPositions, setBrokerHasOpenPositions] = useState<boolean>(false);
   const [brokerSyncing, setBrokerSyncing] = useState(false);
 
   // Persist broker account selection
