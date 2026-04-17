@@ -152,13 +152,30 @@ const Index = () => {
     brokerAutoSync();
   }, [currentPage]);
 
-  // Fetch broker balance when a broker account is selected + realtime updates
+  // Fetch broker balance/equity when a broker account is selected + realtime updates
   useEffect(() => {
     if (!selectedBrokerAccountId) {
       setBrokerBalance(null);
+      setBrokerEquity(null);
+      setBrokerFloatingPl(0);
+      setBrokerHasOpenPositions(false);
       return;
     }
     let brokerConnectionId: string | null = null;
+
+    const fetchOpenPositions = async (connId: string) => {
+      const { data: positions } = await supabase
+        .from('broker_positions')
+        .select('floating_pl')
+        .eq('broker_connection_id', connId)
+        .is('closed_at', null);
+      const floating = (positions || []).reduce(
+        (sum, p) => sum + Number(p.floating_pl || 0),
+        0
+      );
+      setBrokerFloatingPl(floating);
+      setBrokerHasOpenPositions((positions?.length || 0) > 0);
+    };
 
     const fetchBrokerBalance = async () => {
       const { data } = await supabase
@@ -170,25 +187,35 @@ const Index = () => {
         brokerConnectionId = data.broker_connection_id;
         const { data: conn } = await supabase
           .from('broker_connections')
-          .select('account_balance')
+          .select('account_balance, account_equity')
           .eq('id', data.broker_connection_id)
           .single();
         if (conn?.account_balance != null) {
           setBrokerBalance(Number(conn.account_balance));
         }
+        if (conn?.account_equity != null) {
+          setBrokerEquity(Number(conn.account_equity));
+        }
+        await fetchOpenPositions(data.broker_connection_id);
       }
     };
     fetchBrokerBalance();
 
-    // Subscribe to broker_connections changes to auto-update balance
+    // Subscribe to broker_connections + broker_positions for live updates
     const channel = supabase
-      .channel(`dashboard-broker-balance-${selectedBrokerAccountId}-${Date.now()}`)
+      .channel(`dashboard-broker-live-${selectedBrokerAccountId}-${Date.now()}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'broker_connections' }, (payload) => {
         if (brokerConnectionId && payload.new.id === brokerConnectionId) {
           if (payload.new.account_balance != null) {
             setBrokerBalance(Number(payload.new.account_balance));
           }
+          if (payload.new.account_equity != null) {
+            setBrokerEquity(Number(payload.new.account_equity));
+          }
         }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'broker_positions' }, () => {
+        if (brokerConnectionId) fetchOpenPositions(brokerConnectionId);
       })
       .subscribe();
 
@@ -196,6 +223,7 @@ const Index = () => {
       supabase.removeChannel(channel);
     };
   }, [selectedBrokerAccountId]);
+
 
   // Use the account's starting balance (manual accounts only; broker accounts derive it)
   const accountStartBalance = selectedAccount?.starting_balance || 10000;
