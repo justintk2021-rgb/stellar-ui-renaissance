@@ -505,6 +505,18 @@ export function AuthPage() {
                     Minimum 8 characters
                   </motion.p>
                 )}
+                {isLogin && (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      className="text-xs text-white/60 hover:text-white transition-colors"
+                      disabled={isLoading}
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                )}
               </motion.div>
 
               <motion.div variants={itemVariants}>
