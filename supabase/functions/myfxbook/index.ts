@@ -147,6 +147,70 @@ async function mfxOpenTrades(session: string, accountId: string | number) {
   return (data.openTrades as any[]) || [];
 }
 
+async function mfxDailyGain(
+  session: string,
+  accountId: string | number,
+  start: string,
+  end: string,
+) {
+  const url = `${MYFXBOOK_BASE}/get-daily-gain.json?session=${
+    encodeURIComponent(session)
+  }&id=${accountId}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+  const res = await fetch(url);
+  const data = await res.json().catch(() => null);
+  if (!data || data.error) return [];
+  return (data.dailyGain as any[]) || [];
+}
+
+async function mfxGain(
+  session: string,
+  accountId: string | number,
+  start: string,
+  end: string,
+) {
+  const url = `${MYFXBOOK_BASE}/get-gain.json?session=${
+    encodeURIComponent(session)
+  }&id=${accountId}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+  const res = await fetch(url);
+  const data = await res.json().catch(() => null);
+  if (!data || data.error) return null;
+  return data.value ?? null;
+}
+
+// Wrap any Myfxbook call so an "invalid session" response triggers a single
+// re-login + retry. Returns the call result, plus whether the session was
+// refreshed so the caller can persist the new token.
+async function withSessionRetry<T>(
+  supabase: any,
+  conn: any,
+  call: (session: string) => Promise<{ ok: boolean; data: T } | T>,
+): Promise<{ data: T | null; session: string | null; refreshed: boolean }> {
+  const trySession = conn.myfxbook_session;
+  if (trySession) {
+    const result: any = await call(trySession);
+    const isInvalid = result && typeof result === "object" &&
+      ((result.error === true && /invalid session/i.test(result.message || "")) ||
+        result.ok === false);
+    if (!isInvalid) {
+      return { data: result, session: trySession, refreshed: false };
+    }
+  }
+  // Re-login
+  if (!conn.myfxbook_password_enc) {
+    return { data: null, session: null, refreshed: false };
+  }
+  const password = await decryptText(conn.myfxbook_password_enc);
+  if (!password) return { data: null, session: null, refreshed: false };
+  const login = await mfxLogin(conn.login, password);
+  if (!login.ok) return { data: null, session: null, refreshed: false };
+  await supabase
+    .from("broker_connections")
+    .update({ myfxbook_session: login.session })
+    .eq("id", conn.id);
+  const retry: any = await call(login.session);
+  return { data: retry, session: login.session, refreshed: true };
+}
+
 // Get a valid session — uses cached one or re-logs in.
 async function ensureSession(
   supabase: any,
