@@ -154,8 +154,8 @@ async function ensureSession(
 ): Promise<{ session: string | null; updated: boolean }> {
   // Try cached session first by hitting a cheap endpoint
   if (conn.myfxbook_session) {
-    const accounts = await mfxAccounts(conn.myfxbook_session);
-    if (accounts) return { session: conn.myfxbook_session, updated: false };
+    const result = await mfxAccounts(conn.myfxbook_session);
+    if (result.accounts) return { session: conn.myfxbook_session, updated: false };
   }
   // Re-login using stored encrypted password
   if (!conn.myfxbook_password_enc) return { session: null, updated: false };
