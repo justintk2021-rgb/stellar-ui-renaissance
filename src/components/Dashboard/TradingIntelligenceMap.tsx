@@ -69,14 +69,33 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
     pairAgg.set(key, cur);
   });
 
-  // Aggregate by session (setup proxy)
-  const sessionAgg = new Map<string, { count: number; pnl: number }>();
+  // Aggregate by session — track wins, losses, and best/worst trade for richer insight
+  const sessionAgg = new Map<string, { count: number; pnl: number; wins: number; losses: number; best: number; worst: number }>();
   trades.forEach((t) => {
     const key = t.session || "Other";
-    const cur = sessionAgg.get(key) || { count: 0, pnl: 0 };
+    const cur = sessionAgg.get(key) || { count: 0, pnl: 0, wins: 0, losses: 0, best: -Infinity, worst: Infinity };
+    const r = t.result || 0;
+    cur.count += 1;
+    cur.pnl += r;
+    if (r > 0) cur.wins += 1;
+    else if (r < 0) cur.losses += 1;
+    if (r > cur.best) cur.best = r;
+    if (r < cur.worst) cur.worst = r;
+    sessionAgg.set(key, cur);
+  });
+
+  // Pair × Session affinity (which session works best for each pair)
+  const pairSessionAgg = new Map<string, Map<string, { count: number; pnl: number; wins: number }>>();
+  trades.forEach((t) => {
+    const p = t.pair || "Unknown";
+    const s = t.session || "Other";
+    if (!pairSessionAgg.has(p)) pairSessionAgg.set(p, new Map());
+    const inner = pairSessionAgg.get(p)!;
+    const cur = inner.get(s) || { count: 0, pnl: 0, wins: 0 };
     cur.count += 1;
     cur.pnl += t.result || 0;
-    sessionAgg.set(key, cur);
+    if ((t.result || 0) > 0) cur.wins += 1;
+    inner.set(s, cur);
   });
 
   // ===== Core stats =====
