@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTradeLocker } from '@/hooks/useTradeLocker';
+import { MyfxbookPanel } from './MyfxbookPanel';
 import { toast } from 'sonner';
 import {
   Link2, Unlink, RefreshCw, Loader2, CheckCircle2, XCircle, AlertCircle,
