@@ -341,7 +341,17 @@ serve(async (req) => {
       if (!login.ok) {
         return jsonResponse({ error: login.message }, 401);
       }
-      const accountsResult = await mfxAccounts(login.session);
+      let activeSession = login.session;
+      let accountsResult = await mfxAccounts(activeSession);
+      // If Myfxbook rejected the freshly-issued session, log in again once.
+      if (accountsResult.invalidSession) {
+        console.log("[myfxbook] connect: session rejected, re-logging in");
+        const relogin = await mfxLogin(email, password);
+        if (relogin.ok) {
+          activeSession = relogin.session;
+          accountsResult = await mfxAccounts(activeSession);
+        }
+      }
       const accounts = accountsResult.accounts || [];
       if (accountsResult.error) {
         console.error("mfxAccounts error on connect:", accountsResult.error);
