@@ -90,9 +90,18 @@ export function useMyfxbook() {
         toast.error(msg);
         return null;
       }
-      toast.success(`Connected ${data.accounts?.length || 0} account(s)`);
+      const accs = (data.accounts as MyfxbookAccount[]) || [];
+      if (accs.length === 0) {
+        toast.warning(
+          data.warning ||
+            "Connected, but no accounts found on this Myfxbook profile.",
+          { duration: 8000 },
+        );
+      } else {
+        toast.success(`Connected ${accs.length} account(s)`);
+      }
       await refresh();
-      return data.accounts as MyfxbookAccount[];
+      return accs;
     },
     [refresh],
   );

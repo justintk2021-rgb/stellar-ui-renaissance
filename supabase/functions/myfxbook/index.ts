@@ -108,15 +108,21 @@ async function mfxLogout(session: string) {
   } catch { /* ignore */ }
 }
 
-async function mfxAccounts(session: string) {
+async function mfxAccounts(
+  session: string,
+): Promise<{ accounts: any[] | null; error?: string }> {
   const res = await fetch(
     `${MYFXBOOK_BASE}/get-my-accounts.json?session=${
       encodeURIComponent(session)
     }`,
   );
   const data = await res.json().catch(() => null);
-  if (!data || data.error) return null;
-  return data.accounts as any[];
+  if (!data) return { accounts: null, error: "Empty response from Myfxbook" };
+  // Myfxbook returns { error: true/false, message, accounts }
+  if (data.error === true || data.error === "true") {
+    return { accounts: null, error: data.message || "Myfxbook returned error" };
+  }
+  return { accounts: (data.accounts as any[]) || [] };
 }
 
 async function mfxHistory(session: string, accountId: string | number) {
@@ -148,8 +154,8 @@ async function ensureSession(
 ): Promise<{ session: string | null; updated: boolean }> {
   // Try cached session first by hitting a cheap endpoint
   if (conn.myfxbook_session) {
-    const accounts = await mfxAccounts(conn.myfxbook_session);
-    if (accounts) return { session: conn.myfxbook_session, updated: false };
+    const result = await mfxAccounts(conn.myfxbook_session);
+    if (result.accounts) return { session: conn.myfxbook_session, updated: false };
   }
   // Re-login using stored encrypted password
   if (!conn.myfxbook_password_enc) return { session: null, updated: false };
@@ -237,7 +243,12 @@ serve(async (req) => {
       if (!login.ok) {
         return jsonResponse({ error: login.message }, 401);
       }
-      const accounts = await mfxAccounts(login.session) || [];
+      const accountsResult = await mfxAccounts(login.session);
+      const accounts = accountsResult.accounts || [];
+      if (accountsResult.error) {
+        console.error("mfxAccounts error on connect:", accountsResult.error);
+      }
+      console.log(`[myfxbook] connect: fetched ${accounts.length} accounts for ${email}`);
       const enc = await encryptText(password);
 
       // Upsert one connection row per (user, login)
@@ -296,6 +307,10 @@ serve(async (req) => {
       return jsonResponse({
         success: true,
         connectionId,
+        warning: accounts.length === 0
+          ? (accountsResult.error ||
+            "No accounts found on this Myfxbook profile. In Myfxbook, open Portfolio → your account → Settings → set Privacy to 'Public' or 'Custom' (with stats enabled), then click Sync.")
+          : undefined,
         accounts: accounts.map((a) => ({
           id: String(a.id),
           name: a.name,
@@ -399,7 +414,8 @@ serve(async (req) => {
       }
 
       // Pull account snapshot
-      const accounts = await mfxAccounts(session) || [];
+      const accountsResult = await mfxAccounts(session);
+      const accounts = accountsResult.accounts || [];
       const acc = accounts.find((a) => String(a.id) === String(accountIdExternal));
       if (acc) {
         await adminClient.from("broker_connections").update({
