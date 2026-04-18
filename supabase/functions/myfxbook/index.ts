@@ -410,7 +410,8 @@ serve(async (req) => {
       }
 
       // Pull account snapshot
-      const accounts = await mfxAccounts(session) || [];
+      const accountsResult = await mfxAccounts(session);
+      const accounts = accountsResult.accounts || [];
       const acc = accounts.find((a) => String(a.id) === String(accountIdExternal));
       if (acc) {
         await adminClient.from("broker_connections").update({
