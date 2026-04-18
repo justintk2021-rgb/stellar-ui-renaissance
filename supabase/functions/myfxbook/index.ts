@@ -307,6 +307,10 @@ serve(async (req) => {
       return jsonResponse({
         success: true,
         connectionId,
+        warning: accounts.length === 0
+          ? (accountsResult.error ||
+            "No accounts found on this Myfxbook profile. In Myfxbook, open Portfolio → your account → Settings → set Privacy to 'Public' or 'Custom' (with stats enabled), then click Sync.")
+          : undefined,
         accounts: accounts.map((a) => ({
           id: String(a.id),
           name: a.name,
