@@ -917,10 +917,14 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
       <Tabs value={activePlatform} onValueChange={setActivePlatform}>
         <TabsList>
           <TabsTrigger value="tradelocker">TradeLocker</TabsTrigger>
+          <TabsTrigger value="myfxbook">Myfxbook</TabsTrigger>
           <TabsTrigger value="mt5">MetaTrader 5</TabsTrigger>
         </TabsList>
         <TabsContent value="tradelocker" className="mt-6">
           {renderTradeLocker()}
+        </TabsContent>
+        <TabsContent value="myfxbook" className="mt-6">
+          <MyfxbookPanel />
         </TabsContent>
         <TabsContent value="mt5" className="mt-6">
           {renderMT5()}
