@@ -230,7 +230,7 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
 
   // ===== Behavior signals (data-driven, evidence-based) =====
   const sample = trades.length;
-  const behaviors: { label: string; sentiment: NodeSentiment; visible: boolean; detail: string }[] = [
+  const behaviors: { label: string; sentiment: NodeSentiment; visible: boolean; detail: string }[] = ([
     // Positive traits
     {
       label: "Edge",
