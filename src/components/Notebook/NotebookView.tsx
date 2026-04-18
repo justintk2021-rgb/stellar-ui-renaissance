@@ -668,9 +668,9 @@ export function NotebookView({
     localStorage.setItem('notebook-view-mode', newMode);
   };
 
-  // Note card colors based on category - using inline styles for HSL colors
+  // Note card colors based on folder marker color (if set), otherwise fall back to a rotating palette
   const getNoteCardColor = (category: string, index: number) => {
-    const colors = [
+    const fallback = [
       { bg: 'hsl(210, 100%, 95%)', bgDark: 'hsl(210, 50%, 15%)', border: 'hsl(210, 80%, 85%)', borderDark: 'hsl(210, 40%, 25%)', accent: 'hsl(210, 80%, 55%)' },
       { bg: 'hsl(142, 70%, 92%)', bgDark: 'hsl(142, 40%, 12%)', border: 'hsl(142, 60%, 80%)', borderDark: 'hsl(142, 30%, 22%)', accent: 'hsl(142, 70%, 45%)' },
       { bg: 'hsl(48, 95%, 90%)', bgDark: 'hsl(48, 50%, 12%)', border: 'hsl(48, 80%, 80%)', borderDark: 'hsl(48, 40%, 22%)', accent: 'hsl(48, 95%, 50%)' },
@@ -680,7 +680,26 @@ export function NotebookView({
       { bg: 'hsl(186, 80%, 90%)', bgDark: 'hsl(186, 40%, 12%)', border: 'hsl(186, 60%, 80%)', borderDark: 'hsl(186, 30%, 22%)', accent: 'hsl(186, 70%, 45%)' },
       { bg: 'hsl(25, 90%, 92%)', bgDark: 'hsl(25, 50%, 14%)', border: 'hsl(25, 70%, 82%)', borderDark: 'hsl(25, 35%, 24%)', accent: 'hsl(25, 85%, 50%)' },
     ];
-    return colors[index % colors.length];
+
+    // Try to derive from the folder's marker color
+    const markerId = folderMarkers[category];
+    const marker = markerId ? MARKER_COLORS.find(m => m.id === markerId) : null;
+    if (marker && marker.color && marker.color !== 'transparent') {
+      const match = marker.color.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)/);
+      if (match) {
+        const h = match[1];
+        const s = Number(match[2]);
+        return {
+          bg: `hsl(${h}, ${Math.min(s, 80)}%, 93%)`,
+          bgDark: `hsl(${h}, ${Math.min(s, 50)}%, 14%)`,
+          border: `hsl(${h}, ${Math.min(s, 70)}%, 82%)`,
+          borderDark: `hsl(${h}, ${Math.min(s, 35)}%, 24%)`,
+          accent: marker.color,
+        };
+      }
+    }
+
+    return fallback[index % fallback.length];
   };
 
 
