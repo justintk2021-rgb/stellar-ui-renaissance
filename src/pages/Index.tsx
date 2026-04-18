@@ -610,7 +610,7 @@ const Index = () => {
                 trades={trades}
                 showRank={currentPage === 'dashboard'}
                 showGreeting={currentPage === 'dashboard'}
-                greetingName={userProfile?.first_name || (user?.email ? user.email.split('@')[0] : null)}
+                greetingName={userProfile?.first_name || null}
                 rightSlot={currentPage === 'dashboard' ? (
                   <div className="flex items-center gap-3">
                     <AccountSelector
