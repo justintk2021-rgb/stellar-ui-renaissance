@@ -214,7 +214,9 @@ export function DashboardStatsLayout({
           {rightCards.map((card, i) => (
             <StatCard key={card.label} {...card} index={i} />
           ))}
-          <TradingIntelligenceMap trades={trades} compact />
+          <Suspense fallback={<WidgetFallback minHeight={220} />}>
+            <TradingIntelligenceMap trades={trades} compact />
+          </Suspense>
         </div>
       </div>
 
@@ -234,7 +236,9 @@ export function DashboardStatsLayout({
           transition={{ delay: 0.3 }}
           className="lg:col-span-3 min-w-0"
         >
-          <RecentTrades trades={trades} />
+          <Suspense fallback={<WidgetFallback minHeight={280} />}>
+            <RecentTrades trades={trades} />
+          </Suspense>
         </motion.div>
       </div>
     </div>
