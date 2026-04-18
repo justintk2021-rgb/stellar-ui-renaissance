@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Trade } from "@/types/trade";
 import { TrendingUp, TrendingDown, DollarSign, Scale, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,9 +6,22 @@ import { motion } from "framer-motion";
 import { StatCard } from "./StatCard";
 import { PnLCalendar } from "./PnLCalendar";
 import { WinRatioCard } from "./WinRatioCard";
-import { RecentTrades } from "./RecentTrades";
-import { TradingIntelligenceMap } from "./TradingIntelligenceMap";
 import { NotebookEntry } from "@/types/trade";
+
+// Lazy-load heavy widgets so the dashboard top section paints first.
+const RecentTrades = lazy(() =>
+  import("./RecentTrades").then((m) => ({ default: m.RecentTrades }))
+);
+const TradingIntelligenceMap = lazy(() =>
+  import("./TradingIntelligenceMap").then((m) => ({ default: m.TradingIntelligenceMap }))
+);
+
+const WidgetFallback = ({ minHeight = 200 }: { minHeight?: number }) => (
+  <div
+    className="rounded-2xl bg-card/30 border border-border/30 animate-pulse"
+    style={{ minHeight }}
+  />
+);
 
 interface DashboardStatsLayoutProps {
   trades: Trade[];
@@ -201,7 +214,9 @@ export function DashboardStatsLayout({
           {rightCards.map((card, i) => (
             <StatCard key={card.label} {...card} index={i} />
           ))}
-          <TradingIntelligenceMap trades={trades} compact />
+          <Suspense fallback={<WidgetFallback minHeight={220} />}>
+            <TradingIntelligenceMap trades={trades} compact />
+          </Suspense>
         </div>
       </div>
 
@@ -221,7 +236,9 @@ export function DashboardStatsLayout({
           transition={{ delay: 0.3 }}
           className="lg:col-span-3 min-w-0"
         >
-          <RecentTrades trades={trades} />
+          <Suspense fallback={<WidgetFallback minHeight={280} />}>
+            <RecentTrades trades={trades} />
+          </Suspense>
         </motion.div>
       </div>
     </div>
