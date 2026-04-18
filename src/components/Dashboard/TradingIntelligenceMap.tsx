@@ -419,12 +419,7 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
     edges.push({ from: "core", to: id, strength: 0.5 });
   });
 
-  // Cross-connections: link top pair to dominant session
-  const topPair = pairsTop[0];
-  const topSession = sessions[0];
-  if (topPair && topSession) {
-    edges.push({ from: `pair-${topPair[0]}`, to: `session-${topSession[0]}`, strength: 0.4 });
-  }
+  // (Pair × Session affinity edges already created above)
 
   return { nodes, edges };
 }
