@@ -159,24 +159,20 @@ async function mfxAccounts(
 }
 
 async function mfxHistory(session: string, accountId: string | number) {
-  const res = await fetch(
-    `${MYFXBOOK_BASE}/get-history.json?session=${
-      encodeURIComponent(session)
-    }&id=${accountId}`,
-  );
+  const url = `${MYFXBOOK_BASE}/get-history.json?session=${session}&id=${accountId}`;
+  console.log(`[myfxbook] GET HISTORY → ${url}`);
+  const res = await fetch(url);
   const data = await res.json().catch(() => null);
-  if (!data || data.error) return null;
+  if (!data || data.error === true || data.error === "true") return null;
   return data.history as any[];
 }
 
 async function mfxOpenTrades(session: string, accountId: string | number) {
-  const res = await fetch(
-    `${MYFXBOOK_BASE}/get-open-trades.json?session=${
-      encodeURIComponent(session)
-    }&id=${accountId}`,
-  );
+  const url = `${MYFXBOOK_BASE}/get-open-trades.json?session=${session}&id=${accountId}`;
+  console.log(`[myfxbook] GET OPEN TRADES → ${url}`);
+  const res = await fetch(url);
   const data = await res.json().catch(() => null);
-  if (!data || data.error) return [];
+  if (!data || data.error === true || data.error === "true") return [];
   return (data.openTrades as any[]) || [];
 }
 
@@ -186,12 +182,11 @@ async function mfxDailyGain(
   start: string,
   end: string,
 ) {
-  const url = `${MYFXBOOK_BASE}/get-daily-gain.json?session=${
-    encodeURIComponent(session)
-  }&id=${accountId}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+  const url = `${MYFXBOOK_BASE}/get-daily-gain.json?session=${session}&id=${accountId}&start=${start}&end=${end}`;
+  console.log(`[myfxbook] GET DAILY GAIN → ${url}`);
   const res = await fetch(url);
   const data = await res.json().catch(() => null);
-  if (!data || data.error) return [];
+  if (!data || data.error === true || data.error === "true") return [];
   return (data.dailyGain as any[]) || [];
 }
 
@@ -201,12 +196,11 @@ async function mfxGain(
   start: string,
   end: string,
 ) {
-  const url = `${MYFXBOOK_BASE}/get-gain.json?session=${
-    encodeURIComponent(session)
-  }&id=${accountId}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+  const url = `${MYFXBOOK_BASE}/get-gain.json?session=${session}&id=${accountId}&start=${start}&end=${end}`;
+  console.log(`[myfxbook] GET GAIN → ${url}`);
   const res = await fetch(url);
   const data = await res.json().catch(() => null);
-  if (!data || data.error) return null;
+  if (!data || data.error === true || data.error === "true") return null;
   return data.value ?? null;
 }
 
