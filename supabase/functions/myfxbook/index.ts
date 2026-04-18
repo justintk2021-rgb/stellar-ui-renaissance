@@ -147,6 +147,70 @@ async function mfxOpenTrades(session: string, accountId: string | number) {
   return (data.openTrades as any[]) || [];
 }
 
+async function mfxDailyGain(
+  session: string,
+  accountId: string | number,
+  start: string,
+  end: string,
+) {
+  const url = `${MYFXBOOK_BASE}/get-daily-gain.json?session=${
+    encodeURIComponent(session)
+  }&id=${accountId}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+  const res = await fetch(url);
+  const data = await res.json().catch(() => null);
+  if (!data || data.error) return [];
+  return (data.dailyGain as any[]) || [];
+}
+
+async function mfxGain(
+  session: string,
+  accountId: string | number,
+  start: string,
+  end: string,
+) {
+  const url = `${MYFXBOOK_BASE}/get-gain.json?session=${
+    encodeURIComponent(session)
+  }&id=${accountId}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+  const res = await fetch(url);
+  const data = await res.json().catch(() => null);
+  if (!data || data.error) return null;
+  return data.value ?? null;
+}
+
+// Wrap any Myfxbook call so an "invalid session" response triggers a single
+// re-login + retry. Returns the call result, plus whether the session was
+// refreshed so the caller can persist the new token.
+async function withSessionRetry<T>(
+  supabase: any,
+  conn: any,
+  call: (session: string) => Promise<{ ok: boolean; data: T } | T>,
+): Promise<{ data: T | null; session: string | null; refreshed: boolean }> {
+  const trySession = conn.myfxbook_session;
+  if (trySession) {
+    const result: any = await call(trySession);
+    const isInvalid = result && typeof result === "object" &&
+      ((result.error === true && /invalid session/i.test(result.message || "")) ||
+        result.ok === false);
+    if (!isInvalid) {
+      return { data: result, session: trySession, refreshed: false };
+    }
+  }
+  // Re-login
+  if (!conn.myfxbook_password_enc) {
+    return { data: null, session: null, refreshed: false };
+  }
+  const password = await decryptText(conn.myfxbook_password_enc);
+  if (!password) return { data: null, session: null, refreshed: false };
+  const login = await mfxLogin(conn.login, password);
+  if (!login.ok) return { data: null, session: null, refreshed: false };
+  await supabase
+    .from("broker_connections")
+    .update({ myfxbook_session: login.session })
+    .eq("id", conn.id);
+  const retry: any = await call(login.session);
+  return { data: retry, session: login.session, refreshed: true };
+}
+
 // Get a valid session — uses cached one or re-logs in.
 async function ensureSession(
   supabase: any,
@@ -526,6 +590,72 @@ serve(async (req) => {
         ? await mfxOpenTrades(session, accountIdExternal)
         : [];
       return jsonResponse({ success: true, account: acc || null, openTrades: open });
+    }
+
+    // ---------------- ANALYTICS (clean structured data for UI) ----------------
+    if (action === "analytics") {
+      const connectionId = String(body.connectionId || "");
+      const { data: conn } = await adminClient
+        .from("broker_connections")
+        .select("*")
+        .eq("id", connectionId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!conn) return jsonResponse({ error: "Connection not found" }, 404);
+
+      const { session } = await ensureSession(adminClient, conn);
+      if (!session) {
+        return jsonResponse({ error: "Session expired", needsReconnect: true }, 401);
+      }
+      const accountIdExternal = body.accountId || conn.active_account_id;
+      if (!accountIdExternal) {
+        return jsonResponse({ error: "No account selected" }, 400);
+      }
+
+      const accountsResult = await mfxAccounts(session);
+      const acc = (accountsResult.accounts || []).find(
+        (a) => String(a.id) === String(accountIdExternal),
+      );
+      const open = await mfxOpenTrades(session, accountIdExternal);
+      const history = await mfxHistory(session, accountIdExternal) || [];
+
+      // Date range (default last 90 days)
+      const today = new Date();
+      const start = body.start ||
+        new Date(today.getTime() - 90 * 86400000).toISOString().slice(0, 10);
+      const end = body.end || today.toISOString().slice(0, 10);
+      const dailyGain = await mfxDailyGain(session, accountIdExternal, start, end);
+      const totalGain = await mfxGain(session, accountIdExternal, start, end);
+
+      // Win rate from closed history
+      const closed = history.filter((h: any) => {
+        const a = String(h.action || "").toLowerCase();
+        return a.includes("buy") || a.includes("sell");
+      });
+      const wins = closed.filter((h: any) => Number(h.profit || 0) > 0).length;
+      const winRate = closed.length ? (wins / closed.length) * 100 : 0;
+
+      return jsonResponse({
+        success: true,
+        account: acc
+          ? {
+            id: String(acc.id),
+            name: acc.name,
+            balance: acc.balance ?? 0,
+            equity: acc.equity ?? 0,
+            profit: acc.profit ?? 0,
+            gain: acc.gain ?? 0,
+            drawdown: acc.drawdown ?? 0,
+            currency: acc.currency || "USD",
+          }
+          : null,
+        openTrades: open,
+        closedTrades: closed,
+        dailyGain,
+        totalGain,
+        winRate: Number(winRate.toFixed(2)),
+        totalTrades: closed.length,
+      });
     }
 
     // ---------------- DISCONNECT ----------------
