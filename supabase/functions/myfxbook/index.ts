@@ -92,12 +92,22 @@ async function mfxLogin(email: string, password: string) {
   const url = `${MYFXBOOK_BASE}/login.json?email=${
     encodeURIComponent(email)
   }&password=${encodeURIComponent(password)}`;
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: {
+      "Accept": "application/json",
+      "User-Agent": "Mozilla/5.0 (compatible; NsyncJournal/1.0)",
+    },
+  });
   const data = await res.json().catch(() => null);
-  if (!data || data.error) {
-    return { ok: false, message: data?.message || "Login failed" } as const;
+  // Myfxbook returns error as boolean OR string "false"/"true"
+  const hasError = data?.error === true || data?.error === "true";
+  if (!data || hasError || !data.session) {
+    return {
+      ok: false,
+      message: data?.message || "Login failed — check your Myfxbook email and password",
+    } as const;
   }
-  return { ok: true, session: data.session as string } as const;
+  return { ok: true, session: String(data.session) } as const;
 }
 
 async function mfxLogout(session: string) {
