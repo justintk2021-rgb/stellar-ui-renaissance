@@ -374,7 +374,7 @@ serve(async (req) => {
         await adminClient.from("broker_connections").update({
           connection_status: "connected",
           last_connected_at: new Date().toISOString(),
-          myfxbook_session: login.session,
+          myfxbook_session: activeSession,
           myfxbook_password_enc: enc,
           last_error: null,
         }).eq("id", connectionId);
@@ -390,7 +390,7 @@ serve(async (req) => {
             environment: "live",
             connection_status: "connected",
             last_connected_at: new Date().toISOString(),
-            myfxbook_session: login.session,
+            myfxbook_session: activeSession,
             myfxbook_password_enc: enc,
             auto_sync_enabled: true,
           })
