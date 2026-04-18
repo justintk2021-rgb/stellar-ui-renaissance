@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTradeLocker } from '@/hooks/useTradeLocker';
+import { MyfxbookPanel } from './MyfxbookPanel';
 import { toast } from 'sonner';
 import {
   Link2, Unlink, RefreshCw, Loader2, CheckCircle2, XCircle, AlertCircle,
@@ -916,10 +917,14 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
       <Tabs value={activePlatform} onValueChange={setActivePlatform}>
         <TabsList>
           <TabsTrigger value="tradelocker">TradeLocker</TabsTrigger>
+          <TabsTrigger value="myfxbook">Myfxbook</TabsTrigger>
           <TabsTrigger value="mt5">MetaTrader 5</TabsTrigger>
         </TabsList>
         <TabsContent value="tradelocker" className="mt-6">
           {renderTradeLocker()}
+        </TabsContent>
+        <TabsContent value="myfxbook" className="mt-6">
+          <MyfxbookPanel />
         </TabsContent>
         <TabsContent value="mt5" className="mt-6">
           {renderMT5()}
