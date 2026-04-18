@@ -592,6 +592,72 @@ serve(async (req) => {
       return jsonResponse({ success: true, account: acc || null, openTrades: open });
     }
 
+    // ---------------- ANALYTICS (clean structured data for UI) ----------------
+    if (action === "analytics") {
+      const connectionId = String(body.connectionId || "");
+      const { data: conn } = await adminClient
+        .from("broker_connections")
+        .select("*")
+        .eq("id", connectionId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!conn) return jsonResponse({ error: "Connection not found" }, 404);
+
+      const { session } = await ensureSession(adminClient, conn);
+      if (!session) {
+        return jsonResponse({ error: "Session expired", needsReconnect: true }, 401);
+      }
+      const accountIdExternal = body.accountId || conn.active_account_id;
+      if (!accountIdExternal) {
+        return jsonResponse({ error: "No account selected" }, 400);
+      }
+
+      const accountsResult = await mfxAccounts(session);
+      const acc = (accountsResult.accounts || []).find(
+        (a) => String(a.id) === String(accountIdExternal),
+      );
+      const open = await mfxOpenTrades(session, accountIdExternal);
+      const history = await mfxHistory(session, accountIdExternal) || [];
+
+      // Date range (default last 90 days)
+      const today = new Date();
+      const start = body.start ||
+        new Date(today.getTime() - 90 * 86400000).toISOString().slice(0, 10);
+      const end = body.end || today.toISOString().slice(0, 10);
+      const dailyGain = await mfxDailyGain(session, accountIdExternal, start, end);
+      const totalGain = await mfxGain(session, accountIdExternal, start, end);
+
+      // Win rate from closed history
+      const closed = history.filter((h: any) => {
+        const a = String(h.action || "").toLowerCase();
+        return a.includes("buy") || a.includes("sell");
+      });
+      const wins = closed.filter((h: any) => Number(h.profit || 0) > 0).length;
+      const winRate = closed.length ? (wins / closed.length) * 100 : 0;
+
+      return jsonResponse({
+        success: true,
+        account: acc
+          ? {
+            id: String(acc.id),
+            name: acc.name,
+            balance: acc.balance ?? 0,
+            equity: acc.equity ?? 0,
+            profit: acc.profit ?? 0,
+            gain: acc.gain ?? 0,
+            drawdown: acc.drawdown ?? 0,
+            currency: acc.currency || "USD",
+          }
+          : null,
+        openTrades: open,
+        closedTrades: closed,
+        dailyGain,
+        totalGain,
+        winRate: Number(winRate.toFixed(2)),
+        totalTrades: closed.length,
+      });
+    }
+
     // ---------------- DISCONNECT ----------------
     if (action === "disconnect") {
       const connectionId = String(body.connectionId || "");
