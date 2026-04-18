@@ -72,6 +72,8 @@ export type Database = {
           last_error: string | null
           login: string
           metaapi_account_id: string | null
+          myfxbook_password_enc: string | null
+          myfxbook_session: string | null
           platform: string
           server: string
           sync_interval_seconds: number | null
@@ -95,6 +97,8 @@ export type Database = {
           last_error?: string | null
           login: string
           metaapi_account_id?: string | null
+          myfxbook_password_enc?: string | null
+          myfxbook_session?: string | null
           platform: string
           server: string
           sync_interval_seconds?: number | null
@@ -118,6 +122,8 @@ export type Database = {
           last_error?: string | null
           login?: string
           metaapi_account_id?: string | null
+          myfxbook_password_enc?: string | null
+          myfxbook_session?: string | null
           platform?: string
           server?: string
           sync_interval_seconds?: number | null
