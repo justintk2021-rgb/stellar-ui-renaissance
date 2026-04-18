@@ -389,6 +389,47 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
       detail: `Long ${longWinRate.toFixed(0)}% vs Short ${shortWinRate.toFixed(0)}% WR`,
     },
 
+    // ===== Session-aware insights =====
+    {
+      label: bestSession ? `${bestSession.session} Edge` : "Session Edge",
+      sentiment: "positive",
+      visible: !!bestSession && bestSession.pnl > 0 && bestSession.wr >= 55,
+      detail: bestSession
+        ? `${bestSession.session}: ${bestSession.wr.toFixed(0)}% WR · +$${bestSession.avg.toFixed(0)}/trade over ${bestSession.count}`
+        : "",
+    },
+    {
+      label: worstSession ? `${worstSession.session} Drag` : "Session Drag",
+      sentiment: "negative",
+      visible: !!worstSession && worstSession.pnl < 0 && worstSession.count >= 5,
+      detail: worstSession
+        ? `${worstSession.session}: ${worstSession.wr.toFixed(0)}% WR · ${worstSession.avg >= 0 ? "+" : ""}$${worstSession.avg.toFixed(0)}/trade · ${worstSession.count} trades`
+        : "",
+    },
+    {
+      label: "Session Specialist",
+      sentiment: "positive",
+      visible:
+        sessionsRanked.length >= 2 &&
+        !!bestSession &&
+        sessionGap >= Math.max(50, Math.abs(bestSession.avg) * 0.5),
+      detail: bestSession && worstSession
+        ? `${bestSession.session} far outperforms ${worstSession.session} ($${bestSession.avg.toFixed(0)} vs $${worstSession.avg.toFixed(0)} per trade)`
+        : "",
+    },
+    {
+      label: "Session Mismatch",
+      sentiment: "negative",
+      visible:
+        sessionsRanked.length >= 2 &&
+        !!worstSession &&
+        worstSession.count >= Math.max(5, trades.length * 0.25) &&
+        worstSession.pnl < 0,
+      detail: worstSession
+        ? `${(worstSession.count / Math.max(trades.length, 1) * 100).toFixed(0)}% of trades fall in your weakest session (${worstSession.session})`
+        : "",
+    },
+
     // Neutral / informational
     {
       label: "Small Sample",
