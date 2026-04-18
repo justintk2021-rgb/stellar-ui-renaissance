@@ -79,15 +79,97 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
     sessionAgg.set(key, cur);
   });
 
-  // Behavior signals derived from data
-  const totalWins = trades.filter((t) => (t.result || 0) > 0).length;
-  const totalLosses = trades.filter((t) => (t.result || 0) < 0).length;
-  const avgWin = totalWins ? trades.filter((t) => (t.result || 0) > 0).reduce((s, t) => s + (t.result || 0), 0) / totalWins : 0;
-  const avgLoss = totalLosses ? Math.abs(trades.filter((t) => (t.result || 0) < 0).reduce((s, t) => s + (t.result || 0), 0)) / totalLosses : 0;
+  // ===== Core stats =====
+  const wins = trades.filter((t) => (t.result || 0) > 0);
+  const losses = trades.filter((t) => (t.result || 0) < 0);
+  const totalWins = wins.length;
+  const totalLosses = losses.length;
+  const sumWins = wins.reduce((s, t) => s + (t.result || 0), 0);
+  const sumLosses = Math.abs(losses.reduce((s, t) => s + (t.result || 0), 0));
+  const avgWin = totalWins ? sumWins / totalWins : 0;
+  const avgLoss = totalLosses ? sumLosses / totalLosses : 0;
   const winRate = trades.length ? (totalWins / trades.length) * 100 : 0;
+  const profitFactor = sumLosses > 0 ? sumWins / sumLosses : sumWins > 0 ? Infinity : 0;
+  const expectancy = trades.length
+    ? (winRate / 100) * avgWin - (1 - winRate / 100) * avgLoss
+    : 0;
+  const totalPnl = trades.reduce((s, t) => s + (t.result || 0), 0);
+
+  // Sort once chronologically (oldest -> newest) for streak/recency analysis
+  const chronological = [...trades].sort((a, b) => {
+    const da = new Date(a.date).getTime();
+    const db = new Date(b.date).getTime();
+    return da - db;
+  });
+
+  // ===== Streak analysis (revenge trading & hot streaks) =====
+  let maxLossStreak = 0;
+  let maxWinStreak = 0;
+  let curLoss = 0;
+  let curWin = 0;
+  chronological.forEach((t) => {
+    const r = t.result || 0;
+    if (r < 0) {
+      curLoss += 1;
+      curWin = 0;
+      maxLossStreak = Math.max(maxLossStreak, curLoss);
+    } else if (r > 0) {
+      curWin += 1;
+      curLoss = 0;
+      maxWinStreak = Math.max(maxWinStreak, curWin);
+    } else {
+      curWin = 0;
+      curLoss = 0;
+    }
+  });
+
+  // Revenge trading: trades taken on same day right after a loss
+  let revengeCount = 0;
+  for (let i = 1; i < chronological.length; i++) {
+    const prev = chronological[i - 1];
+    const cur = chronological[i];
+    if ((prev.result || 0) < 0 && (cur.date || "").slice(0, 10) === (prev.date || "").slice(0, 10)) {
+      revengeCount += 1;
+    }
+  }
+  const revengeRate = chronological.length ? (revengeCount / chronological.length) * 100 : 0;
+
+  // ===== Risk consistency (bet-size variance via |result|) =====
+  const absResults = trades.map((t) => Math.abs(t.result || 0)).filter((v) => v > 0);
+  const meanAbs = absResults.length ? absResults.reduce((s, v) => s + v, 0) / absResults.length : 0;
+  const variance = absResults.length
+    ? absResults.reduce((s, v) => s + (v - meanAbs) ** 2, 0) / absResults.length
+    : 0;
+  const stdDev = Math.sqrt(variance);
+  const cv = meanAbs > 0 ? stdDev / meanAbs : 0; // coefficient of variation
+
+  // Catastrophic losses: any loss > 3x avg loss
+  const bigLosses = avgLoss > 0 ? losses.filter((t) => Math.abs(t.result || 0) > 3 * avgLoss).length : 0;
+  const bigLossRate = trades.length ? (bigLosses / trades.length) * 100 : 0;
+
+  // ===== Recency analysis: last 20% vs overall =====
+  const recencyN = Math.max(5, Math.floor(chronological.length * 0.2));
+  const recent = chronological.slice(-recencyN);
+  const recentWins = recent.filter((t) => (t.result || 0) > 0).length;
+  const recentWinRate = recent.length ? (recentWins / recent.length) * 100 : winRate;
+  const recentPnl = recent.reduce((s, t) => s + (t.result || 0), 0);
+
+  // ===== Direction bias =====
+  const longs = trades.filter((t) => t.direction === "Long");
+  const shorts = trades.filter((t) => t.direction === "Short");
+  const longWinRate = longs.length
+    ? (longs.filter((t) => (t.result || 0) > 0).length / longs.length) * 100
+    : 0;
+  const shortWinRate = shorts.length
+    ? (shorts.filter((t) => (t.result || 0) > 0).length / shorts.length) * 100
+    : 0;
+  const directionGap = Math.abs(longWinRate - shortWinRate);
+
+  // ===== Pair concentration =====
+  const topPairCount = pairs[0] ? pairs[0][1].count : 0;
+  const concentration = trades.length ? (topPairCount / trades.length) * 100 : 0;
 
   // Core node
-  const totalPnl = trades.reduce((s, t) => s + (t.result || 0), 0);
   const coreSentiment: NodeSentiment = totalPnl > 0 ? "positive" : totalPnl < 0 ? "negative" : "neutral";
   nodes.push({
     id: "core",
@@ -97,18 +179,19 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
     size: 26,
     x: 50,
     y: 50,
-    meta: { count: trades.length, pnl: totalPnl, detail: `${trades.length} trades · ${winRate.toFixed(1)}% win rate` },
+    meta: { count: trades.length, pnl: totalPnl, detail: `${trades.length} trades · ${winRate.toFixed(1)}% WR · PF ${profitFactor === Infinity ? "∞" : profitFactor.toFixed(2)}` },
   });
 
   // Place pair nodes around the top half
-  const pairs = Array.from(pairAgg.entries()).slice(0, 6);
-  const maxPairCount = Math.max(...pairs.map(([, v]) => v.count), 1);
-  pairs.forEach(([pair, v], i) => {
-    const angle = (Math.PI / (pairs.length + 1)) * (i + 1);
+  const pairsTop = pairs.slice(0, 6);
+  const maxPairCount = Math.max(...pairsTop.map(([, v]) => v.count), 1);
+  pairsTop.forEach(([pair, v], i) => {
+    const angle = (Math.PI / (pairsTop.length + 1)) * (i + 1);
     const x = 50 + Math.cos(angle) * 38;
     const y = 28 - Math.sin(angle) * 8;
     const sentiment: NodeSentiment = v.pnl > 0 ? "positive" : v.pnl < 0 ? "negative" : "neutral";
     const id = `pair-${pair}`;
+    const pairWinRate = v.count ? (v.wins / v.count) * 100 : 0;
     nodes.push({
       id,
       label: pair,
@@ -117,7 +200,7 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
       size: 10 + (v.count / maxPairCount) * 14,
       x,
       y,
-      meta: { count: v.count, pnl: v.pnl, pair, detail: `${v.count} trades · ${v.wins}/${v.count} wins` },
+      meta: { count: v.count, pnl: v.pnl, pair, detail: `${v.count} trades · ${pairWinRate.toFixed(0)}% WR · ${v.pnl >= 0 ? "+" : ""}$${v.pnl.toFixed(0)}` },
     });
     edges.push({ from: "core", to: id, strength: 0.4 + (v.count / maxPairCount) * 0.6 });
   });
@@ -130,30 +213,135 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
     const x = onLeft ? 12 + (i * 4) : 88 - (i * 4);
     const y = 50 + (i % 2 === 0 ? -6 : 6) * (i + 1);
     const id = `session-${session}`;
+    const sentiment: NodeSentiment = v.pnl > 0 ? "positive" : v.pnl < 0 ? "negative" : "neutral";
     nodes.push({
       id,
       label: session,
       type: "setup",
-      sentiment: "neutral",
+      sentiment,
       size: 10 + (v.count / maxSessionCount) * 10,
       x,
       y,
-      meta: { count: v.count, pnl: v.pnl, detail: `${session} session · ${v.count} trades` },
+      meta: { count: v.count, pnl: v.pnl, detail: `${session} · ${v.count} trades · ${v.pnl >= 0 ? "+" : ""}$${v.pnl.toFixed(0)}` },
     });
     edges.push({ from: "core", to: id, strength: 0.3 + (v.count / maxSessionCount) * 0.5 });
   });
 
-  // Behavior nodes at the bottom
+  // ===== Behavior signals (data-driven, evidence-based) =====
+  const sample = trades.length;
   const behaviors: { label: string; sentiment: NodeSentiment; visible: boolean; detail: string }[] = [
-    { label: "Discipline", sentiment: "positive" as NodeSentiment, visible: winRate >= 50, detail: `Strong win rate of ${winRate.toFixed(1)}%` },
-    { label: "Risk Control", sentiment: "positive" as NodeSentiment, visible: avgWin >= avgLoss && avgLoss > 0, detail: `Avg win ($${avgWin.toFixed(0)}) ≥ avg loss ($${avgLoss.toFixed(0)})` },
-    { label: "Overtrading", sentiment: "negative" as NodeSentiment, visible: trades.length > 50 && winRate < 45, detail: "High volume with low win rate" },
-    { label: "Cut Winners Early", sentiment: "negative" as NodeSentiment, visible: avgWin > 0 && avgLoss > 0 && avgWin < avgLoss, detail: "Avg loss exceeds avg win" },
-    { label: "Consistency", sentiment: "positive" as NodeSentiment, visible: trades.length >= 10 && winRate >= 55, detail: "Sustained edge over many trades" },
+    // Positive traits
+    {
+      label: "Edge",
+      sentiment: "positive",
+      visible: sample >= 10 && profitFactor >= 1.5 && expectancy > 0,
+      detail: `Profit factor ${profitFactor.toFixed(2)} · expectancy +$${expectancy.toFixed(0)}/trade`,
+    },
+    {
+      label: "Discipline",
+      sentiment: "positive",
+      visible: sample >= 10 && winRate >= 55 && cv < 0.6,
+      detail: `${winRate.toFixed(0)}% WR with consistent risk (CV ${cv.toFixed(2)})`,
+    },
+    {
+      label: "Risk Control",
+      sentiment: "positive",
+      visible: sample >= 10 && avgWin >= avgLoss && bigLossRate < 5,
+      detail: `R:R ${(avgWin / Math.max(avgLoss, 1)).toFixed(2)} · only ${bigLossRate.toFixed(0)}% outsized losses`,
+    },
+    {
+      label: "Hot Streak",
+      sentiment: "positive",
+      visible: maxWinStreak >= 5,
+      detail: `Best win streak: ${maxWinStreak} in a row`,
+    },
+    {
+      label: "Improving",
+      sentiment: "positive",
+      visible: sample >= 20 && recentWinRate > winRate + 5 && recentPnl > 0,
+      detail: `Recent ${recencyN}: ${recentWinRate.toFixed(0)}% WR (vs ${winRate.toFixed(0)}% overall)`,
+    },
+    {
+      label: "Consistency",
+      sentiment: "positive",
+      visible: sample >= 20 && cv < 0.5 && winRate >= 50,
+      detail: `Stable bet sizing (CV ${cv.toFixed(2)}) over ${sample} trades`,
+    },
+
+    // Negative traits
+    {
+      label: "Revenge Trading",
+      sentiment: "negative",
+      visible: sample >= 15 && revengeRate >= 25,
+      detail: `${revengeRate.toFixed(0)}% of trades follow a same-day loss`,
+    },
+    {
+      label: "Tilt Risk",
+      sentiment: "negative",
+      visible: maxLossStreak >= 4,
+      detail: `Worst loss streak: ${maxLossStreak} in a row`,
+    },
+    {
+      label: "Oversized Losses",
+      sentiment: "negative",
+      visible: sample >= 10 && bigLossRate >= 8,
+      detail: `${bigLossRate.toFixed(0)}% of trades are >3× avg loss`,
+    },
+    {
+      label: "Inconsistent Sizing",
+      sentiment: "negative",
+      visible: sample >= 10 && cv >= 1.0,
+      detail: `Risk varies wildly (CV ${cv.toFixed(2)})`,
+    },
+    {
+      label: "Cuts Winners Early",
+      sentiment: "negative",
+      visible: sample >= 10 && avgWin > 0 && avgLoss > 0 && avgWin < avgLoss * 0.7,
+      detail: `Avg win ($${avgWin.toFixed(0)}) much smaller than avg loss ($${avgLoss.toFixed(0)})`,
+    },
+    {
+      label: "Overtrading",
+      sentiment: "negative",
+      visible: sample >= 30 && winRate < 45 && profitFactor < 1,
+      detail: `${sample} trades but only ${winRate.toFixed(0)}% WR · PF ${profitFactor.toFixed(2)}`,
+    },
+    {
+      label: "Slumping",
+      sentiment: "negative",
+      visible: sample >= 20 && recentWinRate < winRate - 10 && recentPnl < 0,
+      detail: `Recent ${recencyN}: ${recentWinRate.toFixed(0)}% WR (down from ${winRate.toFixed(0)}%)`,
+    },
+    {
+      label: "Over-Concentrated",
+      sentiment: "negative",
+      visible: sample >= 15 && concentration >= 60,
+      detail: `${concentration.toFixed(0)}% of trades in one pair`,
+    },
+    {
+      label: "Direction Bias",
+      sentiment: "negative",
+      visible:
+        sample >= 20 &&
+        longs.length >= 5 &&
+        shorts.length >= 5 &&
+        directionGap >= 20,
+      detail: `Long ${longWinRate.toFixed(0)}% vs Short ${shortWinRate.toFixed(0)}% WR`,
+    },
+
+    // Neutral / informational
+    {
+      label: "Small Sample",
+      sentiment: "neutral",
+      visible: sample > 0 && sample < 10,
+      detail: `Only ${sample} trades — patterns not yet reliable`,
+    },
   ].filter((b) => b.visible);
 
-  behaviors.forEach((b, i) => {
-    const angle = (Math.PI / (behaviors.length + 1)) * (i + 1);
+  // Cap to top 7 to keep the canvas readable
+  const topBehaviors = behaviors.slice(0, 7);
+
+  topBehaviors.forEach((b, i) => {
+    const angle = (Math.PI / (topBehaviors.length + 1)) * (i + 1);
     const x = 50 - Math.cos(angle) * 36;
     const y = 78 + Math.sin(angle) * 6;
     const id = `behavior-${b.label}`;
@@ -171,7 +359,7 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
   });
 
   // Cross-connections: link top pair to dominant session
-  const topPair = pairs[0];
+  const topPair = pairsTop[0];
   const topSession = sessions[0];
   if (topPair && topSession) {
     edges.push({ from: `pair-${topPair[0]}`, to: `session-${topSession[0]}`, strength: 0.4 });
