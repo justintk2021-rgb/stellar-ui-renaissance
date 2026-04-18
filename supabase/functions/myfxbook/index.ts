@@ -92,12 +92,22 @@ async function mfxLogin(email: string, password: string) {
   const url = `${MYFXBOOK_BASE}/login.json?email=${
     encodeURIComponent(email)
   }&password=${encodeURIComponent(password)}`;
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: {
+      "Accept": "application/json",
+      "User-Agent": "Mozilla/5.0 (compatible; NsyncJournal/1.0)",
+    },
+  });
   const data = await res.json().catch(() => null);
-  if (!data || data.error) {
-    return { ok: false, message: data?.message || "Login failed" } as const;
+  // Myfxbook returns error as boolean OR string "false"/"true"
+  const hasError = data?.error === true || data?.error === "true";
+  if (!data || hasError || !data.session) {
+    return {
+      ok: false,
+      message: data?.message || "Login failed — check your Myfxbook email and password",
+    } as const;
   }
-  return { ok: true, session: data.session as string } as const;
+  return { ok: true, session: String(data.session) } as const;
 }
 
 async function mfxLogout(session: string) {
@@ -110,19 +120,43 @@ async function mfxLogout(session: string) {
 
 async function mfxAccounts(
   session: string,
-): Promise<{ accounts: any[] | null; error?: string }> {
-  const res = await fetch(
-    `${MYFXBOOK_BASE}/get-my-accounts.json?session=${
-      encodeURIComponent(session)
-    }`,
-  );
-  const data = await res.json().catch(() => null);
-  if (!data) return { accounts: null, error: "Empty response from Myfxbook" };
-  // Myfxbook returns { error: true/false, message, accounts }
-  if (data.error === true || data.error === "true") {
-    return { accounts: null, error: data.message || "Myfxbook returned error" };
+): Promise<{ accounts: any[] | null; error?: string; invalidSession?: boolean }> {
+  const url = `${MYFXBOOK_BASE}/get-my-accounts.json?session=${
+    encodeURIComponent(session)
+  }`;
+  // Retry up to 3 times with backoff — Myfxbook intermittently
+  // rejects a freshly-issued session with "Invalid session."
+  let lastErr: string | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 600 * attempt));
+    const res = await fetch(url, {
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (compatible; NsyncJournal/1.0)",
+      },
+    });
+    const data = await res.json().catch(() => null);
+    if (!data) {
+      lastErr = "Empty response from Myfxbook";
+      continue;
+    }
+    const hasError = data.error === true || data.error === "true";
+    if (hasError) {
+      lastErr = data.message || "Myfxbook returned error";
+      const invalid = /invalid session/i.test(lastErr);
+      // On invalid-session, keep retrying; on other errors, fail fast
+      if (!invalid) {
+        return { accounts: null, error: lastErr };
+      }
+      continue;
+    }
+    return { accounts: (data.accounts as any[]) || [] };
   }
-  return { accounts: (data.accounts as any[]) || [] };
+  return {
+    accounts: null,
+    error: lastErr || "Invalid session",
+    invalidSession: /invalid session/i.test(lastErr || ""),
+  };
 }
 
 async function mfxHistory(session: string, accountId: string | number) {
@@ -307,7 +341,17 @@ serve(async (req) => {
       if (!login.ok) {
         return jsonResponse({ error: login.message }, 401);
       }
-      const accountsResult = await mfxAccounts(login.session);
+      let activeSession = login.session;
+      let accountsResult = await mfxAccounts(activeSession);
+      // If Myfxbook rejected the freshly-issued session, log in again once.
+      if (accountsResult.invalidSession) {
+        console.log("[myfxbook] connect: session rejected, re-logging in");
+        const relogin = await mfxLogin(email, password);
+        if (relogin.ok) {
+          activeSession = relogin.session;
+          accountsResult = await mfxAccounts(activeSession);
+        }
+      }
       const accounts = accountsResult.accounts || [];
       if (accountsResult.error) {
         console.error("mfxAccounts error on connect:", accountsResult.error);
@@ -330,7 +374,7 @@ serve(async (req) => {
         await adminClient.from("broker_connections").update({
           connection_status: "connected",
           last_connected_at: new Date().toISOString(),
-          myfxbook_session: login.session,
+          myfxbook_session: activeSession,
           myfxbook_password_enc: enc,
           last_error: null,
         }).eq("id", connectionId);
@@ -346,7 +390,7 @@ serve(async (req) => {
             environment: "live",
             connection_status: "connected",
             last_connected_at: new Date().toISOString(),
-            myfxbook_session: login.session,
+            myfxbook_session: activeSession,
             myfxbook_password_enc: enc,
             auto_sync_enabled: true,
           })
