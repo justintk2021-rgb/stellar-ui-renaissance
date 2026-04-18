@@ -1,0 +1,2 @@
+ALTER TABLE public.broker_connections DROP CONSTRAINT IF EXISTS broker_connections_platform_check;
+ALTER TABLE public.broker_connections ADD CONSTRAINT broker_connections_platform_check CHECK (platform IN ('mt4', 'mt5', 'tradelocker', 'myfxbook'));
