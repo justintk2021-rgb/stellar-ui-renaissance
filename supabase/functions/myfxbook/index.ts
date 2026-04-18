@@ -120,19 +120,43 @@ async function mfxLogout(session: string) {
 
 async function mfxAccounts(
   session: string,
-): Promise<{ accounts: any[] | null; error?: string }> {
-  const res = await fetch(
-    `${MYFXBOOK_BASE}/get-my-accounts.json?session=${
-      encodeURIComponent(session)
-    }`,
-  );
-  const data = await res.json().catch(() => null);
-  if (!data) return { accounts: null, error: "Empty response from Myfxbook" };
-  // Myfxbook returns { error: true/false, message, accounts }
-  if (data.error === true || data.error === "true") {
-    return { accounts: null, error: data.message || "Myfxbook returned error" };
+): Promise<{ accounts: any[] | null; error?: string; invalidSession?: boolean }> {
+  const url = `${MYFXBOOK_BASE}/get-my-accounts.json?session=${
+    encodeURIComponent(session)
+  }`;
+  // Retry up to 3 times with backoff — Myfxbook intermittently
+  // rejects a freshly-issued session with "Invalid session."
+  let lastErr: string | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 600 * attempt));
+    const res = await fetch(url, {
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (compatible; NsyncJournal/1.0)",
+      },
+    });
+    const data = await res.json().catch(() => null);
+    if (!data) {
+      lastErr = "Empty response from Myfxbook";
+      continue;
+    }
+    const hasError = data.error === true || data.error === "true";
+    if (hasError) {
+      lastErr = data.message || "Myfxbook returned error";
+      const invalid = /invalid session/i.test(lastErr);
+      // On invalid-session, keep retrying; on other errors, fail fast
+      if (!invalid) {
+        return { accounts: null, error: lastErr };
+      }
+      continue;
+    }
+    return { accounts: (data.accounts as any[]) || [] };
   }
-  return { accounts: (data.accounts as any[]) || [] };
+  return {
+    accounts: null,
+    error: lastErr || "Invalid session",
+    invalidSession: /invalid session/i.test(lastErr || ""),
+  };
 }
 
 async function mfxHistory(session: string, accountId: string | number) {
