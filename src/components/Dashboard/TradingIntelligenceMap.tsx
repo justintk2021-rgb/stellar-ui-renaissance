@@ -69,14 +69,33 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
     pairAgg.set(key, cur);
   });
 
-  // Aggregate by session (setup proxy)
-  const sessionAgg = new Map<string, { count: number; pnl: number }>();
+  // Aggregate by session — track wins, losses, and best/worst trade for richer insight
+  const sessionAgg = new Map<string, { count: number; pnl: number; wins: number; losses: number; best: number; worst: number }>();
   trades.forEach((t) => {
     const key = t.session || "Other";
-    const cur = sessionAgg.get(key) || { count: 0, pnl: 0 };
+    const cur = sessionAgg.get(key) || { count: 0, pnl: 0, wins: 0, losses: 0, best: -Infinity, worst: Infinity };
+    const r = t.result || 0;
+    cur.count += 1;
+    cur.pnl += r;
+    if (r > 0) cur.wins += 1;
+    else if (r < 0) cur.losses += 1;
+    if (r > cur.best) cur.best = r;
+    if (r < cur.worst) cur.worst = r;
+    sessionAgg.set(key, cur);
+  });
+
+  // Pair × Session affinity (which session works best for each pair)
+  const pairSessionAgg = new Map<string, Map<string, { count: number; pnl: number; wins: number }>>();
+  trades.forEach((t) => {
+    const p = t.pair || "Unknown";
+    const s = t.session || "Other";
+    if (!pairSessionAgg.has(p)) pairSessionAgg.set(p, new Map());
+    const inner = pairSessionAgg.get(p)!;
+    const cur = inner.get(s) || { count: 0, pnl: 0, wins: 0 };
     cur.count += 1;
     cur.pnl += t.result || 0;
-    sessionAgg.set(key, cur);
+    if ((t.result || 0) > 0) cur.wins += 1;
+    inner.set(s, cur);
   });
 
   // ===== Core stats =====
@@ -206,14 +225,17 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
     edges.push({ from: "core", to: id, strength: 0.4 + (v.count / maxPairCount) * 0.6 });
   });
 
-  // Session nodes (setups) on the sides
-  const sessions = Array.from(sessionAgg.entries()).slice(0, 4);
+  // Session nodes (setups) on the sides — sort by trade count
+  const sessions = Array.from(sessionAgg.entries())
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 4);
   const maxSessionCount = Math.max(...sessions.map(([, v]) => v.count), 1);
   sessions.forEach(([session, v], i) => {
     const onLeft = i % 2 === 0;
     const x = onLeft ? 12 + (i * 4) : 88 - (i * 4);
     const y = 50 + (i % 2 === 0 ? -6 : 6) * (i + 1);
     const id = `session-${session}`;
+    const sessionWinRate = v.count ? (v.wins / v.count) * 100 : 0;
     const sentiment: NodeSentiment = v.pnl > 0 ? "positive" : v.pnl < 0 ? "negative" : "neutral";
     nodes.push({
       id,
@@ -223,10 +245,48 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
       size: 10 + (v.count / maxSessionCount) * 10,
       x,
       y,
-      meta: { count: v.count, pnl: v.pnl, detail: `${session} · ${v.count} trades · ${v.pnl >= 0 ? "+" : ""}$${v.pnl.toFixed(0)}` },
+      meta: {
+        count: v.count,
+        pnl: v.pnl,
+        detail: `${session} · ${v.count} trades · ${sessionWinRate.toFixed(0)}% WR · ${v.pnl >= 0 ? "+" : ""}$${v.pnl.toFixed(0)}`,
+      },
     });
     edges.push({ from: "core", to: id, strength: 0.3 + (v.count / maxSessionCount) * 0.5 });
   });
+
+  // ===== Pair × Session affinity edges =====
+  // For each rendered pair, link it to its single best-performing session (if both nodes exist)
+  const renderedPairIds = new Set(pairsTop.map(([p]) => `pair-${p}`));
+  const renderedSessionIds = new Set(sessions.map(([s]) => `session-${s}`));
+  pairsTop.forEach(([pair]) => {
+    const inner = pairSessionAgg.get(pair);
+    if (!inner) return;
+    let bestSession: string | null = null;
+    let bestPnl = -Infinity;
+    inner.forEach((stats, sess) => {
+      if (stats.count >= 2 && stats.pnl > bestPnl) {
+        bestPnl = stats.pnl;
+        bestSession = sess;
+      }
+    });
+    if (bestSession && renderedPairIds.has(`pair-${pair}`) && renderedSessionIds.has(`session-${bestSession}`)) {
+      edges.push({ from: `pair-${pair}`, to: `session-${bestSession}`, strength: 0.55 });
+    }
+  });
+
+  // ===== Best / worst session insight (used in behavior nodes) =====
+  const sessionsRanked = Array.from(sessionAgg.entries())
+    .filter(([, v]) => v.count >= 3)
+    .map(([s, v]) => ({
+      session: s,
+      count: v.count,
+      pnl: v.pnl,
+      wr: v.count ? (v.wins / v.count) * 100 : 0,
+      avg: v.count ? v.pnl / v.count : 0,
+    }));
+  const bestSession = sessionsRanked.slice().sort((a, b) => b.avg - a.avg)[0];
+  const worstSession = sessionsRanked.slice().sort((a, b) => a.avg - b.avg)[0];
+  const sessionGap = bestSession && worstSession ? bestSession.avg - worstSession.avg : 0;
 
   // ===== Behavior signals (data-driven, evidence-based) =====
   const sample = trades.length;
@@ -329,6 +389,47 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
       detail: `Long ${longWinRate.toFixed(0)}% vs Short ${shortWinRate.toFixed(0)}% WR`,
     },
 
+    // ===== Session-aware insights =====
+    {
+      label: bestSession ? `${bestSession.session} Edge` : "Session Edge",
+      sentiment: "positive",
+      visible: !!bestSession && bestSession.pnl > 0 && bestSession.wr >= 55,
+      detail: bestSession
+        ? `${bestSession.session}: ${bestSession.wr.toFixed(0)}% WR · +$${bestSession.avg.toFixed(0)}/trade over ${bestSession.count}`
+        : "",
+    },
+    {
+      label: worstSession ? `${worstSession.session} Drag` : "Session Drag",
+      sentiment: "negative",
+      visible: !!worstSession && worstSession.pnl < 0 && worstSession.count >= 5,
+      detail: worstSession
+        ? `${worstSession.session}: ${worstSession.wr.toFixed(0)}% WR · ${worstSession.avg >= 0 ? "+" : ""}$${worstSession.avg.toFixed(0)}/trade · ${worstSession.count} trades`
+        : "",
+    },
+    {
+      label: "Session Specialist",
+      sentiment: "positive",
+      visible:
+        sessionsRanked.length >= 2 &&
+        !!bestSession &&
+        sessionGap >= Math.max(50, Math.abs(bestSession.avg) * 0.5),
+      detail: bestSession && worstSession
+        ? `${bestSession.session} far outperforms ${worstSession.session} ($${bestSession.avg.toFixed(0)} vs $${worstSession.avg.toFixed(0)} per trade)`
+        : "",
+    },
+    {
+      label: "Session Mismatch",
+      sentiment: "negative",
+      visible:
+        sessionsRanked.length >= 2 &&
+        !!worstSession &&
+        worstSession.count >= Math.max(5, trades.length * 0.25) &&
+        worstSession.pnl < 0,
+      detail: worstSession
+        ? `${(worstSession.count / Math.max(trades.length, 1) * 100).toFixed(0)}% of trades fall in your weakest session (${worstSession.session})`
+        : "",
+    },
+
     // Neutral / informational
     {
       label: "Small Sample",
@@ -359,12 +460,7 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
     edges.push({ from: "core", to: id, strength: 0.5 });
   });
 
-  // Cross-connections: link top pair to dominant session
-  const topPair = pairsTop[0];
-  const topSession = sessions[0];
-  if (topPair && topSession) {
-    edges.push({ from: `pair-${topPair[0]}`, to: `session-${topSession[0]}`, strength: 0.4 });
-  }
+  // (Pair × Session affinity edges already created above)
 
   return { nodes, edges };
 }
