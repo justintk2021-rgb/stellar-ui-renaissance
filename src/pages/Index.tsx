@@ -276,11 +276,10 @@ const Index = () => {
 
   // Notes are now manually created only — no automatic generation for trades
 
-  // Close sidebar when changing page
+  // Change page without forcing the sidebar to collapse — keeps nav visible on load and during navigation
   const handlePageChange = useCallback((page: string) => {
     setCurrentPage(page);
-    setSidebarCollapsed(true);
-  }, [setSidebarCollapsed]);
+  }, []);
 
   // Fetch user profile
   const fetchProfile = useCallback(async (userId: string) => {
