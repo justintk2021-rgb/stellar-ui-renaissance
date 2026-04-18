@@ -92,92 +92,87 @@ async function mfxLogin(email: string, password: string) {
   const url = `${MYFXBOOK_BASE}/login.json?email=${
     encodeURIComponent(email)
   }&password=${encodeURIComponent(password)}`;
+  console.log(`[myfxbook] LOGIN → ${url.replace(password, "***")}`);
   const res = await fetch(url, {
     headers: {
       "Accept": "application/json",
       "User-Agent": "Mozilla/5.0 (compatible; NsyncJournal/1.0)",
     },
   });
-  const data = await res.json().catch(() => null);
-  // Myfxbook returns error as boolean OR string "false"/"true"
-  const hasError = data?.error === true || data?.error === "true";
-  if (!data || hasError || !data.session) {
+  const raw = await res.text();
+  console.log(`[myfxbook] LOGIN response (${res.status}):`, raw);
+  let data: any = null;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return { ok: false, message: "Myfxbook returned non-JSON response" } as const;
+  }
+  // Hard stop: if session missing, do not continue.
+  if (!data || data.error === true || data.error === "true" || !data.session) {
     return {
       ok: false,
-      message: data?.message || "Login failed — check your Myfxbook email and password",
+      message: data?.message ||
+        "Login failed — session missing from Myfxbook response",
     } as const;
   }
+  // Store session EXACTLY as returned, no modification.
   return { ok: true, session: String(data.session) } as const;
 }
 
 async function mfxLogout(session: string) {
   try {
-    await fetch(
-      `${MYFXBOOK_BASE}/logout.json?session=${encodeURIComponent(session)}`,
-    );
+    // Pass session exactly as returned (no encoding).
+    await fetch(`${MYFXBOOK_BASE}/logout.json?session=${session}`);
   } catch { /* ignore */ }
 }
 
 async function mfxAccounts(
   session: string,
 ): Promise<{ accounts: any[] | null; error?: string; invalidSession?: boolean }> {
-  const url = `${MYFXBOOK_BASE}/get-my-accounts.json?session=${
-    encodeURIComponent(session)
-  }`;
-  // Retry up to 3 times with backoff — Myfxbook intermittently
-  // rejects a freshly-issued session with "Invalid session."
-  let lastErr: string | undefined;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 600 * attempt));
-    const res = await fetch(url, {
-      headers: {
-        "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0 (compatible; NsyncJournal/1.0)",
-      },
-    });
-    const data = await res.json().catch(() => null);
-    if (!data) {
-      lastErr = "Empty response from Myfxbook";
-      continue;
-    }
-    const hasError = data.error === true || data.error === "true";
-    if (hasError) {
-      lastErr = data.message || "Myfxbook returned error";
-      const invalid = /invalid session/i.test(lastErr);
-      // On invalid-session, keep retrying; on other errors, fail fast
-      if (!invalid) {
-        return { accounts: null, error: lastErr };
-      }
-      continue;
-    }
-    return { accounts: (data.accounts as any[]) || [] };
+  // Pass session EXACTLY as returned — no URL encoding.
+  const url = `${MYFXBOOK_BASE}/get-my-accounts.json?session=${session}`;
+  console.log(`[myfxbook] GET ACCOUNTS → ${url}`);
+  const res = await fetch(url, {
+    headers: {
+      "Accept": "application/json",
+      "User-Agent": "Mozilla/5.0 (compatible; NsyncJournal/1.0)",
+    },
+  });
+  const raw = await res.text();
+  console.log(`[myfxbook] GET ACCOUNTS response (${res.status}):`, raw);
+  let data: any = null;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return { accounts: null, error: "Non-JSON response from Myfxbook" };
   }
-  return {
-    accounts: null,
-    error: lastErr || "Invalid session",
-    invalidSession: /invalid session/i.test(lastErr || ""),
-  };
+  const hasError = data?.error === true || data?.error === "true";
+  if (hasError) {
+    const msg = data.message || "Myfxbook returned error";
+    return {
+      accounts: null,
+      error: msg,
+      invalidSession: /invalid session/i.test(msg),
+    };
+  }
+  return { accounts: (data.accounts as any[]) || [] };
 }
 
 async function mfxHistory(session: string, accountId: string | number) {
-  const res = await fetch(
-    `${MYFXBOOK_BASE}/get-history.json?session=${
-      encodeURIComponent(session)
-    }&id=${accountId}`,
-  );
+  const url = `${MYFXBOOK_BASE}/get-history.json?session=${session}&id=${accountId}`;
+  console.log(`[myfxbook] GET HISTORY → ${url}`);
+  const res = await fetch(url);
   const data = await res.json().catch(() => null);
-  if (!data || data.error) return null;
+  if (!data || data.error === true || data.error === "true") return null;
   return data.history as any[];
 }
 
 async function mfxOpenTrades(session: string, accountId: string | number) {
-  const res = await fetch(
-    `${MYFXBOOK_BASE}/get-open-trades.json?session=${
-      encodeURIComponent(session)
-    }&id=${accountId}`,
-  );
+  const url = `${MYFXBOOK_BASE}/get-open-trades.json?session=${session}&id=${accountId}`;
+  console.log(`[myfxbook] GET OPEN TRADES → ${url}`);
+  const res = await fetch(url);
   const data = await res.json().catch(() => null);
-  if (!data || data.error) return [];
+  if (!data || data.error === true || data.error === "true") return [];
   return (data.openTrades as any[]) || [];
 }
 
@@ -187,12 +182,11 @@ async function mfxDailyGain(
   start: string,
   end: string,
 ) {
-  const url = `${MYFXBOOK_BASE}/get-daily-gain.json?session=${
-    encodeURIComponent(session)
-  }&id=${accountId}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+  const url = `${MYFXBOOK_BASE}/get-daily-gain.json?session=${session}&id=${accountId}&start=${start}&end=${end}`;
+  console.log(`[myfxbook] GET DAILY GAIN → ${url}`);
   const res = await fetch(url);
   const data = await res.json().catch(() => null);
-  if (!data || data.error) return [];
+  if (!data || data.error === true || data.error === "true") return [];
   return (data.dailyGain as any[]) || [];
 }
 
@@ -202,12 +196,11 @@ async function mfxGain(
   start: string,
   end: string,
 ) {
-  const url = `${MYFXBOOK_BASE}/get-gain.json?session=${
-    encodeURIComponent(session)
-  }&id=${accountId}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+  const url = `${MYFXBOOK_BASE}/get-gain.json?session=${session}&id=${accountId}&start=${start}&end=${end}`;
+  console.log(`[myfxbook] GET GAIN → ${url}`);
   const res = await fetch(url);
   const data = await res.json().catch(() => null);
-  if (!data || data.error) return null;
+  if (!data || data.error === true || data.error === "true") return null;
   return data.value ?? null;
 }
 
