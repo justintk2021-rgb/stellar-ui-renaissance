@@ -114,17 +114,18 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = false, onTogg
 
   return (
     <>
-      {/* Arrow toggle - always visible on the left edge */}
+      {/* Arrow toggle - always visible on the left edge so the nav is never "missing" on load */}
       <button
         ref={arrowRef}
         onClick={handleArrowClick}
         onMouseEnter={handleArrowHover}
+        aria-label="Open navigation"
         className={cn(
-          "fixed left-0 top-1/2 -translate-y-1/2 w-6 h-16 bg-primary/90 hover:bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-lg transition-all duration-200 hover:w-8 z-50",
+          "fixed left-0 top-1/2 -translate-y-1/2 w-7 h-20 bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-glow-sm transition-all duration-200 hover:w-9 hover:bg-primary/90 z-50",
           showSidebar && "opacity-0 pointer-events-none"
         )}
       >
-        <ChevronRight className="w-4 h-4" />
+        <ChevronRight className="w-5 h-5" />
       </button>
 
       {/* Sidebar panel */}
