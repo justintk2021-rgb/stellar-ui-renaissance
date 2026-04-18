@@ -166,6 +166,7 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
   const directionGap = Math.abs(longWinRate - shortWinRate);
 
   // ===== Pair concentration =====
+  const pairs = Array.from(pairAgg.entries()).sort((a, b) => b[1].count - a[1].count);
   const topPairCount = pairs[0] ? pairs[0][1].count : 0;
   const concentration = trades.length ? (topPairCount / trades.length) * 100 : 0;
 
