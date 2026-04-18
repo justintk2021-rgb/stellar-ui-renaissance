@@ -336,7 +336,7 @@ function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
       visible: sample > 0 && sample < 10,
       detail: `Only ${sample} trades — patterns not yet reliable`,
     },
-  ].filter((b) => b.visible);
+  ] as { label: string; sentiment: NodeSentiment; visible: boolean; detail: string }[]).filter((b) => b.visible);
 
   // Cap to top 7 to keep the canvas readable
   const topBehaviors = behaviors.slice(0, 7);
