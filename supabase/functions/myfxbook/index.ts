@@ -108,15 +108,21 @@ async function mfxLogout(session: string) {
   } catch { /* ignore */ }
 }
 
-async function mfxAccounts(session: string) {
+async function mfxAccounts(
+  session: string,
+): Promise<{ accounts: any[] | null; error?: string }> {
   const res = await fetch(
     `${MYFXBOOK_BASE}/get-my-accounts.json?session=${
       encodeURIComponent(session)
     }`,
   );
   const data = await res.json().catch(() => null);
-  if (!data || data.error) return null;
-  return data.accounts as any[];
+  if (!data) return { accounts: null, error: "Empty response from Myfxbook" };
+  // Myfxbook returns { error: true/false, message, accounts }
+  if (data.error === true || data.error === "true") {
+    return { accounts: null, error: data.message || "Myfxbook returned error" };
+  }
+  return { accounts: (data.accounts as any[]) || [] };
 }
 
 async function mfxHistory(session: string, accountId: string | number) {
