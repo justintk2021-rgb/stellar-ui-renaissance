@@ -243,7 +243,12 @@ serve(async (req) => {
       if (!login.ok) {
         return jsonResponse({ error: login.message }, 401);
       }
-      const accounts = await mfxAccounts(login.session) || [];
+      const accountsResult = await mfxAccounts(login.session);
+      const accounts = accountsResult.accounts || [];
+      if (accountsResult.error) {
+        console.error("mfxAccounts error on connect:", accountsResult.error);
+      }
+      console.log(`[myfxbook] connect: fetched ${accounts.length} accounts for ${email}`);
       const enc = await encryptText(password);
 
       // Upsert one connection row per (user, login)
