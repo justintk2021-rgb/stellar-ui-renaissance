@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { useThemeTransition } from "@/hooks/useThemeTransition";
@@ -10,23 +10,23 @@ import { useChecklists } from "@/hooks/useChecklists";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
-import { StatsGrid } from "@/components/Dashboard/StatsGrid";
-import { DashboardStatsLayout } from "@/components/Dashboard/DashboardStatsLayout";
 import { BalanceCards } from "@/components/Dashboard/BalanceCards";
+import { DashboardStatsLayout } from "@/components/Dashboard/DashboardStatsLayout";
 import { AnimatedBackground } from "@/components/Layout/AnimatedBackground";
-
-import { PnLCalendar } from "@/components/Dashboard/PnLCalendar";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { MiniCalendar } from "@/components/Journal/MiniCalendar";
-import { NotebookView } from "@/components/Notebook/NotebookView";
-import { SettingsView } from "@/components/Settings/SettingsView";
-import { CustomChart } from "@/components/Chart/CustomChart";
-import { PlaybookView } from "@/components/Playbook/PlaybookView";
-import { EconomicCalendarView } from "@/components/EconomicCalendar/EconomicCalendarView";
-import { LotSizeCalculator } from "@/components/Calculator/LotSizeCalculator";
-import { CommunityView } from "@/components/Community/CommunityView";
 import { AccountSelector } from "@/components/Dashboard/AccountSelector";
+
+// Lazy-load heavy/secondary pages so the dashboard paints instantly.
+const NotebookView = lazy(() => import("@/components/Notebook/NotebookView").then(m => ({ default: m.NotebookView })));
+const SettingsView = lazy(() => import("@/components/Settings/SettingsView").then(m => ({ default: m.SettingsView })));
+const CustomChart = lazy(() => import("@/components/Chart/CustomChart").then(m => ({ default: m.CustomChart })));
+const PlaybookView = lazy(() => import("@/components/Playbook/PlaybookView").then(m => ({ default: m.PlaybookView })));
+const EconomicCalendarView = lazy(() => import("@/components/EconomicCalendar/EconomicCalendarView").then(m => ({ default: m.EconomicCalendarView })));
+const LotSizeCalculator = lazy(() => import("@/components/Calculator/LotSizeCalculator").then(m => ({ default: m.LotSizeCalculator })));
+const CommunityView = lazy(() => import("@/components/Community/CommunityView").then(m => ({ default: m.CommunityView })));
+
 import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
@@ -36,6 +36,12 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
 import { AnimatePresence, motion } from "framer-motion";
 import { RefreshCw } from "lucide-react";
+
+const PageFallback = () => (
+  <div className="flex items-center justify-center min-h-[40vh]">
+    <RefreshCw className="h-5 w-5 text-muted-foreground/60 animate-spin" />
+  </div>
+);
 
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
@@ -109,68 +115,58 @@ const Index = () => {
     importTrades 
   } = useTrades(user?.id, selectedBrokerAccountId ? null : selectedAccountId, selectedBrokerAccountId);
 
-  // Auto-sync with broker - on load, every 5 mins, and on page change
-  const brokerAutoSync = useCallback(async () => {
+  // Auto-sync with broker - throttled to once per 60s, runs in background
+  const lastSyncRef = useRef<number>(0);
+  const inFlightSyncRef = useRef<boolean>(false);
+  const brokerAutoSync = useCallback(async (force = false) => {
     if (!user?.id) return;
+    const now = Date.now();
+    if (!force && (inFlightSyncRef.current || now - lastSyncRef.current < 60_000)) return;
+    inFlightSyncRef.current = true;
+    lastSyncRef.current = now;
     try {
       const { data: connections } = await supabase
         .from('broker_connections')
-        .select('id, connection_status')
+        .select('id')
         .eq('user_id', user.id)
         .eq('connection_status', 'connected');
 
       if (!connections?.length) return;
 
       setBrokerSyncing(true);
-      for (const conn of connections) {
-        try {
-          await supabase.functions.invoke('tradelocker', {
+      // Fire all syncs in parallel — don't block UI
+      await Promise.allSettled(
+        connections.map(conn =>
+          supabase.functions.invoke('tradelocker', {
             body: { action: 'sync', connectionId: conn.id },
-          });
-        } catch (e) {
-          console.warn('Auto-sync skipped for connection', conn.id, e);
-        }
-      }
+          })
+        )
+      );
     } catch (e) {
       console.warn('Auto broker sync check failed:', e);
     } finally {
       setBrokerSyncing(false);
+      inFlightSyncRef.current = false;
     }
   }, [user?.id]);
 
-  // Initial sync + 5-minute interval
+  // Initial sync (deferred well past first paint) + 5-minute interval
   useEffect(() => {
     if (!user?.id) return;
-    const timer = setTimeout(brokerAutoSync, 1500);
-    const interval = setInterval(brokerAutoSync, 5 * 60 * 1000);
-    return () => { clearTimeout(timer); clearInterval(interval); };
-  }, [user?.id, brokerAutoSync]);
-
-  // Scroll-triggered sync on the dashboard (throttled to once per minute)
-  const lastScrollSyncRef = useRef<number>(0);
-  useEffect(() => {
-    if (!user?.id || currentPage !== 'dashboard') return;
-    const handleScroll = () => {
-      const now = Date.now();
-      if (now - lastScrollSyncRef.current >= 60_000) {
-        lastScrollSyncRef.current = now;
-        brokerAutoSync();
+    // Defer initial sync so it doesn't compete with first paint / data loads
+    const idle = (cb: () => void) => {
+      if (typeof (window as any).requestIdleCallback === 'function') {
+        (window as any).requestIdleCallback(cb, { timeout: 4000 });
+      } else {
+        setTimeout(cb, 3500);
       }
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    // Also catch scroll on inner scrollable containers
-    document.addEventListener('scroll', handleScroll, { passive: true, capture: true });
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      document.removeEventListener('scroll', handleScroll, { capture: true } as any);
-    };
-  }, [user?.id, currentPage, brokerAutoSync]);
+    let cancelled = false;
+    idle(() => { if (!cancelled) brokerAutoSync(true); });
+    const interval = setInterval(() => brokerAutoSync(), 5 * 60 * 1000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [user?.id, brokerAutoSync]);
 
-  // Sync on page change
-  useEffect(() => {
-    if (!user?.id) return;
-    brokerAutoSync();
-  }, [currentPage]);
 
   // Fetch broker balance/equity when a broker account is selected + realtime updates
   useEffect(() => {
@@ -794,70 +790,84 @@ const Index = () => {
               {/* Notebook Page */}
               {currentPage === 'notebook' && (
                 <PageTransition key="notebook">
-                  <NotebookView
-                    trades={trades}
-                    selectedTradeId={selectedTradeId}
-                    onSelectTrade={setSelectedTradeId}
-                    onSaveNotes={handleSaveNotes}
-                    notebookEntries={notebookEntries}
-                    onSaveEntry={handleSaveEntry}
-                    onDeleteEntry={handleDeleteEntry}
-                    notebookFont={notebookFont}
-                    onFontChange={setNotebookFont}
-                  />
+                  <Suspense fallback={<PageFallback />}>
+                    <NotebookView
+                      trades={trades}
+                      selectedTradeId={selectedTradeId}
+                      onSelectTrade={setSelectedTradeId}
+                      onSaveNotes={handleSaveNotes}
+                      notebookEntries={notebookEntries}
+                      onSaveEntry={handleSaveEntry}
+                      onDeleteEntry={handleDeleteEntry}
+                      notebookFont={notebookFont}
+                      onFontChange={setNotebookFont}
+                    />
+                  </Suspense>
                 </PageTransition>
               )}
 
               {/* Playbook Page */}
               {currentPage === 'playbook' && (
                 <PageTransition key="playbook">
-                  <PlaybookView />
+                  <Suspense fallback={<PageFallback />}>
+                    <PlaybookView />
+                  </Suspense>
                 </PageTransition>
               )}
 
               {/* Economic Calendar Page */}
               {currentPage === 'calendar' && (
                 <PageTransition key="calendar">
-                  <EconomicCalendarView />
+                  <Suspense fallback={<PageFallback />}>
+                    <EconomicCalendarView />
+                  </Suspense>
                 </PageTransition>
               )}
 
               {/* Settings Page */}
               {currentPage === 'settings' && (
                 <PageTransition key="settings">
-                  <SettingsView 
-                    theme={theme} 
-                    onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)}
-                    accentColor={accentColor}
-                    onAccentColorChange={setAccentColor}
-                    userProfile={userProfile}
-                    onLogout={handleLogout}
-                    customColor={customColor}
-                    onCustomColorChange={setCustomColor}
-                    customGradient={customGradient}
-                    onCustomGradientChange={setCustomGradient}
-                  />
+                  <Suspense fallback={<PageFallback />}>
+                    <SettingsView 
+                      theme={theme} 
+                      onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)}
+                      accentColor={accentColor}
+                      onAccentColorChange={setAccentColor}
+                      userProfile={userProfile}
+                      onLogout={handleLogout}
+                      customColor={customColor}
+                      onCustomColorChange={setCustomColor}
+                      customGradient={customGradient}
+                      onCustomGradientChange={setCustomGradient}
+                    />
+                  </Suspense>
                 </PageTransition>
               )}
 
               {/* Chart Page */}
               {currentPage === 'chart' && (
                 <PageTransition key="chart">
-                  <CustomChart />
+                  <Suspense fallback={<PageFallback />}>
+                    <CustomChart />
+                  </Suspense>
                 </PageTransition>
               )}
 
               {/* Calculator Page */}
               {currentPage === 'calculator' && (
                 <PageTransition key="calculator" className="max-w-5xl mx-auto">
-                  <LotSizeCalculator />
+                  <Suspense fallback={<PageFallback />}>
+                    <LotSizeCalculator />
+                  </Suspense>
                 </PageTransition>
               )}
 
               {/* Community Page */}
               {currentPage === 'community' && (
                 <PageTransition key="community">
-                  <CommunityView />
+                  <Suspense fallback={<PageFallback />}>
+                    <CommunityView />
+                  </Suspense>
                 </PageTransition>
               )}
             </AnimatePresence>

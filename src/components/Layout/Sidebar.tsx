@@ -54,32 +54,42 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = false, onTogg
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isPinned, onToggleCollapse]);
 
+  // Fetch user name once; re-fetch only when the user actually changes
   useEffect(() => {
-    const fetchUserName = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('first_name, last_name')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        if (profile) {
-          const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
-          if (fullName.trim()) {
-            setUserName(`${fullName}'s Journal`);
-          }
-        }
+    let cancelled = false;
+    let lastUserId: string | null = null;
+
+    const fetchUserName = async (uid: string) => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('user_id', uid)
+        .maybeSingle();
+      if (cancelled) return;
+      if (profile) {
+        const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
+        if (fullName.trim()) setUserName(`${fullName}'s Journal`);
       }
     };
 
-    fetchUserName();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      fetchUserName();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (cancelled || !user) return;
+      lastUserId = user.id;
+      fetchUserName(user.id);
     });
 
-    return () => subscription.unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const uid = session?.user?.id ?? null;
+      if (uid && uid !== lastUserId) {
+        lastUserId = uid;
+        fetchUserName(uid);
+      } else if (!uid) {
+        lastUserId = null;
+        setUserName("NSYNC JOURNAL");
+      }
+    });
+
+    return () => { cancelled = true; subscription.unsubscribe(); };
   }, []);
 
   const showSidebar = isPinned || isHovering;
