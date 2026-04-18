@@ -790,70 +790,84 @@ const Index = () => {
               {/* Notebook Page */}
               {currentPage === 'notebook' && (
                 <PageTransition key="notebook">
-                  <NotebookView
-                    trades={trades}
-                    selectedTradeId={selectedTradeId}
-                    onSelectTrade={setSelectedTradeId}
-                    onSaveNotes={handleSaveNotes}
-                    notebookEntries={notebookEntries}
-                    onSaveEntry={handleSaveEntry}
-                    onDeleteEntry={handleDeleteEntry}
-                    notebookFont={notebookFont}
-                    onFontChange={setNotebookFont}
-                  />
+                  <Suspense fallback={<PageFallback />}>
+                    <NotebookView
+                      trades={trades}
+                      selectedTradeId={selectedTradeId}
+                      onSelectTrade={setSelectedTradeId}
+                      onSaveNotes={handleSaveNotes}
+                      notebookEntries={notebookEntries}
+                      onSaveEntry={handleSaveEntry}
+                      onDeleteEntry={handleDeleteEntry}
+                      notebookFont={notebookFont}
+                      onFontChange={setNotebookFont}
+                    />
+                  </Suspense>
                 </PageTransition>
               )}
 
               {/* Playbook Page */}
               {currentPage === 'playbook' && (
                 <PageTransition key="playbook">
-                  <PlaybookView />
+                  <Suspense fallback={<PageFallback />}>
+                    <PlaybookView />
+                  </Suspense>
                 </PageTransition>
               )}
 
               {/* Economic Calendar Page */}
               {currentPage === 'calendar' && (
                 <PageTransition key="calendar">
-                  <EconomicCalendarView />
+                  <Suspense fallback={<PageFallback />}>
+                    <EconomicCalendarView />
+                  </Suspense>
                 </PageTransition>
               )}
 
               {/* Settings Page */}
               {currentPage === 'settings' && (
                 <PageTransition key="settings">
-                  <SettingsView 
-                    theme={theme} 
-                    onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)}
-                    accentColor={accentColor}
-                    onAccentColorChange={setAccentColor}
-                    userProfile={userProfile}
-                    onLogout={handleLogout}
-                    customColor={customColor}
-                    onCustomColorChange={setCustomColor}
-                    customGradient={customGradient}
-                    onCustomGradientChange={setCustomGradient}
-                  />
+                  <Suspense fallback={<PageFallback />}>
+                    <SettingsView 
+                      theme={theme} 
+                      onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)}
+                      accentColor={accentColor}
+                      onAccentColorChange={setAccentColor}
+                      userProfile={userProfile}
+                      onLogout={handleLogout}
+                      customColor={customColor}
+                      onCustomColorChange={setCustomColor}
+                      customGradient={customGradient}
+                      onCustomGradientChange={setCustomGradient}
+                    />
+                  </Suspense>
                 </PageTransition>
               )}
 
               {/* Chart Page */}
               {currentPage === 'chart' && (
                 <PageTransition key="chart">
-                  <CustomChart />
+                  <Suspense fallback={<PageFallback />}>
+                    <CustomChart />
+                  </Suspense>
                 </PageTransition>
               )}
 
               {/* Calculator Page */}
               {currentPage === 'calculator' && (
                 <PageTransition key="calculator" className="max-w-5xl mx-auto">
-                  <LotSizeCalculator />
+                  <Suspense fallback={<PageFallback />}>
+                    <LotSizeCalculator />
+                  </Suspense>
                 </PageTransition>
               )}
 
               {/* Community Page */}
               {currentPage === 'community' && (
                 <PageTransition key="community">
-                  <CommunityView />
+                  <Suspense fallback={<PageFallback />}>
+                    <CommunityView />
+                  </Suspense>
                 </PageTransition>
               )}
             </AnimatePresence>
