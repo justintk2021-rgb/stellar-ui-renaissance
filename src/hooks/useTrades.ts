@@ -75,7 +75,10 @@ export function useTrades(userId: string | undefined, accountId: string | null =
     }
   }, [userId, accountId, brokerAccountId]);
 
-  // Set up realtime subscription
+  // Set up realtime subscription (one stable channel per user)
+  const accountIdRef = useRef(accountId);
+  useEffect(() => { accountIdRef.current = accountId; }, [accountId]);
+
   useEffect(() => {
     if (!userId) return;
 
@@ -85,7 +88,8 @@ export function useTrades(userId: string | undefined, accountId: string | null =
       channelRef.current = null;
     }
 
-    const channelName = `trades-realtime-${userId}-${accountId || 'all'}-${Date.now()}`;
+    // Stable channel name per user — no Date.now() so we don't churn subscriptions
+    const channelName = `trades-realtime-${userId}`;
     const channel = supabase
       .channel(channelName)
       .on(
@@ -97,8 +101,7 @@ export function useTrades(userId: string | undefined, accountId: string | null =
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log('Trades realtime update:', payload.eventType);
-          
+          const currentAccountId = accountIdRef.current;
           if (payload.eventType === 'INSERT') {
             const newTrade: Trade = {
               id: payload.new.id,
@@ -114,8 +117,7 @@ export function useTrades(userId: string | undefined, accountId: string | null =
               checklistId: payload.new.checklist_id || undefined,
               checklistState: payload.new.checklist_state || undefined,
             };
-            // Only add if matches current account filter
-            if (!accountId || payload.new.account_id === accountId) {
+            if (!currentAccountId || payload.new.account_id === currentAccountId) {
               setTrades(prev => {
                 if (prev.some(t => t.id === newTrade.id)) return prev;
                 return [newTrade, ...prev];
@@ -152,7 +154,7 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         channelRef.current = null;
       }
     };
-  }, [userId, accountId]);
+  }, [userId]);
 
   useEffect(() => {
     fetchTrades();
