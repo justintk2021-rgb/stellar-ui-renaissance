@@ -496,8 +496,8 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
             const a = nodeById[e.from];
             const b = nodeById[e.to];
             if (!a || !b) return null;
-            const isActive = activeId === e.from || activeId === e.to;
-            const isDimmed = activeId && !isActive;
+            const isConnected = activeId === e.from || activeId === e.to;
+            const isDimmed = activeId && !isConnected;
             const stroke =
               b.sentiment === "negative" || a.sentiment === "negative"
                 ? COLORS.negative
@@ -508,24 +508,55 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
             const y1 = toY(a.y);
             const x2 = toX(b.x);
             const y2 = toY(b.y);
+            // Curved path for organic flow
+            const mx = (x1 + x2) / 2;
+            const my = (y1 + y2) / 2;
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            // Perpendicular offset for curvature (small, consistent direction by edge index)
+            const curveAmt = Math.min(40, len * 0.15) * (i % 2 === 0 ? 1 : -1);
+            const cx1 = mx + (-dy / len) * curveAmt;
+            const cy1 = my + (dx / len) * curveAmt;
+            const path = `M ${x1} ${y1} Q ${cx1} ${cy1} ${x2} ${y2}`;
             return (
               <g key={`edge-${i}`}>
-                <line
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
+                {/* Base edge */}
+                <path
+                  d={path}
+                  fill="none"
                   stroke={stroke}
-                  strokeOpacity={isActive ? 0.7 : isDimmed ? 0.06 : 0.2}
-                  strokeWidth={isActive ? 1.6 : 1}
+                  strokeOpacity={isConnected ? 0.85 : isDimmed ? 0.05 : 0.18}
+                  strokeWidth={isConnected ? 2 : 1}
                   strokeLinecap="round"
                   style={{ transition: "stroke-opacity 300ms ease, stroke-width 300ms ease" }}
                 />
-                {/* Pulse only on the active edges to keep things lightweight */}
-                {isActive && animationsEnabled && (
-                  <circle r={2.5} fill={stroke} opacity={0.9}>
-                    <animateMotion dur="2.4s" repeatCount="indefinite" path={`M ${x1} ${y1} L ${x2} ${y2}`} />
-                  </circle>
+                {/* Animated dashed flow on connected edges to clearly show the link */}
+                {isConnected && animationsEnabled && (
+                  <>
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke={stroke}
+                      strokeOpacity={0.9}
+                      strokeWidth={2.2}
+                      strokeLinecap="round"
+                      strokeDasharray="6 8"
+                      style={{ filter: `drop-shadow(0 0 4px ${stroke})` }}
+                    >
+                      <animate
+                        attributeName="stroke-dashoffset"
+                        from="0"
+                        to="-28"
+                        dur="0.9s"
+                        repeatCount="indefinite"
+                      />
+                    </path>
+                    {/* Travelling particle for unmistakable directional flow */}
+                    <circle r={3} fill={stroke} opacity={0.95} style={{ filter: `drop-shadow(0 0 6px ${stroke})` }}>
+                      <animateMotion dur="1.6s" repeatCount="indefinite" path={path} rotate="auto" />
+                    </circle>
+                  </>
                 )}
               </g>
             );
