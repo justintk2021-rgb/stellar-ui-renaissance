@@ -2069,6 +2069,21 @@ export function NotebookView({
                 className="relative min-h-full"
                 onMouseMove={handleEditorMouseMove}
                 onMouseLeave={handleEditorMouseLeave}
+                onClick={(e) => {
+                  if (isLocked || isSelectedEntryInTrash) return;
+                  if (!editorRef.current) return;
+                  // Ignore clicks inside the editor itself or on interactive controls (block menu, buttons)
+                  if (editorRef.current.contains(e.target as Node)) return;
+                  const target = e.target as HTMLElement;
+                  if (target.closest('button, a, input, textarea, [role="menu"], [contenteditable]')) return;
+                  editorRef.current.focus();
+                  const range = document.createRange();
+                  range.selectNodeContents(editorRef.current);
+                  range.collapse(false);
+                  const sel = window.getSelection();
+                  sel?.removeAllRanges();
+                  sel?.addRange(range);
+                }}
               >
                 {/* Floating Block Button */}
                 {showBlockButton && !isLocked && !isSelectedEntryInTrash && (
