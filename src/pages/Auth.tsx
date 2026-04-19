@@ -12,6 +12,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Float, MeshDistortMaterial, Sphere, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import logo from "@/assets/logo-3d.png";
+import { LoginLoader } from "@/components/Layout/LoginLoader";
 
 // Zod schemas for form validation
 const loginSchema = z.object({
@@ -171,6 +172,8 @@ export function AuthPage() {
     password: "",
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [showLoader, setShowLoader] = useState(false);
+  const [loaderName, setLoaderName] = useState<string | undefined>(undefined);
 
   const handleForgotPassword = async () => {
     if (!formData.email || !formData.email.includes("@")) {
@@ -196,20 +199,21 @@ export function AuthPage() {
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      if (session && !showLoader) {
         navigate("/dashboard");
       }
     };
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
+      // Don't auto-navigate while the cinematic loader is playing — it owns the redirect.
+      if (session && !showLoader) {
         navigate("/dashboard");
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, showLoader]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -234,15 +238,25 @@ export function AuthPage() {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
-        
+
         if (error) {
           toast.error(error.message);
         } else {
-          toast.success("Welcome back!");
+          // Pull a friendly first name from profile (best-effort, non-blocking).
+          const userId = data.user?.id;
+          if (userId) {
+            supabase
+              .from("profiles")
+              .select("first_name")
+              .eq("user_id", userId)
+              .maybeSingle()
+              .then(({ data: p }) => setLoaderName(p?.first_name || undefined));
+          }
+          setShowLoader(true);
         }
       } else {
         const { error } = await supabase.auth.signUp({
@@ -256,11 +270,12 @@ export function AuthPage() {
             },
           },
         });
-        
+
         if (error) {
           toast.error(error.message);
         } else {
-          toast.success("Account created successfully!");
+          setLoaderName(formData.firstName);
+          setShowLoader(true);
         }
       }
     } catch (error: any) {
@@ -271,13 +286,22 @@ export function AuthPage() {
   };
 
   return (
-    <motion.div
-      variants={pageVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className="min-h-screen relative overflow-hidden flex items-center justify-center bg-black"
-    >
+    <>
+      <AnimatePresence>
+        {showLoader && (
+          <LoginLoader
+            name={loaderName}
+            onComplete={() => navigate("/dashboard")}
+          />
+        )}
+      </AnimatePresence>
+      <motion.div
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        className="min-h-screen relative overflow-hidden flex items-center justify-center bg-black"
+      >
       {/* 3D Canvas Background */}
       <div className="absolute inset-0 z-0">
         <Canvas camera={{ position: [0, 0, 6], fov: 50 }}>
@@ -586,5 +610,6 @@ export function AuthPage() {
         </motion.p>
       </div>
     </motion.div>
+    </>
   );
 }
