@@ -174,6 +174,12 @@ export function AuthPage() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showLoader, setShowLoader] = useState(false);
   const [loaderName, setLoaderName] = useState<string | undefined>(undefined);
+  const showLoaderRef = useRef(false);
+
+  // Keep ref in sync so the auth listener always sees the latest value
+  useEffect(() => {
+    showLoaderRef.current = showLoader;
+  }, [showLoader]);
 
   const handleForgotPassword = async () => {
     if (!formData.email || !formData.email.includes("@")) {
@@ -199,7 +205,7 @@ export function AuthPage() {
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session && !showLoader) {
+      if (session && !showLoaderRef.current) {
         navigate("/dashboard");
       }
     };
@@ -207,13 +213,13 @@ export function AuthPage() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // Don't auto-navigate while the cinematic loader is playing — it owns the redirect.
-      if (session && !showLoader) {
+      if (session && !showLoaderRef.current) {
         navigate("/dashboard");
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, showLoader]);
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -238,12 +244,15 @@ export function AuthPage() {
 
     try {
       if (isLogin) {
+        // Set ref BEFORE awaiting so the auth listener doesn't navigate first
+        showLoaderRef.current = true;
         const { data, error } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
 
         if (error) {
+          showLoaderRef.current = false;
           toast.error(error.message);
         } else {
           // Pull a friendly first name from profile (best-effort, non-blocking).
@@ -259,6 +268,7 @@ export function AuthPage() {
           setShowLoader(true);
         }
       } else {
+        showLoaderRef.current = true;
         const { error } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
@@ -272,6 +282,7 @@ export function AuthPage() {
         });
 
         if (error) {
+          showLoaderRef.current = false;
           toast.error(error.message);
         } else {
           setLoaderName(formData.firstName);
@@ -279,6 +290,7 @@ export function AuthPage() {
         }
       }
     } catch (error: any) {
+      showLoaderRef.current = false;
       toast.error(error.message || "An error occurred");
     } finally {
       setIsLoading(false);
