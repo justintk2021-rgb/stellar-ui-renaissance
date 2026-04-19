@@ -12,6 +12,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Float, MeshDistortMaterial, Sphere, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import logo from "@/assets/logo-3d.png";
+import { LoginLoader } from "@/components/Layout/LoginLoader";
 
 // Zod schemas for form validation
 const loginSchema = z.object({
