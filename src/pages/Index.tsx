@@ -135,13 +135,27 @@ const Index = () => {
       if (!connections?.length) return;
 
       setBrokerSyncing(true);
-      // Fire all syncs in parallel — don't block UI
+      // Fire all syncs in parallel — swallow errors silently (e.g. expired sessions).
+      // On 401, mark connection as expired so we stop retrying it.
       await Promise.allSettled(
-        connections.map(conn =>
-          supabase.functions.invoke('tradelocker', {
-            body: { action: 'sync', connectionId: conn.id },
-          })
-        )
+        connections.map(async (conn) => {
+          try {
+            const { error } = await supabase.functions.invoke('tradelocker', {
+              body: { action: 'sync', connectionId: conn.id },
+            });
+            if (error) {
+              const msg = String(error.message || '');
+              if (msg.includes('401') || /invalid|expired session/i.test(msg)) {
+                await supabase
+                  .from('broker_connections')
+                  .update({ connection_status: 'expired' })
+                  .eq('id', conn.id);
+              }
+            }
+          } catch {
+            // Silently ignore — surfaced via Broker Management UI instead.
+          }
+        })
       );
     } catch (e) {
       console.warn('Auto broker sync check failed:', e);
