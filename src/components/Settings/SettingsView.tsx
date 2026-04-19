@@ -796,6 +796,53 @@ export function SettingsView({
         </div>
       </motion.div>
 
+      {/* Glass / Translucent Style Toggle */}
+      <motion.div variants={itemVariants} className="pt-6 border-t border-border/30">
+        <motion.div
+          whileHover={{ scale: 1.005 }}
+          className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/30 p-5"
+        >
+          {/* Tinted preview overlay when enabled */}
+          {glassMode && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent"
+              style={{ backdropFilter: 'blur(0px)' }}
+            />
+          )}
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <motion.div
+                animate={glassMode ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+                transition={{ duration: 1.6, repeat: glassMode ? Infinity : 0, ease: "easeInOut" }}
+                className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/5 flex items-center justify-center backdrop-blur-md border border-primary/20"
+              >
+                <Sparkles className="w-5 h-5 text-primary" />
+              </motion.div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  Glass Style
+                  {glassMode && (
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                      On
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1 max-w-md">
+                  Translucent, blurred surfaces tinted with your accent color. Cards, sidebar and dialogs feel like frosted glass.
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={glassMode}
+              onCheckedChange={(v) => onGlassModeChange?.(v)}
+              className="mt-1"
+            />
+          </div>
+        </motion.div>
+      </motion.div>
+
       {/* Accent Color Settings */}
       <motion.div variants={itemVariants} className="space-y-5 pt-6 border-t border-border/30">
         <div className="flex items-center justify-between">
