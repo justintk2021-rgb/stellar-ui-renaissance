@@ -856,3 +856,71 @@ input[type="number"]::-webkit-outer-spin-button {
 .notebook-todo-item .todo-checkbox-wrapper div {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
+/* ===========================
+   Glass / Translucent UI Mode
+   =========================== */
+.glass-mode {
+  --glass-bg-opacity: 0.45;
+  --glass-blur: 18px;
+  --glass-tint: var(--primary);
+}
+
+.glass-mode.light {
+  --glass-bg-opacity: 0.55;
+}
+
+/* Cards and surfaces become translucent with backdrop blur and accent tint */
+.glass-mode [class*="bg-card"],
+.glass-mode .bg-card,
+.glass-mode .bg-popover,
+.glass-mode .bg-background\/50,
+.glass-mode .bg-background\/80,
+.glass-mode .bg-muted\/50,
+.glass-mode .bg-muted {
+  background-color: hsl(var(--card) / var(--glass-bg-opacity)) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  border-color: hsl(var(--glass-tint) / 0.15);
+}
+
+/* Sidebar gets translucent treatment */
+.glass-mode [data-sidebar="sidebar"],
+.glass-mode aside.bg-sidebar {
+  background-color: hsl(var(--sidebar-background) / 0.55) !important;
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-color: hsl(var(--glass-tint) / 0.12);
+}
+
+/* TopBar / sticky headers translucent */
+.glass-mode header,
+.glass-mode .topbar,
+.glass-mode [data-topbar] {
+  background-color: hsl(var(--background) / 0.5) !important;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+
+/* Dialogs / popovers / dropdowns */
+.glass-mode [role="dialog"],
+.glass-mode [data-radix-popper-content-wrapper] > * {
+  background-color: hsl(var(--popover) / 0.75) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-color: hsl(var(--glass-tint) / 0.18);
+}
+
+/* Subtle accent-tinted glow on glass surfaces */
+.glass-mode .glass-tint {
+  background-image: linear-gradient(
+    135deg,
+    hsl(var(--glass-tint) / 0.08) 0%,
+    transparent 60%
+  );
+}
+
+/* Slightly stronger borders to define translucent shapes */
+.glass-mode .border,
+.glass-mode .border-border {
+  border-color: hsl(var(--glass-tint) / 0.18);
+}
