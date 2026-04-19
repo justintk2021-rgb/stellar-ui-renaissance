@@ -290,10 +290,9 @@ const Index = () => {
     setCustomGradient,
     setSidebarCollapsed,
     setNotebookFont,
-    setGlassMode,
   } = useUserSettings(user?.id);
   
-  const { theme, accentColor, customColor, customGradient, sidebarCollapsed, notebookFont, glassMode } = settings;
+  const { theme, accentColor, customColor, customGradient, sidebarCollapsed, notebookFont } = settings;
   
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
@@ -418,14 +417,7 @@ const Index = () => {
         document.documentElement.style.setProperty('--sidebar-ring', hsl);
       }
     }
-
-    // Glass / translucent UI mode
-    if (glassMode) {
-      document.documentElement.classList.add('glass-mode');
-    } else {
-      document.documentElement.classList.remove('glass-mode');
-    }
-  }, [theme, accentColor, customColor, customGradient, glassMode, settingsInitialized]);
+  }, [theme, accentColor, customColor, customGradient, settingsInitialized]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -871,8 +863,6 @@ const Index = () => {
                       onCustomColorChange={setCustomColor}
                       customGradient={customGradient}
                       onCustomGradientChange={setCustomGradient}
-                      glassMode={glassMode}
-                      onGlassModeChange={setGlassMode}
                     />
                   </Suspense>
                 </PageTransition>

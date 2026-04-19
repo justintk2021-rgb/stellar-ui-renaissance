@@ -1,0 +1,1 @@
+ALTER TABLE public.user_settings DROP COLUMN IF EXISTS glass_mode;
