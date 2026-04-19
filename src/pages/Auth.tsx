@@ -244,12 +244,15 @@ export function AuthPage() {
 
     try {
       if (isLogin) {
+        // Set ref BEFORE awaiting so the auth listener doesn't navigate first
+        showLoaderRef.current = true;
         const { data, error } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
 
         if (error) {
+          showLoaderRef.current = false;
           toast.error(error.message);
         } else {
           // Pull a friendly first name from profile (best-effort, non-blocking).
@@ -265,6 +268,7 @@ export function AuthPage() {
           setShowLoader(true);
         }
       } else {
+        showLoaderRef.current = true;
         const { error } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
@@ -278,6 +282,7 @@ export function AuthPage() {
         });
 
         if (error) {
+          showLoaderRef.current = false;
           toast.error(error.message);
         } else {
           setLoaderName(formData.firstName);
@@ -285,6 +290,7 @@ export function AuthPage() {
         }
       }
     } catch (error: any) {
+      showLoaderRef.current = false;
       toast.error(error.message || "An error occurred");
     } finally {
       setIsLoading(false);
