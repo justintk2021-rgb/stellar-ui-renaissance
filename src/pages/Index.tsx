@@ -135,25 +135,35 @@ const Index = () => {
       if (!connections?.length) return;
 
       setBrokerSyncing(true);
-      // Fire all syncs in parallel — swallow errors silently (e.g. expired sessions).
-      // On 401, mark connection as expired so we stop retrying it.
+      // Use raw fetch to bypass the SDK's throw-on-non-2xx behavior, which
+      // otherwise surfaces as an uncaught runtime error in the dev overlay.
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
+      const anonKey = (import.meta as any).env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
       await Promise.allSettled(
         connections.map(async (conn) => {
           try {
-            const { error } = await supabase.functions.invoke('tradelocker', {
-              body: { action: 'sync', connectionId: conn.id },
+            const res = await fetch(`${supabaseUrl}/functions/v1/tradelocker`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                apikey: anonKey,
+                Authorization: `Bearer ${token ?? anonKey}`,
+              },
+              body: JSON.stringify({ action: 'sync', connectionId: conn.id }),
             });
-            if (error) {
-              const msg = String(error.message || '');
-              if (msg.includes('401') || /invalid|expired session/i.test(msg)) {
-                await supabase
-                  .from('broker_connections')
-                  .update({ connection_status: 'expired' })
-                  .eq('id', conn.id);
-              }
+            if (res.status === 401) {
+              await supabase
+                .from('broker_connections')
+                .update({ connection_status: 'expired' })
+                .eq('id', conn.id);
             }
+            // Drain the body so the connection can be reused; ignore content.
+            try { await res.text(); } catch {}
           } catch {
-            // Silently ignore — surfaced via Broker Management UI instead.
+            // Network errors silently ignored — surfaced via Broker Management UI.
           }
         })
       );
