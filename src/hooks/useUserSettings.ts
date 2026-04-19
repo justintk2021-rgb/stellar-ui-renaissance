@@ -17,7 +17,6 @@ interface UserSettings {
   customGradient: CustomGradient | null;
   sidebarCollapsed: boolean;
   notebookFont: string;
-  glassMode: boolean;
 }
 
 interface DbUserSettings {
@@ -39,7 +38,6 @@ const defaultSettings: UserSettings = {
   customGradient: null,
   sidebarCollapsed: false,
   notebookFont: 'inter',
-  glassMode: false,
 };
 
 export function useUserSettings(userId: string | undefined) {
@@ -66,7 +64,6 @@ export function useUserSettings(userId: string | undefined) {
         customGradient: localGradient ? JSON.parse(localGradient) : null,
         sidebarCollapsed: localSidebar ? JSON.parse(localSidebar) : false,
         notebookFont: 'inter',
-        glassMode: false,
       });
       setIsLoading(false);
       setIsInitialized(true);
@@ -90,7 +87,6 @@ export function useUserSettings(userId: string | undefined) {
           customGradient: data.custom_gradient as unknown as CustomGradient | null,
           sidebarCollapsed: data.sidebar_collapsed,
           notebookFont: (data as any).notebook_font || 'inter',
-          glassMode: (data as any).glass_mode ?? false,
         });
         
         // Clear localStorage after successful fetch from DB
@@ -128,7 +124,6 @@ export function useUserSettings(userId: string | undefined) {
       customGradient: localGradient ? JSON.parse(localGradient) : null,
       sidebarCollapsed: localSidebar ? JSON.parse(localSidebar) : false,
       notebookFont: 'inter',
-      glassMode: false,
     };
 
     try {
@@ -142,8 +137,7 @@ export function useUserSettings(userId: string | undefined) {
           custom_gradient: migratedSettings.customGradient ? JSON.parse(JSON.stringify(migratedSettings.customGradient)) : null,
           sidebar_collapsed: migratedSettings.sidebarCollapsed,
           notebook_font: migratedSettings.notebookFont,
-          glass_mode: migratedSettings.glassMode,
-        } as any]);
+        }]);
 
       if (error) throw error;
 
@@ -195,7 +189,6 @@ export function useUserSettings(userId: string | undefined) {
             customGradient: payload.new.custom_gradient as unknown as CustomGradient | null,
             sidebarCollapsed: payload.new.sidebar_collapsed,
             notebookFont: payload.new.notebook_font || 'inter',
-            glassMode: (payload.new as any).glass_mode ?? false,
           });
         }
       )
@@ -226,8 +219,7 @@ export function useUserSettings(userId: string | undefined) {
           custom_gradient: newSettings.customGradient ? JSON.parse(JSON.stringify(newSettings.customGradient)) : null,
           sidebar_collapsed: newSettings.sidebarCollapsed,
           notebook_font: newSettings.notebookFont,
-          glass_mode: newSettings.glassMode,
-        } as any], {
+        }], {
           onConflict: 'user_id',
         });
 
@@ -246,14 +238,13 @@ export function useUserSettings(userId: string | undefined) {
       const newSettings = { ...prev, [key]: value };
 
       // Apply visual settings immediately + cache for cross-page sync
-      const visualKeys: Array<keyof UserSettings> = ['theme', 'accentColor', 'customColor', 'customGradient', 'glassMode'];
+      const visualKeys: Array<keyof UserSettings> = ['theme', 'accentColor', 'customColor', 'customGradient'];
       if (visualKeys.includes(key)) {
         const applied = {
           theme: newSettings.theme,
           accentColor: newSettings.accentColor,
           customColor: newSettings.customColor,
           customGradient: newSettings.customGradient,
-          glassMode: newSettings.glassMode,
         };
         applySettingsToDocument(applied);
         writeSettingsCache(applied);
@@ -293,6 +284,5 @@ export function useUserSettings(userId: string | undefined) {
     setCustomGradient: (gradient: CustomGradient | null) => updateSetting('customGradient', gradient),
     setSidebarCollapsed: (collapsed: boolean) => updateSetting('sidebarCollapsed', collapsed),
     setNotebookFont: (font: string) => updateSetting('notebookFont', font),
-    setGlassMode: (enabled: boolean) => updateSetting('glassMode', enabled),
   };
 }

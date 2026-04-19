@@ -32,7 +32,6 @@ interface AppliedSettings {
   accentColor?: string;
   customColor?: string | null;
   customGradient?: { from: string; to: string } | null;
-  glassMode?: boolean;
 }
 
 export function applySettingsToDocument(s: AppliedSettings) {
@@ -44,13 +43,6 @@ export function applySettingsToDocument(s: AppliedSettings) {
   const accent = s.accentColor || 'emerald';
   ACCENT_CLASSES.forEach(cls => root.classList.remove(cls));
   root.classList.add(`accent-${accent}`);
-
-  // Glass / translucent UI mode
-  if (s.glassMode) {
-    root.classList.add('glass-mode');
-  } else {
-    root.classList.remove('glass-mode');
-  }
 
   if (accent !== 'custom') {
     root.style.removeProperty('--primary');
@@ -133,7 +125,7 @@ export function useApplyGlobalSettings() {
       try {
         const { data } = await supabase
           .from('user_settings')
-          .select('theme, accent_color, custom_color, custom_gradient, glass_mode')
+          .select('theme, accent_color, custom_color, custom_gradient')
           .eq('user_id', userId)
           .maybeSingle();
         if (cancelled || !data) return;
@@ -142,7 +134,6 @@ export function useApplyGlobalSettings() {
           accentColor: data.accent_color,
           customColor: data.custom_color,
           customGradient: data.custom_gradient as { from: string; to: string } | null,
-          glassMode: (data as any).glass_mode ?? false,
         };
         applySettingsToDocument(applied);
         writeCache(applied);
@@ -166,7 +157,6 @@ export function useApplyGlobalSettings() {
             accentColor: row.accent_color as string,
             customColor: row.custom_color as string | null,
             customGradient: row.custom_gradient as { from: string; to: string } | null,
-            glassMode: (row.glass_mode as boolean) ?? false,
           };
           applySettingsToDocument(applied);
           writeCache(applied);
