@@ -82,6 +82,8 @@ interface SettingsViewProps {
   onCustomColorChange?: (color: string) => void;
   customGradient?: CustomGradient | null;
   onCustomGradientChange?: (gradient: CustomGradient | null) => void;
+  glassMode?: boolean;
+  onGlassModeChange?: (enabled: boolean) => void;
 }
 
 const accentColors: { name: AccentColor; label: string; color: string; darkColor: string; hex: string }[] = [
@@ -225,6 +227,8 @@ export function SettingsView({
   onCustomColorChange,
   customGradient: propCustomGradient,
   onCustomGradientChange,
+  glassMode = false,
+  onGlassModeChange,
 }: SettingsViewProps) {
   const [activeSection, setActiveSection] = useState<SettingsSection>('account');
   const [presets, setPresets] = useState<SettingsPreset[]>([]);
