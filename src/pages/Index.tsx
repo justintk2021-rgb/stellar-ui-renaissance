@@ -418,7 +418,14 @@ const Index = () => {
         document.documentElement.style.setProperty('--sidebar-ring', hsl);
       }
     }
-  }, [theme, accentColor, customColor, customGradient, settingsInitialized]);
+
+    // Glass / translucent UI mode
+    if (glassMode) {
+      document.documentElement.classList.add('glass-mode');
+    } else {
+      document.documentElement.classList.remove('glass-mode');
+    }
+  }, [theme, accentColor, customColor, customGradient, glassMode, settingsInitialized]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
