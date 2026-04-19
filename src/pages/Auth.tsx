@@ -286,13 +286,22 @@ export function AuthPage() {
   };
 
   return (
-    <motion.div
-      variants={pageVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className="min-h-screen relative overflow-hidden flex items-center justify-center bg-black"
-    >
+    <>
+      <AnimatePresence>
+        {showLoader && (
+          <LoginLoader
+            name={loaderName}
+            onComplete={() => navigate("/dashboard")}
+          />
+        )}
+      </AnimatePresence>
+      <motion.div
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        className="min-h-screen relative overflow-hidden flex items-center justify-center bg-black"
+      >
       {/* 3D Canvas Background */}
       <div className="absolute inset-0 z-0">
         <Canvas camera={{ position: [0, 0, 6], fov: 50 }}>
