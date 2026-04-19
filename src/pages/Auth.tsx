@@ -610,5 +610,6 @@ export function AuthPage() {
         </motion.p>
       </div>
     </motion.div>
+    </>
   );
 }
