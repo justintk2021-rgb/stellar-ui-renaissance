@@ -238,15 +238,25 @@ export function AuthPage() {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
-        
+
         if (error) {
           toast.error(error.message);
         } else {
-          toast.success("Welcome back!");
+          // Pull a friendly first name from profile (best-effort, non-blocking).
+          const userId = data.user?.id;
+          if (userId) {
+            supabase
+              .from("profiles")
+              .select("first_name")
+              .eq("user_id", userId)
+              .maybeSingle()
+              .then(({ data: p }) => setLoaderName(p?.first_name || undefined));
+          }
+          setShowLoader(true);
         }
       } else {
         const { error } = await supabase.auth.signUp({
@@ -260,11 +270,12 @@ export function AuthPage() {
             },
           },
         });
-        
+
         if (error) {
           toast.error(error.message);
         } else {
-          toast.success("Account created successfully!");
+          setLoaderName(formData.firstName);
+          setShowLoader(true);
         }
       }
     } catch (error: any) {
