@@ -129,6 +129,7 @@ const Index = () => {
         .from('broker_connections')
         .select('id')
         .eq('user_id', user.id)
+        .eq('platform', 'tradelocker')
         .eq('connection_status', 'connected');
 
       if (!connections?.length) return;
