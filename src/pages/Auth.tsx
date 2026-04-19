@@ -174,6 +174,12 @@ export function AuthPage() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showLoader, setShowLoader] = useState(false);
   const [loaderName, setLoaderName] = useState<string | undefined>(undefined);
+  const showLoaderRef = useRef(false);
+
+  // Keep ref in sync so the auth listener always sees the latest value
+  useEffect(() => {
+    showLoaderRef.current = showLoader;
+  }, [showLoader]);
 
   const handleForgotPassword = async () => {
     if (!formData.email || !formData.email.includes("@")) {
