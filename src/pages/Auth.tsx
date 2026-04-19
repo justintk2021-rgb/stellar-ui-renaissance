@@ -172,6 +172,8 @@ export function AuthPage() {
     password: "",
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [showLoader, setShowLoader] = useState(false);
+  const [loaderName, setLoaderName] = useState<string | undefined>(undefined);
 
   const handleForgotPassword = async () => {
     if (!formData.email || !formData.email.includes("@")) {
