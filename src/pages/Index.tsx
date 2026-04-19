@@ -290,9 +290,10 @@ const Index = () => {
     setCustomGradient,
     setSidebarCollapsed,
     setNotebookFont,
+    setGlassMode,
   } = useUserSettings(user?.id);
   
-  const { theme, accentColor, customColor, customGradient, sidebarCollapsed, notebookFont } = settings;
+  const { theme, accentColor, customColor, customGradient, sidebarCollapsed, notebookFont, glassMode } = settings;
   
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
@@ -863,6 +864,8 @@ const Index = () => {
                       onCustomColorChange={setCustomColor}
                       customGradient={customGradient}
                       onCustomGradientChange={setCustomGradient}
+                      glassMode={glassMode}
+                      onGlassModeChange={setGlassMode}
                     />
                   </Suspense>
                 </PageTransition>
