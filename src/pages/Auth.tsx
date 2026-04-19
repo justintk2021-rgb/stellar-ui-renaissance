@@ -205,7 +205,7 @@ export function AuthPage() {
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session && !showLoader) {
+      if (session && !showLoaderRef.current) {
         navigate("/dashboard");
       }
     };
@@ -213,13 +213,13 @@ export function AuthPage() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // Don't auto-navigate while the cinematic loader is playing — it owns the redirect.
-      if (session && !showLoader) {
+      if (session && !showLoaderRef.current) {
         navigate("/dashboard");
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, showLoader]);
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
