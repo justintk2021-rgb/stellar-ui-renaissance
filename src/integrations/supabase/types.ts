@@ -892,6 +892,7 @@ export type Database = {
           created_at: string
           custom_color: string | null
           custom_gradient: Json | null
+          glass_mode: boolean
           id: string
           notebook_font: string | null
           sidebar_collapsed: boolean
@@ -904,6 +905,7 @@ export type Database = {
           created_at?: string
           custom_color?: string | null
           custom_gradient?: Json | null
+          glass_mode?: boolean
           id?: string
           notebook_font?: string | null
           sidebar_collapsed?: boolean
@@ -916,6 +918,7 @@ export type Database = {
           created_at?: string
           custom_color?: string | null
           custom_gradient?: Json | null
+          glass_mode?: boolean
           id?: string
           notebook_font?: string | null
           sidebar_collapsed?: boolean
