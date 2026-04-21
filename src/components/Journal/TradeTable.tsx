@@ -833,7 +833,6 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                   trades={groupedTrades[date]}
                   notebookEntries={notebookEntries}
                   checklists={checklists}
-                  brokerTimes={brokerTimes}
                   now={now}
                   onEdit={onEdit}
                   onDelete={onDelete}
