@@ -610,28 +610,27 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, brokerTimes,
                     </div>
                     </div>
                     {/* Time + Duration row (for imported broker trades) */}
-                    {trade.importedFromBroker && brokerTimes[trade.id] && (() => {
-                      const t = brokerTimes[trade.id];
-                      const openMs = t.openTime ? new Date(t.openTime).getTime() : NaN;
-                      const closeMs = t.closeTime ? new Date(t.closeTime).getTime() : null;
+                    {trade.importedFromBroker && (trade.openTime || trade.closeTime) && (() => {
+                      const openMs = trade.openTime ? new Date(trade.openTime).getTime() : NaN;
+                      const closeMs = trade.closeTime ? new Date(trade.closeTime).getTime() : null;
                       const isOpen = !closeMs;
                       const durationMs = isOpen
                         ? (isFinite(openMs) ? now - openMs : NaN)
                         : (isFinite(openMs) && closeMs ? closeMs - openMs : NaN);
                       return (
                         <div className="flex items-center gap-4 mt-1.5 flex-wrap">
-                          {t.openTime && (
+                          {trade.openTime && (
                             <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
                               <LogIn className="w-3 h-3 opacity-60" />
                               <span className="opacity-60">Open:</span>{' '}
-                              <span className="font-mono font-medium text-foreground">{formatTimestamp(t.openTime)}</span>
+                              <span className="font-mono font-medium text-foreground">{formatTimestamp(trade.openTime)}</span>
                             </span>
                           )}
-                          {t.closeTime ? (
+                          {trade.closeTime ? (
                             <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
                               <LogOut className="w-3 h-3 opacity-60" />
                               <span className="opacity-60">Close:</span>{' '}
-                              <span className="font-mono font-medium text-foreground">{formatTimestamp(t.closeTime)}</span>
+                              <span className="font-mono font-medium text-foreground">{formatTimestamp(trade.closeTime)}</span>
                             </span>
                           ) : (
                             <span className="text-[11px] text-primary inline-flex items-center gap-1">
