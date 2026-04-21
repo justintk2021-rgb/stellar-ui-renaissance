@@ -367,7 +367,6 @@ interface TradeRowGroupProps {
   trades: Trade[];
   notebookEntries: NotebookEntry[];
   checklists: Checklist[];
-  brokerTimes: Record<string, BrokerTimes>;
   now: number;
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
@@ -377,7 +376,7 @@ interface TradeRowGroupProps {
   onToggle: () => void;
 }
 
-function TradeRowGroup({ date, trades, notebookEntries, checklists, brokerTimes, now, onEdit, onDelete, onViewNotes, index, isExpanded, onToggle }: TradeRowGroupProps) {
+function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit, onDelete, onViewNotes, index, isExpanded, onToggle }: TradeRowGroupProps) {
   const metrics = calculateGroupMetrics(trades);
   const isProfit = metrics.grossPnL >= 0;
 
