@@ -658,16 +658,40 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
   const [dayTrades, setDayTrades] = useState<Trade[] | null>(null);
   const [notesView, setNotesView] = useState<'list' | 'note'>('list');
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriod>("all");
+  const [historySymbol, setHistorySymbol] = useState<string>("__all__");
+  const [historyOpen, setHistoryOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const groupedTrades = groupTradesByDate(trades);
+  const availableSymbols = useMemo(() => {
+    const set = new Set<string>();
+    trades.forEach(t => { if (t.pair) set.add(t.pair); });
+    return Array.from(set).sort();
+  }, [trades]);
+
+  const filteredTrades = useMemo(() => {
+    const cutoff = getPeriodCutoff(historyPeriod);
+    return trades.filter(t => {
+      if (historySymbol !== "__all__" && t.pair !== historySymbol) return false;
+      if (cutoff) {
+        const td = new Date(t.date);
+        if (isNaN(td.getTime()) || td < cutoff) return false;
+      }
+      return true;
+    });
+  }, [trades, historyPeriod, historySymbol]);
+
+  const isFilterActive = historyPeriod !== "all" || historySymbol !== "__all__";
+  const activePeriodLabel = PERIOD_OPTIONS.find(p => p.value === historyPeriod)?.label ?? "All time";
+
+  const groupedTrades = groupTradesByDate(filteredTrades);
   const sortedDates = Object.keys(groupedTrades).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
   // Tick once per second so durations of still-open imported positions update
   // in real time when a row is expanded.
   const hasOpenImported = useMemo(
-    () => trades.some(t => t.importedFromBroker && t.openTime && !t.closeTime),
-    [trades]
+    () => filteredTrades.some(t => t.importedFromBroker && t.openTime && !t.closeTime),
+    [filteredTrades]
   );
   const now = useNowTicker(expandedDate !== null && hasOpenImported, 1000);
 
