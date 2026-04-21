@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, Trophy, Target, ClipboardCheck, ArrowLeft, Clock, LogIn, LogOut, Timer } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
