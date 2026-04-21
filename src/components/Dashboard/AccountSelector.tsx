@@ -65,6 +65,9 @@ export const AccountSelector = ({
   const [selectedBrokerAccount, setSelectedBrokerAccount] = useState<string | null>(() => {
     return localStorage.getItem('selectedBrokerInternalId') || null;
   });
+  const [defaultChoice, setDefaultChoice] = useState<string | null>(() => {
+    return localStorage.getItem('defaultDashboardAccount') || null;
+  });
   const [isRenameBrokerOpen, setIsRenameBrokerOpen] = useState(false);
   const [renamingBroker, setRenamingBroker] = useState<BrokerAccountInfo | null>(null);
   const [brokerDisplayName, setBrokerDisplayName] = useState("");
@@ -113,16 +116,24 @@ export const AccountSelector = ({
 
       setBrokerAccounts(brokerAccs);
 
-      // Restore persisted broker selection
+      // Restore persisted broker selection — fall back to default-broker if no live selection.
       const persistedBrokerId = localStorage.getItem('selectedBrokerInternalId');
-      if (persistedBrokerId) {
-        const match = brokerAccs.find(b => `broker-${b.connectionId}-${b.accNum}` === persistedBrokerId);
+      const storedDefault = localStorage.getItem('defaultDashboardAccount');
+      let defaultBrokerId: string | null = null;
+      if (storedDefault?.startsWith('broker:')) {
+        const [, connId, accNumStr] = storedDefault.split(':');
+        if (connId && accNumStr) defaultBrokerId = `broker-${connId}-${accNumStr}`;
+      }
+      const targetBrokerId = persistedBrokerId || defaultBrokerId;
+
+      if (targetBrokerId) {
+        const match = brokerAccs.find(b => `broker-${b.connectionId}-${b.accNum}` === targetBrokerId);
         if (match) {
-          setSelectedBrokerAccount(persistedBrokerId);
+          setSelectedBrokerAccount(targetBrokerId);
+          localStorage.setItem('selectedBrokerInternalId', targetBrokerId);
           localStorage.setItem('activeBrokerConnectionId', match.connectionId);
           onSelectBrokerAccount?.(match.accountId);
-        } else {
-          // Persisted broker no longer exists, clear it
+        } else if (persistedBrokerId) {
           localStorage.removeItem('selectedBrokerInternalId');
           setSelectedBrokerAccount(null);
         }
@@ -196,6 +207,25 @@ export const AccountSelector = ({
     onSelectBrokerAccount?.(broker.accountId);
   };
 
+  const setManualDefault = (accountId: string) => {
+    const key = `manual:${accountId}`;
+    localStorage.setItem('defaultDashboardAccount', key);
+    setDefaultChoice(key);
+    onSetDefault(accountId);
+  };
+
+  const setBrokerDefault = (broker: BrokerAccountInfo) => {
+    const key = `broker:${broker.connectionId}:${broker.accNum}`;
+    localStorage.setItem('defaultDashboardAccount', key);
+    setDefaultChoice(key);
+  };
+
+  const isManualDefault = (accountId: string) =>
+    defaultChoice === `manual:${accountId}` || (!defaultChoice && accounts.find(a => a.id === accountId)?.is_default);
+
+  const isBrokerDefault = (broker: BrokerAccountInfo) =>
+    defaultChoice === `broker:${broker.connectionId}:${broker.accNum}`;
+
   const openRenameBroker = (broker: BrokerAccountInfo) => {
     setRenamingBroker(broker);
     setBrokerDisplayName(broker.accountName);
@@ -229,11 +259,18 @@ export const AccountSelector = ({
             className="gap-2 min-w-[180px] justify-between bg-background/50 border-border/50"
           >
             <div className="flex items-center gap-2 truncate">
-              {isBrokerSelected ? (
-                <Link2 className="w-3 h-3 text-primary shrink-0" />
-              ) : selectedAccount?.is_default ? (
-                <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
-              ) : null}
+              {(() => {
+                let isDefault = false;
+                if (isBrokerSelected && selectedBrokerAccount) {
+                  const broker = brokerAccounts.find(b => `broker-${b.connectionId}-${b.accNum}` === selectedBrokerAccount);
+                  if (broker) isDefault = isBrokerDefault(broker);
+                } else if (selectedAccount) {
+                  isDefault = !!isManualDefault(selectedAccount.id);
+                }
+                if (isDefault) return <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />;
+                if (isBrokerSelected) return <Link2 className="w-3 h-3 text-primary shrink-0" />;
+                return null;
+              })()}
               <span className="truncate">{displayName}</span>
             </div>
             <ChevronDown className="w-4 h-4 shrink-0 opacity-50" />
@@ -244,39 +281,54 @@ export const AccountSelector = ({
           <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
             Manual Accounts
           </DropdownMenuLabel>
-          {accounts.map((account) => (
-            <DropdownMenuItem
-              key={account.id}
-              className="flex items-center justify-between cursor-pointer"
-              onClick={() => handleSelectManualAccount(account.id)}
-            >
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {account.is_default && (
-                  <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
-                )}
-                <span className="truncate">{account.name}</span>
-                {account.broker && (
-                  <span className="text-xs text-muted-foreground truncate">({account.broker})</span>
-                )}
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {!isBrokerSelected && selectedAccount?.id === account.id && (
-                  <Check className="w-4 h-4 text-primary" />
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openEditDialog(account);
-                  }}
-                >
-                  <Settings className="w-3 h-3" />
-                </Button>
-              </div>
-            </DropdownMenuItem>
-          ))}
+          {accounts.map((account) => {
+            const isDefault = isManualDefault(account.id);
+            return (
+              <DropdownMenuItem
+                key={account.id}
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => handleSelectManualAccount(account.id)}
+              >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {isDefault && (
+                    <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
+                  )}
+                  <span className="truncate">{account.name}</span>
+                  {account.broker && (
+                    <span className="text-xs text-muted-foreground truncate">({account.broker})</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {!isBrokerSelected && selectedAccount?.id === account.id && (
+                    <Check className="w-4 h-4 text-primary" />
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    title={isDefault ? "Default account" : "Set as default"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setManualDefault(account.id);
+                    }}
+                  >
+                    <Star className={cn("w-3 h-3", isDefault ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground")} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEditDialog(account);
+                    }}
+                  >
+                    <Settings className="w-3 h-3" />
+                  </Button>
+                </div>
+              </DropdownMenuItem>
+            );
+          })}
 
           {/* Broker-Connected Accounts */}
           {brokerAccounts.length > 0 && (
@@ -288,6 +340,7 @@ export const AccountSelector = ({
               </DropdownMenuLabel>
               {brokerAccounts.map((broker) => {
                 const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
+                const isDefault = isBrokerDefault(broker);
                 return (
                   <DropdownMenuItem
                     key={brokerId}
@@ -295,7 +348,11 @@ export const AccountSelector = ({
                     onClick={() => handleSelectBrokerAccount(broker)}
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <Link2 className="w-3 h-3 text-primary shrink-0" />
+                      {isDefault ? (
+                        <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
+                      ) : (
+                        <Link2 className="w-3 h-3 text-primary shrink-0" />
+                      )}
                       <div className="flex flex-col min-w-0">
                         <span className="truncate text-sm">{broker.accountName}</span>
                         <span className="text-[10px] text-muted-foreground truncate">
@@ -308,6 +365,18 @@ export const AccountSelector = ({
                       {selectedBrokerAccount === brokerId && (
                         <Check className="w-4 h-4 text-primary" />
                       )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        title={isDefault ? "Default account" : "Set as default"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBrokerDefault(broker);
+                        }}
+                      >
+                        <Star className={cn("w-3 h-3", isDefault ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground")} />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
