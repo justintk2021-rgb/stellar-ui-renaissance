@@ -340,6 +340,7 @@ export const AccountSelector = ({
               </DropdownMenuLabel>
               {brokerAccounts.map((broker) => {
                 const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
+                const isDefault = isBrokerDefault(broker);
                 return (
                   <DropdownMenuItem
                     key={brokerId}
@@ -347,7 +348,11 @@ export const AccountSelector = ({
                     onClick={() => handleSelectBrokerAccount(broker)}
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <Link2 className="w-3 h-3 text-primary shrink-0" />
+                      {isDefault ? (
+                        <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
+                      ) : (
+                        <Link2 className="w-3 h-3 text-primary shrink-0" />
+                      )}
                       <div className="flex flex-col min-w-0">
                         <span className="truncate text-sm">{broker.accountName}</span>
                         <span className="text-[10px] text-muted-foreground truncate">
@@ -360,6 +365,18 @@ export const AccountSelector = ({
                       {selectedBrokerAccount === brokerId && (
                         <Check className="w-4 h-4 text-primary" />
                       )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        title={isDefault ? "Default account" : "Set as default"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBrokerDefault(broker);
+                        }}
+                      >
+                        <Star className={cn("w-3 h-3", isDefault ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground")} />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
