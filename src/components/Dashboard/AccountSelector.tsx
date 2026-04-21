@@ -259,14 +259,18 @@ export const AccountSelector = ({
             className="gap-2 min-w-[180px] justify-between bg-background/50 border-border/50"
           >
             <div className="flex items-center gap-2 truncate">
-              {(isBrokerSelected
-                ? selectedBrokerAccount && defaultChoice === `broker:${selectedBrokerAccount.replace('broker-', '').replace('-', ':')}`
-                : selectedAccount && (defaultChoice === `manual:${selectedAccount.id}` || (!defaultChoice && selectedAccount.is_default))
-              ) ? (
-                <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
-              ) : isBrokerSelected ? (
-                <Link2 className="w-3 h-3 text-primary shrink-0" />
-              ) : null}
+              {(() => {
+                let isDefault = false;
+                if (isBrokerSelected && selectedBrokerAccount) {
+                  const broker = brokerAccounts.find(b => `broker-${b.connectionId}-${b.accNum}` === selectedBrokerAccount);
+                  if (broker) isDefault = isBrokerDefault(broker);
+                } else if (selectedAccount) {
+                  isDefault = !!isManualDefault(selectedAccount.id);
+                }
+                if (isDefault) return <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />;
+                if (isBrokerSelected) return <Link2 className="w-3 h-3 text-primary shrink-0" />;
+                return null;
+              })()}
               <span className="truncate">{displayName}</span>
             </div>
             <ChevronDown className="w-4 h-4 shrink-0 opacity-50" />
