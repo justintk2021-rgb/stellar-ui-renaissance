@@ -65,6 +65,9 @@ export const AccountSelector = ({
   const [selectedBrokerAccount, setSelectedBrokerAccount] = useState<string | null>(() => {
     return localStorage.getItem('selectedBrokerInternalId') || null;
   });
+  const [defaultChoice, setDefaultChoice] = useState<string | null>(() => {
+    return localStorage.getItem('defaultDashboardAccount') || null;
+  });
   const [isRenameBrokerOpen, setIsRenameBrokerOpen] = useState(false);
   const [renamingBroker, setRenamingBroker] = useState<BrokerAccountInfo | null>(null);
   const [brokerDisplayName, setBrokerDisplayName] = useState("");
@@ -113,16 +116,24 @@ export const AccountSelector = ({
 
       setBrokerAccounts(brokerAccs);
 
-      // Restore persisted broker selection
+      // Restore persisted broker selection — fall back to default-broker if no live selection.
       const persistedBrokerId = localStorage.getItem('selectedBrokerInternalId');
-      if (persistedBrokerId) {
-        const match = brokerAccs.find(b => `broker-${b.connectionId}-${b.accNum}` === persistedBrokerId);
+      const storedDefault = localStorage.getItem('defaultDashboardAccount');
+      let defaultBrokerId: string | null = null;
+      if (storedDefault?.startsWith('broker:')) {
+        const [, connId, accNumStr] = storedDefault.split(':');
+        if (connId && accNumStr) defaultBrokerId = `broker-${connId}-${accNumStr}`;
+      }
+      const targetBrokerId = persistedBrokerId || defaultBrokerId;
+
+      if (targetBrokerId) {
+        const match = brokerAccs.find(b => `broker-${b.connectionId}-${b.accNum}` === targetBrokerId);
         if (match) {
-          setSelectedBrokerAccount(persistedBrokerId);
+          setSelectedBrokerAccount(targetBrokerId);
+          localStorage.setItem('selectedBrokerInternalId', targetBrokerId);
           localStorage.setItem('activeBrokerConnectionId', match.connectionId);
           onSelectBrokerAccount?.(match.accountId);
-        } else {
-          // Persisted broker no longer exists, clear it
+        } else if (persistedBrokerId) {
           localStorage.removeItem('selectedBrokerInternalId');
           setSelectedBrokerAccount(null);
         }
