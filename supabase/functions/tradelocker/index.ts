@@ -836,6 +836,8 @@ serve(async (req) => {
               execution_type: 'market',
               open_price: entryPrice,
               close_price: exitPrice || null,
+              open_time: openedAt,
+              close_time: closedAt,
               swap: orderSwap,
               commission: orderCommission,
             }).eq('id', existingJournal.id);
@@ -859,6 +861,8 @@ serve(async (req) => {
               execution_type: 'market',
               open_price: entryPrice,
               close_price: exitPrice || null,
+              open_time: openedAt,
+              close_time: closedAt,
               swap: orderSwap,
               commission: orderCommission,
             });
