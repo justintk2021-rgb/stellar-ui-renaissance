@@ -3,7 +3,7 @@ import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, Trophy, Target, ClipboardCheck, ArrowLeft, Clock, LogIn, LogOut, Timer } from "lucide-react";
+import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, Trophy, Target, ClipboardCheck, ArrowLeft, Clock, LogIn, LogOut, Timer, Check, History } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
@@ -12,7 +12,33 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { motion, AnimatePresence } from "framer-motion";
+
+type HistoryPeriod = "all" | "week" | "month" | "3months" | "6months" | "year";
+
+const PERIOD_OPTIONS: { value: HistoryPeriod; label: string }[] = [
+  { value: "all", label: "All time" },
+  { value: "week", label: "Last week" },
+  { value: "month", label: "Last month" },
+  { value: "3months", label: "Last 3 months" },
+  { value: "6months", label: "Last 6 months" },
+  { value: "year", label: "Last year" },
+];
+
+function getPeriodCutoff(period: HistoryPeriod): Date | null {
+  if (period === "all") return null;
+  const now = new Date();
+  const d = new Date(now);
+  switch (period) {
+    case "week": d.setDate(d.getDate() - 7); break;
+    case "month": d.setMonth(d.getMonth() - 1); break;
+    case "3months": d.setMonth(d.getMonth() - 3); break;
+    case "6months": d.setMonth(d.getMonth() - 6); break;
+    case "year": d.setFullYear(d.getFullYear() - 1); break;
+  }
+  return d;
+}
 
 interface Checklist {
   id: string;
