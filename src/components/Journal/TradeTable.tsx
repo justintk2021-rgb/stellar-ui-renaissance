@@ -721,11 +721,14 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
             {trades.length > 0 && onClearAll && (
               <ConfirmDialog
                 trigger={
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Button variant="ghost" size="sm" className="text-xs text-destructive hover:bg-destructive/10 hover:text-destructive">
-                      Clear All
-                    </Button>
-                  </motion.div>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="w-9 h-9 rounded-full bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors"
+                    aria-label="Clear all trades"
+                  >
+                    <Clock className="w-4 h-4 text-foreground" />
+                  </motion.button>
                 }
                 title="Delete All Trades"
                 description="This will permanently delete all your trades. This action cannot be undone."
@@ -734,9 +737,6 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                 onConfirm={onClearAll}
               />
             )}
-            <Badge variant="secondary" className="text-[10px] px-2.5 py-0.5 bg-muted/50">
-              {trades.length} {trades.length === 1 ? 'Trade' : 'Trades'}
-            </Badge>
           </div>
         </div>
 
