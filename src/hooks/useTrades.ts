@@ -61,6 +61,8 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         commission: t.commission != null ? Number(t.commission) : undefined,
         openPrice: t.open_price != null ? Number(t.open_price) : undefined,
         closePrice: t.close_price != null ? Number(t.close_price) : undefined,
+        openTime: t.open_time || undefined,
+        closeTime: t.close_time || undefined,
       }));
 
       setTrades(formattedTrades);
