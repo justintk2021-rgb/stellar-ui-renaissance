@@ -259,10 +259,13 @@ export const AccountSelector = ({
             className="gap-2 min-w-[180px] justify-between bg-background/50 border-border/50"
           >
             <div className="flex items-center gap-2 truncate">
-              {isBrokerSelected ? (
-                <Link2 className="w-3 h-3 text-primary shrink-0" />
-              ) : selectedAccount?.is_default ? (
+              {(isBrokerSelected
+                ? selectedBrokerAccount && defaultChoice === `broker:${selectedBrokerAccount.replace('broker-', '').replace('-', ':')}`
+                : selectedAccount && (defaultChoice === `manual:${selectedAccount.id}` || (!defaultChoice && selectedAccount.is_default))
+              ) ? (
                 <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
+              ) : isBrokerSelected ? (
+                <Link2 className="w-3 h-3 text-primary shrink-0" />
               ) : null}
               <span className="truncate">{displayName}</span>
             </div>
