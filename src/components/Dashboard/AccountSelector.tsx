@@ -281,39 +281,54 @@ export const AccountSelector = ({
           <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
             Manual Accounts
           </DropdownMenuLabel>
-          {accounts.map((account) => (
-            <DropdownMenuItem
-              key={account.id}
-              className="flex items-center justify-between cursor-pointer"
-              onClick={() => handleSelectManualAccount(account.id)}
-            >
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {account.is_default && (
-                  <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
-                )}
-                <span className="truncate">{account.name}</span>
-                {account.broker && (
-                  <span className="text-xs text-muted-foreground truncate">({account.broker})</span>
-                )}
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {!isBrokerSelected && selectedAccount?.id === account.id && (
-                  <Check className="w-4 h-4 text-primary" />
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openEditDialog(account);
-                  }}
-                >
-                  <Settings className="w-3 h-3" />
-                </Button>
-              </div>
-            </DropdownMenuItem>
-          ))}
+          {accounts.map((account) => {
+            const isDefault = isManualDefault(account.id);
+            return (
+              <DropdownMenuItem
+                key={account.id}
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => handleSelectManualAccount(account.id)}
+              >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {isDefault && (
+                    <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
+                  )}
+                  <span className="truncate">{account.name}</span>
+                  {account.broker && (
+                    <span className="text-xs text-muted-foreground truncate">({account.broker})</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {!isBrokerSelected && selectedAccount?.id === account.id && (
+                    <Check className="w-4 h-4 text-primary" />
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    title={isDefault ? "Default account" : "Set as default"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setManualDefault(account.id);
+                    }}
+                  >
+                    <Star className={cn("w-3 h-3", isDefault ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground")} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEditDialog(account);
+                    }}
+                  >
+                    <Settings className="w-3 h-3" />
+                  </Button>
+                </div>
+              </DropdownMenuItem>
+            );
+          })}
 
           {/* Broker-Connected Accounts */}
           {brokerAccounts.length > 0 && (
