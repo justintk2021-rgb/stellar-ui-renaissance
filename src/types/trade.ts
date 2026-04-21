@@ -52,6 +52,8 @@ export interface Trade {
   commission?: number;
   openPrice?: number;
   closePrice?: number;
+  openTime?: string;
+  closeTime?: string;
 }
 
 export interface DailyStats {

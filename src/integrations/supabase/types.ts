@@ -746,6 +746,7 @@ export type Database = {
           checklist_id: string | null
           checklist_state: Json | null
           close_price: number | null
+          close_time: string | null
           commission: number | null
           created_at: string
           date: string
@@ -757,6 +758,7 @@ export type Database = {
           notebook: string | null
           notes: string | null
           open_price: number | null
+          open_time: string | null
           pair: string
           result: number
           session: string | null
@@ -777,6 +779,7 @@ export type Database = {
           checklist_id?: string | null
           checklist_state?: Json | null
           close_price?: number | null
+          close_time?: string | null
           commission?: number | null
           created_at?: string
           date: string
@@ -788,6 +791,7 @@ export type Database = {
           notebook?: string | null
           notes?: string | null
           open_price?: number | null
+          open_time?: string | null
           pair: string
           result: number
           session?: string | null
@@ -808,6 +812,7 @@ export type Database = {
           checklist_id?: string | null
           checklist_state?: Json | null
           close_price?: number | null
+          close_time?: string | null
           commission?: number | null
           created_at?: string
           date?: string
@@ -819,6 +824,7 @@ export type Database = {
           notebook?: string | null
           notes?: string | null
           open_price?: number | null
+          open_time?: string | null
           pair?: string
           result?: number
           session?: string | null

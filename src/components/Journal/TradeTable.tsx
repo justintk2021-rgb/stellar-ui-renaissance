@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, Trophy, Target, ClipboardCheck, ArrowLeft, Clock, LogIn, LogOut, Timer } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
@@ -120,77 +120,8 @@ const formatDuration = (ms: number) => {
   return `${seconds}s`;
 };
 
-interface BrokerTimes {
-  openTime: string;
-  closeTime: string | null;
-}
-
-// Fetch broker open/close times for the given journal trade IDs.
-// Subscribes to realtime changes so durations stay live for open positions.
-function useBrokerTradeTimes(tradeIds: string[]): Record<string, BrokerTimes> {
-  const [map, setMap] = useState<Record<string, BrokerTimes>>({});
-  const idsKey = useMemo(() => [...tradeIds].sort().join(','), [tradeIds]);
-
-  useEffect(() => {
-    if (!idsKey) {
-      setMap({});
-      return;
-    }
-    const ids = idsKey.split(',').filter(Boolean);
-    if (ids.length === 0) return;
-
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from('broker_trades')
-        .select('journal_trade_id, open_time, close_time')
-        .in('journal_trade_id', ids);
-      if (error || cancelled || !data) return;
-      const next: Record<string, BrokerTimes> = {};
-      for (const row of data as any[]) {
-        if (row.journal_trade_id) {
-          next[row.journal_trade_id] = {
-            openTime: row.open_time,
-            closeTime: row.close_time,
-          };
-        }
-      }
-      setMap(next);
-    })();
-
-    const channel = supabase
-      .channel(`broker-trades-times-${idsKey.slice(0, 32)}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'broker_trades' },
-        (payload: any) => {
-          const row = payload.new || payload.old;
-          if (!row?.journal_trade_id || !ids.includes(row.journal_trade_id)) return;
-          setMap(prev => {
-            if (payload.eventType === 'DELETE') {
-              const { [row.journal_trade_id]: _, ...rest } = prev;
-              return rest;
-            }
-            return {
-              ...prev,
-              [row.journal_trade_id]: {
-                openTime: row.open_time,
-                closeTime: row.close_time,
-              },
-            };
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [idsKey]);
-
-  return map;
-}
+// (Broker open/close times now live directly on the trade row, populated by
+// the TradeLocker sync function — no separate fetch needed.)
 
 // Live ticker that re-renders every second so open-trade durations update in real time
 function useNowTicker(active: boolean, intervalMs = 1000) {
@@ -367,7 +298,6 @@ interface TradeRowGroupProps {
   trades: Trade[];
   notebookEntries: NotebookEntry[];
   checklists: Checklist[];
-  brokerTimes: Record<string, BrokerTimes>;
   now: number;
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
@@ -377,7 +307,7 @@ interface TradeRowGroupProps {
   onToggle: () => void;
 }
 
-function TradeRowGroup({ date, trades, notebookEntries, checklists, brokerTimes, now, onEdit, onDelete, onViewNotes, index, isExpanded, onToggle }: TradeRowGroupProps) {
+function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit, onDelete, onViewNotes, index, isExpanded, onToggle }: TradeRowGroupProps) {
   const metrics = calculateGroupMetrics(trades);
   const isProfit = metrics.grossPnL >= 0;
 
@@ -610,28 +540,27 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, brokerTimes,
                     </div>
                     </div>
                     {/* Time + Duration row (for imported broker trades) */}
-                    {trade.importedFromBroker && brokerTimes[trade.id] && (() => {
-                      const t = brokerTimes[trade.id];
-                      const openMs = t.openTime ? new Date(t.openTime).getTime() : NaN;
-                      const closeMs = t.closeTime ? new Date(t.closeTime).getTime() : null;
+                    {trade.importedFromBroker && (trade.openTime || trade.closeTime) && (() => {
+                      const openMs = trade.openTime ? new Date(trade.openTime).getTime() : NaN;
+                      const closeMs = trade.closeTime ? new Date(trade.closeTime).getTime() : null;
                       const isOpen = !closeMs;
                       const durationMs = isOpen
                         ? (isFinite(openMs) ? now - openMs : NaN)
                         : (isFinite(openMs) && closeMs ? closeMs - openMs : NaN);
                       return (
                         <div className="flex items-center gap-4 mt-1.5 flex-wrap">
-                          {t.openTime && (
+                          {trade.openTime && (
                             <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
                               <LogIn className="w-3 h-3 opacity-60" />
                               <span className="opacity-60">Open:</span>{' '}
-                              <span className="font-mono font-medium text-foreground">{formatTimestamp(t.openTime)}</span>
+                              <span className="font-mono font-medium text-foreground">{formatTimestamp(trade.openTime)}</span>
                             </span>
                           )}
-                          {t.closeTime ? (
+                          {trade.closeTime ? (
                             <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
                               <LogOut className="w-3 h-3 opacity-60" />
                               <span className="opacity-60">Close:</span>{' '}
-                              <span className="font-mono font-medium text-foreground">{formatTimestamp(t.closeTime)}</span>
+                              <span className="font-mono font-medium text-foreground">{formatTimestamp(trade.closeTime)}</span>
                             </span>
                           ) : (
                             <span className="text-[11px] text-primary inline-flex items-center gap-1">
@@ -708,16 +637,11 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
   const groupedTrades = groupTradesByDate(trades);
   const sortedDates = Object.keys(groupedTrades).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
-  // Fetch broker open/close times for imported trades; live tick once per second
-  // so durations of still-open positions update in real time when the row is expanded.
-  const importedIds = useMemo(
-    () => trades.filter(t => t.importedFromBroker).map(t => t.id),
-    [trades]
-  );
-  const brokerTimes = useBrokerTradeTimes(importedIds);
+  // Tick once per second so durations of still-open imported positions update
+  // in real time when a row is expanded.
   const hasOpenImported = useMemo(
-    () => importedIds.some(id => brokerTimes[id] && !brokerTimes[id].closeTime),
-    [importedIds, brokerTimes]
+    () => trades.some(t => t.importedFromBroker && t.openTime && !t.closeTime),
+    [trades]
   );
   const now = useNowTicker(expandedDate !== null && hasOpenImported, 1000);
 
@@ -839,7 +763,6 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                   trades={groupedTrades[date]}
                   notebookEntries={notebookEntries}
                   checklists={checklists}
-                  brokerTimes={brokerTimes}
                   now={now}
                   onEdit={onEdit}
                   onDelete={onDelete}
