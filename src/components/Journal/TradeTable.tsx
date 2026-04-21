@@ -768,25 +768,111 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
             <p className="text-xs text-muted-foreground mt-1">Click a row to expand details</p>
           </div>
           <div className="flex items-center gap-3">
-            {trades.length > 0 && onClearAll && (
-              <ConfirmDialog
-                trigger={
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="w-9 h-9 rounded-full bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors"
-                    aria-label="Clear all trades"
-                  >
-                    <Clock className="w-4 h-4 text-foreground" />
-                  </motion.button>
-                }
-                title="Delete All Trades"
-                description="This will permanently delete all your trades. This action cannot be undone."
-                confirmLabel="Delete All"
-                variant="destructive"
-                onConfirm={onClearAll}
-              />
-            )}
+            <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+              <PopoverTrigger asChild>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={cn(
+                    "relative w-9 h-9 rounded-full flex items-center justify-center transition-colors",
+                    isFilterActive
+                      ? "bg-primary/15 text-primary hover:bg-primary/20"
+                      : "bg-muted/50 text-foreground hover:bg-muted"
+                  )}
+                  aria-label="Trade history filter"
+                >
+                  <Clock className="w-4 h-4" />
+                  {isFilterActive && (
+                    <motion.span
+                      layoutId="history-active-dot"
+                      className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary ring-2 ring-background"
+                    />
+                  )}
+                </motion.button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                sideOffset={8}
+                className="w-72 p-0 overflow-hidden rounded-2xl border-border/40 bg-popover/95 backdrop-blur-xl shadow-xl"
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                >
+                  <div className="px-4 py-3 border-b border-border/40 flex items-center gap-2">
+                    <History className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-semibold">Trade History</span>
+                    {isFilterActive && (
+                      <button
+                        onClick={() => { setHistoryPeriod("all"); setHistorySymbol("__all__"); }}
+                        className="ml-auto text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Symbol filter */}
+                  <div className="px-4 py-3 border-b border-border/40">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground">Symbol</span>
+                      <select
+                        value={historySymbol}
+                        onChange={(e) => setHistorySymbol(e.target.value)}
+                        className="text-sm bg-transparent text-muted-foreground hover:text-foreground focus:text-foreground outline-none cursor-pointer max-w-[140px] truncate"
+                      >
+                        <option value="__all__">All symbols</option>
+                        {availableSymbols.map(sym => (
+                          <option key={sym} value={sym}>{sym}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Period list */}
+                  <div className="py-1">
+                    {PERIOD_OPTIONS.map((opt, i) => {
+                      const selected = historyPeriod === opt.value;
+                      return (
+                        <motion.button
+                          key={opt.value}
+                          onClick={() => { setHistoryPeriod(opt.value); setHistoryOpen(false); }}
+                          initial={{ opacity: 0, x: -4 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.15, delay: i * 0.025 }}
+                          whileHover={{ backgroundColor: "hsl(var(--muted) / 0.5)" }}
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors"
+                        >
+                          <span className={cn(selected ? "text-foreground font-medium" : "text-foreground/90")}>
+                            {opt.label}
+                          </span>
+                          <AnimatePresence>
+                            {selected && (
+                              <motion.span
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0, opacity: 0 }}
+                                transition={{ duration: 0.15 }}
+                              >
+                                <Check className="w-4 h-4 text-primary" />
+                              </motion.span>
+                            )}
+                          </AnimatePresence>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer summary */}
+                  <div className="px-4 py-2.5 border-t border-border/40 bg-muted/20">
+                    <p className="text-[11px] text-muted-foreground">
+                      Showing <span className="text-foreground font-medium">{filteredTrades.length}</span> of {trades.length} trades · {activePeriodLabel}
+                    </p>
+                  </div>
+                </motion.div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
