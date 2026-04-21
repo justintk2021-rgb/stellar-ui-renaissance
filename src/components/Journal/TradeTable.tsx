@@ -88,6 +88,121 @@ const formatDate = (dateStr: string) => {
   }
 };
 
+// Format a timestamp into a short HH:MM (date) string
+const formatTimestamp = (iso?: string | null) => {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return null;
+  }
+};
+
+// Format a duration in ms into "1d 2h 15m" / "2h 15m" / "45m 12s" / "12s"
+const formatDuration = (ms: number) => {
+  if (!isFinite(ms) || ms < 0) return '—';
+  const totalSeconds = Math.floor(ms / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+};
+
+interface BrokerTimes {
+  openTime: string;
+  closeTime: string | null;
+}
+
+// Fetch broker open/close times for the given journal trade IDs.
+// Subscribes to realtime changes so durations stay live for open positions.
+function useBrokerTradeTimes(tradeIds: string[]): Record<string, BrokerTimes> {
+  const [map, setMap] = useState<Record<string, BrokerTimes>>({});
+  const idsKey = useMemo(() => [...tradeIds].sort().join(','), [tradeIds]);
+
+  useEffect(() => {
+    if (!idsKey) {
+      setMap({});
+      return;
+    }
+    const ids = idsKey.split(',').filter(Boolean);
+    if (ids.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('broker_trades')
+        .select('journal_trade_id, open_time, close_time')
+        .in('journal_trade_id', ids);
+      if (error || cancelled || !data) return;
+      const next: Record<string, BrokerTimes> = {};
+      for (const row of data as any[]) {
+        if (row.journal_trade_id) {
+          next[row.journal_trade_id] = {
+            openTime: row.open_time,
+            closeTime: row.close_time,
+          };
+        }
+      }
+      setMap(next);
+    })();
+
+    const channel = supabase
+      .channel(`broker-trades-times-${idsKey.slice(0, 32)}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'broker_trades' },
+        (payload: any) => {
+          const row = payload.new || payload.old;
+          if (!row?.journal_trade_id || !ids.includes(row.journal_trade_id)) return;
+          setMap(prev => {
+            if (payload.eventType === 'DELETE') {
+              const { [row.journal_trade_id]: _, ...rest } = prev;
+              return rest;
+            }
+            return {
+              ...prev,
+              [row.journal_trade_id]: {
+                openTime: row.open_time,
+                closeTime: row.close_time,
+              },
+            };
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [idsKey]);
+
+  return map;
+}
+
+// Live ticker that re-renders every second so open-trade durations update in real time
+function useNowTicker(active: boolean, intervalMs = 1000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [active, intervalMs]);
+  return now;
+}
+
 // Animated Line Chart Component
 function AnimatedLineChart({ trades, isExpanded }: { trades: Trade[]; isExpanded: boolean }) {
   const [animationProgress, setAnimationProgress] = useState(0);
