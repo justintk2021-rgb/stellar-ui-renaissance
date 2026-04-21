@@ -708,6 +708,19 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
   const groupedTrades = groupTradesByDate(trades);
   const sortedDates = Object.keys(groupedTrades).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
+  // Fetch broker open/close times for imported trades; live tick once per second
+  // so durations of still-open positions update in real time when the row is expanded.
+  const importedIds = useMemo(
+    () => trades.filter(t => t.importedFromBroker).map(t => t.id),
+    [trades]
+  );
+  const brokerTimes = useBrokerTradeTimes(importedIds);
+  const hasOpenImported = useMemo(
+    () => importedIds.some(id => brokerTimes[id] && !brokerTimes[id].closeTime),
+    [importedIds, brokerTimes]
+  );
+  const now = useNowTicker(expandedDate !== null && hasOpenImported, 1000);
+
   // Collapse when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
