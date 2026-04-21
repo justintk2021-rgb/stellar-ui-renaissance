@@ -548,32 +548,32 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit,
                         ? (isFinite(openMs) ? now - openMs : NaN)
                         : (isFinite(openMs) && closeMs ? closeMs - openMs : NaN);
                       return (
-                        <div className="flex items-center gap-4 mt-1.5 flex-wrap">
+                        <div className="flex items-center justify-center gap-6 mt-3 mb-1 flex-wrap">
                           {trade.openTime && (
-                            <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
-                              <LogIn className="w-3 h-3 opacity-60" />
+                            <span className="text-sm text-muted-foreground inline-flex items-center gap-1.5">
+                              <LogIn className="w-4 h-4 opacity-60" />
                               <span className="opacity-60">Open:</span>{' '}
-                              <span className="font-mono font-medium text-foreground">{formatTimestamp(trade.openTime)}</span>
+                              <span className="font-mono font-semibold text-foreground">{formatTimestamp(trade.openTime)}</span>
                             </span>
                           )}
                           {trade.closeTime ? (
-                            <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
-                              <LogOut className="w-3 h-3 opacity-60" />
+                            <span className="text-sm text-muted-foreground inline-flex items-center gap-1.5">
+                              <LogOut className="w-4 h-4 opacity-60" />
                               <span className="opacity-60">Close:</span>{' '}
-                              <span className="font-mono font-medium text-foreground">{formatTimestamp(trade.closeTime)}</span>
+                              <span className="font-mono font-semibold text-foreground">{formatTimestamp(trade.closeTime)}</span>
                             </span>
                           ) : (
-                            <span className="text-[11px] text-primary inline-flex items-center gap-1">
-                              <LogOut className="w-3 h-3 opacity-60" />
+                            <span className="text-sm text-primary inline-flex items-center gap-1.5">
+                              <LogOut className="w-4 h-4 opacity-60" />
                               <span className="opacity-60">Close:</span>{' '}
-                              <span className="font-mono font-medium">Still open</span>
+                              <span className="font-mono font-semibold">Still open</span>
                             </span>
                           )}
-                          <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
-                            <Timer className="w-3 h-3 opacity-60" />
+                          <span className="text-sm text-muted-foreground inline-flex items-center gap-1.5">
+                            <Timer className="w-4 h-4 opacity-60" />
                             <span className="opacity-60">Duration:</span>{' '}
                             <span className={cn(
-                              "font-mono font-medium",
+                              "font-mono font-semibold",
                               isOpen ? "text-primary" : "text-foreground"
                             )}>
                               {formatDuration(durationMs)}
