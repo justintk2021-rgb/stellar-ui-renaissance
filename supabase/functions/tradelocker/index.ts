@@ -956,6 +956,8 @@ serve(async (req) => {
                 execution_type: 'market',
                 open_price: trade.avgFilledPrice || 0,
                 close_price: trade.closePrice || null,
+                open_time: trade.createdAt || now,
+                close_time: trade.filledAt || trade.closedAt || now,
                 swap: trade.swap || 0,
                 commission: trade.commission || 0,
               });
