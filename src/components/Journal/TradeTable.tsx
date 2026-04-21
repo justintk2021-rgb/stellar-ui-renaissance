@@ -3,7 +3,7 @@ import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, Trophy, Target, ClipboardCheck, ArrowLeft, Clock, LogIn, LogOut, Timer } from "lucide-react";
+import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, Trophy, Target, ClipboardCheck, ArrowLeft, Clock, LogIn, LogOut, Timer, Check, History } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
@@ -12,7 +12,33 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { motion, AnimatePresence } from "framer-motion";
+
+type HistoryPeriod = "all" | "week" | "month" | "3months" | "6months" | "year";
+
+const PERIOD_OPTIONS: { value: HistoryPeriod; label: string }[] = [
+  { value: "all", label: "All time" },
+  { value: "week", label: "Last week" },
+  { value: "month", label: "Last month" },
+  { value: "3months", label: "Last 3 months" },
+  { value: "6months", label: "Last 6 months" },
+  { value: "year", label: "Last year" },
+];
+
+function getPeriodCutoff(period: HistoryPeriod): Date | null {
+  if (period === "all") return null;
+  const now = new Date();
+  const d = new Date(now);
+  switch (period) {
+    case "week": d.setDate(d.getDate() - 7); break;
+    case "month": d.setMonth(d.getMonth() - 1); break;
+    case "3months": d.setMonth(d.getMonth() - 3); break;
+    case "6months": d.setMonth(d.getMonth() - 6); break;
+    case "year": d.setFullYear(d.getFullYear() - 1); break;
+  }
+  return d;
+}
 
 interface Checklist {
   id: string;
@@ -632,16 +658,40 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
   const [dayTrades, setDayTrades] = useState<Trade[] | null>(null);
   const [notesView, setNotesView] = useState<'list' | 'note'>('list');
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriod>("all");
+  const [historySymbol, setHistorySymbol] = useState<string>("__all__");
+  const [historyOpen, setHistoryOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const groupedTrades = groupTradesByDate(trades);
+  const availableSymbols = useMemo(() => {
+    const set = new Set<string>();
+    trades.forEach(t => { if (t.pair) set.add(t.pair); });
+    return Array.from(set).sort();
+  }, [trades]);
+
+  const filteredTrades = useMemo(() => {
+    const cutoff = getPeriodCutoff(historyPeriod);
+    return trades.filter(t => {
+      if (historySymbol !== "__all__" && t.pair !== historySymbol) return false;
+      if (cutoff) {
+        const td = new Date(t.date);
+        if (isNaN(td.getTime()) || td < cutoff) return false;
+      }
+      return true;
+    });
+  }, [trades, historyPeriod, historySymbol]);
+
+  const isFilterActive = historyPeriod !== "all" || historySymbol !== "__all__";
+  const activePeriodLabel = PERIOD_OPTIONS.find(p => p.value === historyPeriod)?.label ?? "All time";
+
+  const groupedTrades = groupTradesByDate(filteredTrades);
   const sortedDates = Object.keys(groupedTrades).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
   // Tick once per second so durations of still-open imported positions update
   // in real time when a row is expanded.
   const hasOpenImported = useMemo(
-    () => trades.some(t => t.importedFromBroker && t.openTime && !t.closeTime),
-    [trades]
+    () => filteredTrades.some(t => t.importedFromBroker && t.openTime && !t.closeTime),
+    [filteredTrades]
   );
   const now = useNowTicker(expandedDate !== null && hasOpenImported, 1000);
 
@@ -718,25 +768,111 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
             <p className="text-xs text-muted-foreground mt-1">Click a row to expand details</p>
           </div>
           <div className="flex items-center gap-3">
-            {trades.length > 0 && onClearAll && (
-              <ConfirmDialog
-                trigger={
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="w-9 h-9 rounded-full bg-muted/50 hover:bg-muted flex items-center justify-center transition-colors"
-                    aria-label="Clear all trades"
-                  >
-                    <Clock className="w-4 h-4 text-foreground" />
-                  </motion.button>
-                }
-                title="Delete All Trades"
-                description="This will permanently delete all your trades. This action cannot be undone."
-                confirmLabel="Delete All"
-                variant="destructive"
-                onConfirm={onClearAll}
-              />
-            )}
+            <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+              <PopoverTrigger asChild>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={cn(
+                    "relative w-9 h-9 rounded-full flex items-center justify-center transition-colors",
+                    isFilterActive
+                      ? "bg-primary/15 text-primary hover:bg-primary/20"
+                      : "bg-muted/50 text-foreground hover:bg-muted"
+                  )}
+                  aria-label="Trade history filter"
+                >
+                  <Clock className="w-4 h-4" />
+                  {isFilterActive && (
+                    <motion.span
+                      layoutId="history-active-dot"
+                      className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary ring-2 ring-background"
+                    />
+                  )}
+                </motion.button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                sideOffset={8}
+                className="w-72 p-0 overflow-hidden rounded-2xl border-border/40 bg-popover/95 backdrop-blur-xl shadow-xl"
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                >
+                  <div className="px-4 py-3 border-b border-border/40 flex items-center gap-2">
+                    <History className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-semibold">Trade History</span>
+                    {isFilterActive && (
+                      <button
+                        onClick={() => { setHistoryPeriod("all"); setHistorySymbol("__all__"); }}
+                        className="ml-auto text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Symbol filter */}
+                  <div className="px-4 py-3 border-b border-border/40">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground">Symbol</span>
+                      <select
+                        value={historySymbol}
+                        onChange={(e) => setHistorySymbol(e.target.value)}
+                        className="text-sm bg-transparent text-muted-foreground hover:text-foreground focus:text-foreground outline-none cursor-pointer max-w-[140px] truncate"
+                      >
+                        <option value="__all__">All symbols</option>
+                        {availableSymbols.map(sym => (
+                          <option key={sym} value={sym}>{sym}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Period list */}
+                  <div className="py-1">
+                    {PERIOD_OPTIONS.map((opt, i) => {
+                      const selected = historyPeriod === opt.value;
+                      return (
+                        <motion.button
+                          key={opt.value}
+                          onClick={() => { setHistoryPeriod(opt.value); setHistoryOpen(false); }}
+                          initial={{ opacity: 0, x: -4 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.15, delay: i * 0.025 }}
+                          whileHover={{ backgroundColor: "hsl(var(--muted) / 0.5)" }}
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors"
+                        >
+                          <span className={cn(selected ? "text-foreground font-medium" : "text-foreground/90")}>
+                            {opt.label}
+                          </span>
+                          <AnimatePresence>
+                            {selected && (
+                              <motion.span
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0, opacity: 0 }}
+                                transition={{ duration: 0.15 }}
+                              >
+                                <Check className="w-4 h-4 text-primary" />
+                              </motion.span>
+                            )}
+                          </AnimatePresence>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer summary */}
+                  <div className="px-4 py-2.5 border-t border-border/40 bg-muted/20">
+                    <p className="text-[11px] text-muted-foreground">
+                      Showing <span className="text-foreground font-medium">{filteredTrades.length}</span> of {trades.length} trades · {activePeriodLabel}
+                    </p>
+                  </div>
+                </motion.div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
