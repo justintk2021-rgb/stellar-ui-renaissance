@@ -207,6 +207,25 @@ export const AccountSelector = ({
     onSelectBrokerAccount?.(broker.accountId);
   };
 
+  const setManualDefault = (accountId: string) => {
+    const key = `manual:${accountId}`;
+    localStorage.setItem('defaultDashboardAccount', key);
+    setDefaultChoice(key);
+    onSetDefault(accountId);
+  };
+
+  const setBrokerDefault = (broker: BrokerAccountInfo) => {
+    const key = `broker:${broker.connectionId}:${broker.accNum}`;
+    localStorage.setItem('defaultDashboardAccount', key);
+    setDefaultChoice(key);
+  };
+
+  const isManualDefault = (accountId: string) =>
+    defaultChoice === `manual:${accountId}` || (!defaultChoice && accounts.find(a => a.id === accountId)?.is_default);
+
+  const isBrokerDefault = (broker: BrokerAccountInfo) =>
+    defaultChoice === `broker:${broker.connectionId}:${broker.accNum}`;
+
   const openRenameBroker = (broker: BrokerAccountInfo) => {
     setRenamingBroker(broker);
     setBrokerDisplayName(broker.accountName);
