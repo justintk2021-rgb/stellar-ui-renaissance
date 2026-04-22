@@ -773,8 +773,9 @@ const Index = () => {
                         trades={(() => {
                           const base = journalFilter === 'all' ? trades : journalFilter === 'wins' ? trades.filter(t => t.result > 0) : trades.filter(t => t.result < 0);
                           if (!journalDateRange) return base;
-                          const startStr = journalDateRange.start.toISOString().slice(0, 10);
-                          const endStr = journalDateRange.end.toISOString().slice(0, 10);
+                          const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                          const startStr = fmt(journalDateRange.start);
+                          const endStr = fmt(journalDateRange.end);
                           return base.filter(t => {
                             const d = (t.date || '').slice(0, 10);
                             return d >= startStr && d <= endStr;
