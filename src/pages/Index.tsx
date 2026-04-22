@@ -778,13 +778,20 @@ const Index = () => {
                       const fmt = (d: Date) =>
                         `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+                      // Use the trade's close date (when the trade was closed) for range filtering.
+                      // Fall back to the trade's `date` field if no closeTime is available.
+                      const getCloseDateKey = (t: typeof winLossFiltered[number]) => {
+                        const raw = t.closeTime || t.date || '';
+                        return raw.slice(0, 10);
+                      };
+
                       const rangeFiltered = journalDateRange
                         ? (() => {
                             const startStr = fmt(journalDateRange.start);
                             const endStr = fmt(journalDateRange.end);
                             return winLossFiltered.filter(t => {
-                              const d = (t.date || '').slice(0, 10);
-                              // Inclusive on both ends
+                              const d = getCloseDateKey(t);
+                              // Inclusive on both ends — based on CLOSE date
                               return d >= startStr && d <= endStr;
                             });
                           })()
@@ -792,7 +799,7 @@ const Index = () => {
 
                       const pnlByDate: Record<string, number> = {};
                       rangeFiltered.forEach(t => {
-                        const key = (t.date || '').slice(0, 10);
+                        const key = getCloseDateKey(t);
                         if (!key) return;
                         pnlByDate[key] = (pnlByDate[key] || 0) + (t.result || 0);
                       });
