@@ -298,6 +298,7 @@ const Index = () => {
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
   const [journalFilter, setJournalFilter] = useState<'all' | 'wins' | 'losses'>('all');
+  const [journalDateRange, setJournalDateRange] = useState<{ start: Date; end: Date } | null>(null);
 
   // Notes are now manually created only — no automatic generation for trades
 
