@@ -165,8 +165,10 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
               isWinning && !isSelected && "bg-emerald-500/20 text-emerald-500 font-medium",
               isLosing && !isSelected && "bg-red-500/20 text-red-500 font-medium",
               hasTrade && dayPnL === 0 && !isSelected && "bg-muted text-muted-foreground font-medium",
-              inRange && !isSelected && "ring-1 ring-primary/40",
-              (isRangeStart || isRangeEnd) && !isSelected && "ring-2 ring-primary",
+              // Soft per-day tint for custom range (no continuous line)
+              inRange && !isSelected && !hasTrade && "bg-primary/15 text-primary",
+              inRange && !isSelected && hasTrade && "ring-1 ring-inset ring-primary/40",
+              (isRangeStart || isRangeEnd) && !isSelected && "bg-primary/25 text-primary font-semibold",
             )}
           >
             {format(day, "d")}
