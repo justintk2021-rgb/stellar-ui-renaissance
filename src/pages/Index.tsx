@@ -298,6 +298,7 @@ const Index = () => {
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
   const [journalFilter, setJournalFilter] = useState<'all' | 'wins' | 'losses'>('all');
+  const [journalDateRange, setJournalDateRange] = useState<{ start: Date; end: Date } | null>(null);
 
   // Notes are now manually created only — no automatic generation for trades
 
@@ -769,7 +770,16 @@ const Index = () => {
                     {/* Trade Table */}
                     <div className="flex-1 min-w-0">
                       <TradeTable
-                        trades={journalFilter === 'all' ? trades : journalFilter === 'wins' ? trades.filter(t => t.result > 0) : trades.filter(t => t.result < 0)}
+                        trades={(() => {
+                          const base = journalFilter === 'all' ? trades : journalFilter === 'wins' ? trades.filter(t => t.result > 0) : trades.filter(t => t.result < 0);
+                          if (!journalDateRange) return base;
+                          const startStr = journalDateRange.start.toISOString().slice(0, 10);
+                          const endStr = journalDateRange.end.toISOString().slice(0, 10);
+                          return base.filter(t => {
+                            const d = (t.date || '').slice(0, 10);
+                            return d >= startStr && d <= endStr;
+                          });
+                        })()}
                         notebookEntries={notebookEntries}
                         checklists={checklists}
                         onEdit={(trade) => {
@@ -785,6 +795,7 @@ const Index = () => {
                     {/* Mini Calendar Sidebar */}
                     <div className="hidden lg:block w-64 flex-shrink-0">
                       <MiniCalendar 
+                        onRangeChange={setJournalDateRange}
                         dayPnLs={(() => {
                           const filteredTrades = journalFilter === 'all' ? trades : journalFilter === 'wins' ? trades.filter(t => t.result > 0) : trades.filter(t => t.result < 0);
                           const pnlByDate: Record<string, number> = {};
