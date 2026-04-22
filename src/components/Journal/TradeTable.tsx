@@ -13,6 +13,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { motion, AnimatePresence } from "framer-motion";
 
 type HistoryPeriod = "all" | "week" | "month" | "3months" | "6months" | "year";
@@ -815,18 +822,26 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
 
                   {/* Symbol filter */}
                   <div className="px-4 py-3 border-b border-border/40">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3">
                       <span className="text-sm text-foreground">Symbol</span>
-                      <select
-                        value={historySymbol}
-                        onChange={(e) => setHistorySymbol(e.target.value)}
-                        className="text-sm bg-transparent text-muted-foreground hover:text-foreground focus:text-foreground outline-none cursor-pointer max-w-[140px] truncate"
-                      >
-                        <option value="__all__">All symbols</option>
-                        {availableSymbols.map(sym => (
-                          <option key={sym} value={sym}>{sym}</option>
-                        ))}
-                      </select>
+                      <Select value={historySymbol} onValueChange={setHistorySymbol}>
+                        <SelectTrigger className="h-8 w-[150px] rounded-lg border-border/50 bg-muted/40 hover:bg-muted/60 text-sm focus:ring-1 focus:ring-ring/50 focus:ring-offset-0 transition-colors">
+                          <SelectValue placeholder="All symbols" />
+                        </SelectTrigger>
+                        <SelectContent
+                          align="end"
+                          className="rounded-xl border-border/40 bg-popover/95 backdrop-blur-xl shadow-xl max-h-64"
+                        >
+                          <SelectItem value="__all__" className="rounded-lg text-sm">
+                            All symbols
+                          </SelectItem>
+                          {availableSymbols.map(sym => (
+                            <SelectItem key={sym} value={sym} className="rounded-lg text-sm font-mono">
+                              {sym}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
