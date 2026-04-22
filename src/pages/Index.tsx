@@ -778,11 +778,16 @@ const Index = () => {
                       const fmt = (d: Date) =>
                         `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-                      // Use the trade's OPEN date (when the trade was opened) for range filtering
-                      // and calendar dots. Falls back to the trade's `date` field if no openTime exists.
+                      // Use the trade's OPEN date in the user's LOCAL timezone for filtering
+                      // and calendar dots. This guarantees a trade opened Apr 7 at 11:30pm local
+                      // shows on Apr 7 (not Apr 8 due to UTC conversion). Falls back to the
+                      // trade's `date` field for manual entries without an openTime.
                       const getOpenDateKey = (t: typeof winLossFiltered[number]) => {
-                        const raw = t.openTime || t.date || '';
-                        return raw.slice(0, 10);
+                        if (t.openTime) {
+                          const d = new Date(t.openTime);
+                          if (!isNaN(d.getTime())) return fmt(d);
+                        }
+                        return (t.date || '').slice(0, 10);
                       };
 
                       const rangeFiltered = journalDateRange
