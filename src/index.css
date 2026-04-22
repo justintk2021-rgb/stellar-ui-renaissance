@@ -430,6 +430,15 @@
 }
 
 @layer utilities {
+  /* Hide scrollbar across browsers (used in iOS-style wheel pickers) */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Glass morphism */
   .glass {
     @apply backdrop-blur-xl bg-card/80 border border-border/50;
