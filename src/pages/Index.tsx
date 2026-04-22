@@ -767,46 +767,65 @@ const Index = () => {
 
                   {/* Main Content with Calendar Sidebar */}
                   <motion.div variants={staggerItem} className="flex gap-6">
-                    {/* Trade Table */}
-                    <div className="flex-1 min-w-0">
-                      <TradeTable
-                        trades={(() => {
-                          const base = journalFilter === 'all' ? trades : journalFilter === 'wins' ? trades.filter(t => t.result > 0) : trades.filter(t => t.result < 0);
-                          if (!journalDateRange) return base;
-                          const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                          const startStr = fmt(journalDateRange.start);
-                          const endStr = fmt(journalDateRange.end);
-                          return base.filter(t => {
-                            const d = (t.date || '').slice(0, 10);
-                            return d >= startStr && d <= endStr;
-                          });
-                        })()}
-                        notebookEntries={notebookEntries}
-                        checklists={checklists}
-                        onEdit={(trade) => {
-                          setEditingTrade(trade);
-                          setIsTradeFormOpen(true);
-                        }}
-                        onDelete={handleDeleteTrade}
-                        onSelectForNotebook={handleSelectForNotebook}
-                        onClearAll={handleClearAll}
-                      />
-                    </div>
-                    
-                    {/* Mini Calendar Sidebar */}
-                    <div className="hidden lg:block w-64 flex-shrink-0">
-                      <MiniCalendar 
-                        onRangeChange={setJournalDateRange}
-                        dayPnLs={(() => {
-                          const filteredTrades = journalFilter === 'all' ? trades : journalFilter === 'wins' ? trades.filter(t => t.result > 0) : trades.filter(t => t.result < 0);
-                          const pnlByDate: Record<string, number> = {};
-                          filteredTrades.forEach(t => {
-                            pnlByDate[t.date] = (pnlByDate[t.date] || 0) + (t.result || 0);
-                          });
-                          return Object.entries(pnlByDate).map(([date, pnl]) => ({ date, pnl }));
-                        })()}
-                      />
-                    </div>
+                    {(() => {
+                      // Build a single shared filtered list — used by BOTH the trade log AND the mini calendar dots
+                      const winLossFiltered = journalFilter === 'all'
+                        ? trades
+                        : journalFilter === 'wins'
+                          ? trades.filter(t => t.result > 0)
+                          : trades.filter(t => t.result < 0);
+
+                      const fmt = (d: Date) =>
+                        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+                      const rangeFiltered = journalDateRange
+                        ? (() => {
+                            const startStr = fmt(journalDateRange.start);
+                            const endStr = fmt(journalDateRange.end);
+                            return winLossFiltered.filter(t => {
+                              const d = (t.date || '').slice(0, 10);
+                              // Inclusive on both ends
+                              return d >= startStr && d <= endStr;
+                            });
+                          })()
+                        : winLossFiltered;
+
+                      const pnlByDate: Record<string, number> = {};
+                      rangeFiltered.forEach(t => {
+                        const key = (t.date || '').slice(0, 10);
+                        if (!key) return;
+                        pnlByDate[key] = (pnlByDate[key] || 0) + (t.result || 0);
+                      });
+                      const dayPnLs = Object.entries(pnlByDate).map(([date, pnl]) => ({ date, pnl }));
+
+                      return (
+                        <>
+                          {/* Trade Table */}
+                          <div className="flex-1 min-w-0">
+                            <TradeTable
+                              trades={rangeFiltered}
+                              notebookEntries={notebookEntries}
+                              checklists={checklists}
+                              onEdit={(trade) => {
+                                setEditingTrade(trade);
+                                setIsTradeFormOpen(true);
+                              }}
+                              onDelete={handleDeleteTrade}
+                              onSelectForNotebook={handleSelectForNotebook}
+                              onClearAll={handleClearAll}
+                            />
+                          </div>
+
+                          {/* Mini Calendar Sidebar */}
+                          <div className="hidden lg:block w-64 flex-shrink-0">
+                            <MiniCalendar
+                              onRangeChange={setJournalDateRange}
+                              dayPnLs={dayPnLs}
+                            />
+                          </div>
+                        </>
+                      );
+                    })()}
                   </motion.div>
 
                   {/* Trade Form Modal */}
