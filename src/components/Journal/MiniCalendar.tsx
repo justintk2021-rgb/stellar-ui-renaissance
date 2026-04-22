@@ -33,9 +33,10 @@ interface MiniCalendarProps {
   selectedDate?: Date;
   onSelectDate?: (date: Date) => void;
   dayPnLs?: DayPnL[];
+  onRangeChange?: (range: { start: Date; end: Date } | null) => void;
 }
 
-export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [] }: MiniCalendarProps) {
+export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRangeChange }: MiniCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [direction, setDirection] = useState(0);
 
