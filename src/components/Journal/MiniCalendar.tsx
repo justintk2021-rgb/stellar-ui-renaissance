@@ -1,8 +1,9 @@
 import { useState, useRef } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sparkles, GitCompare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 
 interface DayPnL {
   date: string;
@@ -172,6 +173,28 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [] }: MiniC
           {renderCells()}
         </motion.div>
       </AnimatePresence>
+
+      {/* Custom + Compare action buttons */}
+      <div className="mt-4 pt-3 border-t border-border/40 grid grid-cols-2 gap-2">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => toast.info("Custom month selection coming soon")}
+          className="inline-flex items-center justify-center gap-1.5 h-8 rounded-lg bg-muted/50 hover:bg-muted text-xs font-medium text-foreground transition-colors"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
+          Custom
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => toast.info("Compare months coming soon")}
+          className="inline-flex items-center justify-center gap-1.5 h-8 rounded-lg bg-muted/50 hover:bg-muted text-xs font-medium text-foreground transition-colors"
+        >
+          <GitCompare className="w-3.5 h-3.5 text-muted-foreground" />
+          Compare
+        </motion.button>
+      </div>
     </div>
   );
 }
