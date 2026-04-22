@@ -581,37 +581,70 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit,
                         ? (isFinite(openMs) ? now - openMs : NaN)
                         : (isFinite(openMs) && closeMs ? closeMs - openMs : NaN);
                       return (
-                        <div className="flex items-center justify-center gap-6 mt-3 mb-1 flex-wrap">
-                          {trade.openTime && (
-                            <span className="text-sm text-muted-foreground inline-flex items-center gap-1.5">
-                              <LogIn className="w-4 h-4 opacity-60" />
-                              <span className="opacity-60">Open:</span>{' '}
-                              <span className="font-mono font-semibold text-foreground">{formatTimestamp(trade.openTime)}</span>
-                            </span>
-                          )}
-                          {trade.closeTime ? (
-                            <span className="text-sm text-muted-foreground inline-flex items-center gap-1.5">
-                              <LogOut className="w-4 h-4 opacity-60" />
-                              <span className="opacity-60">Close:</span>{' '}
-                              <span className="font-mono font-semibold text-foreground">{formatTimestamp(trade.closeTime)}</span>
-                            </span>
-                          ) : (
-                            <span className="text-sm text-primary inline-flex items-center gap-1.5">
-                              <LogOut className="w-4 h-4 opacity-60" />
-                              <span className="opacity-60">Close:</span>{' '}
-                              <span className="font-mono font-semibold">Still open</span>
-                            </span>
-                          )}
-                          <span className="text-sm text-muted-foreground inline-flex items-center gap-1.5">
-                            <Timer className="w-4 h-4 opacity-60" />
-                            <span className="opacity-60">Duration:</span>{' '}
-                            <span className={cn(
-                              "font-mono font-semibold",
-                              isOpen ? "text-primary" : "text-foreground"
-                            )}>
-                              {formatDuration(durationMs)}
-                            </span>
-                          </span>
+                        <div className="flex justify-center mt-3 mb-2 animate-fade-in">
+                          <div className="inline-flex items-stretch gap-0 rounded-full bg-muted/40 backdrop-blur-sm px-1 py-1 shadow-sm">
+                            {/* Open */}
+                            {trade.openTime && (
+                              <div className="flex items-center gap-2 px-4 py-1.5">
+                                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-background/60">
+                                  <LogIn className="w-3.5 h-3.5 text-muted-foreground" />
+                                </div>
+                                <div className="flex flex-col leading-tight">
+                                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">Open</span>
+                                  <span className="font-mono text-sm font-semibold text-foreground">{formatTimestamp(trade.openTime)}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Divider */}
+                            <div className="w-px bg-border/50 my-2" />
+
+                            {/* Close */}
+                            <div className="flex items-center gap-2 px-4 py-1.5">
+                              <div className={cn(
+                                "flex items-center justify-center w-6 h-6 rounded-full",
+                                isOpen ? "bg-primary/15" : "bg-background/60"
+                              )}>
+                                <LogOut className={cn(
+                                  "w-3.5 h-3.5",
+                                  isOpen ? "text-primary" : "text-muted-foreground"
+                                )} />
+                              </div>
+                              <div className="flex flex-col leading-tight">
+                                <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">Close</span>
+                                {trade.closeTime ? (
+                                  <span className="font-mono text-sm font-semibold text-foreground">{formatTimestamp(trade.closeTime)}</span>
+                                ) : (
+                                  <span className="font-mono text-sm font-semibold text-primary">Still open</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Divider */}
+                            <div className="w-px bg-border/50 my-2" />
+
+                            {/* Duration */}
+                            <div className="flex items-center gap-2 px-4 py-1.5">
+                              <div className={cn(
+                                "flex items-center justify-center w-6 h-6 rounded-full",
+                                isOpen ? "bg-primary/15" : "bg-background/60"
+                              )}>
+                                <Timer className={cn(
+                                  "w-3.5 h-3.5",
+                                  isOpen ? "text-primary" : "text-muted-foreground"
+                                )} />
+                              </div>
+                              <div className="flex flex-col leading-tight">
+                                <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">Duration</span>
+                                <span className={cn(
+                                  "font-mono text-sm font-semibold tabular-nums",
+                                  isOpen ? "text-primary" : "text-foreground"
+                                )}>
+                                  {formatDuration(durationMs)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       );
                     })()}
