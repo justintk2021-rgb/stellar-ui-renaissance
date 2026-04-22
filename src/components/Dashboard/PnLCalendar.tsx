@@ -100,19 +100,35 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
   }, [notebookEntries]);
 
   // Calculate daily stats and trades - memoized to prevent glitches on month switch
+  // Bucket trades by their OPEN date in the user's LOCAL timezone, so a trade
+  // opened on Apr 7 at 11:30pm shows on Apr 7 (not Apr 8 due to UTC drift).
   const { dailyStats, dailyTrades } = useMemo(() => {
     const stats: Record<string, DailyStats & { winRate: number }> = {};
     const tradesMap: Record<string, Trade[]> = {};
-    
-    trades.forEach((trade) => {
-      if (!trade.date) return;
-      if (!stats[trade.date]) {
-        stats[trade.date] = { pnl: 0, trades: 0, winRate: 0 };
-        tradesMap[trade.date] = [];
+
+    const fmtLocal = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const getOpenDateKey = (trade: Trade): string | null => {
+      // Prefer the actual open timestamp (broker-imported trades have this).
+      if (trade.openTime) {
+        const d = new Date(trade.openTime);
+        if (!isNaN(d.getTime())) return fmtLocal(d);
       }
-      stats[trade.date].pnl += trade.result || 0;
-      stats[trade.date].trades += 1;
-      tradesMap[trade.date].push(trade);
+      // Fall back to the trade's `date` field for manual entries.
+      return trade.date ? trade.date.slice(0, 10) : null;
+    };
+
+    trades.forEach((trade) => {
+      const key = getOpenDateKey(trade);
+      if (!key) return;
+      if (!stats[key]) {
+        stats[key] = { pnl: 0, trades: 0, winRate: 0 };
+        tradesMap[key] = [];
+      }
+      stats[key].pnl += trade.result || 0;
+      stats[key].trades += 1;
+      tradesMap[key].push(trade);
     });
 
     // Calculate win rate for each day
