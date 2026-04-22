@@ -71,11 +71,13 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
     setAppliedRange({ start, end });
     setCurrentMonth(start);
     setCustomOpen(false);
+    onRangeChange?.({ start, end });
     toast.success(`Showing ${format(start, "MMM d, yyyy")} – ${format(end, "MMM d, yyyy")}`);
   };
 
   const clearCustomRange = () => {
     setAppliedRange(null);
+    onRangeChange?.(null);
     toast.info("Custom range cleared");
   };
 
