@@ -778,10 +778,10 @@ const Index = () => {
                       const fmt = (d: Date) =>
                         `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-                      // Use the trade's close date (when the trade was closed) for range filtering.
-                      // Fall back to the trade's `date` field if no closeTime is available.
-                      const getCloseDateKey = (t: typeof winLossFiltered[number]) => {
-                        const raw = t.closeTime || t.date || '';
+                      // Use the trade's OPEN date (when the trade was opened) for range filtering
+                      // and calendar dots. Falls back to the trade's `date` field if no openTime exists.
+                      const getOpenDateKey = (t: typeof winLossFiltered[number]) => {
+                        const raw = t.openTime || t.date || '';
                         return raw.slice(0, 10);
                       };
 
@@ -790,8 +790,8 @@ const Index = () => {
                             const startStr = fmt(journalDateRange.start);
                             const endStr = fmt(journalDateRange.end);
                             return winLossFiltered.filter(t => {
-                              const d = getCloseDateKey(t);
-                              // Inclusive on both ends — based on CLOSE date
+                              const d = getOpenDateKey(t);
+                              // Inclusive on both ends — based on OPEN date
                               return d >= startStr && d <= endStr;
                             });
                           })()
@@ -799,7 +799,7 @@ const Index = () => {
 
                       const pnlByDate: Record<string, number> = {};
                       rangeFiltered.forEach(t => {
-                        const key = getCloseDateKey(t);
+                        const key = getOpenDateKey(t);
                         if (!key) return;
                         pnlByDate[key] = (pnlByDate[key] || 0) + (t.result || 0);
                       });
