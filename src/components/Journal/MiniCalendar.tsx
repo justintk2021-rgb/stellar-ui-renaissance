@@ -1,13 +1,32 @@
-import { useState, useRef } from "react";
-import { ChevronLeft, ChevronRight, Sparkles, GitCompare } from "lucide-react";
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, Sparkles, GitCompare, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  isSameMonth,
+  isSameDay,
+  addMonths,
+  subMonths,
+  isWithinInterval,
+} from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { IOSDatePicker } from "./IOSDatePicker";
 
 interface DayPnL {
   date: string;
   pnl: number;
+}
+
+interface CustomRange {
+  start: Date;
+  end: Date;
 }
 
 interface MiniCalendarProps {
@@ -20,8 +39,18 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [] }: MiniC
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [direction, setDirection] = useState(0);
 
+  // Custom date-range popover state
+  const [customOpen, setCustomOpen] = useState(false);
+  const [draftStart, setDraftStart] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d;
+  });
+  const [draftEnd, setDraftEnd] = useState<Date>(new Date());
+  const [appliedRange, setAppliedRange] = useState<CustomRange | null>(null);
+
   // Create a map for quick lookup
-  const pnlMap = new Map(dayPnLs.map(d => [d.date, d.pnl]));
+  const pnlMap = new Map(dayPnLs.map((d) => [d.date, d.pnl]));
 
   const handlePrevMonth = () => {
     setDirection(-1);
@@ -31,6 +60,22 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [] }: MiniC
   const handleNextMonth = () => {
     setDirection(1);
     setCurrentMonth(addMonths(currentMonth, 1));
+  };
+
+  const handleApplyCustom = () => {
+    // Normalize: ensure start <= end
+    const [s, e] = draftStart <= draftEnd ? [draftStart, draftEnd] : [draftEnd, draftStart];
+    const start = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+    const end = new Date(e.getFullYear(), e.getMonth(), e.getDate());
+    setAppliedRange({ start, end });
+    setCurrentMonth(start);
+    setCustomOpen(false);
+    toast.success(`Showing ${format(start, "MMM d, yyyy")} – ${format(end, "MMM d, yyyy")}`);
+  };
+
+  const clearCustomRange = () => {
+    setAppliedRange(null);
+    toast.info("Custom range cleared");
   };
 
   const renderHeader = () => {
@@ -69,10 +114,7 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [] }: MiniC
     return (
       <div className="grid grid-cols-7 gap-1 mb-2">
         {days.map((day) => (
-          <div
-            key={day}
-            className="text-center text-xs font-medium text-muted-foreground py-1"
-          >
+          <div key={day} className="text-center text-xs font-medium text-muted-foreground py-1">
             {day}
           </div>
         ))}
@@ -101,6 +143,11 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [] }: MiniC
         const isSelected = selectedDate && isSameDay(day, selectedDate);
         const isCurrentMonth = isSameMonth(day, monthStart);
         const isToday = isSameDay(day, new Date());
+        const inRange =
+          appliedRange &&
+          isWithinInterval(day, { start: appliedRange.start, end: appliedRange.end });
+        const isRangeStart = appliedRange && isSameDay(day, appliedRange.start);
+        const isRangeEnd = appliedRange && isSameDay(day, appliedRange.end);
 
         days.push(
           <button
@@ -114,26 +161,30 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [] }: MiniC
               isSelected && "bg-primary text-primary-foreground font-semibold",
               isWinning && !isSelected && "bg-emerald-500/20 text-emerald-500 font-medium",
               isLosing && !isSelected && "bg-red-500/20 text-red-500 font-medium",
-              hasTrade && dayPnL === 0 && !isSelected && "bg-muted text-muted-foreground font-medium"
+              hasTrade && dayPnL === 0 && !isSelected && "bg-muted text-muted-foreground font-medium",
+              inRange && !isSelected && "ring-1 ring-primary/40",
+              (isRangeStart || isRangeEnd) && !isSelected && "ring-2 ring-primary",
             )}
           >
             {format(day, "d")}
             {hasTrade && !isSelected && (
-              <span className={cn(
-                "absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full",
-                isWinning && "bg-emerald-500",
-                isLosing && "bg-red-500",
-                dayPnL === 0 && "bg-muted-foreground"
-              )} />
+              <span
+                className={cn(
+                  "absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full",
+                  isWinning && "bg-emerald-500",
+                  isLosing && "bg-red-500",
+                  dayPnL === 0 && "bg-muted-foreground",
+                )}
+              />
             )}
-          </button>
+          </button>,
         );
         day = addDays(day, 1);
       }
       rows.push(
         <div key={day.toString()} className="grid grid-cols-7 gap-1">
           {days}
-        </div>
+        </div>,
       );
       days = [];
     }
@@ -141,18 +192,9 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [] }: MiniC
   };
 
   const slideVariants = {
-    enter: (dir: number) => ({
-      x: dir > 0 ? 20 : -20,
-      opacity: 0,
-    }),
-    center: {
-      x: 0,
-      opacity: 1,
-    },
-    exit: (dir: number) => ({
-      x: dir > 0 ? -20 : 20,
-      opacity: 0,
-    }),
+    enter: (dir: number) => ({ x: dir > 0 ? 20 : -20, opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (dir: number) => ({ x: dir > 0 ? -20 : 20, opacity: 0 }),
   };
 
   return (
@@ -174,17 +216,112 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [] }: MiniC
         </motion.div>
       </AnimatePresence>
 
+      {/* Active range chip */}
+      <AnimatePresence>
+        {appliedRange && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-2.5 py-1.5"
+          >
+            <span className="text-[11px] text-foreground tabular-nums truncate">
+              {format(appliedRange.start, "MMM d")} – {format(appliedRange.end, "MMM d, yyyy")}
+            </span>
+            <button
+              onClick={clearCustomRange}
+              className="p-0.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Clear range"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Custom + Compare action buttons */}
       <div className="mt-4 pt-3 border-t border-border/40 grid grid-cols-2 gap-2">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => toast.info("Custom month selection coming soon")}
-          className="inline-flex items-center justify-center gap-1.5 h-8 rounded-lg bg-muted/50 hover:bg-muted text-xs font-medium text-foreground transition-colors"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
-          Custom
-        </motion.button>
+        <Popover open={customOpen} onOpenChange={setCustomOpen}>
+          <PopoverTrigger asChild>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className={cn(
+                "inline-flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-medium transition-colors",
+                appliedRange
+                  ? "bg-primary/15 text-primary hover:bg-primary/20"
+                  : "bg-muted/50 hover:bg-muted text-foreground",
+              )}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Custom
+            </motion.button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="center"
+            sideOffset={8}
+            className="w-auto p-4 rounded-2xl border-border/60 shadow-xl"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="flex flex-col gap-4"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">Custom range</span>
+                <button
+                  onClick={() => setCustomOpen(false)}
+                  className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <IOSDatePicker
+                  label="Start date"
+                  value={draftStart}
+                  onChange={setDraftStart}
+                />
+                <div className="w-px self-stretch bg-border/40 mt-6" />
+                <IOSDatePicker
+                  label="End date"
+                  value={draftEnd}
+                  onChange={setDraftEnd}
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <span className="text-[11px] text-muted-foreground tabular-nums">
+                  {format(draftStart, "MMM d, yyyy")} → {format(draftEnd, "MMM d, yyyy")}
+                </span>
+                <div className="flex items-center gap-2">
+                  {appliedRange && (
+                    <button
+                      onClick={() => {
+                        clearCustomRange();
+                        setCustomOpen(false);
+                      }}
+                      className="h-8 px-3 rounded-lg text-xs font-medium bg-muted/50 hover:bg-muted text-foreground transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={handleApplyCustom}
+                    className="h-8 px-4 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    Apply
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </PopoverContent>
+        </Popover>
+
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
