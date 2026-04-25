@@ -583,7 +583,7 @@ const Index = () => {
 
       <div className={cn(
         "min-h-screen flex flex-col gap-3 p-2 sm:p-3 pb-24 transition-all duration-300 w-full",
-        !isChartPage && "lg:p-5 lg:pb-5 lg:pl-24"
+        !isChartPage && "lg:p-5 lg:pb-5"
       )}>
         {/* Mobile Header */}
         {!isChartPage && (
@@ -612,7 +612,8 @@ const Index = () => {
         )}
 
         <main className={cn(
-          "flex-1 transition-all duration-300 min-w-0"
+          "flex-1 transition-all duration-300 min-w-0",
+          !isChartPage && sidebarCollapsed && "lg:ml-24"
         )}>
           <div className={cn(
             "glass-strong rounded-2xl min-h-[calc(100vh-120px)]",
