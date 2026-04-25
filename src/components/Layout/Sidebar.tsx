@@ -88,15 +88,19 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
 
             return (
               <div key={item.id} className="relative group">
+                {/* Active indicator bar on the left */}
+                {isActive && (
+                  <span className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-primary shadow-glow-sm" />
+                )}
                 <button
                   onClick={() => !isDisabled && onPageChange(item.id)}
                   disabled={isDisabled}
                   className={cn(
-                    "flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300",
+                    "flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300 relative",
                     isDisabled
                       ? "text-muted-foreground/50 cursor-not-allowed opacity-50"
                       : isActive
-                        ? "bg-gradient-to-r from-primary/20 to-secondary/10 border border-primary/50 text-foreground shadow-glow-sm"
+                        ? "bg-primary/15 border border-primary/60 text-foreground shadow-glow-sm scale-105"
                         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
                   )}
                 >
@@ -105,7 +109,7 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
                     isDisabled
                       ? "text-muted-foreground/50"
                       : isActive
-                        ? "text-primary"
+                        ? "text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.6)]"
                         : "text-muted-foreground group-hover:text-primary"
                   )} />
                 </button>
