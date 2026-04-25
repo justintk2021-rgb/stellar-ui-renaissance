@@ -26,7 +26,6 @@ const navItems = [
 export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
   const [, setUserName] = useState<string>("NSYNC JOURNAL");
 
-  // Fetch user name once; re-fetch only when the user actually changes
   useEffect(() => {
     let cancelled = false;
     let lastUserId: string | null = null;
@@ -65,9 +64,7 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
   }, []);
 
   return (
-    <aside
-      className="hidden lg:block fixed left-0 top-0 h-full z-50 p-3 w-20"
-    >
+    <aside className="hidden lg:block fixed left-0 top-0 h-full z-50 p-3 w-20">
       <div className="glass-strong rounded-2xl flex flex-col gap-6 shadow-card h-full p-3 w-14 items-center">
         {/* Logo */}
         <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -110,14 +107,15 @@ export function Sidebar({ currentPage, onPageChange }: SidebarProps) {
                   )} />
                 </button>
 
-                {/* Inline hover label — appears to the right of the icon */}
+                {/* Inline hover label — slides in from the left and fades out on leave */}
                 <span
                   className={cn(
                     "pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 whitespace-nowrap",
                     "px-3 py-1.5 rounded-lg text-sm font-medium",
-                    "glass-strong shadow-card text-foreground",
-                    "opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0",
-                    "transition-all duration-200 z-50"
+                    "glass-strong shadow-card text-foreground border border-border/40",
+                    "opacity-0 -translate-x-2 scale-95",
+                    "group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100",
+                    "transition-all duration-300 ease-out z-50"
                   )}
                 >
                   {item.label}
