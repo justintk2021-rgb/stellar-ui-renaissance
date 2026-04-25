@@ -583,7 +583,7 @@ const Index = () => {
 
       <div className={cn(
         "min-h-screen flex flex-col gap-3 p-2 sm:p-3 pb-24 transition-all duration-300 w-full",
-        !isChartPage && "lg:p-5 lg:pb-5"
+        !isChartPage && "lg:p-5 lg:pb-5 lg:pl-24"
       )}>
         {/* Mobile Header */}
         {!isChartPage && (
