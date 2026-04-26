@@ -823,7 +823,7 @@ const Index = () => {
                   </motion.div>
 
                   {/* Main Content with Calendar Sidebar */}
-                  <motion.div variants={staggerItem} className="flex gap-6">
+                  <motion.div variants={staggerItem} className={cn(compareOpen ? "block w-full" : "flex gap-6")}>
                     {compareOpen ? (
                       <CompareView
                         trades={trades}
@@ -832,10 +832,20 @@ const Index = () => {
                         initialMode={pickerInitial ? "range" : readCompareFromURL(window.location.search)?.mode}
                         initialA={pickerInitial?.a ?? readCompareFromURL(window.location.search)?.a}
                         initialB={pickerInitial?.b ?? readCompareFromURL(window.location.search)?.b}
+                        onEditPeriods={({ a, b }) => {
+                          // Seed the picker with the current A/B months so the
+                          // user sees their existing selection preloaded.
+                          setPickerSelection([
+                            { month: a.start.getMonth(), year: a.start.getFullYear() },
+                            { month: b.start.getMonth(), year: b.start.getFullYear() },
+                          ]);
+                          setComparePickerOpen(true);
+                        }}
                         onClose={() => {
                           clearCompareFromURL();
                           setCompareOpen(false);
                           setPickerInitial(null);
+                          setPickerSelection(undefined);
                         }}
                       />
                     ) : (() => {
@@ -846,8 +856,6 @@ const Index = () => {
                           ? trades.filter(t => t.result > 0)
                           : trades.filter(t => t.result < 0);
 
-                      // Use the SHARED helpers so the trade log, dashboard
-                      // PnL calendar, and mini calendar always agree.
                       const fmt = formatLocalDateKey;
                       const getOpenDateKey = (t: typeof winLossFiltered[number]) =>
                         getTradeLocalDateKey(t);
@@ -858,7 +866,6 @@ const Index = () => {
                             const endStr = fmt(journalDateRange.end);
                             return winLossFiltered.filter(t => {
                               const d = getOpenDateKey(t);
-                              // Inclusive on both ends — based on OPEN date
                               return d >= startStr && d <= endStr;
                             });
                           })()
@@ -890,37 +897,42 @@ const Index = () => {
                             />
                           </div>
 
-                          {/* Mini Calendar Sidebar — always visible; picker is an overlay modal */}
+                          {/* Mini Calendar Sidebar */}
                           <div className="hidden lg:block w-64 flex-shrink-0">
                             <MiniCalendar
                               onRangeChange={setJournalDateRange}
                               dayPnLs={dayPnLs}
-                              onCompareClick={() => setComparePickerOpen(true)}
+                              onCompareClick={() => {
+                                setPickerSelection(undefined);
+                                setComparePickerOpen(true);
+                              }}
                             />
                           </div>
-
-                          {/* Year-view month picker (centered modal overlay) */}
-                          <YearMonthPicker
-                            open={comparePickerOpen}
-                            dayPnLs={dayPnLs}
-                            onClose={() => setComparePickerOpen(false)}
-                            onConfirm={(a: MonthSelection, b: MonthSelection) => {
-                              const aStart = new Date(a.year, a.month, 1);
-                              const aEnd = new Date(a.year, a.month + 1, 0);
-                              const bStart = new Date(b.year, b.month, 1);
-                              const bEnd = new Date(b.year, b.month + 1, 0);
-                              setPickerInitial({
-                                a: { start: aStart, end: aEnd },
-                                b: { start: bStart, end: bEnd },
-                              });
-                              setComparePickerOpen(false);
-                              setCompareOpen(true);
-                            }}
-                          />
                         </>
                       );
                     })()}
                   </motion.div>
+
+                  {/* Year-view month picker — available from BOTH the sidebar
+                      Compare button AND the in-Compare "Edit periods" button. */}
+                  <YearMonthPicker
+                    open={comparePickerOpen}
+                    initialSelection={pickerSelection}
+                    onClose={() => setComparePickerOpen(false)}
+                    onConfirm={(a: MonthSelection, b: MonthSelection) => {
+                      const aStart = new Date(a.year, a.month, 1);
+                      const aEnd = new Date(a.year, a.month + 1, 0);
+                      const bStart = new Date(b.year, b.month, 1);
+                      const bEnd = new Date(b.year, b.month + 1, 0);
+                      setPickerInitial({
+                        a: { start: aStart, end: aEnd },
+                        b: { start: bStart, end: bEnd },
+                      });
+                      setComparePickerOpen(false);
+                      setPickerSelection(undefined);
+                      setCompareOpen(true);
+                    }}
+                  />
 
                   {/* Trade Form Modal */}
                   <TradeFormModal
