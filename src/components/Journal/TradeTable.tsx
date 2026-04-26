@@ -82,24 +82,12 @@ const getTradeNote = (entries: NotebookEntry[], tradeId: string): NotebookEntry 
   return entries.find(e => e.tradeId === tradeId && !e.isDeleted);
 };
 
-// Group trades by their LOCAL open date so the trade log matches the
-// dashboard PnL calendar and journal mini calendar exactly. A trade opened
-// late at night (e.g., 11:30 PM local) stays on that day rather than
-// shifting to the next day due to UTC conversion of `openTime`.
-const getTradeBucketDate = (trade: Trade): string => {
-  if (trade.openTime) {
-    const d = new Date(trade.openTime);
-    if (!isNaN(d.getTime())) {
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    }
-  }
-  return (trade.date || 'Unknown').slice(0, 10);
-};
-
+// Group trades by their LOCAL open date using the SHARED helper so the trade
+// log matches the dashboard PnL calendar and journal mini calendar exactly.
 const groupTradesByDate = (trades: Trade[]) => {
   const groups: Record<string, Trade[]> = {};
   trades.forEach(trade => {
-    const date = getTradeBucketDate(trade);
+    const date = getTradeLocalDateKey(trade) || 'Unknown';
     if (!groups[date]) {
       groups[date] = [];
     }
