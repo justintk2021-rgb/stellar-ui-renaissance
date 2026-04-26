@@ -315,6 +315,11 @@ const Index = () => {
     a: { start: Date; end: Date };
     b: { start: Date; end: Date };
   } | null>(null);
+  // Optional initial selection passed to the YearMonthPicker when re-opened
+  // from the Compare view's "Edit periods" button.
+  const [pickerSelection, setPickerSelection] = useState<
+    { month: number; year: number }[] | undefined
+  >(undefined);
   const [allUserTrades, setAllUserTrades] = useState<Trade[]>([]);
 
   // Lazily fetch ALL of the user's trades (across every account) when Compare opens,
