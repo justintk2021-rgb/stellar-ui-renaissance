@@ -549,7 +549,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit,
                       "text-sm font-bold font-mono flex items-center",
                       tradeIsProfit ? "text-primary" : "text-destructive"
                     )}>
-                      {tradeIsProfit ? '+' : ''}{pl.toFixed(2)}
+                      {formatPnL(pl, { withSymbol: false })}
                     </div>
                     <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                       {!trade.importedFromBroker && (
