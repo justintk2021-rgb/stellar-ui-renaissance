@@ -53,12 +53,20 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
   // Create a map for quick lookup
   const pnlMap = new Map(dayPnLs.map((d) => [d.date, d.pnl]));
 
+  // Boundary months for the applied custom range (first day of month).
+  const rangeMinMonth = appliedRange ? startOfMonth(appliedRange.start) : null;
+  const rangeMaxMonth = appliedRange ? startOfMonth(appliedRange.end) : null;
+  const canGoPrev = !rangeMinMonth || startOfMonth(currentMonth) > rangeMinMonth;
+  const canGoNext = !rangeMaxMonth || startOfMonth(currentMonth) < rangeMaxMonth;
+
   const handlePrevMonth = () => {
+    if (!canGoPrev) return;
     setDirection(-1);
     setCurrentMonth(subMonths(currentMonth, 1));
   };
 
   const handleNextMonth = () => {
+    if (!canGoNext) return;
     setDirection(1);
     setCurrentMonth(addMonths(currentMonth, 1));
   };
