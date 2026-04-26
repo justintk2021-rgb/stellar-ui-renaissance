@@ -17,6 +17,7 @@ import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { MiniCalendar } from "@/components/Journal/MiniCalendar";
 import { AccountSelector } from "@/components/Dashboard/AccountSelector";
+import { formatLocalDateKey, getTradeLocalDateKey } from "@/lib/tradeFormat";
 
 // Lazy-load heavy/secondary pages so the dashboard paints instantly.
 const NotebookView = lazy(() => import("@/components/Notebook/NotebookView").then(m => ({ default: m.NotebookView })));
@@ -775,20 +776,11 @@ const Index = () => {
                           ? trades.filter(t => t.result > 0)
                           : trades.filter(t => t.result < 0);
 
-                      const fmt = (d: Date) =>
-                        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-                      // Use the trade's OPEN date in the user's LOCAL timezone for filtering
-                      // and calendar dots. This guarantees a trade opened Apr 7 at 11:30pm local
-                      // shows on Apr 7 (not Apr 8 due to UTC conversion). Falls back to the
-                      // trade's `date` field for manual entries without an openTime.
-                      const getOpenDateKey = (t: typeof winLossFiltered[number]) => {
-                        if (t.openTime) {
-                          const d = new Date(t.openTime);
-                          if (!isNaN(d.getTime())) return fmt(d);
-                        }
-                        return (t.date || '').slice(0, 10);
-                      };
+                      // Use the SHARED helpers so the trade log, dashboard
+                      // PnL calendar, and mini calendar always agree.
+                      const fmt = formatLocalDateKey;
+                      const getOpenDateKey = (t: typeof winLossFiltered[number]) =>
+                        getTradeLocalDateKey(t);
 
                       const rangeFiltered = journalDateRange
                         ? (() => {

@@ -21,6 +21,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  getTradeLocalDateKey,
+  parseLocalDateKey,
+  formatPnL,
+  sumPnL,
+} from "@/lib/tradeFormat";
 
 type HistoryPeriod = "all" | "week" | "month" | "3months" | "6months" | "year";
 
@@ -76,24 +82,12 @@ const getTradeNote = (entries: NotebookEntry[], tradeId: string): NotebookEntry 
   return entries.find(e => e.tradeId === tradeId && !e.isDeleted);
 };
 
-// Group trades by their LOCAL open date so the trade log matches the
-// dashboard PnL calendar and journal mini calendar exactly. A trade opened
-// late at night (e.g., 11:30 PM local) stays on that day rather than
-// shifting to the next day due to UTC conversion of `openTime`.
-const getTradeBucketDate = (trade: Trade): string => {
-  if (trade.openTime) {
-    const d = new Date(trade.openTime);
-    if (!isNaN(d.getTime())) {
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    }
-  }
-  return (trade.date || 'Unknown').slice(0, 10);
-};
-
+// Group trades by their LOCAL open date using the SHARED helper so the trade
+// log matches the dashboard PnL calendar and journal mini calendar exactly.
 const groupTradesByDate = (trades: Trade[]) => {
   const groups: Record<string, Trade[]> = {};
   trades.forEach(trade => {
-    const date = getTradeBucketDate(trade);
+    const date = getTradeLocalDateKey(trade) || 'Unknown';
     if (!groups[date]) {
       groups[date] = [];
     }
@@ -109,7 +103,7 @@ const calculateGroupMetrics = (trades: Trade[]) => {
   const losers = trades.filter(t => (t.result || 0) < 0).length;
   const winRate = totalTrades > 0 ? (winners / totalTrades) * 100 : 0;
   
-  const grossPnL = trades.reduce((sum, t) => sum + (t.result || 0), 0);
+  const grossPnL = sumPnL(trades);
   const totalWins = trades.filter(t => (t.result || 0) > 0).reduce((sum, t) => sum + (t.result || 0), 0);
   const totalLosses = Math.abs(trades.filter(t => (t.result || 0) < 0).reduce((sum, t) => sum + (t.result || 0), 0));
   const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? Infinity : 0;
@@ -125,9 +119,14 @@ const calculateGroupMetrics = (trades: Trade[]) => {
 };
 
 // Format date for display
+// Format the bucket date string (YYYY-MM-DD) for display. We parse the key as
+// a LOCAL date — using `new Date("2025-04-07")` parses as UTC midnight which
+// would shift to Apr 6 in negative-UTC zones. parseLocalDateKey avoids that.
 const formatDate = (dateStr: string) => {
   try {
-    const date = new Date(dateStr);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
+      ? parseLocalDateKey(dateStr)
+      : new Date(dateStr);
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' });
   } catch {
     return dateStr;
@@ -400,7 +399,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit,
               "text-base font-bold font-mono",
               isProfit ? "text-primary" : "text-destructive"
             )}>
-              {isProfit ? '+' : ''}{metrics.grossPnL.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+              {formatPnL(metrics.grossPnL)}
             </span>
           </div>
           <Badge 
@@ -477,7 +476,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit,
                   />
                   <MetricCard 
                     label="Gross P&L" 
-                    value={`$${Math.abs(metrics.grossPnL).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                    value={formatPnL(Math.abs(metrics.grossPnL), { showPlus: false })}
                     color={isProfit ? "primary" : "destructive"}
                     delay={0.3}
                   />
@@ -550,7 +549,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit,
                       "text-sm font-bold font-mono flex items-center",
                       tradeIsProfit ? "text-primary" : "text-destructive"
                     )}>
-                      {tradeIsProfit ? '+' : ''}{pl.toFixed(2)}
+                      {formatPnL(pl, { withSymbol: false })}
                     </div>
                     <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                       {!trade.importedFromBroker && (
@@ -1053,7 +1052,7 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                                 "text-xs font-mono font-bold",
                                 isProfit ? "text-primary" : "text-destructive"
                               )}>
-                                {isProfit ? '+' : ''}{pl.toFixed(2)}
+                                {formatPnL(pl, { withSymbol: false })}
                               </span>
                             </div>
                           </div>

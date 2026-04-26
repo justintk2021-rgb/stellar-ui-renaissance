@@ -21,6 +21,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  formatPnL as sharedFormatPnL,
+  getTradeLocalDateKey,
+} from "@/lib/tradeFormat";
 
 import { toast } from "sonner";
 
@@ -44,13 +48,9 @@ const MONTH_NAMES = [
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// Format PnL with exact values (no rounding)
-const formatPnL = (value: number): string => {
-  const absValue = Math.abs(value);
-  const factor = Math.pow(10, 2);
-  const truncated = Math.trunc(absValue * factor) / factor;
-  return `${value < 0 ? '-' : ''}$${truncated.toFixed(2)}`;
-};
+// Format PnL using the shared truncating formatter so the dashboard, trade
+// log, and mini calendar always agree to the cent.
+const formatPnL = (value: number): string => sharedFormatPnL(value, { showPlus: false });
 
 export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSaveEntry, onAddTrade }: PnLCalendarProps) {
   const { checklists } = useChecklists();
@@ -106,17 +106,11 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
     const stats: Record<string, DailyStats & { winRate: number }> = {};
     const tradesMap: Record<string, Trade[]> = {};
 
-    const fmtLocal = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
+    // Use the SHARED bucketing helper so dashboard / trade log / mini calendar
+    // can never drift apart again.
     const getOpenDateKey = (trade: Trade): string | null => {
-      // Prefer the actual open timestamp (broker-imported trades have this).
-      if (trade.openTime) {
-        const d = new Date(trade.openTime);
-        if (!isNaN(d.getTime())) return fmtLocal(d);
-      }
-      // Fall back to the trade's `date` field for manual entries.
-      return trade.date ? trade.date.slice(0, 10) : null;
+      const key = getTradeLocalDateKey(trade);
+      return key || null;
     };
 
     trades.forEach((trade) => {
