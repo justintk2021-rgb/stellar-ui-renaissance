@@ -885,34 +885,33 @@ const Index = () => {
                             />
                           </div>
 
-                          {/* Mini Calendar Sidebar (or year-view month picker overlay) */}
-                          <div className="hidden lg:block w-64 flex-shrink-0 relative">
-                            {comparePickerOpen ? (
-                              <YearMonthPicker
-                                open={comparePickerOpen}
-                                dayPnLs={dayPnLs}
-                                onClose={() => setComparePickerOpen(false)}
-                                onConfirm={(a: MonthSelection, b: MonthSelection) => {
-                                  const aStart = new Date(a.year, a.month, 1);
-                                  const aEnd = new Date(a.year, a.month + 1, 0);
-                                  const bStart = new Date(b.year, b.month, 1);
-                                  const bEnd = new Date(b.year, b.month + 1, 0);
-                                  setPickerInitial({
-                                    a: { start: aStart, end: aEnd },
-                                    b: { start: bStart, end: bEnd },
-                                  });
-                                  setComparePickerOpen(false);
-                                  setCompareOpen(true);
-                                }}
-                              />
-                            ) : (
-                              <MiniCalendar
-                                onRangeChange={setJournalDateRange}
-                                dayPnLs={dayPnLs}
-                                onCompareClick={() => setComparePickerOpen(true)}
-                              />
-                            )}
+                          {/* Mini Calendar Sidebar — always visible; picker is an overlay modal */}
+                          <div className="hidden lg:block w-64 flex-shrink-0">
+                            <MiniCalendar
+                              onRangeChange={setJournalDateRange}
+                              dayPnLs={dayPnLs}
+                              onCompareClick={() => setComparePickerOpen(true)}
+                            />
                           </div>
+
+                          {/* Year-view month picker (centered modal overlay) */}
+                          <YearMonthPicker
+                            open={comparePickerOpen}
+                            dayPnLs={dayPnLs}
+                            onClose={() => setComparePickerOpen(false)}
+                            onConfirm={(a: MonthSelection, b: MonthSelection) => {
+                              const aStart = new Date(a.year, a.month, 1);
+                              const aEnd = new Date(a.year, a.month + 1, 0);
+                              const bStart = new Date(b.year, b.month, 1);
+                              const bEnd = new Date(b.year, b.month + 1, 0);
+                              setPickerInitial({
+                                a: { start: aStart, end: aEnd },
+                                b: { start: bStart, end: bEnd },
+                              });
+                              setComparePickerOpen(false);
+                              setCompareOpen(true);
+                            }}
+                          />
                         </>
                       );
                     })()}
