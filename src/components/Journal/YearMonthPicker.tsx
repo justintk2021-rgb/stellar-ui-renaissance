@@ -317,14 +317,24 @@ const MonthTile: React.FC<{
   const endDate = endOfWeek(monthEnd);
   const today = new Date();
 
+  // Always pad to 6 weeks (42 cells) so EVERY tile is the same height
+  // regardless of whether the month spans 4, 5, or 6 calendar rows.
   const days: Date[] = [];
   let day = startDate;
   while (day <= endDate) {
     days.push(day);
     day = addDays(day, 1);
   }
+  while (days.length < 42) {
+    days.push(addDays(days[days.length - 1], 1));
+  }
 
   const weekdayHeaders = ["S", "M", "T", "W", "T", "F", "S"];
+
+  // Fixed cell size keeps every tile identical in height. 6 rows × 28px ≈ 168px
+  // for the day grid alone, plus header + weekday + padding. Worst-case month
+  // (6 rows) and best-case month (4 rows) render at the SAME size.
+  const CELL_SIZE = "h-7"; // 28px
 
   return (
     <motion.button
@@ -333,7 +343,7 @@ const MonthTile: React.FC<{
       whileTap={{ scale: 0.99 }}
       onClick={onClick}
       className={cn(
-        "flex flex-col items-stretch gap-2 rounded-xl p-3 text-left transition-colors h-full min-h-0",
+        "flex flex-col items-stretch rounded-xl p-3 text-left transition-colors",
         selected
           ? "bg-primary/20 ring-1 ring-inset ring-primary/50"
           : "bg-muted/20 hover:bg-muted/40",
@@ -342,7 +352,7 @@ const MonthTile: React.FC<{
       {/* Month name */}
       <div
         className={cn(
-          "text-xs font-semibold text-center px-1 py-0.5 rounded shrink-0",
+          "text-xs font-semibold text-center px-1 pb-2 shrink-0",
           selected ? "text-primary" : "text-foreground",
         )}
       >
@@ -350,19 +360,20 @@ const MonthTile: React.FC<{
       </div>
 
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 gap-0.5 shrink-0">
+      <div className="grid grid-cols-7 gap-1 shrink-0 pb-1.5">
         {weekdayHeaders.map((d, i) => (
           <div
             key={`${d}-${i}`}
-            className="text-center text-[10px] font-medium text-muted-foreground/70 leading-tight"
+            className="text-center text-[10px] font-medium text-muted-foreground/70 leading-none h-3 flex items-center justify-center"
           >
             {d}
           </div>
         ))}
       </div>
 
-      {/* Day grid — fills the remaining tile height */}
-      <div className="grid grid-cols-7 gap-0.5 flex-1 min-h-0">
+      {/* Day grid — ALWAYS 6 rows × 7 cols, fixed cell height. Months that
+          only need 5 rows render the trailing row as muted out-of-month days. */}
+      <div className="grid grid-cols-7 grid-rows-6 gap-1 shrink-0">
         {days.map((d) => {
           const inMonth = isSameMonth(d, monthStart);
           const dateKey = format(d, "yyyy-MM-dd");
@@ -375,7 +386,7 @@ const MonthTile: React.FC<{
           // Same number-color rules as the standard mini calendar.
           let numberColorClass = "text-foreground";
           if (!inMonth) {
-            numberColorClass = "text-muted-foreground/30";
+            numberColorClass = "text-muted-foreground/25";
           } else if (hasTrade) {
             if (isWinning) numberColorClass = "text-emerald-500";
             else if (isLosing) numberColorClass = "text-red-500";
@@ -387,17 +398,18 @@ const MonthTile: React.FC<{
             <div
               key={d.toString()}
               className={cn(
-                "relative aspect-square flex items-center justify-center text-[10px] leading-none rounded-md",
+                "relative flex items-center justify-center text-[10px] leading-none rounded-md",
+                CELL_SIZE,
                 inMonth && hasTrade && "bg-primary/15 font-medium",
                 inMonth && isToday && !hasTrade && "bg-primary/15 font-semibold",
                 numberColorClass,
               )}
             >
-              {format(d, "d")}
+              <span className="block -mt-0.5">{format(d, "d")}</span>
               {hasTrade && (
                 <span
                   className={cn(
-                    "absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full",
+                    "absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full",
                     isWinning && "bg-emerald-500",
                     isLosing && "bg-red-500",
                     dayPnL === 0 && "bg-muted-foreground",
