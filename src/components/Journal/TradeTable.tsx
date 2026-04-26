@@ -119,9 +119,14 @@ const calculateGroupMetrics = (trades: Trade[]) => {
 };
 
 // Format date for display
+// Format the bucket date string (YYYY-MM-DD) for display. We parse the key as
+// a LOCAL date — using `new Date("2025-04-07")` parses as UTC midnight which
+// would shift to Apr 6 in negative-UTC zones. parseLocalDateKey avoids that.
 const formatDate = (dateStr: string) => {
   try {
-    const date = new Date(dateStr);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
+      ? parseLocalDateKey(dateStr)
+      : new Date(dateStr);
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' });
   } catch {
     return dateStr;
