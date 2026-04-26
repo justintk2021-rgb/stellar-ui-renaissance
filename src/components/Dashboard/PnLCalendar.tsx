@@ -21,6 +21,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  formatPnL as sharedFormatPnL,
+  getTradeLocalDateKey,
+} from "@/lib/tradeFormat";
 
 import { toast } from "sonner";
 
