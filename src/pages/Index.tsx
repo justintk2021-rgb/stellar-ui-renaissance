@@ -893,6 +893,25 @@ const Index = () => {
                               onCompareClick={() => setComparePickerOpen(true)}
                             />
                           </div>
+
+                          {/* Year-view month picker (centered modal overlay) */}
+                          <YearMonthPicker
+                            open={comparePickerOpen}
+                            dayPnLs={dayPnLs}
+                            onClose={() => setComparePickerOpen(false)}
+                            onConfirm={(a: MonthSelection, b: MonthSelection) => {
+                              const aStart = new Date(a.year, a.month, 1);
+                              const aEnd = new Date(a.year, a.month + 1, 0);
+                              const bStart = new Date(b.year, b.month, 1);
+                              const bEnd = new Date(b.year, b.month + 1, 0);
+                              setPickerInitial({
+                                a: { start: aStart, end: aEnd },
+                                b: { start: bStart, end: bEnd },
+                              });
+                              setComparePickerOpen(false);
+                              setCompareOpen(true);
+                            }}
+                          />
                         </>
                       );
                     })()}
