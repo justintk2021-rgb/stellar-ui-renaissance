@@ -180,8 +180,11 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
               isCurrentMonth && !hasTrade && !isOutOfRange && "text-foreground hover:bg-muted",
               isToday && !isSelected && !hasTrade && !isOutOfRange && "bg-primary/15 text-primary font-semibold",
               isSelected && !isOutOfRange && "bg-primary text-primary-foreground font-semibold",
-              // Uniform accent treatment for any day with trades (win/loss meaning lives in the dot)
-              hasTrade && !isSelected && !isOutOfRange && "bg-primary/15 text-primary font-medium",
+              // Accent pill for any day with trades; date number inherits win/loss semantic color
+              hasTrade && !isSelected && !isOutOfRange && "bg-primary/15 font-medium",
+              hasTrade && !isSelected && !isOutOfRange && isWinning && "text-emerald-500",
+              hasTrade && !isSelected && !isOutOfRange && isLosing && "text-red-500",
+              hasTrade && !isSelected && !isOutOfRange && dayPnL === 0 && "text-foreground",
               // Soft per-day tint for custom range (no continuous line)
               inRange && !isSelected && !hasTrade && "bg-primary/15 text-primary",
               inRange && !isSelected && hasTrade && "ring-1 ring-inset ring-primary/40",
