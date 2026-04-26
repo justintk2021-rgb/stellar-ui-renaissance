@@ -217,8 +217,9 @@ export function YearMonthPicker({
               </div>
             </div>
 
-            {/* Year grid: 4 cols × 3 rows of mini month tiles, fills available space */}
-            <div className="flex-1 min-h-0 px-6 py-5 overflow-auto">
+            {/* Year grid: 4 cols × 3 rows of mini month tiles. Body scrolls
+                vertically when tiles don't fit so months are NEVER compressed. */}
+            <div className="flex-1 min-h-0 px-8 py-6 overflow-y-auto overflow-x-hidden">
               <AnimatePresence mode="wait" custom={direction}>
                 <motion.div
                   key={year}
@@ -228,7 +229,7 @@ export function YearMonthPicker({
                   animate="center"
                   exit="exit"
                   transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="grid grid-cols-4 grid-rows-3 gap-4 h-full min-h-[480px]"
+                  className="grid grid-cols-4 gap-x-8 gap-y-12"
                 >
                   {Array.from({ length: 12 }, (_, m) => (
                     <MonthTile
