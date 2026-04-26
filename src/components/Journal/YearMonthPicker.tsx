@@ -56,6 +56,7 @@ const sameSel = (a: MonthSelection, b: MonthSelection) =>
 export function YearMonthPicker({
   open,
   initialYear,
+  initialSelection,
   dayPnLs = [],
   onClose,
   onConfirm,
@@ -64,13 +65,16 @@ export function YearMonthPicker({
     initialYear ?? new Date().getFullYear(),
   );
   const [direction, setDirection] = useState(0);
-  const [selected, setSelected] = useState<MonthSelection[]>([]);
+  const [selected, setSelected] = useState<MonthSelection[]>(initialSelection ?? []);
 
-  // Reset to current year + clear selection whenever the picker is opened.
+  // Reset to current year + (re)apply selection whenever the picker is opened.
   useEffect(() => {
     if (open) {
-      setYear(initialYear ?? new Date().getFullYear());
-      setSelected([]);
+      const seed = initialSelection ?? [];
+      const defaultYear =
+        initialYear ?? (seed[0]?.year ?? new Date().getFullYear());
+      setYear(defaultYear);
+      setSelected(seed);
       setDirection(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
