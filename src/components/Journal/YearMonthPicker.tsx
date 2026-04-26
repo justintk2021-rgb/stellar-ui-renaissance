@@ -142,48 +142,64 @@ export function YearMonthPicker({
   return (
     <AnimatePresence>
       {open && (
-        <>
-          {/* Outside-click backdrop — invisible, just catches clicks */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-10">
+          {/* Dim + blur backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-40"
+            transition={{ duration: 0.18 }}
+            className="absolute inset-0 bg-background/60 backdrop-blur-sm"
             onClick={onClose}
           />
 
-          {/* Popover panel — replaces the mini calendar in place */}
+          {/* Centered modal panel */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -4 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="relative z-50 p-4 rounded-xl bg-card/95 backdrop-blur-sm border border-border/40 shadow-xl overflow-hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Select two months to compare"
+            className={cn(
+              "relative z-10 flex flex-col rounded-2xl bg-card/95 backdrop-blur-md border border-border/50 shadow-2xl overflow-hidden",
+              // Sizing: ~80% of viewport, capped at 1200×800
+              "w-[80vw] h-[80vh] max-w-[1200px] max-h-[800px]",
+            )}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header: year nav + close */}
-            <div className="flex items-center justify-between mb-3">
-              <button
-                onClick={handlePrevYear}
-                className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-                aria-label="Previous year"
-              >
-                <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={year}
-                  initial={{ opacity: 0, y: direction * 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: direction * -8 }}
-                  transition={{ duration: 0.18 }}
-                  className="text-sm font-semibold tabular-nums"
+            {/* Header */}
+            <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border/40 shrink-0">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-foreground truncate">
+                  Select two months to compare
+                </div>
+                <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                  Pick any two months from any year — they become Period A and Period B.
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePrevYear}
+                  className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                  aria-label="Previous year"
                 >
-                  {year}
-                </motion.span>
-              </AnimatePresence>
-              <div className="flex items-center gap-1">
+                  <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                </button>
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={year}
+                    initial={{ opacity: 0, y: direction * 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: direction * -8 }}
+                    transition={{ duration: 0.18 }}
+                    className="text-base font-semibold tabular-nums min-w-[3.5rem] text-center"
+                  >
+                    {year}
+                  </motion.span>
+                </AnimatePresence>
                 <button
                   onClick={handleNextYear}
                   className="p-1.5 rounded-lg hover:bg-muted transition-colors"
@@ -193,88 +209,92 @@ export function YearMonthPicker({
                 </button>
                 <button
                   onClick={onClose}
-                  className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  className="ml-2 p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                   aria-label="Close"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
 
-            {/* Year grid: 4 cols × 3 rows of mini month tiles */}
-            <AnimatePresence mode="wait" custom={direction}>
-              <motion.div
-                key={year}
-                custom={direction}
-                variants={slideVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="grid grid-cols-4 gap-2"
-              >
-                {Array.from({ length: 12 }, (_, m) => (
-                  <MonthTile
-                    key={m}
-                    month={m}
-                    year={year}
-                    selected={isMonthSelected(m, year)}
-                    onClick={() => toggleMonth(m, year)}
-                    pnlMap={pnlMap}
-                  />
-                ))}
-              </motion.div>
-            </AnimatePresence>
-
-            {/* Selection chips */}
-            <div className="mt-3 min-h-[28px] flex flex-wrap items-center gap-1.5">
-              {selected.length === 0 && (
-                <span className="text-[11px] text-muted-foreground">
-                  No months selected
-                </span>
-              )}
-              {selected.map((sel) => (
-                <span
-                  key={`${sel.year}-${sel.month}`}
-                  className="inline-flex items-center gap-1 rounded-md bg-primary/15 text-primary text-[11px] font-medium px-2 py-0.5"
+            {/* Year grid: 4 cols × 3 rows of mini month tiles, fills available space */}
+            <div className="flex-1 min-h-0 px-6 py-5 overflow-auto">
+              <AnimatePresence mode="wait" custom={direction}>
+                <motion.div
+                  key={year}
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="grid grid-cols-4 grid-rows-3 gap-4 h-full min-h-[480px]"
                 >
-                  {monthShortLabel(sel.month, sel.year)}
-                  <button
-                    onClick={() => removeSelection(sel)}
-                    className="p-0.5 rounded hover:bg-primary/20"
-                    aria-label={`Remove ${monthShortLabel(sel.month, sel.year)}`}
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
-                </span>
-              ))}
+                  {Array.from({ length: 12 }, (_, m) => (
+                    <MonthTile
+                      key={m}
+                      month={m}
+                      year={year}
+                      selected={isMonthSelected(m, year)}
+                      onClick={() => toggleMonth(m, year)}
+                      pnlMap={pnlMap}
+                    />
+                  ))}
+                </motion.div>
+              </AnimatePresence>
             </div>
 
-            {/* Confirm */}
-            <div className="mt-3 pt-3 border-t border-border/40">
-              <motion.button
-                whileHover={canConfirm ? { scale: 1.01 } : undefined}
-                whileTap={canConfirm ? { scale: 0.98 } : undefined}
-                onClick={handleConfirm}
-                disabled={!canConfirm}
-                className={cn(
-                  "w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-semibold transition-colors",
-                  canConfirm
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                    : "bg-muted/50 text-muted-foreground cursor-not-allowed",
+            {/* Footer: chips + Compare */}
+            <div className="px-6 py-4 border-t border-border/40 shrink-0 flex items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                {selected.length === 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    No months selected
+                  </span>
+                ) : (
+                  selected.map((sel) => (
+                    <span
+                      key={`${sel.year}-${sel.month}`}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-primary/15 text-primary text-xs font-medium px-2.5 py-1"
+                    >
+                      {monthLabel(sel.month, sel.year)}
+                      <button
+                        onClick={() => removeSelection(sel)}
+                        className="p-0.5 rounded hover:bg-primary/20"
+                        aria-label={`Remove ${monthLabel(sel.month, sel.year)}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))
                 )}
-              >
-                <GitCompare className="w-3.5 h-3.5" />
-                Compare
-              </motion.button>
-              {!canConfirm && (
-                <p className="mt-1.5 text-[10px] text-center text-muted-foreground">
-                  Select two months to compare.
-                </p>
-              )}
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                {!canConfirm && (
+                  <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                    Select two months to compare.
+                  </span>
+                )}
+                <motion.button
+                  whileHover={canConfirm ? { scale: 1.02 } : undefined}
+                  whileTap={canConfirm ? { scale: 0.98 } : undefined}
+                  onClick={handleConfirm}
+                  disabled={!canConfirm}
+                  className={cn(
+                    "inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-lg text-xs font-semibold transition-colors",
+                    canConfirm
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "bg-muted/50 text-muted-foreground cursor-not-allowed",
+                  )}
+                >
+                  <GitCompare className="w-3.5 h-3.5" />
+                  Compare
+                </motion.button>
+              </div>
             </div>
           </motion.div>
-        </>
+        </div>
       )}
     </AnimatePresence>
   );
