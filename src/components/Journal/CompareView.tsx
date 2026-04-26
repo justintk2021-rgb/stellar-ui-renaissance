@@ -269,219 +269,204 @@ export function CompareView({
         </div>
       </div>
 
-      {/* T-chart card */}
-      <div className="glass rounded-2xl border border-border/40 relative overflow-hidden group hover:border-primary/30 transition-all duration-300 hover:shadow-glow-sm">
-        {/* Subtle bg gradient — match Checklist Performance card */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-        <div className="relative z-10 p-5 space-y-4">
-          {/* Card title */}
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-              <BarChart3 className="w-4 h-4 text-primary" />
+      {/* Headline strip — Net P&L A → B + delta */}
+      <div className={cn(
+        "rounded-2xl p-4 relative overflow-hidden border",
+        headlineDelta.direction === "improved"
+          ? "bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent border-emerald-500/30"
+          : headlineDelta.direction === "regressed"
+            ? "bg-gradient-to-r from-red-500/15 via-red-500/5 to-transparent border-red-500/30"
+            : "bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-primary/30"
+      )}>
+        <div className="flex items-center justify-between gap-6 flex-wrap">
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{aShort} · Net P&L</div>
+              <div className={cn("text-2xl font-bold font-mono tabular-nums", pnlTextColor(aStats.netPnL))}>
+                {formatPnL(aStats.netPnL)}
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold text-sm">Comparison</h3>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Performance Comparison</p>
+            <ArrowRight className="w-5 h-5 text-muted-foreground" />
+            <div className="text-center">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{bShort} · Net P&L</div>
+              <div className={cn("text-2xl font-bold font-mono tabular-nums", pnlTextColor(bStats.netPnL))}>
+                {formatPnL(bStats.netPnL)}
+              </div>
             </div>
           </div>
-
-          {/* Headline strip — Net P&L A → B + delta */}
           <div className={cn(
-            "rounded-xl p-4 relative overflow-hidden border",
-            headlineDelta.direction === "improved"
-              ? "bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent border-emerald-500/30"
-              : headlineDelta.direction === "regressed"
-                ? "bg-gradient-to-r from-red-500/15 via-red-500/5 to-transparent border-red-500/30"
-                : "bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-primary/30"
+            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold tabular-nums border",
+            deltaBgChip(headlineDelta),
           )}>
-            <div className="flex items-center justify-between gap-6 flex-wrap">
-              <div className="flex items-center gap-4">
-                <div className="text-center">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{aShort} · Net P&L</div>
-                  <div className={cn("text-2xl font-bold font-mono tabular-nums", pnlTextColor(aStats.netPnL))}>
-                    {formatPnL(aStats.netPnL)}
-                  </div>
-                </div>
-                <ArrowRight className="w-5 h-5 text-muted-foreground" />
-                <div className="text-center">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{bShort} · Net P&L</div>
-                  <div className={cn("text-2xl font-bold font-mono tabular-nums", pnlTextColor(bStats.netPnL))}>
-                    {formatPnL(bStats.netPnL)}
-                  </div>
-                </div>
-              </div>
-              <div className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold tabular-nums border",
-                deltaBgChip(headlineDelta),
-              )}>
-                {headlineDelta.direction === "improved" ? <TrendingUp className="w-4 h-4" /> :
-                  headlineDelta.direction === "regressed" ? <TrendingDown className="w-4 h-4" /> : null}
-                {headlineDelta.direction === "unchanged"
-                  ? "No change"
-                  : headlineDelta.pct !== null
-                    ? `${deltaSign(headlineDelta.pct)}${Math.abs(headlineDelta.pct).toFixed(1)}%`
-                    : `${deltaSign(headlineDelta.abs)}${formatNumber(Math.abs(headlineDelta.abs))}`}
-              </div>
-            </div>
-          </div>
-
-          {/* T-chart grid: Labels (15) | Period A (20) | Period B (20) | Conclusion (45) */}
-          <div
-            className="grid gap-0 rounded-xl bg-muted/10 border border-border/30 overflow-hidden"
-            style={{ gridTemplateColumns: "15% 20% 20% 45%" }}
-          >
-            {/* === HEADER ROW === */}
-            <div className="px-3 py-3" />
-            <div className="px-3 py-3 border-l border-border/40 text-center">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Period A</div>
-              <div className="text-sm font-semibold truncate">{aShort}</div>
-            </div>
-            <div className="px-3 py-3 border-l border-border/40 text-center">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Period B</div>
-              <div className="text-sm font-semibold truncate">{bShort}</div>
-            </div>
-            <div className="px-4 py-3 border-l border-border/40">
-              <div className="text-[10px] uppercase tracking-wider text-primary font-bold flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3" />
-                Conclusion of Comparison
-              </div>
-            </div>
-
-            {/* Spans full width: horizontal divider under header (the top of the T) */}
-            <div className="col-span-4 border-t border-border/40" />
-
-            {/* === BODY ROW === */}
-            {/* Label column */}
-            <div className="flex flex-col">
-              {HEADLINE_METRICS.map((m, i) => (
-                <div
-                  key={m.key}
-                  className={cn(
-                    "px-3 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center",
-                    i > 0 && "border-t border-border/20",
-                  )}
-                >
-                  {m.label}
-                </div>
-              ))}
-            </div>
-
-            {/* Period A column */}
-            <div className="flex flex-col border-l border-border/40">
-              {HEADLINE_METRICS.map((m, i) => {
-                const v = m.rawA(aStats);
-                return (
-                  <div
-                    key={m.key}
-                    className={cn(
-                      "px-3 py-3 flex items-center justify-center",
-                      i > 0 && "border-t border-border/20",
-                    )}
-                  >
-                    <span className={cn(
-                      "tabular-nums font-mono text-sm font-semibold",
-                      m.isPnL ? pnlTextColor(v) : "text-foreground",
-                    )}>
-                      {m.format(v)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Period B column */}
-            <div className="flex flex-col border-l border-border/40">
-              {HEADLINE_METRICS.map((m, i) => {
-                const aVal = m.rawA(aStats);
-                const bVal = m.rawB(bStats);
-                const delta = computeDelta(aVal, bVal, m.direction);
-                return (
-                  <div
-                    key={m.key}
-                    className={cn(
-                      "px-3 py-3 flex items-center justify-center gap-2 flex-wrap",
-                      i > 0 && "border-t border-border/20",
-                    )}
-                  >
-                    <span className={cn(
-                      "tabular-nums font-mono text-sm font-semibold",
-                      m.isPnL ? pnlTextColor(bVal) : "text-foreground",
-                    )}>
-                      {m.format(bVal)}
-                    </span>
-                    {m.direction !== "neutral" || delta.direction !== "unchanged" ? (
-                      <span className={cn(
-                        "inline-flex items-center px-1.5 py-0.5 rounded-md border text-[10px] font-semibold tabular-nums shrink-0",
-                        deltaBgChip(delta),
-                      )}>
-                        {delta.direction === "improved" ? "▲ " : delta.direction === "regressed" ? "▼ " : ""}
-                        {delta.direction === "unchanged"
-                          ? "—"
-                          : delta.pct !== null
-                            ? `${deltaSign(delta.pct)}${Math.abs(delta.pct).toFixed(1)}${m.pctSuffix || "%"}`
-                            : `${deltaSign(delta.abs)}${formatNumber(Math.abs(delta.abs))}`}
-                      </span>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Conclusion column — internal scroll if needed */}
-            <div className="border-l border-border/40 flex flex-col max-h-[560px] overflow-y-auto">
-              <div className="p-4 space-y-4">
-                {/* Insight text */}
-                <div className="space-y-1.5">
-                  {insights.map((line, i) => (
-                    <p key={i} className="text-xs text-foreground/90 leading-relaxed">
-                      {line}
-                    </p>
-                  ))}
-                  {lengthMismatch && (
-                    <p className="text-[10px] text-muted-foreground italic pt-1">
-                      Period A is {aDays} days, Period B is {bDays} days — some metrics are normalized per-day.
-                    </p>
-                  )}
-                </div>
-
-                {/* Per-asset mini-breakdown */}
-                <div className="space-y-2">
-                  <div className="text-[10px] uppercase tracking-wider text-primary font-bold">Per-asset breakdown</div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-muted/30 rounded-lg p-2">
-                      <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Period A</div>
-                      <MiniAssetTable rows={aAssetRows} />
-                    </div>
-                    <div className="bg-muted/30 rounded-lg p-2">
-                      <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Period B</div>
-                      <MiniAssetTable rows={bAssetRows} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Best & worst */}
-                <div className="space-y-2">
-                  <div className="text-[10px] uppercase tracking-wider text-primary font-bold">Best &amp; worst trades</div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-muted/30 rounded-lg p-2">
-                      <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Period A</div>
-                      <MiniBestWorst bw={aBW} />
-                    </div>
-                    <div className="bg-muted/30 rounded-lg p-2">
-                      <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Period B</div>
-                      <MiniBestWorst bw={bBW} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {headlineDelta.direction === "improved" ? <TrendingUp className="w-4 h-4" /> :
+              headlineDelta.direction === "regressed" ? <TrendingDown className="w-4 h-4" /> : null}
+            {headlineDelta.direction === "unchanged"
+              ? "No change"
+              : headlineDelta.pct !== null
+                ? `${deltaSign(headlineDelta.pct)}${Math.abs(headlineDelta.pct).toFixed(1)}%`
+                : `${deltaSign(headlineDelta.abs)}${formatNumber(Math.abs(headlineDelta.abs))}`}
           </div>
         </div>
+      </div>
+
+      {/* Three card columns: Period A | Period B | Conclusion */}
+      <div
+        className="grid gap-6"
+        style={{ gridTemplateColumns: "1fr 1fr 2fr" }}
+      >
+        {/* === Period A card === */}
+        <PeriodCard
+          title={aShort}
+          icon={<TrendingUp className="w-4 h-4 text-primary" />}
+        >
+          {HEADLINE_METRICS.map((m) => {
+            const v = m.rawA(aStats);
+            return (
+              <MetricPill
+                key={m.key}
+                label={m.label}
+                value={m.format(v)}
+                valueClass={m.isPnL ? pnlTextColor(v) : "text-foreground"}
+              />
+            );
+          })}
+        </PeriodCard>
+
+        {/* === Period B card === */}
+        <PeriodCard
+          title={bShort}
+          icon={<TrendingDown className="w-4 h-4 text-primary" />}
+        >
+          {HEADLINE_METRICS.map((m) => {
+            const aVal = m.rawA(aStats);
+            const bVal = m.rawB(bStats);
+            const delta = computeDelta(aVal, bVal, m.direction);
+            const showDelta = m.direction !== "neutral" || delta.direction !== "unchanged";
+            return (
+              <MetricPill
+                key={m.key}
+                label={m.label}
+                value={m.format(bVal)}
+                valueClass={m.isPnL ? pnlTextColor(bVal) : "text-foreground"}
+                rightExtra={showDelta ? (
+                  <span className={cn(
+                    "inline-flex items-center px-1.5 py-0.5 rounded-md border text-[9px] font-semibold tabular-nums",
+                    deltaBgChip(delta),
+                  )}>
+                    {delta.direction === "improved" ? "▲ " : delta.direction === "regressed" ? "▼ " : ""}
+                    {delta.direction === "unchanged"
+                      ? "—"
+                      : delta.pct !== null
+                        ? `${deltaSign(delta.pct)}${Math.abs(delta.pct).toFixed(1)}${m.pctSuffix || "%"}`
+                        : `${deltaSign(delta.abs)}${formatNumber(Math.abs(delta.abs))}`}
+                  </span>
+                ) : null}
+              />
+            );
+          })}
+        </PeriodCard>
+
+        {/* === Conclusion card === */}
+        <PeriodCard
+          title="Conclusion of Comparison"
+          icon={<Sparkles className="w-4 h-4 text-primary" />}
+        >
+          <div className="max-h-[560px] overflow-y-auto pr-1 space-y-4">
+            {/* Insight text */}
+            <div className="space-y-1.5 px-1">
+              {insights.map((line, i) => (
+                <p key={i} className="text-xs text-foreground/90 leading-relaxed">
+                  {line}
+                </p>
+              ))}
+              {lengthMismatch && (
+                <p className="text-[10px] text-muted-foreground italic pt-1">
+                  Period A is {aDays} days, Period B is {bDays} days — some metrics are normalized per-day.
+                </p>
+              )}
+            </div>
+
+            {/* Per-asset mini-breakdown */}
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-wider text-primary font-bold px-1">Per-asset breakdown</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-muted/30 rounded-lg p-2.5">
+                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Period A</div>
+                  <MiniAssetTable rows={aAssetRows} />
+                </div>
+                <div className="bg-muted/30 rounded-lg p-2.5">
+                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Period B</div>
+                  <MiniAssetTable rows={bAssetRows} />
+                </div>
+              </div>
+            </div>
+
+            {/* Best & worst */}
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-wider text-primary font-bold px-1">Best &amp; worst trades</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-muted/30 rounded-lg p-2.5">
+                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Period A</div>
+                  <MiniBestWorst bw={aBW} />
+                </div>
+                <div className="bg-muted/30 rounded-lg p-2.5">
+                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Period B</div>
+                  <MiniBestWorst bw={bBW} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </PeriodCard>
       </div>
     </motion.div>
   );
 }
+
+/* ----------------------------- Card primitives ----------------------------- */
+
+const PeriodCard: React.FC<{
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ title, icon, children }) => (
+  <div className="glass rounded-2xl border border-border/40 relative overflow-hidden group hover:border-primary/30 transition-all duration-300">
+    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+    <div className="relative z-10 p-3 space-y-2.5">
+      {/* Header pill */}
+      <div className="rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/30 px-3 py-2.5 flex flex-col items-center gap-1">
+        <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
+          {icon}
+        </div>
+        <div className="text-[11px] font-bold text-foreground uppercase tracking-wide text-center truncate max-w-full">
+          {title}
+        </div>
+      </div>
+      {/* Body */}
+      <div className="space-y-1.5">
+        {children}
+      </div>
+    </div>
+  </div>
+);
+
+const MetricPill: React.FC<{
+  label: string;
+  value: string;
+  valueClass?: string;
+  rightExtra?: React.ReactNode;
+}> = ({ label, value, valueClass, rightExtra }) => (
+  <div className="rounded-lg bg-primary/5 hover:bg-primary/10 border border-primary/10 px-3 py-2 flex items-center justify-between gap-2 transition-colors">
+    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium truncate">
+      {label}
+    </span>
+    <div className="flex items-center gap-1.5 shrink-0">
+      <span className={cn("tabular-nums font-mono text-sm font-semibold", valueClass)}>
+        {value}
+      </span>
+      {rightExtra}
+    </div>
+  </div>
+);
 
 /* ----------------------------- Mini components ----------------------------- */
 
