@@ -21,6 +21,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  getTradeLocalDateKey,
+  parseLocalDateKey,
+  formatPnL,
+  sumPnL,
+} from "@/lib/tradeFormat";
 
 type HistoryPeriod = "all" | "week" | "month" | "3months" | "6months" | "year";
 
