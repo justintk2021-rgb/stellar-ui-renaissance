@@ -106,17 +106,11 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
     const stats: Record<string, DailyStats & { winRate: number }> = {};
     const tradesMap: Record<string, Trade[]> = {};
 
-    const fmtLocal = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
+    // Use the SHARED bucketing helper so dashboard / trade log / mini calendar
+    // can never drift apart again.
     const getOpenDateKey = (trade: Trade): string | null => {
-      // Prefer the actual open timestamp (broker-imported trades have this).
-      if (trade.openTime) {
-        const d = new Date(trade.openTime);
-        if (!isNaN(d.getTime())) return fmtLocal(d);
-      }
-      // Fall back to the trade's `date` field for manual entries.
-      return trade.date ? trade.date.slice(0, 10) : null;
+      const key = getTradeLocalDateKey(trade);
+      return key || null;
     };
 
     trades.forEach((trade) => {
