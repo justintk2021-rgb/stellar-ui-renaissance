@@ -53,12 +53,20 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
   // Create a map for quick lookup
   const pnlMap = new Map(dayPnLs.map((d) => [d.date, d.pnl]));
 
+  // Boundary months for the applied custom range (first day of month).
+  const rangeMinMonth = appliedRange ? startOfMonth(appliedRange.start) : null;
+  const rangeMaxMonth = appliedRange ? startOfMonth(appliedRange.end) : null;
+  const canGoPrev = !rangeMinMonth || startOfMonth(currentMonth) > rangeMinMonth;
+  const canGoNext = !rangeMaxMonth || startOfMonth(currentMonth) < rangeMaxMonth;
+
   const handlePrevMonth = () => {
+    if (!canGoPrev) return;
     setDirection(-1);
     setCurrentMonth(subMonths(currentMonth, 1));
   };
 
   const handleNextMonth = () => {
+    if (!canGoNext) return;
     setDirection(1);
     setCurrentMonth(addMonths(currentMonth, 1));
   };
@@ -86,7 +94,11 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={handlePrevMonth}
-          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+          disabled={!canGoPrev}
+          className={cn(
+            "p-1.5 rounded-lg transition-colors",
+            canGoPrev ? "hover:bg-muted" : "opacity-30 cursor-not-allowed",
+          )}
         >
           <ChevronLeft className="h-4 w-4 text-muted-foreground" />
         </button>
@@ -104,7 +116,11 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
         </AnimatePresence>
         <button
           onClick={handleNextMonth}
-          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+          disabled={!canGoNext}
+          className={cn(
+            "p-1.5 rounded-lg transition-colors",
+            canGoNext ? "hover:bg-muted" : "opacity-30 cursor-not-allowed",
+          )}
         >
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
@@ -151,28 +167,31 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
           isWithinInterval(day, { start: appliedRange.start, end: appliedRange.end });
         const isRangeStart = appliedRange && isSameDay(day, appliedRange.start);
         const isRangeEnd = appliedRange && isSameDay(day, appliedRange.end);
+        const isOutOfRange = !!appliedRange && !inRange;
 
         days.push(
           <button
             key={day.toString()}
-            onClick={() => onSelectDate?.(cloneDay)}
+            onClick={() => !isOutOfRange && onSelectDate?.(cloneDay)}
+            disabled={isOutOfRange}
             className={cn(
               "relative aspect-square flex items-center justify-center text-xs rounded-md transition-all",
               !isCurrentMonth && "text-muted-foreground/40",
-              isCurrentMonth && !hasTrade && "text-foreground hover:bg-muted",
-              isToday && !isSelected && !hasTrade && "bg-muted font-semibold",
-              isSelected && "bg-primary text-primary-foreground font-semibold",
-              isWinning && !isSelected && "bg-emerald-500/20 text-emerald-500 font-medium",
-              isLosing && !isSelected && "bg-red-500/20 text-red-500 font-medium",
-              hasTrade && dayPnL === 0 && !isSelected && "bg-muted text-muted-foreground font-medium",
+              isCurrentMonth && !hasTrade && !isOutOfRange && "text-foreground hover:bg-muted",
+              isToday && !isSelected && !hasTrade && !isOutOfRange && "bg-muted font-semibold",
+              isSelected && !isOutOfRange && "bg-primary text-primary-foreground font-semibold",
+              isWinning && !isSelected && !isOutOfRange && "bg-emerald-500/20 text-emerald-500 font-medium",
+              isLosing && !isSelected && !isOutOfRange && "bg-red-500/20 text-red-500 font-medium",
+              hasTrade && dayPnL === 0 && !isSelected && !isOutOfRange && "bg-muted text-muted-foreground font-medium",
               // Soft per-day tint for custom range (no continuous line)
               inRange && !isSelected && !hasTrade && "bg-primary/15 text-primary",
               inRange && !isSelected && hasTrade && "ring-1 ring-inset ring-primary/40",
               (isRangeStart || isRangeEnd) && !isSelected && "bg-primary/25 text-primary font-semibold",
+              isOutOfRange && "text-muted-foreground/30 opacity-40 cursor-not-allowed",
             )}
           >
             {format(day, "d")}
-            {hasTrade && !isSelected && (
+            {hasTrade && !isSelected && !isOutOfRange && (
               <span
                 className={cn(
                   "absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full",
