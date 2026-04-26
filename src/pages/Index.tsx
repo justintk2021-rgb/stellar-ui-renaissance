@@ -824,12 +824,13 @@ const Index = () => {
                         trades={trades}
                         allAccountTrades={allUserTrades.length ? allUserTrades : trades}
                         accounts={accounts}
-                        initialMode={readCompareFromURL(window.location.search)?.mode}
-                        initialA={readCompareFromURL(window.location.search)?.a}
-                        initialB={readCompareFromURL(window.location.search)?.b}
+                        initialMode={pickerInitial ? "range" : readCompareFromURL(window.location.search)?.mode}
+                        initialA={pickerInitial?.a ?? readCompareFromURL(window.location.search)?.a}
+                        initialB={pickerInitial?.b ?? readCompareFromURL(window.location.search)?.b}
                         onClose={() => {
                           clearCompareFromURL();
                           setCompareOpen(false);
+                          setPickerInitial(null);
                         }}
                       />
                     ) : (() => {
