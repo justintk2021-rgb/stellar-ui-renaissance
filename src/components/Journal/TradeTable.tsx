@@ -1052,7 +1052,7 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                                 "text-xs font-mono font-bold",
                                 isProfit ? "text-primary" : "text-destructive"
                               )}>
-                                {isProfit ? '+' : ''}{pl.toFixed(2)}
+                                {formatPnL(pl, { withSymbol: false })}
                               </span>
                             </div>
                           </div>
