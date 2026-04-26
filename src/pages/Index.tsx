@@ -16,6 +16,7 @@ import { AnimatedBackground } from "@/components/Layout/AnimatedBackground";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { MiniCalendar } from "@/components/Journal/MiniCalendar";
+import { CompareView, readCompareFromURL, clearCompareFromURL } from "@/components/Journal/CompareView";
 import { AccountSelector } from "@/components/Dashboard/AccountSelector";
 import { formatLocalDateKey, getTradeLocalDateKey } from "@/lib/tradeFormat";
 
