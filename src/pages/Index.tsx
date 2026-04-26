@@ -811,7 +811,20 @@ const Index = () => {
 
                   {/* Main Content with Calendar Sidebar */}
                   <motion.div variants={staggerItem} className="flex gap-6">
-                    {(() => {
+                    {compareOpen ? (
+                      <CompareView
+                        trades={trades}
+                        allAccountTrades={allUserTrades.length ? allUserTrades : trades}
+                        accounts={accounts}
+                        initialMode={readCompareFromURL(window.location.search)?.mode}
+                        initialA={readCompareFromURL(window.location.search)?.a}
+                        initialB={readCompareFromURL(window.location.search)?.b}
+                        onClose={() => {
+                          clearCompareFromURL();
+                          setCompareOpen(false);
+                        }}
+                      />
+                    ) : (() => {
                       // Build a single shared filtered list — used by BOTH the trade log AND the mini calendar dots
                       const winLossFiltered = journalFilter === 'all'
                         ? trades
@@ -868,6 +881,7 @@ const Index = () => {
                             <MiniCalendar
                               onRangeChange={setJournalDateRange}
                               dayPnLs={dayPnLs}
+                              onCompareClick={() => setCompareOpen(true)}
                             />
                           </div>
                         </>
