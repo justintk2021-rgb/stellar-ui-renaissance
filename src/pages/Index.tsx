@@ -302,6 +302,48 @@ const Index = () => {
   const [journalFilter, setJournalFilter] = useState<'all' | 'wins' | 'losses'>('all');
   const [journalDateRange, setJournalDateRange] = useState<{ start: Date; end: Date } | null>(null);
 
+  // Compare view state — hydrated from URL so the view is shareable.
+  const [compareOpen, setCompareOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('compare') === 'true';
+  });
+  const [allUserTrades, setAllUserTrades] = useState<Trade[]>([]);
+
+  // Lazily fetch ALL of the user's trades (across every account) when Compare opens,
+  // so the "Account" comparison mode has data from both sides regardless of the
+  // currently-selected account at the top of the page.
+  useEffect(() => {
+    if (!compareOpen || !user?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('trades')
+          .select('*')
+          .eq('user_id', user.id);
+        if (error) throw error;
+        if (cancelled) return;
+        const formatted: Trade[] = (data || []).map((t: any) => ({
+          id: t.id,
+          date: t.date,
+          pair: t.pair,
+          direction: t.direction as 'Long' | 'Short',
+          result: Number(t.result),
+          session: t.session || undefined,
+          notes: t.notes || undefined,
+          notebook: t.notebook || undefined,
+          accountId: t.account_id || undefined,
+          openTime: t.open_time || undefined,
+          closeTime: t.close_time || undefined,
+        }));
+        setAllUserTrades(formatted);
+      } catch (e) {
+        console.error('Compare: failed to load all-account trades', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [compareOpen, user?.id]);
+
   // Notes are now manually created only — no automatic generation for trades
 
   // Change page without forcing the sidebar to collapse — keeps nav visible on load and during navigation
