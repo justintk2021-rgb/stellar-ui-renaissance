@@ -17,6 +17,7 @@ import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { MiniCalendar } from "@/components/Journal/MiniCalendar";
 import { AccountSelector } from "@/components/Dashboard/AccountSelector";
+import { formatLocalDateKey, getTradeLocalDateKey } from "@/lib/tradeFormat";
 
 // Lazy-load heavy/secondary pages so the dashboard paints instantly.
 const NotebookView = lazy(() => import("@/components/Notebook/NotebookView").then(m => ({ default: m.NotebookView })));
