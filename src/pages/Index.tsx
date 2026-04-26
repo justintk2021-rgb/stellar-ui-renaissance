@@ -308,6 +308,13 @@ const Index = () => {
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).get('compare') === 'true';
   });
+  const [comparePickerOpen, setComparePickerOpen] = useState<boolean>(false);
+  // When the user picks two months, we feed those date ranges into CompareView
+  // as initialA / initialB (overriding URL hydration for that single open).
+  const [pickerInitial, setPickerInitial] = useState<{
+    a: { start: Date; end: Date };
+    b: { start: Date; end: Date };
+  } | null>(null);
   const [allUserTrades, setAllUserTrades] = useState<Trade[]>([]);
 
   // Lazily fetch ALL of the user's trades (across every account) when Compare opens,
