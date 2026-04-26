@@ -169,6 +169,26 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
         const isRangeEnd = appliedRange && isSameDay(day, appliedRange.end);
         const isOutOfRange = !!appliedRange && !inRange;
 
+        // Single source of truth for the date NUMBER text color.
+        // Order of precedence: out-of-range → selected → win/loss (always wins when there's a trade) → range tint → today → default.
+        let numberColorClass = "text-foreground";
+        if (!isCurrentMonth) {
+          numberColorClass = "text-muted-foreground/40";
+        }
+        if (isOutOfRange) {
+          numberColorClass = "text-muted-foreground/30";
+        } else if (isSelected) {
+          numberColorClass = "text-primary-foreground";
+        } else if (hasTrade) {
+          if (isWinning) numberColorClass = "text-emerald-500";
+          else if (isLosing) numberColorClass = "text-red-500";
+          else numberColorClass = "text-foreground";
+        } else if (inRange) {
+          numberColorClass = "text-primary";
+        } else if (isToday) {
+          numberColorClass = "text-primary";
+        }
+
         days.push(
           <button
             key={day.toString()}
@@ -176,20 +196,16 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
             disabled={isOutOfRange}
             className={cn(
               "relative aspect-square flex items-center justify-center text-xs rounded-md transition-all",
-              !isCurrentMonth && "text-muted-foreground/40",
-              isCurrentMonth && !hasTrade && !isOutOfRange && "text-foreground hover:bg-muted",
-              isToday && !isSelected && !hasTrade && !isOutOfRange && "bg-primary/15 text-primary font-semibold",
-              isSelected && !isOutOfRange && "bg-primary text-primary-foreground font-semibold",
-              // Accent pill for any day with trades; date number inherits win/loss semantic color
+              isCurrentMonth && !hasTrade && !isOutOfRange && !inRange && !isSelected && "hover:bg-muted",
+              // Background pills (do NOT set text color here — numberColorClass owns it)
+              isToday && !isSelected && !hasTrade && !inRange && !isOutOfRange && "bg-primary/15 font-semibold",
+              isSelected && !isOutOfRange && "bg-primary font-semibold",
               hasTrade && !isSelected && !isOutOfRange && "bg-primary/15 font-medium",
-              hasTrade && !isSelected && !isOutOfRange && isWinning && "text-emerald-500",
-              hasTrade && !isSelected && !isOutOfRange && isLosing && "text-red-500",
-              hasTrade && !isSelected && !isOutOfRange && dayPnL === 0 && "text-foreground",
-              // Soft per-day tint for custom range (no continuous line)
-              inRange && !isSelected && !hasTrade && "bg-primary/15 text-primary",
+              inRange && !isSelected && !hasTrade && "bg-primary/15",
               inRange && !isSelected && hasTrade && "ring-1 ring-inset ring-primary/40",
-              (isRangeStart || isRangeEnd) && !isSelected && "bg-primary/25 text-primary font-semibold",
-              isOutOfRange && "text-muted-foreground/30 opacity-40 cursor-not-allowed",
+              (isRangeStart || isRangeEnd) && !isSelected && "bg-primary/25 font-semibold",
+              isOutOfRange && "opacity-40 cursor-not-allowed",
+              numberColorClass,
             )}
           >
             {format(day, "d")}
