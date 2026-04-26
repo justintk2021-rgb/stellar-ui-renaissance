@@ -29,6 +29,8 @@ interface YearMonthPickerProps {
   open: boolean;
   /** Year to default to when opening */
   initialYear?: number;
+  /** Optional initial selection (e.g. when re-opening from Compare to edit) */
+  initialSelection?: MonthSelection[];
   /** P&L per day (YYYY-MM-DD) — used for trade-day highlighting / win-loss dots */
   dayPnLs?: DayPnL[];
   /** Cancel/close (Escape, outside click, ✕) */
