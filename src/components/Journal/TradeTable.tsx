@@ -103,7 +103,7 @@ const calculateGroupMetrics = (trades: Trade[]) => {
   const losers = trades.filter(t => (t.result || 0) < 0).length;
   const winRate = totalTrades > 0 ? (winners / totalTrades) * 100 : 0;
   
-  const grossPnL = trades.reduce((sum, t) => sum + (t.result || 0), 0);
+  const grossPnL = sumPnL(trades);
   const totalWins = trades.filter(t => (t.result || 0) > 0).reduce((sum, t) => sum + (t.result || 0), 0);
   const totalLosses = Math.abs(trades.filter(t => (t.result || 0) < 0).reduce((sum, t) => sum + (t.result || 0), 0));
   const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? Infinity : 0;
