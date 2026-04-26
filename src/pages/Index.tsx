@@ -17,6 +17,7 @@ import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { MiniCalendar } from "@/components/Journal/MiniCalendar";
 import { CompareView, readCompareFromURL, clearCompareFromURL } from "@/components/Journal/CompareView";
+import { YearMonthPicker, type MonthSelection } from "@/components/Journal/YearMonthPicker";
 import { AccountSelector } from "@/components/Dashboard/AccountSelector";
 import { formatLocalDateKey, getTradeLocalDateKey } from "@/lib/tradeFormat";
 
@@ -307,6 +308,13 @@ const Index = () => {
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).get('compare') === 'true';
   });
+  const [comparePickerOpen, setComparePickerOpen] = useState<boolean>(false);
+  // When the user picks two months, we feed those date ranges into CompareView
+  // as initialA / initialB (overriding URL hydration for that single open).
+  const [pickerInitial, setPickerInitial] = useState<{
+    a: { start: Date; end: Date };
+    b: { start: Date; end: Date };
+  } | null>(null);
   const [allUserTrades, setAllUserTrades] = useState<Trade[]>([]);
 
   // Lazily fetch ALL of the user's trades (across every account) when Compare opens,
@@ -816,12 +824,13 @@ const Index = () => {
                         trades={trades}
                         allAccountTrades={allUserTrades.length ? allUserTrades : trades}
                         accounts={accounts}
-                        initialMode={readCompareFromURL(window.location.search)?.mode}
-                        initialA={readCompareFromURL(window.location.search)?.a}
-                        initialB={readCompareFromURL(window.location.search)?.b}
+                        initialMode={pickerInitial ? "range" : readCompareFromURL(window.location.search)?.mode}
+                        initialA={pickerInitial?.a ?? readCompareFromURL(window.location.search)?.a}
+                        initialB={pickerInitial?.b ?? readCompareFromURL(window.location.search)?.b}
                         onClose={() => {
                           clearCompareFromURL();
                           setCompareOpen(false);
+                          setPickerInitial(null);
                         }}
                       />
                     ) : (() => {
@@ -876,13 +885,33 @@ const Index = () => {
                             />
                           </div>
 
-                          {/* Mini Calendar Sidebar */}
-                          <div className="hidden lg:block w-64 flex-shrink-0">
-                            <MiniCalendar
-                              onRangeChange={setJournalDateRange}
-                              dayPnLs={dayPnLs}
-                              onCompareClick={() => setCompareOpen(true)}
-                            />
+                          {/* Mini Calendar Sidebar (or year-view month picker overlay) */}
+                          <div className="hidden lg:block w-64 flex-shrink-0 relative">
+                            {comparePickerOpen ? (
+                              <YearMonthPicker
+                                open={comparePickerOpen}
+                                dayPnLs={dayPnLs}
+                                onClose={() => setComparePickerOpen(false)}
+                                onConfirm={(a: MonthSelection, b: MonthSelection) => {
+                                  const aStart = new Date(a.year, a.month, 1);
+                                  const aEnd = new Date(a.year, a.month + 1, 0);
+                                  const bStart = new Date(b.year, b.month, 1);
+                                  const bEnd = new Date(b.year, b.month + 1, 0);
+                                  setPickerInitial({
+                                    a: { start: aStart, end: aEnd },
+                                    b: { start: bStart, end: bEnd },
+                                  });
+                                  setComparePickerOpen(false);
+                                  setCompareOpen(true);
+                                }}
+                              />
+                            ) : (
+                              <MiniCalendar
+                                onRangeChange={setJournalDateRange}
+                                dayPnLs={dayPnLs}
+                                onCompareClick={() => setComparePickerOpen(true)}
+                              />
+                            )}
                           </div>
                         </>
                       );
