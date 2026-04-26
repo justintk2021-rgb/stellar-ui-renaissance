@@ -399,7 +399,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit,
               "text-base font-bold font-mono",
               isProfit ? "text-primary" : "text-destructive"
             )}>
-              {isProfit ? '+' : ''}{metrics.grossPnL.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+              {formatPnL(metrics.grossPnL)}
             </span>
           </div>
           <Badge 
