@@ -775,20 +775,11 @@ const Index = () => {
                           ? trades.filter(t => t.result > 0)
                           : trades.filter(t => t.result < 0);
 
-                      const fmt = (d: Date) =>
-                        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-                      // Use the trade's OPEN date in the user's LOCAL timezone for filtering
-                      // and calendar dots. This guarantees a trade opened Apr 7 at 11:30pm local
-                      // shows on Apr 7 (not Apr 8 due to UTC conversion). Falls back to the
-                      // trade's `date` field for manual entries without an openTime.
-                      const getOpenDateKey = (t: typeof winLossFiltered[number]) => {
-                        if (t.openTime) {
-                          const d = new Date(t.openTime);
-                          if (!isNaN(d.getTime())) return fmt(d);
-                        }
-                        return (t.date || '').slice(0, 10);
-                      };
+                      // Use the SHARED helpers so the trade log, dashboard
+                      // PnL calendar, and mini calendar always agree.
+                      const fmt = formatLocalDateKey;
+                      const getOpenDateKey = (t: typeof winLossFiltered[number]) =>
+                        getTradeLocalDateKey(t);
 
                       const rangeFiltered = journalDateRange
                         ? (() => {
