@@ -94,7 +94,11 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={handlePrevMonth}
-          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+          disabled={!canGoPrev}
+          className={cn(
+            "p-1.5 rounded-lg transition-colors",
+            canGoPrev ? "hover:bg-muted" : "opacity-30 cursor-not-allowed",
+          )}
         >
           <ChevronLeft className="h-4 w-4 text-muted-foreground" />
         </button>
@@ -112,7 +116,11 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
         </AnimatePresence>
         <button
           onClick={handleNextMonth}
-          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+          disabled={!canGoNext}
+          className={cn(
+            "p-1.5 rounded-lg transition-colors",
+            canGoNext ? "hover:bg-muted" : "opacity-30 cursor-not-allowed",
+          )}
         >
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
