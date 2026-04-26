@@ -329,10 +329,10 @@ const MonthTile: React.FC<{
     <motion.button
       type="button"
       whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.98 }}
+      whileTap={{ scale: 0.99 }}
       onClick={onClick}
       className={cn(
-        "flex flex-col items-stretch gap-1 rounded-lg p-1.5 text-left transition-colors",
+        "flex flex-col items-stretch gap-2 rounded-xl p-3 text-left transition-colors h-full min-h-0",
         selected
           ? "bg-primary/20 ring-1 ring-inset ring-primary/50"
           : "bg-muted/20 hover:bg-muted/40",
@@ -341,27 +341,27 @@ const MonthTile: React.FC<{
       {/* Month name */}
       <div
         className={cn(
-          "text-[10px] font-semibold text-center px-1 py-0.5 rounded",
+          "text-xs font-semibold text-center px-1 py-0.5 rounded shrink-0",
           selected ? "text-primary" : "text-foreground",
         )}
       >
-        {format(monthDate, "MMM")}
+        {format(monthDate, "MMMM")}
       </div>
 
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 gap-[1px]">
+      <div className="grid grid-cols-7 gap-0.5 shrink-0">
         {weekdayHeaders.map((d, i) => (
           <div
             key={`${d}-${i}`}
-            className="text-center text-[7px] font-medium text-muted-foreground/70 leading-tight"
+            className="text-center text-[10px] font-medium text-muted-foreground/70 leading-tight"
           >
             {d}
           </div>
         ))}
       </div>
 
-      {/* Day grid */}
-      <div className="grid grid-cols-7 gap-[1px]">
+      {/* Day grid — fills the remaining tile height */}
+      <div className="grid grid-cols-7 gap-0.5 flex-1 min-h-0">
         {days.map((d) => {
           const inMonth = isSameMonth(d, monthStart);
           const dateKey = format(d, "yyyy-MM-dd");
@@ -386,7 +386,7 @@ const MonthTile: React.FC<{
             <div
               key={d.toString()}
               className={cn(
-                "relative aspect-square flex items-center justify-center text-[7px] leading-none rounded-[3px]",
+                "relative aspect-square flex items-center justify-center text-[10px] leading-none rounded-md",
                 inMonth && hasTrade && "bg-primary/15 font-medium",
                 inMonth && isToday && !hasTrade && "bg-primary/15 font-semibold",
                 numberColorClass,
@@ -396,7 +396,7 @@ const MonthTile: React.FC<{
               {hasTrade && (
                 <span
                   className={cn(
-                    "absolute -bottom-px left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full",
+                    "absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full",
                     isWinning && "bg-emerald-500",
                     isLosing && "bg-red-500",
                     dayPnL === 0 && "bg-muted-foreground",
