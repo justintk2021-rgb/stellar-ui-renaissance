@@ -476,7 +476,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit,
                   />
                   <MetricCard 
                     label="Gross P&L" 
-                    value={`$${Math.abs(metrics.grossPnL).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                    value={formatPnL(Math.abs(metrics.grossPnL), { showPlus: false })}
                     color={isProfit ? "primary" : "destructive"}
                     delay={0.3}
                   />
