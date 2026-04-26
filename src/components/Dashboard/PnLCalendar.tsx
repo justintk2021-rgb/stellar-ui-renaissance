@@ -48,13 +48,9 @@ const MONTH_NAMES = [
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// Format PnL with exact values (no rounding)
-const formatPnL = (value: number): string => {
-  const absValue = Math.abs(value);
-  const factor = Math.pow(10, 2);
-  const truncated = Math.trunc(absValue * factor) / factor;
-  return `${value < 0 ? '-' : ''}$${truncated.toFixed(2)}`;
-};
+// Format PnL using the shared truncating formatter so the dashboard, trade
+// log, and mini calendar always agree to the cent.
+const formatPnL = (value: number): string => sharedFormatPnL(value, { showPlus: false });
 
 export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSaveEntry, onAddTrade }: PnLCalendarProps) {
   const { checklists } = useChecklists();
