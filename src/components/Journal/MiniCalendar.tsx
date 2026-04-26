@@ -34,9 +34,10 @@ interface MiniCalendarProps {
   onSelectDate?: (date: Date) => void;
   dayPnLs?: DayPnL[];
   onRangeChange?: (range: { start: Date; end: Date } | null) => void;
+  onCompareClick?: () => void;
 }
 
-export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRangeChange }: MiniCalendarProps) {
+export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRangeChange, onCompareClick }: MiniCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [direction, setDirection] = useState(0);
 
@@ -367,7 +368,7 @@ export function MiniCalendar({ selectedDate, onSelectDate, dayPnLs = [], onRange
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
-          onClick={() => toast.info("Compare months coming soon")}
+          onClick={() => onCompareClick?.()}
           className="inline-flex items-center justify-center gap-1.5 h-8 rounded-lg bg-muted/50 hover:bg-muted text-xs font-medium text-foreground transition-colors"
         >
           <GitCompare className="w-3.5 h-3.5 text-muted-foreground" />
