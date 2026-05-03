@@ -506,9 +506,9 @@ export function CompareView({
           </div>
         </motion.div>
 
-        {/* Right: Per-asset breakdown + Best/Worst */}
+        {/* Right: Per-asset bubble chart + Best/Worst */}
         <motion.div variants={itemVariants} className="space-y-4">
-          {/* Per-asset */}
+          {/* Per-asset Bubble Chart */}
           <div className="rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4">
             <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-3">
               Per-Asset Breakdown
@@ -516,11 +516,11 @@ export function CompareView({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-2">{aShort}</div>
-                <AssetList rows={aAssetRows} />
+                <AssetBubbleChart rows={aAssetRows} period="a" />
               </div>
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-2">{bShort}</div>
-                <AssetList rows={bAssetRows} />
+                <AssetBubbleChart rows={bAssetRows} period="b" />
               </div>
             </div>
           </div>
