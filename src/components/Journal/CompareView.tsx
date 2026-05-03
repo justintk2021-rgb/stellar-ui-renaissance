@@ -12,9 +12,8 @@ import {
   Pencil,
   TrendingUp,
   TrendingDown,
-  BarChart3,
 } from "lucide-react";
-import { format, subDays, differenceInCalendarDays } from "date-fns";
+import { format, subDays, differenceInCalendarDays, eachDayOfInterval } from "date-fns";
 import {
   formatLocalDateKey,
   getTradeLocalDateKey,
@@ -28,6 +27,13 @@ import {
   buildInsights,
   type Delta,
 } from "@/lib/compareMetrics";
+import {
+  Area,
+  AreaChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+} from "recharts";
 
 /* --------------------------------- Types --------------------------------- */
 
@@ -154,18 +160,36 @@ const filterTradesForSlot = (
 
 /* ------------------------------ Color helpers ----------------------------- */
 
-const deltaBgChip = (d: Delta) =>
+const deltaColor = (d: Delta) =>
   d.direction === "improved"
-    ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+    ? "text-emerald-500"
     : d.direction === "regressed"
-      ? "bg-red-500/15 text-red-500 border-red-500/30"
-      : "bg-muted/40 text-muted-foreground border-border/40";
+      ? "text-red-500"
+      : "text-muted-foreground";
 
 const pnlTextColor = (n: number) =>
   n > 0 ? "text-emerald-500" : n < 0 ? "text-red-500" : "text-foreground";
 
 const formatNumber = (n: number, digits = 2) => isFinite(n) ? n.toFixed(digits) : "∞";
 const deltaSign = (n: number) => (n > 0 ? "+" : n < 0 ? "" : "");
+
+/* ---------------------- Sparkline data builder ---------------------- */
+
+function buildDailyPnL(trades: Trade[], start: Date, end: Date) {
+  const days = eachDayOfInterval({ start, end });
+  const map = new Map<string, number>();
+  trades.forEach((t) => {
+    const k = getTradeLocalDateKey(t);
+    map.set(k, (map.get(k) || 0) + (t.result || 0));
+  });
+  let cum = 0;
+  return days.map((d) => {
+    const k = formatLocalDateKey(d);
+    const daily = map.get(k) || 0;
+    cum += daily;
+    return { date: format(d, "MMM d"), pnl: cum };
+  });
+}
 
 /* --------------------------- Headline metric def --------------------------- */
 
@@ -174,21 +198,20 @@ interface MetricDef {
   label: string;
   format: (n: number) => string;
   pctSuffix?: string;
-  rawA: (s: ReturnType<typeof computePeriodStats>) => number;
-  rawB: (s: ReturnType<typeof computePeriodStats>) => number;
+  raw: (s: ReturnType<typeof computePeriodStats>) => number;
   direction: "higher-better" | "lower-better" | "neutral";
   isPnL?: boolean;
 }
 
-const HEADLINE_METRICS: MetricDef[] = [
-  { key: "netPnL", label: "Net P&L", format: (n) => formatPnL(n), rawA: (s) => s.netPnL, rawB: (s) => s.netPnL, direction: "higher-better", isPnL: true },
-  { key: "winRate", label: "Win Rate", format: (n) => `${(n * 100).toFixed(1)}%`, pctSuffix: "pp", rawA: (s) => s.winRate, rawB: (s) => s.winRate, direction: "higher-better" },
-  { key: "profitFactor", label: "Profit Factor", format: (n) => isFinite(n) ? n.toFixed(2) : "∞", rawA: (s) => isFinite(s.profitFactor) ? s.profitFactor : 0, rawB: (s) => isFinite(s.profitFactor) ? s.profitFactor : 0, direction: "higher-better" },
-  { key: "expectancy", label: "Expectancy", format: (n) => formatPnL(n), rawA: (s) => s.expectancy, rawB: (s) => s.expectancy, direction: "higher-better", isPnL: true },
-  { key: "avgWin", label: "Avg Win", format: (n) => formatPnL(n), rawA: (s) => s.avgWin, rawB: (s) => s.avgWin, direction: "higher-better", isPnL: true },
-  { key: "avgLoss", label: "Avg Loss", format: (n) => formatPnL(n), rawA: (s) => s.avgLoss, rawB: (s) => s.avgLoss, direction: "higher-better", isPnL: true },
-  { key: "totalTrades", label: "Total Trades", format: (n) => String(Math.round(n)), rawA: (s) => s.totalTrades, rawB: (s) => s.totalTrades, direction: "neutral" },
-  { key: "avgTradesPerDay", label: "Trades / Day", format: (n) => n.toFixed(2), rawA: (s) => s.avgTradesPerDay, rawB: (s) => s.avgTradesPerDay, direction: "neutral" },
+const METRICS: MetricDef[] = [
+  { key: "netPnL", label: "NET P&L", format: (n) => formatPnL(n), raw: (s) => s.netPnL, direction: "higher-better", isPnL: true },
+  { key: "winRate", label: "WIN RATE", format: (n) => `${(n * 100).toFixed(1)}%`, pctSuffix: "pp", raw: (s) => s.winRate, direction: "higher-better" },
+  { key: "profitFactor", label: "PROFIT FACTOR", format: (n) => isFinite(n) ? n.toFixed(2) : "∞", raw: (s) => isFinite(s.profitFactor) ? s.profitFactor : 0, direction: "higher-better" },
+  { key: "totalTrades", label: "TOTAL TRADES", format: (n) => String(Math.round(n)), raw: (s) => s.totalTrades, direction: "neutral" },
+  { key: "expectancy", label: "EXPECTANCY", format: (n) => formatPnL(n), raw: (s) => s.expectancy, direction: "higher-better", isPnL: true },
+  { key: "avgWin", label: "AVG WIN", format: (n) => formatPnL(n), raw: (s) => s.avgWin, direction: "higher-better", isPnL: true },
+  { key: "avgLoss", label: "AVG LOSS", format: (n) => formatPnL(n), raw: (s) => s.avgLoss, direction: "higher-better", isPnL: true },
+  { key: "avgTradesPerDay", label: "TRADES / DAY", format: (n) => n.toFixed(1), raw: (s) => s.avgTradesPerDay, direction: "neutral" },
 ];
 
 /* --------------------------------- Main --------------------------------- */
@@ -207,7 +230,6 @@ export function CompareView({
     const state = { mode, a: aSlot, b: bSlot };
     writeCompareToURL(state);
     onChange?.(state);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, aSlot, bSlot]);
 
   const aTrades = useMemo(() => filterTradesForSlot(trades, allAccountTrades, aSlot, mode), [trades, allAccountTrades, aSlot, mode]);
@@ -224,30 +246,74 @@ export function CompareView({
   const bDays = differenceInCalendarDays(bSlot.end, bSlot.start) + 1;
   const lengthMismatch = mode === "range" && aDays !== bDays;
 
-  const aAssetRows = useMemo(() => buildSinglePeriodAssetRows(aTrades), [aTrades]);
-  const bAssetRows = useMemo(() => buildSinglePeriodAssetRows(bTrades), [bTrades]);
+  // Sparkline data
+  const aSparkline = useMemo(() => buildDailyPnL(aTrades, aSlot.start, aSlot.end), [aTrades, aSlot]);
+  const bSparkline = useMemo(() => buildDailyPnL(bTrades, bSlot.start, bSlot.end), [bTrades, bSlot]);
+
+  // Top 3 stat cards with sparklines (like the reference image)
+  const topCards = useMemo(() => {
+    return [
+      {
+        label: "NET P&L",
+        aVal: aStats.netPnL,
+        bVal: bStats.netPnL,
+        format: formatPnL,
+        direction: "higher-better" as const,
+        isPnL: true,
+        aData: aSparkline,
+        bData: bSparkline,
+      },
+      {
+        label: "WIN RATE",
+        aVal: aStats.winRate,
+        bVal: bStats.winRate,
+        format: (n: number) => `${(n * 100).toFixed(1)}%`,
+        direction: "higher-better" as const,
+        isPnL: false,
+        aData: null,
+        bData: null,
+      },
+      {
+        label: "TOTAL TRADES",
+        aVal: aStats.totalTrades,
+        bVal: bStats.totalTrades,
+        format: (n: number) => String(Math.round(n)),
+        direction: "neutral" as const,
+        isPnL: false,
+        aData: null,
+        bData: null,
+      },
+    ];
+  }, [aStats, bStats, aSparkline, bSparkline]);
+
   const aBW = useMemo(() => bestAndWorst(aTrades), [aTrades]);
   const bBW = useMemo(() => bestAndWorst(bTrades), [bTrades]);
+  const aAssetRows = useMemo(() => buildSinglePeriodAssetRows(aTrades), [aTrades]);
+  const bAssetRows = useMemo(() => buildSinglePeriodAssetRows(bTrades), [bTrades]);
 
-  // Headline strip delta (Net P&L)
-  const headlineDelta = computeDelta(aStats.netPnL, bStats.netPnL, "higher-better");
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.06 } },
+  };
+  const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
+  };
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
-      className="flex-1 min-w-0 w-full space-y-4 mx-auto"
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="flex-1 min-w-0 w-full space-y-5 mx-auto px-2"
       style={{ maxWidth: "95%" }}
     >
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-4 rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 px-4 py-3">
-        <div className="flex items-center gap-2 text-sm min-w-0">
-          <Sparkles className="w-4 h-4 text-primary shrink-0" />
-          <span className="font-semibold whitespace-nowrap">Compare:</span>
-          <span className="text-muted-foreground truncate">{aLabel}</span>
-          <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-          <span className="text-muted-foreground truncate">{bLabel}</span>
+      <motion.div variants={itemVariants} className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold text-foreground">Compare</h1>
+          <span className="text-muted-foreground text-sm">·</span>
+          <span className="text-sm text-muted-foreground">{aShort} vs {bShort}</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {onEditPeriods && (
@@ -264,211 +330,226 @@ export function CompareView({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card/80 hover:bg-card text-xs font-medium border border-border/40 transition-colors"
           >
             <X className="w-3.5 h-3.5" />
-            Exit Compare
+            Exit
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Headline strip — Net P&L A → B + delta */}
-      <div className={cn(
-        "rounded-2xl p-4 relative overflow-hidden border",
-        headlineDelta.direction === "improved"
-          ? "bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent border-emerald-500/30"
-          : headlineDelta.direction === "regressed"
-            ? "bg-gradient-to-r from-red-500/15 via-red-500/5 to-transparent border-red-500/30"
-            : "bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-primary/30"
-      )}>
-        <div className="flex items-center justify-between gap-6 flex-wrap">
-          <div className="flex items-center gap-4">
-            <div className="text-center">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{aShort} · Net P&L</div>
-              <div className={cn("text-2xl font-bold font-mono tabular-nums", pnlTextColor(aStats.netPnL))}>
-                {formatPnL(aStats.netPnL)}
+      {/* Top stat cards row — 3 cards with sparkline charts */}
+      <motion.div variants={itemVariants} className="grid grid-cols-3 gap-4">
+        {topCards.map((card, idx) => {
+          const delta = computeDelta(card.aVal, card.bVal, card.direction);
+          const sparkData = card.aData;
+          const isPositive = card.bVal >= card.aVal;
+          const sparkColor = delta.direction === "improved" ? "#10b981" : delta.direction === "regressed" ? "#ef4444" : "hsl(var(--primary))";
+
+          return (
+            <div
+              key={idx}
+              className="rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4 space-y-3 hover:border-border/50 transition-colors"
+            >
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">
+                {card.label}
               </div>
-            </div>
-            <ArrowRight className="w-5 h-5 text-muted-foreground" />
-            <div className="text-center">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{bShort} · Net P&L</div>
-              <div className={cn("text-2xl font-bold font-mono tabular-nums", pnlTextColor(bStats.netPnL))}>
-                {formatPnL(bStats.netPnL)}
-              </div>
-            </div>
-          </div>
-          <div className={cn(
-            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold tabular-nums border",
-            deltaBgChip(headlineDelta),
-          )}>
-            {headlineDelta.direction === "improved" ? <TrendingUp className="w-4 h-4" /> :
-              headlineDelta.direction === "regressed" ? <TrendingDown className="w-4 h-4" /> : null}
-            {headlineDelta.direction === "unchanged"
-              ? "No change"
-              : headlineDelta.pct !== null
-                ? `${deltaSign(headlineDelta.pct)}${Math.abs(headlineDelta.pct).toFixed(1)}%`
-                : `${deltaSign(headlineDelta.abs)}${formatNumber(Math.abs(headlineDelta.abs))}`}
-          </div>
-        </div>
-      </div>
-
-      {/* Three card columns: Period A | Period B | Conclusion */}
-      <div
-        className="grid gap-6"
-        style={{ gridTemplateColumns: "1fr 1fr 2fr" }}
-      >
-        {/* === Period A card === */}
-        <PeriodCard
-          title={aShort}
-          icon={<TrendingUp className="w-4 h-4 text-primary" />}
-        >
-          {HEADLINE_METRICS.map((m) => {
-            const v = m.rawA(aStats);
-            return (
-              <MetricPill
-                key={m.key}
-                label={m.label}
-                value={m.format(v)}
-                valueClass={m.isPnL ? pnlTextColor(v) : "text-foreground"}
-              />
-            );
-          })}
-        </PeriodCard>
-
-        {/* === Period B card === */}
-        <PeriodCard
-          title={bShort}
-          icon={<TrendingDown className="w-4 h-4 text-primary" />}
-        >
-          {HEADLINE_METRICS.map((m) => {
-            const aVal = m.rawA(aStats);
-            const bVal = m.rawB(bStats);
-            const delta = computeDelta(aVal, bVal, m.direction);
-            const showDelta = m.direction !== "neutral" || delta.direction !== "unchanged";
-            return (
-              <MetricPill
-                key={m.key}
-                label={m.label}
-                value={m.format(bVal)}
-                valueClass={m.isPnL ? pnlTextColor(bVal) : "text-foreground"}
-                rightExtra={showDelta ? (
-                  <span className={cn(
-                    "inline-flex items-center px-1.5 py-0.5 rounded-md border text-[9px] font-semibold tabular-nums",
-                    deltaBgChip(delta),
-                  )}>
-                    {delta.direction === "improved" ? "▲ " : delta.direction === "regressed" ? "▼ " : ""}
-                    {delta.direction === "unchanged"
-                      ? "—"
-                      : delta.pct !== null
-                        ? `${deltaSign(delta.pct)}${Math.abs(delta.pct).toFixed(1)}${m.pctSuffix || "%"}`
-                        : `${deltaSign(delta.abs)}${formatNumber(Math.abs(delta.abs))}`}
+              <div className="flex items-baseline gap-2.5">
+                <span className={cn("text-2xl font-bold tabular-nums font-mono", card.isPnL ? pnlTextColor(card.bVal) : "text-foreground")}>
+                  {card.format(card.bVal)}
+                </span>
+                <span className="text-sm text-muted-foreground tabular-nums font-mono">
+                  {card.format(card.aVal)}
+                </span>
+                {delta.direction !== "unchanged" && (
+                  <span className={cn("inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums", deltaColor(delta))}>
+                    {delta.direction === "improved" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                    {delta.pct !== null
+                      ? `${deltaSign(delta.pct)}${Math.abs(delta.pct).toFixed(1)}%`
+                      : `${deltaSign(delta.abs)}${formatNumber(Math.abs(delta.abs))}`}
                   </span>
-                ) : null}
-              />
-            );
-          })}
-        </PeriodCard>
-
-        {/* === Conclusion card === */}
-        <PeriodCard
-          title="Conclusion of Comparison"
-          icon={<Sparkles className="w-4 h-4 text-primary" />}
-        >
-          <div className="max-h-[560px] overflow-y-auto pr-1 space-y-4">
-            {/* Insight text */}
-            <div className="space-y-1.5 px-1">
-              {insights.map((line, i) => (
-                <p key={i} className="text-xs text-foreground/90 leading-relaxed">
-                  {line}
-                </p>
-              ))}
-              {lengthMismatch && (
-                <p className="text-[10px] text-muted-foreground italic pt-1">
-                  Period A is {aDays} days, Period B is {bDays} days — some metrics are normalized per-day.
-                </p>
+                )}
+              </div>
+              {/* Sparkline */}
+              {sparkData && sparkData.length > 1 && (
+                <div className="h-14 -mx-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={sparkData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id={`grad-${idx}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={sparkColor} stopOpacity={0.3} />
+                          <stop offset="100%" stopColor={sparkColor} stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="date" hide />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                          fontSize: "11px",
+                          padding: "4px 8px",
+                        }}
+                        labelStyle={{ color: "hsl(var(--muted-foreground))", fontSize: "10px" }}
+                        formatter={(value: number) => [formatPnL(value), "Cumulative"]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="pnl"
+                        stroke={sparkColor}
+                        strokeWidth={1.5}
+                        fill={`url(#grad-${idx})`}
+                        animationDuration={800}
+                        animationEasing="ease-out"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {!sparkData && (
+                <div className="h-14 flex items-end">
+                  {/* Simple bar indicator for non-sparkline cards */}
+                  <div className="w-full flex items-end gap-[2px] h-10">
+                    {[...Array(12)].map((_, i) => {
+                      const h = 20 + Math.random() * 80;
+                      return (
+                        <motion.div
+                          key={i}
+                          initial={{ scaleY: 0 }}
+                          animate={{ scaleY: 1 }}
+                          transition={{ delay: i * 0.03, duration: 0.4 }}
+                          className="flex-1 rounded-sm origin-bottom"
+                          style={{
+                            height: `${h}%`,
+                            backgroundColor: sparkColor,
+                            opacity: 0.15 + (i / 12) * 0.35,
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
+          );
+        })}
+      </motion.div>
 
-            {/* Per-asset mini-breakdown */}
-            <div className="space-y-2">
-              <div className="text-[10px] uppercase tracking-wider text-primary font-bold px-1">Per-asset breakdown</div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted/30 rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Period A</div>
-                  <MiniAssetTable rows={aAssetRows} />
+      {/* Insights row */}
+      <motion.div variants={itemVariants} className="rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-4 h-4 text-primary" />
+          <span className="text-sm font-semibold text-foreground">Insights</span>
+        </div>
+        <div className="space-y-2">
+          {insights.map((line, i) => (
+            <motion.p
+              key={i}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 + i * 0.1 }}
+              className="text-sm text-muted-foreground leading-relaxed"
+            >
+              {line}
+            </motion.p>
+          ))}
+          {lengthMismatch && (
+            <p className="text-xs text-muted-foreground/60 italic pt-1">
+              Note: Period A is {aDays} days, Period B is {bDays} days.
+            </p>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Bottom section: Metrics comparison + Per-asset + Best/Worst */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Left: Full metric comparison table */}
+        <motion.div variants={itemVariants} className="rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4">
+          <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-3">
+            Detailed Metrics
+          </div>
+          <div className="space-y-1">
+            {METRICS.map((m) => {
+              const aVal = m.raw(aStats);
+              const bVal = m.raw(bStats);
+              const delta = computeDelta(aVal, bVal, m.direction);
+              return (
+                <div
+                  key={m.key}
+                  className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-muted/20 transition-colors"
+                >
+                  <span className="text-xs text-muted-foreground font-medium w-28">{m.label}</span>
+                  <div className="flex items-center gap-6 text-right">
+                    <span className={cn("text-sm tabular-nums font-mono w-20 text-right", m.isPnL ? pnlTextColor(aVal) : "text-foreground")}>
+                      {m.format(aVal)}
+                    </span>
+                    <span className={cn("text-sm tabular-nums font-mono font-semibold w-20 text-right", m.isPnL ? pnlTextColor(bVal) : "text-foreground")}>
+                      {m.format(bVal)}
+                    </span>
+                    <span className={cn("text-xs tabular-nums font-semibold w-16 text-right", deltaColor(delta))}>
+                      {delta.direction === "unchanged"
+                        ? "—"
+                        : delta.pct !== null
+                          ? `${deltaSign(delta.pct)}${Math.abs(delta.pct).toFixed(1)}${m.pctSuffix || "%"}`
+                          : `${deltaSign(delta.abs)}${formatNumber(Math.abs(delta.abs))}`}
+                    </span>
+                  </div>
                 </div>
-                <div className="bg-muted/30 rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Period B</div>
-                  <MiniAssetTable rows={bAssetRows} />
-                </div>
-              </div>
+              );
+            })}
+          </div>
+          {/* Column headers */}
+          <div className="flex items-center justify-between px-2 pt-2 border-t border-border/20 mt-1">
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 w-28">Metric</span>
+            <div className="flex items-center gap-6 text-right">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 w-20 text-right">{aShort}</span>
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 w-20 text-right">{bShort}</span>
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 w-16 text-right">Delta</span>
             </div>
+          </div>
+        </motion.div>
 
-            {/* Best & worst */}
-            <div className="space-y-2">
-              <div className="text-[10px] uppercase tracking-wider text-primary font-bold px-1">Best &amp; worst trades</div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted/30 rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Period A</div>
-                  <MiniBestWorst bw={aBW} />
-                </div>
-                <div className="bg-muted/30 rounded-lg p-2.5">
-                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Period B</div>
-                  <MiniBestWorst bw={bBW} />
-                </div>
+        {/* Right: Per-asset breakdown + Best/Worst */}
+        <motion.div variants={itemVariants} className="space-y-4">
+          {/* Per-asset */}
+          <div className="rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4">
+            <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-3">
+              Per-Asset Breakdown
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-2">{aShort}</div>
+                <AssetList rows={aAssetRows} />
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-2">{bShort}</div>
+                <AssetList rows={bAssetRows} />
               </div>
             </div>
           </div>
-        </PeriodCard>
+
+          {/* Best & Worst */}
+          <div className="rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4">
+            <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-3">
+              Best & Worst Trades
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60">{aShort}</div>
+                <TradeHighlight trade={aBW.best} type="best" />
+                <TradeHighlight trade={aBW.worst} type="worst" />
+              </div>
+              <div className="space-y-2">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60">{bShort}</div>
+                <TradeHighlight trade={bBW.best} type="best" />
+                <TradeHighlight trade={bBW.worst} type="worst" />
+              </div>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </motion.div>
   );
 }
 
-/* ----------------------------- Card primitives ----------------------------- */
-
-const PeriodCard: React.FC<{
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}> = ({ title, icon, children }) => (
-  <div className="glass rounded-2xl border border-border/40 relative overflow-hidden group hover:border-primary/30 transition-all duration-300">
-    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-    <div className="relative z-10 p-3 space-y-2.5">
-      {/* Header pill */}
-      <div className="rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/30 px-3 py-2.5 flex flex-col items-center gap-1">
-        <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
-          {icon}
-        </div>
-        <div className="text-[11px] font-bold text-foreground uppercase tracking-wide text-center truncate max-w-full">
-          {title}
-        </div>
-      </div>
-      {/* Body */}
-      <div className="space-y-1.5">
-        {children}
-      </div>
-    </div>
-  </div>
-);
-
-const MetricPill: React.FC<{
-  label: string;
-  value: string;
-  valueClass?: string;
-  rightExtra?: React.ReactNode;
-}> = ({ label, value, valueClass, rightExtra }) => (
-  <div className="rounded-lg bg-primary/5 hover:bg-primary/10 border border-primary/10 px-3 py-2 flex items-center justify-between gap-2 transition-colors">
-    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium truncate">
-      {label}
-    </span>
-    <div className="flex items-center gap-1.5 shrink-0">
-      <span className={cn("tabular-nums font-mono text-sm font-semibold", valueClass)}>
-        {value}
-      </span>
-      {rightExtra}
-    </div>
-  </div>
-);
-
-/* ----------------------------- Mini components ----------------------------- */
+/* ----------------------------- Sub-components ----------------------------- */
 
 interface AssetRow {
   asset: string;
@@ -494,14 +575,14 @@ function buildSinglePeriodAssetRows(trades: Trade[]): AssetRow[] {
   return rows;
 }
 
-const MiniAssetTable: React.FC<{ rows: AssetRow[] }> = ({ rows }) => {
-  if (!rows.length) return <div className="text-[10px] text-muted-foreground py-1">No trades.</div>;
+const AssetList: React.FC<{ rows: AssetRow[] }> = ({ rows }) => {
+  if (!rows.length) return <div className="text-xs text-muted-foreground py-2">No trades.</div>;
   return (
-    <div className="space-y-1">
-      {rows.slice(0, 4).map((r) => (
-        <div key={r.asset} className="flex items-center justify-between gap-2 text-[11px]">
-          <span className="font-medium truncate">{r.asset}</span>
-          <span className={cn("tabular-nums font-mono shrink-0", pnlTextColor(r.pnl))}>
+    <div className="space-y-1.5">
+      {rows.slice(0, 5).map((r) => (
+        <div key={r.asset} className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium truncate text-foreground/80">{r.asset}</span>
+          <span className={cn("text-xs tabular-nums font-mono font-semibold shrink-0", pnlTextColor(r.pnl))}>
             {formatPnL(r.pnl)}
           </span>
         </div>
@@ -510,32 +591,18 @@ const MiniAssetTable: React.FC<{ rows: AssetRow[] }> = ({ rows }) => {
   );
 };
 
-const MiniBestWorst: React.FC<{ bw: { best: Trade | null; worst: Trade | null } }> = ({ bw }) => {
-  if (!bw.best && !bw.worst) return <div className="text-[10px] text-muted-foreground py-1">No trades.</div>;
+const TradeHighlight: React.FC<{ trade: Trade | null; type: "best" | "worst" }> = ({ trade, type }) => {
+  if (!trade) return null;
+  const isBest = type === "best";
   return (
-    <div className="space-y-1.5">
-      {bw.best && (
-        <div className="flex items-center justify-between gap-1.5">
-          <div className="flex items-center gap-1 min-w-0">
-            <Trophy className="w-3 h-3 text-emerald-500 shrink-0" />
-            <span className="text-[10px] font-medium truncate">{bw.best.pair}</span>
-          </div>
-          <span className="text-[10px] font-mono tabular-nums font-semibold text-emerald-500 shrink-0">
-            {formatPnL(bw.best.result)}
-          </span>
-        </div>
-      )}
-      {bw.worst && bw.worst.id !== bw.best?.id && (
-        <div className="flex items-center justify-between gap-1.5">
-          <div className="flex items-center gap-1 min-w-0">
-            <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />
-            <span className="text-[10px] font-medium truncate">{bw.worst.pair}</span>
-          </div>
-          <span className="text-[10px] font-mono tabular-nums font-semibold text-red-500 shrink-0">
-            {formatPnL(bw.worst.result)}
-          </span>
-        </div>
-      )}
+    <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/20 px-2.5 py-1.5">
+      <div className="flex items-center gap-1.5 min-w-0">
+        {isBest ? <Trophy className="w-3 h-3 text-emerald-500 shrink-0" /> : <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" />}
+        <span className="text-xs font-medium truncate">{trade.pair}</span>
+      </div>
+      <span className={cn("text-xs font-mono tabular-nums font-semibold shrink-0", isBest ? "text-emerald-500" : "text-red-500")}>
+        {formatPnL(trade.result)}
+      </span>
     </div>
   );
 };
@@ -557,7 +624,6 @@ function slotLabel(s: SlotConfig, mode: CompareMode, accounts: TradingAccount[],
   return range;
 }
 
-/** Short header label — prefer single month name when slot is exactly that month. */
 function shortLabel(s: SlotConfig, mode: CompareMode, accounts: TradingAccount[]): string {
   if (mode === "account") {
     const acc = accounts.find((a) => a.id === s.accountId);
@@ -569,7 +635,6 @@ function shortLabel(s: SlotConfig, mode: CompareMode, accounts: TradingAccount[]
     const labels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     return labels[s.dayOfWeek];
   }
-  // If start is day 1 of its month and end is the last day of same month → single month name
   const start = s.start;
   const end = s.end;
   const lastOfMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0);
