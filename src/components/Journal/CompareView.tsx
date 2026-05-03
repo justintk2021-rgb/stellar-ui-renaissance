@@ -575,6 +575,181 @@ function buildSinglePeriodAssetRows(trades: Trade[]): AssetRow[] {
   return rows;
 }
 
+const BUBBLE_COLORS = [
+  { bg: "rgba(99, 102, 241, 0.55)", border: "rgba(99, 102, 241, 0.8)" },   // indigo
+  { bg: "rgba(168, 85, 247, 0.55)", border: "rgba(168, 85, 247, 0.8)" },    // purple
+  { bg: "rgba(236, 72, 153, 0.55)", border: "rgba(236, 72, 153, 0.8)" },    // pink
+  { bg: "rgba(59, 130, 246, 0.55)", border: "rgba(59, 130, 246, 0.8)" },    // blue
+  { bg: "rgba(245, 158, 11, 0.55)", border: "rgba(245, 158, 11, 0.8)" },    // amber
+  { bg: "rgba(16, 185, 129, 0.55)", border: "rgba(16, 185, 129, 0.8)" },    // emerald
+  { bg: "rgba(239, 68, 68, 0.55)", border: "rgba(239, 68, 68, 0.8)" },      // red
+  { bg: "rgba(14, 165, 233, 0.55)", border: "rgba(14, 165, 233, 0.8)" },    // sky
+];
+
+interface BubbleData {
+  asset: string;
+  pnl: number;
+  trades: number;
+  winRate: number;
+  r: number;
+  cx: number;
+  cy: number;
+  color: typeof BUBBLE_COLORS[0];
+}
+
+function packBubbles(rows: AssetRow[], width: number, height: number): BubbleData[] {
+  if (!rows.length) return [];
+  const maxTrades = Math.max(...rows.map((r) => r.trades), 1);
+  const minR = 18;
+  const maxR = Math.min(width, height) * 0.32;
+
+  const bubbles: BubbleData[] = rows.slice(0, 8).map((r, i) => {
+    const ratio = r.trades / maxTrades;
+    const radius = minR + ratio * (maxR - minR);
+    return {
+      ...r,
+      r: radius,
+      cx: width / 2 + (Math.random() - 0.5) * width * 0.3,
+      cy: height / 2 + (Math.random() - 0.5) * height * 0.3,
+      color: BUBBLE_COLORS[i % BUBBLE_COLORS.length],
+    };
+  });
+
+  // Simple force-based packing (few iterations)
+  for (let iter = 0; iter < 80; iter++) {
+    for (let i = 0; i < bubbles.length; i++) {
+      for (let j = i + 1; j < bubbles.length; j++) {
+        const a = bubbles[i], b = bubbles[j];
+        const dx = b.cx - a.cx;
+        const dy = b.cy - a.cy;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const minDist = a.r + b.r + 3;
+        if (dist < minDist) {
+          const push = (minDist - dist) / 2;
+          const nx = dx / dist, ny = dy / dist;
+          a.cx -= nx * push;
+          a.cy -= ny * push;
+          b.cx += nx * push;
+          b.cy += ny * push;
+        }
+      }
+      // Pull toward center
+      const b = bubbles[i];
+      b.cx += (width / 2 - b.cx) * 0.03;
+      b.cy += (height / 2 - b.cy) * 0.03;
+      // Keep in bounds
+      b.cx = Math.max(b.r + 2, Math.min(width - b.r - 2, b.cx));
+      b.cy = Math.max(b.r + 2, Math.min(height - b.r - 2, b.cy));
+    }
+  }
+
+  return bubbles;
+}
+
+const AssetBubbleChart: React.FC<{ rows: AssetRow[]; period: string }> = ({ rows, period }) => {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const W = 260, H = 220;
+  const bubbles = useMemo(() => packBubbles(rows, W, H), [rows]);
+
+  if (!rows.length) return <div className="text-xs text-muted-foreground py-2">No trades.</div>;
+
+  return (
+    <div className="relative" style={{ width: W, height: H }}>
+      <svg width={W} height={H} className="overflow-visible">
+        <defs>
+          {bubbles.map((b, i) => (
+            <radialGradient key={`${period}-grad-${i}`} id={`${period}-bgrad-${i}`} cx="35%" cy="35%">
+              <stop offset="0%" stopColor="white" stopOpacity={0.25} />
+              <stop offset="100%" stopColor={b.color.bg} stopOpacity={1} />
+            </radialGradient>
+          ))}
+        </defs>
+        {bubbles.map((b, i) => {
+          const isHovered = hoveredIdx === i;
+          return (
+            <motion.g
+              key={`${period}-${b.asset}`}
+              onMouseEnter={() => setHoveredIdx(i)}
+              onMouseLeave={() => setHoveredIdx(null)}
+              style={{ cursor: "pointer" }}
+            >
+              <motion.circle
+                cx={b.cx}
+                cy={b.cy}
+                initial={{ r: 0, opacity: 0 }}
+                animate={{
+                  r: isHovered ? b.r * 1.12 : b.r,
+                  opacity: hoveredIdx !== null && !isHovered ? 0.4 : 1,
+                }}
+                transition={{
+                  r: { type: "spring", stiffness: 200, damping: 18, delay: i * 0.08 },
+                  opacity: { duration: 0.2 },
+                }}
+                fill={`url(#${period}-bgrad-${i})`}
+                stroke={b.color.border}
+                strokeWidth={isHovered ? 2 : 1}
+              />
+              {b.r > 22 && (
+                <motion.text
+                  x={b.cx}
+                  y={b.cy - (b.r > 35 ? 4 : 0)}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  className="fill-foreground pointer-events-none select-none"
+                  style={{ fontSize: Math.max(8, Math.min(11, b.r * 0.35)), fontWeight: 600 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: hoveredIdx !== null && !isHovered ? 0.3 : 1 }}
+                >
+                  {b.asset}
+                </motion.text>
+              )}
+              {b.r > 35 && (
+                <motion.text
+                  x={b.cx}
+                  y={b.cy + 10}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  className="pointer-events-none select-none"
+                  style={{
+                    fontSize: Math.max(7, b.r * 0.25),
+                    fontFamily: "monospace",
+                    fill: b.pnl >= 0 ? "#10b981" : "#ef4444",
+                    fontWeight: 700,
+                  }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: hoveredIdx !== null && !isHovered ? 0.3 : 1 }}
+                >
+                  {formatPnL(b.pnl)}
+                </motion.text>
+              )}
+            </motion.g>
+          );
+        })}
+      </svg>
+      {/* Tooltip on hover */}
+      {hoveredIdx !== null && bubbles[hoveredIdx] && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="absolute z-50 pointer-events-none rounded-lg border border-border/50 bg-card/95 backdrop-blur-md px-3 py-2 shadow-xl"
+          style={{
+            left: Math.min(bubbles[hoveredIdx].cx + bubbles[hoveredIdx].r + 8, W - 120),
+            top: Math.max(bubbles[hoveredIdx].cy - 30, 4),
+          }}
+        >
+          <div className="text-xs font-semibold text-foreground">{bubbles[hoveredIdx].asset}</div>
+          <div className={cn("text-xs font-mono tabular-nums font-bold", pnlTextColor(bubbles[hoveredIdx].pnl))}>
+            {formatPnL(bubbles[hoveredIdx].pnl)}
+          </div>
+          <div className="text-[10px] text-muted-foreground">
+            {bubbles[hoveredIdx].trades} trades · {(bubbles[hoveredIdx].winRate * 100).toFixed(0)}% win
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+};
+
 const AssetList: React.FC<{ rows: AssetRow[] }> = ({ rows }) => {
   if (!rows.length) return <div className="text-xs text-muted-foreground py-2">No trades.</div>;
   return (
