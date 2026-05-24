@@ -3,6 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Trade } from '@/types/trade';
 import { toast } from 'sonner';
 
+// Hard cap on trades fetched per request. The dashboard and journal views
+// rarely need more than this; raise it (or paginate) if power users hit the cap.
+const TRADES_FETCH_LIMIT = 1000;
+
 export function useTrades(userId: string | undefined, accountId: string | null = null, brokerAccountId: string | null = null) {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,8 +25,9 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         .from('trades')
         .select('*')
         .eq('user_id', userId)
-        .order('date', { ascending: false });
-      
+        .order('date', { ascending: false })
+        .limit(TRADES_FETCH_LIMIT);
+
       // Filter by broker account if specified
       if (brokerAccountId) {
         query = query.eq('broker_account_id', brokerAccountId).eq('imported_from_broker', true);

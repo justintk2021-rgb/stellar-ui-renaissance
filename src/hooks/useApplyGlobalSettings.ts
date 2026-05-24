@@ -37,12 +37,20 @@ interface AppliedSettings {
 export function applySettingsToDocument(s: AppliedSettings) {
   const root = document.documentElement;
   const theme = s.theme === 'light' ? 'light' : 'dark';
-  root.classList.remove('light', 'dark');
-  root.classList.add(theme);
+
+  // Only swap the theme class if it actually changed — avoids re-triggering
+  // every CSS recompute on the page when realtime/cache echoes the same value.
+  if (!root.classList.contains(theme)) {
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme);
+  }
 
   const accent = s.accentColor || 'emerald';
-  ACCENT_CLASSES.forEach(cls => root.classList.remove(cls));
-  root.classList.add(`accent-${accent}`);
+  const targetAccentClass = `accent-${accent}`;
+  if (!root.classList.contains(targetAccentClass)) {
+    ACCENT_CLASSES.forEach(cls => root.classList.remove(cls));
+    root.classList.add(targetAccentClass);
+  }
 
   if (accent !== 'custom') {
     root.style.removeProperty('--primary');

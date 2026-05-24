@@ -237,7 +237,11 @@ export function useUserSettings(userId: string | undefined) {
     setSettings(prev => {
       const newSettings = { ...prev, [key]: value };
 
-      // Apply visual settings immediately + cache for cross-page sync
+      // Apply visual settings to the DOM and localStorage cache.
+      // For `theme`, `useThemeTransition` has already swapped the <html> class
+      // synchronously inside the click handler — `applySettingsToDocument` is
+      // idempotent so calling it again is a cheap no-op, but we still need to
+      // refresh the cache so other tabs / the Landing page pick up the change.
       const visualKeys: Array<keyof UserSettings> = ['theme', 'accentColor', 'customColor', 'customGradient'];
       if (visualKeys.includes(key)) {
         const applied = {
@@ -246,20 +250,21 @@ export function useUserSettings(userId: string | undefined) {
           customColor: newSettings.customColor,
           customGradient: newSettings.customGradient,
         };
-        applySettingsToDocument(applied);
+        // Only call applySettingsToDocument for non-theme visual keys; theme
+        // is handled by useThemeTransition with the no-transition guard.
+        if (key !== 'theme') {
+          applySettingsToDocument(applied);
+        }
         writeSettingsCache(applied);
       }
 
-      // Clear existing timeout
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
-      
-      // Debounce save to database
       saveTimeoutRef.current = setTimeout(() => {
         saveToDatabase(newSettings);
       }, 500);
-      
+
       return newSettings;
     });
   }, [saveToDatabase]);

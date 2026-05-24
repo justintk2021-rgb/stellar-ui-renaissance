@@ -1,7 +1,7 @@
 import * as React from "react";
+import { motion } from "framer-motion";
 import { Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
 
 interface ThemeToggleProps {
   checked: boolean;
@@ -10,99 +10,87 @@ interface ThemeToggleProps {
   size?: "sm" | "default" | "lg";
 }
 
+const spring = { type: "spring" as const, stiffness: 520, damping: 32, mass: 0.7 };
+
 const ThemeToggle = React.forwardRef<HTMLButtonElement, ThemeToggleProps>(
   ({ checked, onCheckedChange, className, size = "default" }, ref) => {
     const sizeClasses = {
-      sm: "w-12 h-6",
-      default: "w-14 h-7",
-      lg: "w-16 h-8",
-    };
-
-    const thumbSizes = {
-      sm: "w-5 h-5",
-      default: "w-6 h-6",
-      lg: "w-7 h-7",
+      sm: "h-8 w-[4.25rem] p-0.5",
+      default: "h-9 w-[4.75rem] p-0.5",
+      lg: "h-10 w-[5.25rem] p-1",
     };
 
     const iconSizes = {
-      sm: "w-3 h-3",
-      default: "w-3.5 h-3.5",
-      lg: "w-4 h-4",
+      sm: "h-3.5 w-3.5",
+      default: "h-4 w-4",
+      lg: "h-4 w-4",
     };
 
-    const translateX = {
-      sm: checked ? 24 : 2,
-      default: checked ? 28 : 2,
-      lg: checked ? 32 : 2,
+    const thumbSizes = {
+      sm: "h-7 w-[calc(50%-2px)]",
+      default: "h-8 w-[calc(50%-2px)]",
+      lg: "h-8 w-[calc(50%-4px)]",
     };
 
     return (
-      <button
+      <motion.button
         ref={ref}
+        type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={checked ? "Switch to light mode" : "Switch to dark mode"}
         onClick={() => onCheckedChange(!checked)}
+        whileTap={{ scale: 0.96 }}
+        transition={{ type: "spring", stiffness: 600, damping: 30 }}
         className={cn(
-          "relative inline-flex shrink-0 cursor-pointer items-center rounded-full p-0.5",
-          "bg-gradient-to-r transition-all duration-300 ease-out",
-          checked
-            ? "from-indigo-500/20 via-purple-500/20 to-pink-500/20"
-            : "from-amber-500/20 via-orange-500/20 to-yellow-500/20",
-          "hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+          "group relative inline-flex shrink-0 cursor-pointer items-center rounded-full",
+          "border border-border/60 bg-muted/40 shadow-sm backdrop-blur-sm",
+          "transition-[border-color,box-shadow] duration-150 ease-out",
+          "hover:border-border hover:bg-muted/55 hover:shadow-md",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           sizeClasses[size],
           className
         )}
       >
-        {/* Background glow effect */}
-        <motion.div
+        <motion.span
+          aria-hidden
           className={cn(
-            "absolute inset-0 rounded-full opacity-50 blur-md",
-            checked
-              ? "bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-pink-500/30"
-              : "bg-gradient-to-r from-amber-500/30 via-orange-500/30 to-yellow-500/30"
-          )}
-          animate={{ opacity: checked ? 0.4 : 0.3 }}
-          transition={{ duration: 0.3 }}
-        />
-
-        {/* Track background */}
-        <div
-          className={cn(
-            "absolute inset-0 rounded-full transition-colors duration-300",
-            checked ? "bg-muted/80" : "bg-muted/60"
-          )}
-        />
-
-        {/* Animated thumb */}
-        <motion.div
-          className={cn(
-            "relative flex items-center justify-center rounded-full shadow-md",
-            "bg-gradient-to-br transition-shadow duration-300",
-            checked
-              ? "from-indigo-400 to-purple-500 shadow-purple-500/30"
-              : "from-amber-400 to-orange-500 shadow-orange-500/30",
+            "pointer-events-none absolute top-0.5 bottom-0.5 left-0.5 rounded-full",
+            "bg-background shadow-sm ring-1 ring-border/40 will-change-transform",
             thumbSizes[size]
           )}
-          animate={{ x: translateX[size] }}
-          transition={{
-            type: "spring",
-            stiffness: 500,
-            damping: 30,
-          }}
-        >
-          {/* Icon container with rotation */}
-          <motion.div
-            animate={{ rotate: checked ? 360 : 0 }}
-            transition={{ duration: 0.5, ease: "easeInOut" }}
+          animate={{ x: checked ? "calc(100% + 2px)" : 0 }}
+          transition={spring}
+        />
+
+        <span className="relative z-10 flex flex-1 items-center justify-center">
+          <motion.span
+            animate={{
+              scale: !checked ? 1.12 : 0.82,
+              rotate: !checked ? 0 : -90,
+              opacity: !checked ? 1 : 0.4,
+            }}
+            transition={spring}
+            className={cn(!checked ? "text-amber-500" : "text-muted-foreground/45 group-hover:text-muted-foreground/70")}
           >
-            {checked ? (
-              <Moon className={cn(iconSizes[size], "text-white")} />
-            ) : (
-              <Sun className={cn(iconSizes[size], "text-white")} />
-            )}
-          </motion.div>
-        </motion.div>
-      </button>
+            <Sun className={iconSizes[size]} strokeWidth={2.25} />
+          </motion.span>
+        </span>
+
+        <span className="relative z-10 flex flex-1 items-center justify-center">
+          <motion.span
+            animate={{
+              scale: checked ? 1.12 : 0.82,
+              rotate: checked ? 0 : 90,
+              opacity: checked ? 1 : 0.4,
+            }}
+            transition={spring}
+            className={cn(checked ? "text-indigo-400" : "text-muted-foreground/45 group-hover:text-muted-foreground/70")}
+          >
+            <Moon className={iconSizes[size]} strokeWidth={2.25} />
+          </motion.span>
+        </span>
+      </motion.button>
     );
   }
 );

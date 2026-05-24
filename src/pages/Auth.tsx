@@ -5,6 +5,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, Sparkles, ChevronRight } from "lucide-react";
+
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+      />
+    </svg>
+  );
+}
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
@@ -174,6 +197,7 @@ export function AuthPage() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showLoader, setShowLoader] = useState(false);
   const [loaderName, setLoaderName] = useState<string | undefined>(undefined);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const showLoaderRef = useRef(false);
 
   // Keep ref in sync so the auth listener always sees the latest value
@@ -197,10 +221,24 @@ export function AuthPage() {
   };
 
   useEffect(() => {
-    // Force dark theme for auth page
-    document.documentElement.classList.remove('light');
-    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove("light");
+    document.documentElement.classList.add("dark", "accent-emerald");
   }, []);
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+        queryParams: { access_type: "offline", prompt: "consent" },
+      },
+    });
+    if (error) {
+      toast.error(error.message);
+      setIsGoogleLoading(false);
+    }
+  };
 
   useEffect(() => {
     const checkSession = async () => {
@@ -312,7 +350,7 @@ export function AuthPage() {
         initial="initial"
         animate="animate"
         exit="exit"
-        className="min-h-screen relative overflow-hidden flex items-center justify-center bg-black"
+        className="min-h-screen relative overflow-hidden flex items-center justify-center bg-background"
       >
       {/* 3D Canvas Background */}
       <div className="absolute inset-0 z-0">
@@ -324,8 +362,8 @@ export function AuthPage() {
       </div>
 
       {/* Gradient Overlays */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/50 to-black/90 z-10" />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-black/60 z-10" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/60 to-background/95 z-10" />
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-secondary/5 z-10" />
 
       {/* Back to Home Button */}
       <motion.div
@@ -336,7 +374,7 @@ export function AuthPage() {
       >
         <Link to="/">
           <motion.div whileHover={{ scale: 1.05, x: -5 }} whileTap={{ scale: 0.95 }}>
-            <Button variant="ghost" className="gap-2 text-white/60 hover:text-white hover:bg-white/10 border border-white/20">
+            <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground hover:bg-card/60 border border-border/50">
               <ArrowLeft className="w-4 h-4" />
               Back
             </Button>
@@ -352,14 +390,12 @@ export function AuthPage() {
           animate="visible"
           className="relative rounded-3xl p-8 overflow-hidden"
         >
-          {/* Glassmorphism card background */}
-          <div className="absolute inset-0 bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/20 shadow-2xl" />
-          
-          {/* Animated border glow */}
+          <div className="absolute inset-0 glass-strong rounded-3xl shadow-2xl" />
+
           <motion.div
-            className="absolute inset-0 rounded-3xl opacity-30"
+            className="absolute inset-0 rounded-3xl opacity-40"
             style={{
-              background: "linear-gradient(135deg, transparent 40%, rgba(255, 255, 255, 0.2) 50%, transparent 60%)",
+              background: "linear-gradient(135deg, transparent 40%, hsl(158 64% 52% / 0.15) 50%, transparent 60%)",
               backgroundSize: "200% 200%",
             }}
             animate={{
@@ -373,13 +409,13 @@ export function AuthPage() {
             <motion.div variants={itemVariants} className="text-center mb-8">
               <motion.div
                 whileHover={{ scale: 1.1, rotate: 5 }}
-                className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white flex items-center justify-center shadow-2xl"
+                className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-glow"
               >
                 <img src={logo} alt="NSYNC" className="w-12 h-12 rounded-xl" />
               </motion.div>
-              
-              <motion.h1 
-                className="text-3xl font-bold mb-2 text-white"
+
+              <motion.h1
+                className="text-3xl font-bold mb-2 text-foreground"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
@@ -387,8 +423,8 @@ export function AuthPage() {
                 {isLogin ? "Welcome Back" : "Create Account"}
               </motion.h1>
               
-              <motion.p 
-                className="text-sm text-white/50"
+              <motion.p
+                className="text-sm text-muted-foreground"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
@@ -399,7 +435,38 @@ export function AuthPage() {
               </motion.p>
             </motion.div>
 
-            {/* Form */}
+            {/* Google Sign In */}
+            <motion.div variants={itemVariants} className="space-y-4 mb-6">
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isLoading || isGoogleLoading}
+                  onClick={handleGoogleSignIn}
+                  className="w-full h-12 rounded-xl border-border/60 bg-card/40 hover:bg-card/60 text-foreground font-medium"
+                >
+                  {isGoogleLoading ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-5 h-5 border-2 border-muted-foreground/30 border-t-primary rounded-full"
+                    />
+                  ) : (
+                    <>
+                      <GoogleIcon className="w-5 h-5 mr-2.5" />
+                      Continue with Google
+                    </>
+                  )}
+                </Button>
+              </motion.div>
+
+              <div className="relative flex items-center">
+                <div className="flex-1 border-t border-border/50" />
+                <span className="px-3 text-xs text-muted-foreground uppercase tracking-wider">or continue with email</span>
+                <div className="flex-1 border-t border-border/50" />
+              </div>
+            </motion.div>
+
             <form onSubmit={handleSubmit} className="space-y-5">
               <AnimatePresence mode="wait">
                 {!isLogin && (
@@ -412,9 +479,9 @@ export function AuthPage() {
                     className="grid grid-cols-2 gap-4"
                   >
                     <motion.div variants={itemVariants} className="space-y-2">
-                      <Label className="text-xs text-white/50 font-medium">First Name</Label>
+                      <Label className="text-xs text-muted-foreground font-medium">First Name</Label>
                       <div className="relative group">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-white transition-colors" />
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                         <Input
                           placeholder="John"
                           value={formData.firstName}
@@ -422,7 +489,7 @@ export function AuthPage() {
                             setFormData({ ...formData, firstName: e.target.value });
                             if (errors.firstName) setErrors({ ...errors, firstName: '' });
                           }}
-                          className={`pl-10 bg-white/5 border-white/20 focus:border-white/50 focus:bg-white/10 transition-all duration-300 rounded-xl h-12 text-white placeholder:text-white/30 ${errors.firstName ? 'border-red-500' : ''}`}
+                          className={`pl-10 bg-card/40 border-border/50 focus:border-primary/50 focus:bg-card/60 transition-all duration-300 rounded-xl h-12 ${errors.firstName ? 'border-destructive' : ''}`}
                           disabled={isLoading}
                           maxLength={50}
                         />
@@ -439,9 +506,9 @@ export function AuthPage() {
                     </motion.div>
                     
                     <motion.div variants={itemVariants} className="space-y-2">
-                      <Label className="text-xs text-white/50 font-medium">Last Name</Label>
+                      <Label className="text-xs text-muted-foreground font-medium">Last Name</Label>
                       <div className="relative group">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-white transition-colors" />
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                         <Input
                           placeholder="Doe"
                           value={formData.lastName}
@@ -449,7 +516,7 @@ export function AuthPage() {
                             setFormData({ ...formData, lastName: e.target.value });
                             if (errors.lastName) setErrors({ ...errors, lastName: '' });
                           }}
-                          className={`pl-10 bg-white/5 border-white/20 focus:border-white/50 focus:bg-white/10 transition-all duration-300 rounded-xl h-12 text-white placeholder:text-white/30 ${errors.lastName ? 'border-red-500' : ''}`}
+                          className={`pl-10 bg-card/40 border-border/50 focus:border-primary/50 focus:bg-card/60 transition-all duration-300 rounded-xl h-12 ${errors.lastName ? 'border-destructive' : ''}`}
                           disabled={isLoading}
                           maxLength={50}
                         />
@@ -469,9 +536,9 @@ export function AuthPage() {
               </AnimatePresence>
 
               <motion.div variants={itemVariants} className="space-y-2">
-                <Label className="text-xs text-white/50 font-medium">Email Address</Label>
+                <Label className="text-xs text-muted-foreground font-medium">Email Address</Label>
                 <div className="relative group">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-white transition-colors" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
                     type="email"
                     placeholder="you@example.com"
@@ -480,7 +547,7 @@ export function AuthPage() {
                       setFormData({ ...formData, email: e.target.value });
                       if (errors.email) setErrors({ ...errors, email: '' });
                     }}
-                    className={`pl-10 bg-white/5 border-white/20 focus:border-white/50 focus:bg-white/10 transition-all duration-300 rounded-xl h-12 text-white placeholder:text-white/30 ${errors.email ? 'border-red-500' : ''}`}
+                    className={`pl-10 bg-card/40 border-border/50 focus:border-primary/50 focus:bg-card/60 transition-all duration-300 rounded-xl h-12 ${errors.email ? 'border-destructive' : ''}`}
                     disabled={isLoading}
                     maxLength={255}
                   />
@@ -497,9 +564,9 @@ export function AuthPage() {
               </motion.div>
 
               <motion.div variants={itemVariants} className="space-y-2">
-                <Label className="text-xs text-white/50 font-medium">Password</Label>
+                <Label className="text-xs text-muted-foreground font-medium">Password</Label>
                 <div className="relative group">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-white transition-colors" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
@@ -508,7 +575,7 @@ export function AuthPage() {
                       setFormData({ ...formData, password: e.target.value });
                       if (errors.password) setErrors({ ...errors, password: '' });
                     }}
-                    className={`pl-10 pr-10 bg-white/5 border-white/20 focus:border-white/50 focus:bg-white/10 transition-all duration-300 rounded-xl h-12 text-white placeholder:text-white/30 ${errors.password ? 'border-red-500' : ''}`}
+                    className={`pl-10 pr-10 bg-card/40 border-border/50 focus:border-primary/50 focus:bg-card/60 transition-all duration-300 rounded-xl h-12 ${errors.password ? 'border-destructive' : ''}`}
                     disabled={isLoading}
                     maxLength={128}
                   />
@@ -517,7 +584,7 @@ export function AuthPage() {
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     tabIndex={-1}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -536,7 +603,7 @@ export function AuthPage() {
                   <motion.p 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-xs text-white/40"
+                    className="text-xs text-muted-foreground"
                   >
                     Minimum 8 characters
                   </motion.p>
@@ -546,7 +613,7 @@ export function AuthPage() {
                     <button
                       type="button"
                       onClick={handleForgotPassword}
-                      className="text-xs text-white/60 hover:text-white transition-colors"
+                      className="text-xs text-muted-foreground hover:text-primary transition-colors"
                       disabled={isLoading}
                     >
                       Forgot password?
@@ -557,19 +624,19 @@ export function AuthPage() {
 
               <motion.div variants={itemVariants}>
                 <motion.div
-                  whileHover={{ scale: 1.02, boxShadow: "0 20px 40px -10px rgba(255, 255, 255, 0.2)" }}
+                  whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
                   <Button
                     type="submit"
-                    disabled={isLoading}
-                    className="w-full h-12 text-base font-semibold bg-white text-black hover:bg-white/90 shadow-xl rounded-xl transition-all duration-300"
+                    disabled={isLoading || isGoogleLoading}
+                    className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-glow rounded-xl transition-all duration-300"
                   >
                     {isLoading ? (
                       <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full"
+                        className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"
                       />
                     ) : (
                       <>
@@ -587,15 +654,15 @@ export function AuthPage() {
               variants={itemVariants}
               className="mt-6 text-center"
             >
-              <p className="text-sm text-white/50">
+              <p className="text-sm text-muted-foreground">
                 {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
                 <motion.button
                   type="button"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setIsLogin(!isLogin)}
-                  className="text-white hover:text-white/80 font-semibold transition-colors inline-flex items-center gap-1"
-                  disabled={isLoading}
+                  className="text-primary hover:text-primary/80 font-semibold transition-colors inline-flex items-center gap-1"
+                  disabled={isLoading || isGoogleLoading}
                 >
                   {isLogin ? (
                     <>
@@ -616,7 +683,7 @@ export function AuthPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="text-center text-xs text-white/30 mt-6"
+          className="text-center text-xs text-muted-foreground/60 mt-6"
         >
           By continuing, you agree to our Terms of Service
         </motion.p>

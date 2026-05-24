@@ -44,7 +44,6 @@ export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], sho
           <ThemeToggle
             checked={theme === 'dark'}
             onCheckedChange={(checked) => onThemeChange(checked ? 'dark' : 'light')}
-            size="sm"
           />
         )}
         <Badge variant="secondary" className="px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium text-muted-foreground hidden sm:inline-flex">

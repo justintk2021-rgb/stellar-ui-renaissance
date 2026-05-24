@@ -1,14 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
-@import url("https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap");
-
-@import url("https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap");
-
-@import url("https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap");
 
 @layer base {
   :root {
@@ -366,10 +363,8 @@
     @apply border-border;
   }
 
-  /* Seamless theme transition - GPU accelerated */
   html {
     color-scheme: light dark;
-    transition: none;
   }
 
   html.light {
@@ -380,30 +375,17 @@
     color-scheme: dark;
   }
 
-  /* View Transitions API for seamless theme switching */
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation: none;
-    mix-blend-mode: normal;
+  /* During a theme swap, disable every transition/animation on the page so
+     the swap is instant. The class is added before changing the theme class
+     and removed on the next frame in useThemeTransition. */
+  html.theme-switching,
+  html.theme-switching *,
+  html.theme-switching *::before,
+  html.theme-switching *::after {
+    transition: none !important;
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
-
-  ::view-transition-old(root) {
-    z-index: 1;
-  }
-
-  ::view-transition-new(root) {
-    z-index: 9999;
-  }
-
-  .dark::view-transition-old(root) {
-    z-index: 9999;
-  }
-
-  .dark::view-transition-new(root) {
-    z-index: 1;
-  }
-
-  /* Theme switches are now instant - no transition overhead */
 
   body {
     @apply bg-background text-foreground font-sans antialiased;

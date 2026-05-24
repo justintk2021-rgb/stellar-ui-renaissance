@@ -12,7 +12,6 @@ import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
 import { BalanceCards } from "@/components/Dashboard/BalanceCards";
 import { DashboardStatsLayout } from "@/components/Dashboard/DashboardStatsLayout";
-import { AnimatedBackground } from "@/components/Layout/AnimatedBackground";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { TradeTable } from "@/components/Journal/TradeTable";
 import { MiniCalendar } from "@/components/Journal/MiniCalendar";
@@ -29,6 +28,9 @@ const PlaybookView = lazy(() => import("@/components/Playbook/PlaybookView").the
 const EconomicCalendarView = lazy(() => import("@/components/EconomicCalendar/EconomicCalendarView").then(m => ({ default: m.EconomicCalendarView })));
 const LotSizeCalculator = lazy(() => import("@/components/Calculator/LotSizeCalculator").then(m => ({ default: m.LotSizeCalculator })));
 const CommunityView = lazy(() => import("@/components/Community/CommunityView").then(m => ({ default: m.CommunityView })));
+
+// 3D animated background is ~600KB (three.js + drei). Lazy-load and only mount on the dashboard tab.
+const AnimatedBackground = lazy(() => import("@/components/Layout/AnimatedBackground").then(m => ({ default: m.AnimatedBackground })));
 
 import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
@@ -286,7 +288,6 @@ const Index = () => {
   // Use database-backed user settings (syncs across devices)
   const { 
     settings,
-    isInitialized: settingsInitialized,
     setTheme,
     setAccentColor,
     setCustomColor,
@@ -416,66 +417,6 @@ const Index = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate, fetchProfile]);
-
-  // Apply theme and accent color to document
-  useEffect(() => {
-    if (!settingsInitialized) return;
-    
-    document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(theme);
-    
-    // Remove all accent classes and add the current one
-    const accentClasses = ['accent-emerald', 'accent-blue', 'accent-purple', 'accent-pink', 'accent-red', 'accent-orange', 'accent-yellow', 'accent-cyan', 'accent-custom'];
-    accentClasses.forEach(cls => document.documentElement.classList.remove(cls));
-    document.documentElement.classList.add(`accent-${accentColor}`);
-
-    // Clear any inline custom styles when switching to a preset accent color
-    if (accentColor !== 'custom') {
-      document.documentElement.style.removeProperty('--primary');
-      document.documentElement.style.removeProperty('--primary-glow');
-      document.documentElement.style.removeProperty('--ring');
-      document.documentElement.style.removeProperty('--sidebar-primary');
-      document.documentElement.style.removeProperty('--sidebar-ring');
-    } else {
-      // Apply custom color/gradient from database
-      const hexToHsl = (hex: string): string => {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        if (!result) return '158 64% 51%';
-        let r = parseInt(result[1], 16) / 255;
-        let g = parseInt(result[2], 16) / 255;
-        let b = parseInt(result[3], 16) / 255;
-        const max = Math.max(r, g, b), min = Math.min(r, g, b);
-        let h = 0, s = 0, l = (max + min) / 2;
-        if (max !== min) {
-          const d = max - min;
-          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-          switch (max) {
-            case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-            case g: h = ((b - r) / d + 2) / 6; break;
-            case b: h = ((r - g) / d + 4) / 6; break;
-          }
-        }
-        return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-      };
-
-      if (customGradient) {
-        const fromHsl = hexToHsl(customGradient.from);
-        const toHsl = hexToHsl(customGradient.to);
-        document.documentElement.style.setProperty('--primary', fromHsl);
-        document.documentElement.style.setProperty('--primary-glow', toHsl);
-        document.documentElement.style.setProperty('--ring', fromHsl);
-        document.documentElement.style.setProperty('--sidebar-primary', fromHsl);
-        document.documentElement.style.setProperty('--sidebar-ring', fromHsl);
-      } else if (customColor) {
-        const hsl = hexToHsl(customColor);
-        document.documentElement.style.setProperty('--primary', hsl);
-        document.documentElement.style.setProperty('--primary-glow', hsl);
-        document.documentElement.style.setProperty('--ring', hsl);
-        document.documentElement.style.setProperty('--sidebar-primary', hsl);
-        document.documentElement.style.setProperty('--sidebar-ring', hsl);
-      }
-    }
-  }, [theme, accentColor, customColor, customGradient, settingsInitialized]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -627,8 +568,12 @@ const Index = () => {
         <meta name="description" content="Track your trades, analyze performance, and keep detailed notes with NSYNC Journal - your personal trading journal." />
       </Helmet>
 
-      {/* Animated Stars Background */}
-      <AnimatedBackground />
+      {/* Animated Stars Background — only mounted on the dashboard tab to keep the GPU idle elsewhere */}
+      {currentPage === 'dashboard' && (
+        <Suspense fallback={null}>
+          <AnimatedBackground />
+        </Suspense>
+      )}
 
       {/* Global Sidebar - works for all pages */}
       <Sidebar 
