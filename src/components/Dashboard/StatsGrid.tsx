@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { Trade } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Info, DollarSign, Percent, BarChart3, Scale, Activity } from "lucide-react";
@@ -7,7 +7,7 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import { WinRatioCard } from "./WinRatioCard";
 import { RecentTrades } from "./RecentTrades";
 import { motion } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
+import { useActiveBrokerConnectionId, useBrokerPositions, sumFloatingPl } from "@/hooks/useBrokerPositions";
 
 interface StatsGridProps {
   trades: Trade[];
@@ -96,57 +96,13 @@ const iconVariants = {
 // Removed animated glow variants to reduce visual interference
 
 export function StatsGrid({ trades }: StatsGridProps) {
-  const [openPositions, setOpenPositions] = useState<{ count: number; floatingPl: number }>({ count: 0, floatingPl: 0 });
+  const activeBrokerConnId = useActiveBrokerConnectionId();
+  const { positions: brokerPositions } = useBrokerPositions(activeBrokerConnId);
 
-  const [activeBrokerConnId, setActiveBrokerConnId] = useState<string | null>(
-    localStorage.getItem('activeBrokerConnectionId')
-  );
-
-  // Poll for active broker connection changes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const current = localStorage.getItem('activeBrokerConnectionId');
-      setActiveBrokerConnId(prev => prev !== current ? current : prev);
-    }, 1000);
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'activeBrokerConnectionId') setActiveBrokerConnId(e.newValue);
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => { clearInterval(interval); window.removeEventListener('storage', handleStorage); };
-  }, []);
-
-  useEffect(() => {
-    const fetchOpenPositions = async () => {
-      if (!activeBrokerConnId) {
-        setOpenPositions({ count: 0, floatingPl: 0 });
-        return;
-      }
-
-      const { data: positions } = await supabase
-        .from('broker_positions')
-        .select('floating_pl')
-        .eq('broker_connection_id', activeBrokerConnId)
-        .is('closed_at', null);
-
-      if (positions) {
-        setOpenPositions({
-          count: positions.length,
-          floatingPl: positions.reduce((sum, p) => sum + Number(p.floating_pl || 0), 0),
-        });
-      } else {
-        setOpenPositions({ count: 0, floatingPl: 0 });
-      }
-    };
-
-    fetchOpenPositions();
-
-    const channel = supabase
-      .channel(`stats-positions-${Date.now()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'broker_positions' }, () => fetchOpenPositions())
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [trades, activeBrokerConnId]);
+  const openPositions = useMemo(() => ({
+    count: brokerPositions.length,
+    floatingPl: sumFloatingPl(brokerPositions),
+  }), [brokerPositions]);
 
   const stats = trades.reduce(
     (acc, trade) => {

@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { queryKeys } from '@/lib/queries/keys';
+import type { BrokerPosition } from '@/types/broker';
+
+export type { BrokerPosition };
 
 export interface BrokerConnection {
   id: string;
@@ -32,22 +37,6 @@ export interface BrokerAccount {
   acc_num: number;
   account_name: string | null;
   is_active: boolean;
-}
-
-export interface BrokerPosition {
-  id: string;
-  broker_connection_id: string;
-  position_id: string;
-  symbol: string;
-  type: string;
-  side: string | null;
-  volume: number;
-  open_price: number;
-  current_price: number | null;
-  stop_loss: number | null;
-  take_profit: number | null;
-  floating_pl: number;
-  open_time: string;
 }
 
 export interface BrokerOrder {
@@ -93,16 +82,29 @@ export interface AccountSummary {
 }
 
 async function invokeTradeLocker(action: string, body: Record<string, unknown> = {}) {
-  const response = await supabase.functions.invoke('tradelocker', {
+  const { data, error } = await supabase.functions.invoke('tradelocker', {
     body: { action, ...body },
   });
-  if (response.error) throw new Error(response.error.message || 'Request failed');
-  if (response.data?.error) throw new Error(response.data.error);
-  return response.data;
+
+  if (data?.error) throw new Error(String(data.error));
+
+  if (error) {
+    let message = error.message || 'Request failed';
+    if ('context' in error && error.context instanceof Response) {
+      try {
+        const parsed = await error.context.json();
+        if (parsed?.error) message = String(parsed.error);
+      } catch {
+        // Keep default message when response body isn't JSON.
+      }
+    }
+    throw new Error(message);
+  }
+
+  return data;
 }
 
 export function useTradeLocker() {
-  const [connections, setConnections] = useState<BrokerConnection[]>([]);
   const [activeConnectionId, setActiveConnectionId] = useState<string | null>(() => {
     return localStorage.getItem('activeBrokerConnectionId') || null;
   });
@@ -111,14 +113,10 @@ export function useTradeLocker() {
   const [orders, setOrders] = useState<BrokerOrder[]>([]);
   const [history, setHistory] = useState<BrokerTradeHistory[]>([]);
   const [summary, setSummary] = useState<AccountSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [accountsLoading, setAccountsLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Derived active connection
-  const connection = connections.find(c => c.id === activeConnectionId) || null;
-
-  // Persist active connection
   const selectConnection = useCallback((connectionId: string | null) => {
     setActiveConnectionId(connectionId);
     if (connectionId) {
@@ -126,18 +124,18 @@ export function useTradeLocker() {
     } else {
       localStorage.removeItem('activeBrokerConnectionId');
     }
-    // Reset connection-specific data
     setPositions([]);
     setOrders([]);
     setHistory([]);
     setSummary(null);
   }, []);
 
-  // Fetch all connections
-  const fetchConnections = useCallback(async () => {
-    try {
+  // Fetch all connections via React Query
+  const { data: connections = [], isLoading: loading, refetch: refetchConnections } = useQuery({
+    queryKey: queryKeys.broker.connections('current'),
+    queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) return [];
 
       const { data, error } = await supabase
         .from('broker_connections')
@@ -147,40 +145,52 @@ export function useTradeLocker() {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      const conns = (data || []) as unknown as BrokerConnection[];
-      setConnections(conns);
+      return (data || []) as unknown as BrokerConnection[];
+    },
+    staleTime: 30_000,
+  });
 
-      // Auto-select if needed
-      if (conns.length > 0) {
-        const persisted = localStorage.getItem('activeBrokerConnectionId');
-        const match = conns.find(c => c.id === persisted);
-        if (!match) {
-          selectConnection(conns[0].id);
-        }
-      } else {
-        selectConnection(null);
+  useEffect(() => {
+    if (connections.length > 0) {
+      const persisted = localStorage.getItem('activeBrokerConnectionId');
+      const match = connections.find(c => c.id === persisted);
+      if (!match && activeConnectionId !== connections[0].id) {
+        selectConnection(connections[0].id);
       }
-    } catch (error) {
-      console.error('Error fetching connections:', error);
-    } finally {
-      setLoading(false);
+    } else if (connections.length === 0 && activeConnectionId) {
+      selectConnection(null);
     }
-  }, [selectConnection]);
+  }, [connections.length]);
+
+  const fetchConnections = useCallback(async () => {
+    await refetchConnections();
+  }, [refetchConnections]);
+
+  const connection = connections.find(c => c.id === activeConnectionId) || null;
 
   // Fetch accounts for active connection
-  const fetchAccounts = useCallback(async () => {
-    if (!activeConnectionId) {
+  const fetchAccounts = useCallback(async (connectionId?: string | null) => {
+    const connId = connectionId ?? activeConnectionId;
+    if (!connId) {
       setAccounts([]);
-      return;
+      return [];
     }
+    setAccountsLoading(true);
     try {
-      const { data: accs } = await supabase
+      const { data: accs, error } = await supabase
         .from('broker_accounts')
         .select('*')
-        .eq('broker_connection_id', activeConnectionId);
-      setAccounts((accs || []) as unknown as BrokerAccount[]);
+        .eq('broker_connection_id', connId);
+      if (error) throw error;
+      const brokerAccounts = (accs || []) as unknown as BrokerAccount[];
+      setAccounts(brokerAccounts);
+      return brokerAccounts;
     } catch (error) {
       console.error('Error fetching accounts:', error);
+      setAccounts([]);
+      return [];
+    } finally {
+      setAccountsLoading(false);
     }
   }, [activeConnectionId]);
 
@@ -189,12 +199,28 @@ export function useTradeLocker() {
     try {
       const result = await invokeTradeLocker('connect', { email, password, server, environment });
       toast.success(result.message || 'Connected!');
-      await fetchConnections();
-      // Select the newly created connection
+
       if (result.connectionId) {
         selectConnection(result.connectionId);
+        await fetchConnections();
+        const brokerAccounts = await fetchAccounts(result.connectionId);
+
+        if (brokerAccounts.length === 1) {
+          const acc = brokerAccounts[0];
+          await invokeTradeLocker('select-account', {
+            connectionId: result.connectionId,
+            accountId: acc.account_id_external,
+            accNum: acc.acc_num,
+          });
+          toast.success('Account selected');
+          await fetchConnections();
+          return { ...result, autoSelected: true };
+        }
+      } else {
+        await fetchConnections();
       }
-      return result;
+
+      return { ...result, autoSelected: false };
     } catch (error: any) {
       toast.error(error.message);
       throw error;
@@ -202,14 +228,18 @@ export function useTradeLocker() {
   };
 
   // Select account within a connection
-  const selectAccount = async (accountId: string, accNum: number) => {
-    if (!connection) return;
+  const selectAccount = async (accountId: string, accNum: number, connectionId?: string) => {
+    const connId = connectionId || connection?.id;
+    if (!connId) return false;
     try {
-      await invokeTradeLocker('select-account', { connectionId: connection.id, accountId, accNum });
+      await invokeTradeLocker('select-account', { connectionId: connId, accountId, accNum });
       toast.success('Account selected');
       await fetchConnections();
+      await fetchAccounts(connId);
+      return true;
     } catch (error: any) {
       toast.error(error.message);
+      return false;
     }
   };
 
@@ -404,11 +434,6 @@ export function useTradeLocker() {
     }
   };
 
-  // Initial load
-  useEffect(() => {
-    fetchConnections();
-  }, [fetchConnections]);
-
   // Fetch accounts when active connection changes
   useEffect(() => {
     fetchAccounts();
@@ -454,6 +479,7 @@ export function useTradeLocker() {
     history,
     summary,
     loading,
+    accountsLoading,
     syncing,
     connect,
     selectAccount,

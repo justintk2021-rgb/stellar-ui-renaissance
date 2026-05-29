@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTradeLocker } from '@/hooks/useTradeLocker';
-import { MyfxbookPanel } from './MyfxbookPanel';
+import { MetaTraderManagement } from '@/components/Settings/MetaTraderManagement';
 import { toast } from 'sonner';
 import {
   Link2, Unlink, RefreshCw, Loader2, CheckCircle2, XCircle, AlertCircle,
@@ -29,23 +29,45 @@ import {
 
 interface BrokerManagementProps {
   userId?: string;
+  variant?: 'full' | 'connect';
+  onConnectionComplete?: () => void;
 }
 
-export function BrokerManagement({ userId }: BrokerManagementProps) {
+type DiagnosticResult = {
+  step: string;
+  status: 'pass' | 'fail';
+  detail: string;
+};
+
+type SyncLog = {
+  id: string;
+  sync_type: string;
+  status: string;
+  records_processed: number | null;
+  started_at: string | null;
+  error_message: string | null;
+};
+
+export function BrokerManagement({
+  userId,
+  variant = 'full',
+  onConnectionComplete,
+}: BrokerManagementProps) {
+  const isConnectMode = variant === 'connect';
   const [activePlatform, setActivePlatform] = useState<string>('tradelocker');
 
   const {
     connections, connection, activeConnectionId, selectConnection,
     accounts, positions, orders, history, summary,
-    loading, syncing,
+    loading, accountsLoading, syncing,
     connect, selectAccount, sync, disconnect, reconnect,
     placeOrder, closePosition, modifyPosition, cancelOrder, modifyOrder,
     updateSyncSettings, runDiagnostic, fetchSyncLogs,
   } = useTradeLocker();
 
-  const [diagnosticResults, setDiagnosticResults] = useState<any[] | null>(null);
+  const [diagnosticResults, setDiagnosticResults] = useState<DiagnosticResult[] | null>(null);
   const [runningDiagnostic, setRunningDiagnostic] = useState(false);
-  const [syncLogs, setSyncLogs] = useState<any[]>([]);
+  const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [showDebug, setShowDebug] = useState(false);
 
   // Connection form
@@ -92,14 +114,26 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
     }
     setIsConnecting(true);
     try {
-      await connect(email, password, server, environment);
+      const result = await connect(email.trim(), password, server.trim(), environment);
       setEmail('');
       setPassword('');
       setServer('');
-      setShowConnectForm(false);
+      if (!isConnectMode) {
+        setShowConnectForm(false);
+      } else if (result?.autoSelected && onConnectionComplete) {
+        onConnectionComplete();
+      }
     } catch {
+      // Toast is handled by the hook.
     } finally {
       setIsConnecting(false);
+    }
+  };
+
+  const handleSelectAccount = async (accountId: string, accNum: number) => {
+    const ok = await selectAccount(accountId, accNum);
+    if (ok && isConnectMode && onConnectionComplete) {
+      onConnectionComplete();
     }
   };
 
@@ -135,6 +169,7 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
       setTradeTp('');
       setTradableInstrumentId('');
     } catch {
+      // Toast is handled by the hook.
     } finally {
       setIsPlacing(false);
     }
@@ -170,20 +205,27 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
               <Link2 className="w-5 h-5 text-primary" />
               Connect TradeLocker
             </div>
-            {connections.length > 0 && (
+            {connections.length > 0 && !isConnectMode && (
               <Button variant="ghost" size="sm" onClick={() => setShowConnectForm(false)}>
                 <X className="w-4 h-4 mr-1" /> Cancel
               </Button>
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleConnect();
+            }}
+          >
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Environment</Label>
               <Select value={environment} onValueChange={setEnvironment}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[200]">
                   <SelectItem value="demo">Demo</SelectItem>
                   <SelectItem value="live">Live</SelectItem>
                 </SelectContent>
@@ -219,10 +261,11 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
               </Button>
             </div>
           </div>
-          <Button onClick={handleConnect} disabled={isConnecting} className="w-full">
+          <Button type="submit" disabled={isConnecting} className="w-full">
             {isConnecting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Link2 className="w-4 h-4 mr-2" />}
             Connect
           </Button>
+          </form>
         </CardContent>
       </Card>
     </div>
@@ -289,7 +332,135 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
     );
   };
 
+  const renderTradeLockerConnect = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      );
+    }
+
+    if (connections.length === 0 || showConnectForm) {
+      return (
+        <div className="space-y-4">
+          {connections.length > 0 && (
+            <div className="flex justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setShowConnectForm(false)}>
+                <X className="w-4 h-4 mr-1" /> Back to accounts
+              </Button>
+            </div>
+          )}
+          {renderConnectForm()}
+        </div>
+      );
+    }
+
+    if (!connection) {
+      return (
+        <div className="text-center py-12 text-muted-foreground">
+          Select a connection to continue.
+        </div>
+      );
+    }
+
+    if (!connection.active_account_id && accounts.length > 0) {
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between gap-3">
+            {connections.length > 1 && renderConnectionSwitcher()}
+            <Button variant="outline" size="sm" onClick={() => setShowConnectForm(true)} className="ml-auto">
+              <Plus className="w-4 h-4 mr-1" /> Connect another
+            </Button>
+          </div>
+          <div className="max-w-2xl mx-auto">
+            <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle>Select Trading Account</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {accounts.map((acc) => (
+                  <Button
+                    key={acc.id}
+                    variant="outline"
+                    className="w-full justify-between h-auto py-3"
+                    onClick={() => handleSelectAccount(acc.account_id_external, acc.acc_num)}
+                  >
+                    <span className="font-medium">{acc.account_name || `Account ${acc.acc_num}`}</span>
+                    <Badge variant="secondary">accNum: {acc.acc_num}</Badge>
+                  </Button>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
+
+    if (connection.active_account_id) {
+      return (
+        <div className="max-w-xl mx-auto space-y-4">
+          {!isConnectMode && (
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowConnectForm(true)}>
+                <Plus className="w-4 h-4 mr-1" /> Connect another
+              </Button>
+            </div>
+          )}
+          <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+            <CardContent className="py-10 text-center space-y-4">
+              <CheckCircle2 className="w-12 h-12 text-primary mx-auto" />
+              <div>
+                <h3 className="font-medium">TradeLocker Connected</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {connection.broker_name} · {connection.environment?.toUpperCase()}
+                </p>
+              </div>
+              {isConnectMode && onConnectionComplete && (
+                <Button onClick={onConnectionComplete} className="w-full">
+                  Continue to Dashboard
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    if (accountsLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <p className="text-sm">Loading your TradeLocker accounts…</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="max-w-xl mx-auto">
+        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+          <CardContent className="py-8 text-center space-y-4">
+            <AlertCircle className="w-10 h-10 text-amber-400 mx-auto" />
+            <div>
+              <h3 className="font-medium">No accounts found</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Connected successfully, but no trading accounts were returned. Check your server name and environment, then try again.
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => setShowConnectForm(true)}>
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   const renderTradeLocker = () => {
+    if (isConnectMode) {
+      return renderTradeLockerConnect();
+    }
+
     if (loading) {
       return (
         <div className="flex items-center justify-center py-12">
@@ -327,7 +498,7 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
                     key={acc.id}
                     variant="outline"
                     className="w-full justify-between h-auto py-3"
-                    onClick={() => selectAccount(acc.account_id_external, acc.acc_num)}
+                    onClick={() => handleSelectAccount(acc.account_id_external, acc.acc_num)}
                   >
                     <span className="font-medium">{acc.account_name || `Account ${acc.acc_num}`}</span>
                     <Badge variant="secondary">accNum: {acc.acc_num}</Badge>
@@ -751,7 +922,7 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
               <CardContent className="space-y-4">
                 {diagnosticResults && (
                   <div className="space-y-2">
-                    {diagnosticResults.map((r: any, i: number) => (
+                    {diagnosticResults.map((r, i) => (
                       <div key={i} className="flex items-center gap-3 p-2 rounded border border-border/50 bg-background/50">
                         {r.status === 'pass' ? (
                           <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -793,7 +964,7 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {syncLogs.map((log: any) => (
+                        {syncLogs.map((log) => (
                           <TableRow key={log.id}>
                             <TableCell className="text-xs">{log.sync_type}</TableCell>
                             <TableCell>
@@ -895,36 +1066,25 @@ export function BrokerManagement({ userId }: BrokerManagementProps) {
     );
   };
 
-  const renderMT5 = () => (
-    <div className="max-w-2xl mx-auto">
-      <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
-        <CardContent className="py-12 text-center space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-full bg-muted/50 flex items-center justify-center">
-            <Activity className="w-8 h-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-medium">MetaTrader 5</h3>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            MT5 integration coming soon. Requires a self-hosted Python bridge on a VPS for direct API access.
-          </p>
-          <Badge variant="secondary">Coming Soon</Badge>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  const renderMT5 = () => <MetaTraderManagement />;
+
+  if (isConnectMode) {
+    return (
+      <div className="space-y-6">
+        {renderTradeLocker()}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <Tabs value={activePlatform} onValueChange={setActivePlatform}>
         <TabsList>
           <TabsTrigger value="tradelocker">TradeLocker</TabsTrigger>
-          <TabsTrigger value="myfxbook">Myfxbook</TabsTrigger>
           <TabsTrigger value="mt5">MetaTrader 5</TabsTrigger>
         </TabsList>
         <TabsContent value="tradelocker" className="mt-6">
           {renderTradeLocker()}
-        </TabsContent>
-        <TabsContent value="myfxbook" className="mt-6">
-          <MyfxbookPanel />
         </TabsContent>
         <TabsContent value="mt5" className="mt-6">
           {renderMT5()}

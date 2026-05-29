@@ -1,29 +1,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { APP_KNOWLEDGE, formatUserContext } from "./appKnowledge.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You are an expert trading assistant for NSYNC Journal - a personal trading journal app. You help traders analyze their performance, provide insights, and can add trades to their journal.
+const SYSTEM_PROMPT = `${APP_KNOWLEDGE}
 
-When a user wants to add a trade, use the add_trade function. Extract the following from their description:
-- date: The trade date (YYYY-MM-DD format, default to today if not specified)
-- pair: The trading pair/symbol (e.g., EURUSD, BTCUSD, AAPL)
-- direction: Either "Long" or "Short"
-- result: The P&L result in dollars (positive for wins, negative for losses)
-- session: Optional - trading session (e.g., "London", "New York", "Asian")
-- strategy: Optional - the strategy used
-- notes: Optional - any additional notes
+## Trade logging tool
+When a user wants to add a trade, use the add_trade function. Extract:
+- date: YYYY-MM-DD (default today)
+- pair: symbol (EURUSD, BTCUSD, etc.)
+- direction: "Long" or "Short"
+- result: P&L in dollars (+ profit, - loss)
+- session: optional (London, New York, Asian)
+- notes: optional
 
-Be conversational and helpful. When analyzing trades, focus on:
-- Win rate and consistency
-- Risk management patterns
-- Best performing pairs/sessions/strategies
-- Areas for improvement
-
-Keep responses concise but insightful.`;
+Be conversational, data-driven, and actionable.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -57,29 +52,15 @@ serve(async (req) => {
 
     console.log("Authenticated user:", user.id);
 
-    const { messages, tradeContext } = await req.json();
+    const { messages, userContext, tradeContext } = await req.json();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
     if (!OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY is not configured");
     }
 
-    // Build context-aware system prompt
-    let contextPrompt = SYSTEM_PROMPT;
-    if (tradeContext) {
-      contextPrompt += `\n\nCurrent trading data context:
-- Total trades: ${tradeContext.totalTrades}
-- Win rate: ${tradeContext.winRate}%
-- Total P&L: $${tradeContext.totalPnL}
-- Average win: $${tradeContext.avgWin}
-- Average loss: $${tradeContext.avgLoss}
-- Profit factor: ${tradeContext.profitFactor}
-- Most traded pairs: ${tradeContext.topPairs}
-- Most used sessions: ${tradeContext.topSessions}
-- Most used strategies: ${tradeContext.topStrategies}
-- Recent trades: ${tradeContext.recentTrades}
-- Today's date: ${new Date().toISOString().slice(0, 10)}`;
-    }
+    const contextPayload = userContext ?? tradeContext;
+    const contextPrompt = `${SYSTEM_PROMPT}\n\n${formatUserContext(contextPayload)}`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

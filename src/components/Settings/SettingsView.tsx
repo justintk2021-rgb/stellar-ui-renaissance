@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, memo, useRef } from "react";
 import { Moon, Sun, User, Mail, Key, Calendar, LogOut, Palette, Save, Check, Trash2, Download, Link2, Pipette, RotateCcw, Settings, ChevronRight, FileText, Database, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { BrokerManagement } from "./BrokerManagement";
 import { CSVImport } from "./CSVImport";
+import { CustomAccentColorPicker } from "./CustomAccentColorPicker";
 import { useTrades } from "@/hooks/useTrades";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
@@ -35,14 +36,6 @@ function hexToHsl(hex: string): string {
   }
 
   return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-}
-
-// Helper function to adjust lightness of HSL string
-function adjustLightness(hsl: string, amount: number): string {
-  const parts = hsl.split(' ');
-  if (parts.length !== 3) return hsl;
-  const l = parseInt(parts[2]);
-  return `${parts[0]} ${parts[1]} ${Math.min(100, l + amount)}%`;
 }
 
 interface UserProfile {
@@ -80,6 +73,7 @@ interface SettingsViewProps {
   onLogout: () => void;
   customColor?: string;
   onCustomColorChange?: (color: string) => void;
+  onCustomAccentChange?: (color: string) => void;
   customGradient?: CustomGradient | null;
   onCustomGradientChange?: (gradient: CustomGradient | null) => void;
 }
@@ -199,6 +193,47 @@ const pulseVariants = {
   },
 };
 
+// Gradient stop picker — local swatch updates only while dragging.
+const GradientStopPicker = memo(function GradientStopPicker({
+  value,
+  onChange,
+  sizeClass = "w-12 h-12",
+}: {
+  value: string;
+  onChange: (color: string) => void;
+  sizeClass?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const swatchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (inputRef.current) inputRef.current.value = value;
+    if (swatchRef.current) swatchRef.current.style.backgroundColor = value;
+  }, [value]);
+
+  return (
+    <label className="relative cursor-pointer">
+      <input
+        ref={inputRef}
+        type="color"
+        defaultValue={value}
+        onInput={(e) => {
+          if (swatchRef.current) {
+            swatchRef.current.style.backgroundColor = e.currentTarget.value;
+          }
+        }}
+        onChange={(e) => onChange(e.currentTarget.value)}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+      />
+      <div
+        ref={swatchRef}
+        className={cn("rounded-xl border-2 border-border/30 shadow-lg pointer-events-none", sizeClass)}
+        style={{ backgroundColor: value }}
+      />
+    </label>
+  );
+});
+
 // Wrapper component for CSV Import to use the trades hook
 function CSVImportWrapper({ userId }: { userId?: string }) {
   const { importTrades } = useTrades(userId);
@@ -223,6 +258,7 @@ export function SettingsView({
   onLogout, 
   customColor, 
   onCustomColorChange,
+  onCustomAccentChange,
   customGradient: propCustomGradient,
   onCustomGradientChange,
 }: SettingsViewProps) {
@@ -252,6 +288,12 @@ export function SettingsView({
 
   // Sync with prop changes
   useEffect(() => {
+    if (customColor) {
+      setLocalCustomColor(customColor);
+    }
+  }, [customColor]);
+
+  useEffect(() => {
     if (propCustomGradient) {
       setSelectedGradient(propCustomGradient);
       setCustomGradientFrom(propCustomGradient.from);
@@ -268,17 +310,20 @@ export function SettingsView({
     localStorage.setItem('atp_gradient_enabled', JSON.stringify(gradientEnabled));
   }, [gradientEnabled]);
 
-  // Apply custom color to CSS variables
-  useEffect(() => {
-    if (accentEnabled && !gradientEnabled && localCustomColor && accentColor === 'custom') {
-      const hsl = hexToHsl(localCustomColor);
-      document.documentElement.style.setProperty('--primary', hsl);
-      document.documentElement.style.setProperty('--primary-glow', adjustLightness(hsl, 5));
-      document.documentElement.style.setProperty('--ring', hsl);
-      document.documentElement.style.setProperty('--sidebar-primary', hsl);
-      document.documentElement.style.setProperty('--sidebar-ring', hsl);
-    }
-  }, [accentEnabled, gradientEnabled, accentColor, localCustomColor]);
+  const commitCustomAccent = useCallback(
+    (color: string) => {
+      setLocalCustomColor(color);
+      setGradientEnabled(false);
+      setAccentEnabled(true);
+      if (onCustomAccentChange) {
+        onCustomAccentChange(color);
+      } else {
+        onAccentColorChange("custom");
+        onCustomColorChange?.(color);
+      }
+    },
+    [onCustomAccentChange, onAccentColorChange, onCustomColorChange],
+  );
 
   // Apply gradient colors and save to database
   useEffect(() => {
@@ -335,11 +380,7 @@ export function SettingsView({
   };
 
   const handleCustomColorChange = (color: string) => {
-    setLocalCustomColor(color);
-    setGradientEnabled(false);
-    setAccentEnabled(true);
-    onAccentColorChange('custom');
-    onCustomColorChange?.(color);
+    commitCustomAccent(color);
   };
 
   const handleGradientSelect = (gradient: { from: string; to: string }) => {
@@ -511,6 +552,7 @@ export function SettingsView({
                   <img 
                     src={userProfile.avatar_url} 
                     alt="Avatar" 
+                    loading="lazy"
                     className="w-20 h-20 rounded-2xl object-cover ring-4 ring-primary/20"
                   />
                 ) : (
@@ -831,21 +873,11 @@ export function SettingsView({
             </div>
             <div className="h-6 w-px bg-border/50" />
             <div className="flex items-center gap-2">
-              <motion.label
-                whileHover={{ scale: 1.05 }}
-                className="relative cursor-pointer"
-              >
-                <input
-                  type="color"
-                  value={localCustomColor}
-                  onChange={(e) => handleCustomColorChange(e.target.value)}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <div
-                  className="w-7 h-7 rounded-lg border-2 border-border/50 shadow-inner"
-                  style={{ backgroundColor: localCustomColor }}
-                />
-              </motion.label>
+              <CustomAccentColorPicker
+                value={localCustomColor}
+                selected={accentColor === "custom" && accentEnabled && !gradientEnabled}
+                onCommit={handleCustomColorChange}
+              />
             </div>
             <Switch
               checked={accentEnabled}
@@ -999,22 +1031,10 @@ export function SettingsView({
               <div className="flex-1 space-y-2">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground">From</label>
                 <div className="flex items-center gap-3">
-                  <motion.label
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="relative cursor-pointer"
-                  >
-                    <input
-                      type="color"
-                      value={customGradientFrom}
-                      onChange={(e) => setCustomGradientFrom(e.target.value)}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <div
-                      className="w-12 h-12 rounded-xl border-2 border-border/30 shadow-lg cursor-pointer"
-                      style={{ backgroundColor: customGradientFrom }}
-                    />
-                  </motion.label>
+                  <GradientStopPicker
+                    value={customGradientFrom}
+                    onChange={setCustomGradientFrom}
+                  />
                   <Input
                     type="text"
                     value={customGradientFrom}
@@ -1035,22 +1055,10 @@ export function SettingsView({
               <div className="flex-1 space-y-2">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground">To</label>
                 <div className="flex items-center gap-3">
-                  <motion.label
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="relative cursor-pointer"
-                  >
-                    <input
-                      type="color"
-                      value={customGradientTo}
-                      onChange={(e) => setCustomGradientTo(e.target.value)}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <div
-                      className="w-12 h-12 rounded-xl border-2 border-border/30 shadow-lg cursor-pointer"
-                      style={{ backgroundColor: customGradientTo }}
-                    />
-                  </motion.label>
+                  <GradientStopPicker
+                    value={customGradientTo}
+                    onChange={setCustomGradientTo}
+                  />
                   <Input
                     type="text"
                     value={customGradientTo}

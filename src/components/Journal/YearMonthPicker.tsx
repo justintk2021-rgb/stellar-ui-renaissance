@@ -67,7 +67,7 @@ export function YearMonthPicker({
   const [direction, setDirection] = useState(0);
   const [selected, setSelected] = useState<MonthSelection[]>(initialSelection ?? []);
 
-  // Reset to current year + (re)apply selection whenever the picker is opened.
+  // Reset year + selection whenever the picker opens or seeded selection changes.
   useEffect(() => {
     if (open) {
       const seed = initialSelection ?? [];
@@ -77,8 +77,7 @@ export function YearMonthPicker({
       setSelected(seed);
       setDirection(0);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, initialSelection, initialYear]);
 
   // Close on Escape
   useEffect(() => {

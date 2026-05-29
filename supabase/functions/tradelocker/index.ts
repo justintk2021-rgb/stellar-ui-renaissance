@@ -75,15 +75,28 @@ async function tlAuth(email: string, password: string, server: string, environme
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, server }),
     });
+    const text = await res.text();
     if (!res.ok) {
-      const text = await res.text();
       console.error('TL auth failed:', text);
-      return null;
+      let detail = text;
+      try {
+        const parsed = JSON.parse(text);
+        detail = parsed.message || parsed.error || parsed.detail || text;
+      } catch {
+        // keep raw text
+      }
+      return { error: detail || `Authentication failed (${res.status})` };
     }
-    return await res.json();
+    const data = JSON.parse(text);
+    const accessToken = data.accessToken || data.access_token;
+    const refreshToken = data.refreshToken || data.refresh_token;
+    if (!accessToken) {
+      return { error: 'TradeLocker did not return an access token. Check server name and environment.' };
+    }
+    return { accessToken, refreshToken };
   } catch (e) {
     console.error('TL auth error:', e);
-    return null;
+    return { error: 'Could not reach TradeLocker. Check your connection and try again.' };
   }
 }
 
@@ -107,9 +120,26 @@ async function tlGetAccounts(accessToken: string, environment: string) {
   const res = await fetch(`${baseUrl}/auth/jwt/all-accounts`, {
     headers: { 'Authorization': `Bearer ${accessToken}` },
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('TL get accounts failed:', text);
+    return [];
+  }
   const data = await res.json();
-  return data.accounts || [];
+  return data.accounts || data.data?.accounts || [];
+}
+
+function normalizeTlAccount(acc: any, index: number) {
+  const id = acc?.id ?? acc?.accountId ?? acc?.account_id;
+  const rawAccNum = acc?.accNum ?? acc?.acc_num ?? acc?.number ?? (index + 1);
+  const parsedAccNum = typeof rawAccNum === 'string' ? parseInt(rawAccNum, 10) : Number(rawAccNum);
+  const name = acc?.name ?? acc?.accountName ?? acc?.label ?? null;
+  if (!id || !Number.isFinite(parsedAccNum)) return null;
+  return {
+    id: String(id),
+    accNum: parsedAccNum,
+    name: name || `Account ${parsedAccNum}`,
+  };
 }
 
 async function tlGetAccountState(accessToken: string, accountId: string, accNum: number, environment: string) {
@@ -400,13 +430,18 @@ serve(async (req) => {
       }
 
       const authResult = await tlAuth(email, password, server, environment);
-      if (!authResult || !authResult.accessToken) {
-        return jsonResponse({ error: 'Failed to authenticate with TradeLocker. Check credentials and server name.' }, 400);
+      if (!authResult || authResult.error || !authResult.accessToken) {
+        return jsonResponse({
+          error: authResult?.error || 'Failed to authenticate with TradeLocker. Check credentials and server name.',
+        }, 400);
       }
 
-      const accounts = await tlGetAccounts(authResult.accessToken, environment);
+      const rawAccounts = await tlGetAccounts(authResult.accessToken, environment);
+      const accounts = rawAccounts
+        .map((acc: any, index: number) => normalizeTlAccount(acc, index))
+        .filter(Boolean);
       if (!accounts.length) {
-        return jsonResponse({ error: 'No TradeLocker accounts found.' }, 400);
+        return jsonResponse({ error: 'No TradeLocker accounts found for these credentials.' }, 400);
       }
 
       const tokenData = JSON.stringify({
@@ -476,20 +511,23 @@ serve(async (req) => {
 
       // Store broker accounts
       for (const acc of accounts) {
-        const parsedAccNum = typeof acc.accNum === 'string' ? parseInt(acc.accNum, 10) : acc.accNum;
-        await supabase.from('broker_accounts').insert({
+        const { error: accError } = await supabase.from('broker_accounts').insert({
           broker_connection_id: connection.id,
-          account_id_external: String(acc.id),
-          acc_num: parsedAccNum,
-          account_name: acc.name || `Account ${parsedAccNum}`,
+          account_id_external: acc.id,
+          acc_num: acc.accNum,
+          account_name: acc.name,
         });
+        if (accError) {
+          console.error('Broker account insert error:', accError);
+          return jsonResponse({ error: 'Failed to save broker accounts. Please try again.' }, 500);
+        }
       }
 
       return jsonResponse({
         success: true,
         connectionId: connection.id,
         connection: { ...connection, metaapi_account_id: undefined },
-        accounts: accounts.map((a: any) => ({ id: String(a.id), accNum: a.accNum, name: a.name || `Account ${a.accNum}` })),
+        accounts: accounts.map((a: any) => ({ id: a.id, accNum: a.accNum, name: a.name })),
         message: 'TradeLocker connected successfully!',
       });
     }

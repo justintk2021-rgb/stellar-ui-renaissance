@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Plus, X, ImagePlus, Trash2, ClipboardList, Award, GitBranch, ListChecks } from "lucide-react";
 import { useChecklists } from "@/hooks/useChecklists";
+import { useTradeDetail } from "@/hooks/useTrades";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChecklistPopup } from "./ChecklistPopup";
@@ -113,13 +114,15 @@ interface TradeFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   editingTrade: Trade | null;
+  userId?: string;
   onSubmit: (trade: Omit<Trade, 'id'>) => void;
   onCancelEdit: () => void;
   initialDate?: string; // Optional initial date for the trade
 }
 
-export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCancelEdit, initialDate }: TradeFormModalProps) {
+export function TradeFormModal({ isOpen, onClose, editingTrade, userId, onSubmit, onCancelEdit, initialDate }: TradeFormModalProps) {
   const { checklists, isAuthenticated } = useChecklists();
+  const { data: tradeDetail } = useTradeDetail(userId, editingTrade?.id ?? null);
   const [formData, setFormData] = useState({
     date: initialDate || new Date().toISOString().slice(0, 10),
     pair: '',
@@ -159,6 +162,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
 
   useEffect(() => {
     if (editingTrade) {
+      const detail = tradeDetail?.id === editingTrade.id ? tradeDetail : null;
       setFormData({
         date: editingTrade.date,
         pair: editingTrade.pair,
@@ -168,12 +172,12 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
         notes: editingTrade.notes || '',
         checklistId: editingTrade.checklistId || '',
       });
-      setChartImage(editingTrade.chartImage);
-      setChecklistState(editingTrade.checklistState);
+      setChartImage(detail?.chartImage ?? editingTrade.chartImage);
+      setChecklistState(detail?.checklistState ?? editingTrade.checklistState);
     } else {
       resetForm();
     }
-  }, [editingTrade, isOpen]);
+  }, [editingTrade, isOpen, tradeDetail]);
 
   // Update date when initialDate changes (e.g., opening from calendar)
   useEffect(() => {
@@ -184,13 +188,23 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setChartImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const maxWidth = 800;
+      const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      setChartImage(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.src = objectUrl;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -446,6 +460,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, onSubmit, onCanc
                       <img
                         src={chartImage}
                         alt="Trade chart"
+                        loading="lazy"
                         className="w-full h-32 object-cover"
                       />
                       <Button

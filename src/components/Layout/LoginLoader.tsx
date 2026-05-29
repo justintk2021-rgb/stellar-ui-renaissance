@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface LoginLoaderProps {
   /** Called when the loader animation finishes and the app should mount the dashboard. */
@@ -22,29 +22,42 @@ export function LoginLoader({
   name,
   duration = 2200,
 }: LoginLoaderProps) {
-  const [progress, setProgress] = useState(0);
   const [phaseIdx, setPhaseIdx] = useState(0);
+  const progressRef = useRef<HTMLDivElement>(null);
+  const percentRef = useRef<HTMLSpanElement>(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
     const start = performance.now();
     let raf = 0;
+
     const tick = (now: number) => {
       const p = Math.min(1, (now - start) / duration);
-      setProgress(p);
+      if (progressRef.current) {
+        progressRef.current.style.width = `${p * 100}%`;
+      }
+      if (percentRef.current) {
+        percentRef.current.textContent = `${Math.floor(p * 100).toString().padStart(2, "0")}%`;
+      }
       const idx = Math.min(PHASES.length - 1, Math.floor(p * PHASES.length));
-      setPhaseIdx(idx);
-      if (p < 1) raf = requestAnimationFrame(tick);
-      else onComplete();
+      setPhaseIdx((prev) => (prev === idx ? prev : idx));
+      if (p < 1) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        onCompleteRef.current();
+      }
     };
+
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [duration, onComplete]);
+  }, [duration]);
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0, filter: "blur(12px)" }}
+      exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-black"
     >
@@ -135,10 +148,10 @@ export function LoginLoader({
           className="w-[280px] sm:w-[340px] flex flex-col gap-3"
         >
           <div className="h-[2px] w-full rounded-full bg-foreground/10 overflow-hidden">
-            <motion.div
+            <div
+              ref={progressRef}
               className="h-full bg-gradient-to-r from-primary via-primary/80 to-primary"
-              style={{ width: `${progress * 100}%` }}
-              transition={{ duration: 0.1, ease: "linear" }}
+              style={{ width: "0%" }}
             />
           </div>
           <div className="flex items-center justify-between text-[10px] tracking-[0.3em] uppercase">
@@ -151,8 +164,8 @@ export function LoginLoader({
             >
               {PHASES[phaseIdx]}
             </motion.span>
-            <span className="text-primary font-mono">
-              {Math.floor(progress * 100).toString().padStart(2, "0")}%
+            <span ref={percentRef} className="text-primary font-mono">
+              00%
             </span>
           </div>
         </motion.div>

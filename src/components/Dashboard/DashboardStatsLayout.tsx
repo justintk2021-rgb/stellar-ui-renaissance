@@ -1,12 +1,12 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useMemo, lazy, Suspense } from "react";
 import { Trade } from "@/types/trade";
 import { TrendingUp, TrendingDown, DollarSign, Scale, Activity } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
 import { StatCard } from "./StatCard";
 import { PnLCalendar } from "./PnLCalendar";
 import { WinRatioCard } from "./WinRatioCard";
 import { NotebookEntry } from "@/types/trade";
+import { useActiveBrokerConnectionId, useBrokerPositions, sumFloatingPl } from "@/hooks/useBrokerPositions";
 
 // Lazy-load heavy widgets so the dashboard top section paints first.
 const RecentTrades = lazy(() =>
@@ -38,60 +38,13 @@ export function DashboardStatsLayout({
   onSaveEntry,
   onAddTrade,
 }: DashboardStatsLayoutProps) {
-  const [openPositions, setOpenPositions] = useState<{ count: number; floatingPl: number }>({
-    count: 0,
-    floatingPl: 0,
-  });
-  const [activeBrokerConnId, setActiveBrokerConnId] = useState<string | null>(
-    localStorage.getItem("activeBrokerConnectionId")
-  );
+  const activeBrokerConnId = useActiveBrokerConnectionId();
+  const { positions: brokerPositions } = useBrokerPositions(activeBrokerConnId);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const current = localStorage.getItem("activeBrokerConnectionId");
-      setActiveBrokerConnId((prev) => (prev !== current ? current : prev));
-    }, 1000);
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === "activeBrokerConnectionId") setActiveBrokerConnId(e.newValue);
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("storage", handleStorage);
-    };
-  }, []);
-
-  useEffect(() => {
-    const fetchOpenPositions = async () => {
-      if (!activeBrokerConnId) {
-        setOpenPositions({ count: 0, floatingPl: 0 });
-        return;
-      }
-      const { data: positions } = await supabase
-        .from("broker_positions")
-        .select("floating_pl")
-        .eq("broker_connection_id", activeBrokerConnId)
-        .is("closed_at", null);
-      if (positions) {
-        setOpenPositions({
-          count: positions.length,
-          floatingPl: positions.reduce((sum, p) => sum + Number(p.floating_pl || 0), 0),
-        });
-      } else {
-        setOpenPositions({ count: 0, floatingPl: 0 });
-      }
-    };
-    fetchOpenPositions();
-    const channel = supabase
-      .channel(`dash-stats-positions-${Date.now()}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "broker_positions" }, () =>
-        fetchOpenPositions()
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [trades, activeBrokerConnId]);
+  const openPositions = useMemo(() => ({
+    count: brokerPositions.length,
+    floatingPl: sumFloatingPl(brokerPositions),
+  }), [brokerPositions]);
 
   const stats = trades.reduce(
     (acc, trade) => {
@@ -190,16 +143,18 @@ export function DashboardStatsLayout({
   return (
     <div className="space-y-5 md:space-y-6">
       {/* Responsive layout: tablet uses 2-col, desktop uses 3-col split */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 md:gap-5 lg:gap-8 items-stretch">
-        {/* Left column - stats */}
-        <div className="md:col-span-1 lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 md:grid-cols-1 gap-4 md:gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 md:gap-4 lg:gap-5 items-stretch">
+        {/* Left column — fills height, compact cards */}
+        <div className="md:col-span-1 lg:col-span-2 flex flex-col gap-2 min-h-0">
           {leftCards.map((card, i) => (
-            <StatCard key={card.label} {...card} index={i} />
+            <div key={card.label} className="flex-1 min-h-0">
+              <StatCard {...card} index={i} compact fill />
+            </div>
           ))}
         </div>
 
         {/* Center column - Calendar */}
-        <div className="md:col-span-2 lg:col-span-7 order-first md:order-none">
+        <div className="md:col-span-2 lg:col-span-8 order-first md:order-none min-w-0">
           <PnLCalendar
             trades={trades}
             onUpdateTrade={onUpdateTrade}
@@ -209,14 +164,18 @@ export function DashboardStatsLayout({
           />
         </div>
 
-        {/* Right column - smaller */}
-        <div className="md:col-span-2 lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-1 gap-4 self-stretch">
+        {/* Right column — fills height, compact cards + map */}
+        <div className="md:col-span-2 lg:col-span-2 flex flex-col gap-2 min-h-0">
           {rightCards.map((card, i) => (
-            <StatCard key={card.label} {...card} index={i} />
+            <div key={card.label} className="flex-1 min-h-0">
+              <StatCard {...card} index={i} compact fill />
+            </div>
           ))}
-          <Suspense fallback={<WidgetFallback minHeight={220} />}>
-            <TradingIntelligenceMap trades={trades} compact />
-          </Suspense>
+          <div className="flex-[1.4] min-h-0">
+            <Suspense fallback={<WidgetFallback minHeight={120} />}>
+              <TradingIntelligenceMap trades={trades} compact />
+            </Suspense>
+          </div>
         </div>
       </div>
 

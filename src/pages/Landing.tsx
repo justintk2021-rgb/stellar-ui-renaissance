@@ -1,4 +1,4 @@
-import { useRef, lazy, Suspense, useEffect } from "react";
+import { useRef, lazy, Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,8 @@ import {
 } from "lucide-react";
 import logo from "@/assets/logo-3d.png";
 
-const AnimatedBackground = lazy(() =>
-  import("@/components/Layout/AnimatedBackground").then((m) => ({ default: m.AnimatedBackground }))
+const SpectraNoise = lazy(() =>
+  import("@/components/Layout/SpectraNoise").then((m) => ({ default: m.SpectraNoise }))
 );
 
 const fadeUp = {
@@ -214,34 +214,42 @@ const workflow = [
 
 export default function Landing() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
+  const [spectraPaused, setSpectraPaused] = useState(false);
   const { scrollYProgress } = useScroll({ target: containerRef });
   const heroOpacity = useTransform(scrollYProgress, [0, 0.25], [1, 0]);
   const heroScale = useTransform(scrollYProgress, [0, 0.25], [1, 0.96]);
 
   useEffect(() => {
     document.documentElement.classList.remove("light");
-    document.documentElement.classList.add("dark", "accent-emerald");
+    document.documentElement.classList.add("dark");
+  }, []);
+
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setSpectraPaused(!entry.isIntersecting),
+      { rootMargin: "100px" }
+    );
+    observer.observe(hero);
+    return () => observer.disconnect();
   }, []);
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {/* Starfield background */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <Suspense fallback={null}>
-          <AnimatedBackground />
-        </Suspense>
-      </div>
+    <div ref={containerRef} className="min-h-screen bg-black text-foreground overflow-x-hidden">
+      {/* SpectraNoise — bending spectral light ribbon */}
+      <Suspense fallback={<div className="fixed inset-0 z-0 bg-black" aria-hidden />}>
+        <SpectraNoise paused={spectraPaused} />
+      </Suspense>
 
       {/* Navigation */}
       <motion.nav
-        initial={{ y: -80, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.7, type: "spring", stiffness: 100 }}
         className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 py-3"
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between glass-strong rounded-2xl px-4 sm:px-6 py-3 border-border/50">
           <Link to="/" className="flex items-center gap-2.5 group">
-            <img src={logo} alt="NSYNC" className="w-9 h-9 rounded-xl group-hover:scale-105 transition-transform" />
+            <img src={logo} alt="NSYNC" loading="lazy" className="w-9 h-9 rounded-xl group-hover:scale-105 transition-transform" />
             <span className="text-lg font-bold hidden sm:inline">NSYNC Journal</span>
           </Link>
 
@@ -280,6 +288,7 @@ export default function Landing() {
 
       {/* Hero */}
       <motion.section
+        ref={heroRef}
         style={{ opacity: heroOpacity, scale: heroScale }}
         className="relative min-h-screen flex items-center justify-center pt-28 pb-20 px-4 sm:px-6"
       >
@@ -553,7 +562,7 @@ export default function Landing() {
       <footer className="relative z-10 border-t border-border/40 py-10 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <img src={logo} alt="NSYNC" className="w-8 h-8 rounded-lg" />
+            <img src={logo} alt="NSYNC" loading="lazy" className="w-8 h-8 rounded-lg" />
             <span className="font-bold">NSYNC Journal</span>
             <Badge variant="secondary" className="text-[10px] text-muted-foreground ml-1">
               ATP • Private

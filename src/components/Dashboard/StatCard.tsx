@@ -21,6 +21,8 @@ interface StatCardProps {
   highlightColor?: "primary" | "destructive";
   extra?: string;
   index?: number;
+  compact?: boolean;
+  fill?: boolean;
 }
 
 const cardVariants = {
@@ -107,7 +109,11 @@ export function StatCard({
   highlightColor = "primary",
   extra,
   index = 0,
+  compact = false,
+  fill = false,
 }: StatCardProps) {
+  const isSidebar = compact && fill;
+
   return (
     <motion.div
       variants={cardVariants}
@@ -116,7 +122,9 @@ export function StatCard({
       whileHover="hover"
       custom={index}
       className={cn(
-        "relative rounded-2xl p-5 overflow-hidden bg-card/40 backdrop-blur-xl border shadow-xl",
+        "relative rounded-xl overflow-hidden bg-card/40 backdrop-blur-xl border shadow-xl",
+        compact ? "px-3 py-4" : "p-5 rounded-2xl",
+        fill && "h-full w-full flex flex-col justify-center items-center",
         highlight
           ? highlightColor === "primary"
             ? "border-primary/40"
@@ -124,26 +132,56 @@ export function StatCard({
           : "border-border/30"
       )}
     >
-      <div className="relative">
-        <div className="flex items-center gap-2 mb-3">
+      <div
+        className={cn(
+          "relative w-full",
+          isSidebar && "flex flex-col items-center text-center gap-2",
+        )}
+      >
+        {isSidebar ? (
           <motion.div
             variants={iconVariants}
             initial="initial"
             whileHover="hover"
-            className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", bgClass)}
+            className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", bgClass)}
           >
             <Icon className={cn("w-4 h-4", colorClass)} />
           </motion.div>
-          <span className="text-sm text-muted-foreground truncate">{label}</span>
-          {tooltip && <InfoTooltip content={tooltip} />}
-        </div>
+        ) : (
+          <div className={cn("flex items-center gap-2", compact ? "mb-2" : "mb-3")}>
+            <motion.div
+              variants={iconVariants}
+              initial="initial"
+              whileHover="hover"
+              className={cn(
+                "rounded-lg flex items-center justify-center shrink-0",
+                compact ? "w-7 h-7" : "w-8 h-8",
+                bgClass,
+              )}
+            >
+              <Icon className={cn(compact ? "w-3.5 h-3.5" : "w-4 h-4", colorClass)} />
+            </motion.div>
+            <span className="text-sm text-muted-foreground truncate">{label}</span>
+            {tooltip && <InfoTooltip content={tooltip} />}
+          </div>
+        )}
 
-        <div className="flex items-center gap-2 flex-wrap">
+        {isSidebar && (
+          <div className="flex items-center justify-center gap-1.5">
+            <span className="text-base font-medium text-muted-foreground">{label}</span>
+            {tooltip && <InfoTooltip content={tooltip} />}
+          </div>
+        )}
+
+        <div className={cn("flex items-center gap-2", isSidebar && "justify-center")}>
           {displayInfinity ? (
             <motion.span
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className="text-2xl font-bold font-mono text-primary"
+              className={cn(
+                "font-bold font-mono text-primary",
+                isSidebar ? "text-3xl tracking-tight" : "text-2xl",
+              )}
             >
               ∞
             </motion.span>
@@ -153,7 +191,11 @@ export function StatCard({
               decimals={decimals}
               prefix={prefix}
               suffix={suffix}
-              className={cn("text-2xl font-bold font-mono", colorClass)}
+              className={cn(
+                "font-bold font-mono",
+                isSidebar ? "text-3xl tracking-tight" : "text-2xl",
+                colorClass,
+              )}
             />
           )}
           {showTrend && (
@@ -163,9 +205,9 @@ export function StatCard({
               transition={{ delay: 0.5 }}
             >
               {isPositive ? (
-                <TrendingUp className="w-4 h-4 text-primary" />
+                <TrendingUp className={cn(isSidebar ? "w-5 h-5" : "w-4 h-4", "text-primary")} />
               ) : (
-                <TrendingDown className="w-4 h-4 text-destructive" />
+                <TrendingDown className={cn(isSidebar ? "w-5 h-5" : "w-4 h-4", "text-destructive")} />
               )}
             </motion.div>
           )}
@@ -176,7 +218,10 @@ export function StatCard({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="text-xs text-muted-foreground mt-2"
+            className={cn(
+              "text-muted-foreground",
+              isSidebar ? "text-sm mt-0.5" : "text-xs mt-1.5",
+            )}
           >
             {extra}
           </motion.p>

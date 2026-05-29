@@ -274,6 +274,367 @@ const fmtPct = (n: number) =>
 const fmtMoney = (n: number) =>
   `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
 
+const fmtPctPoints = (n: number) =>
+  `${n >= 0 ? "+" : ""}${(n * 100).toFixed(1)} pp`;
+
+const fmtPF = (n: number) =>
+  !isFinite(n) ? "∞" : n.toFixed(2);
+
+export type InsightTone = "positive" | "negative" | "neutral" | "advice";
+
+export interface CompareInsight {
+  id: string;
+  title: string;
+  analysis: string;
+  advice?: string;
+  tone: InsightTone;
+}
+
+const pushInsight = (
+  list: CompareInsight[],
+  insight: CompareInsight,
+  max = 5,
+) => {
+  if (list.length < max) list.push(insight);
+};
+
+const bestBucket = (buckets: { label: string; count: number; pnl: number }[]) => {
+  const active = buckets.filter((b) => b.count > 0);
+  if (!active.length) return null;
+  return active.reduce((best, b) => (b.pnl > best.pnl ? b : best), active[0]);
+};
+
+const worstBucket = (buckets: { label: string; count: number; pnl: number }[]) => {
+  const active = buckets.filter((b) => b.count > 0);
+  if (!active.length) return null;
+  return active.reduce((worst, b) => (b.pnl < worst.pnl ? b : worst), active[0]);
+};
+
+const riskReward = (stats: PeriodStats) => {
+  if (!stats.avgLoss) return stats.avgWin > 0 ? Infinity : 0;
+  return stats.avgWin / Math.abs(stats.avgLoss);
+};
+
+/** Rich, actionable comparison insights between two periods. */
+export const buildCompareInsights = (
+  aStats: PeriodStats,
+  bStats: PeriodStats,
+  aTrades: Trade[],
+  bTrades: Trade[],
+  aLabel: string,
+  bLabel: string,
+  opts?: { aDays?: number; bDays?: number },
+): CompareInsight[] => {
+  const out: CompareInsight[] = [];
+  const aDays = opts?.aDays ?? aStats.uniqueDays;
+  const bDays = opts?.bDays ?? bStats.uniqueDays;
+  const lengthMismatch = aDays !== bDays && aDays > 0 && bDays > 0;
+
+  if (aStats.totalTrades === 0 && bStats.totalTrades === 0) {
+    return [{
+      id: "empty",
+      title: "No data",
+      analysis: "Neither period has trades yet.",
+      advice: "Log 5–10 trades in each month before comparing.",
+      tone: "neutral",
+    }];
+  }
+
+  if (aStats.totalTrades === 0 || bStats.totalTrades === 0) {
+    const empty = aStats.totalTrades === 0 ? aLabel : bLabel;
+    const active = aStats.totalTrades === 0 ? bLabel : aLabel;
+    return [{
+      id: "one-sided",
+      title: "One-sided",
+      analysis: `${empty} has no trades; only ${active} has data.`,
+      advice: "Pick two active months for a fair comparison.",
+      tone: "neutral",
+    }];
+  }
+
+  const pnlDelta = computeDelta(aStats.netPnL, bStats.netPnL, "netPnL");
+  const wrDelta = computeDelta(aStats.winRate, bStats.winRate, "winRate");
+  const pfDelta = computeDelta(
+    isFinite(aStats.profitFactor) ? aStats.profitFactor : 0,
+    isFinite(bStats.profitFactor) ? bStats.profitFactor : 0,
+    "profitFactor",
+  );
+  const expDelta = computeDelta(aStats.expectancy, bStats.expectancy, "expectancy");
+  const tradeDelta = computeDelta(aStats.totalTrades, bStats.totalTrades, "neutral");
+  const aDaily = aDays ? aStats.netPnL / aDays : 0;
+  const bDaily = bDays ? bStats.netPnL / bDays : 0;
+
+  // —— 1. Executive summary ——
+  const winner =
+    bStats.netPnL > aStats.netPnL ? bLabel :
+    aStats.netPnL > bStats.netPnL ? aLabel : null;
+
+  let summaryAnalysis = winner
+    ? `${winner} ahead by ${fmtMoney(Math.abs(pnlDelta.abs))} (${fmtMoney(aStats.netPnL)} → ${fmtMoney(bStats.netPnL)}).`
+    : `Near breakeven (${fmtMoney(aStats.netPnL)} vs ${fmtMoney(bStats.netPnL)}).`;
+
+  if (lengthMismatch) {
+    summaryAnalysis += ` Per day: ${fmtMoney(aDaily)} vs ${fmtMoney(bDaily)}.`;
+  }
+
+  summaryAnalysis += ` WR ${(aStats.winRate * 100).toFixed(0)}% → ${(bStats.winRate * 100).toFixed(0)}%.`;
+
+  let summaryAdvice: string | undefined;
+  if (pnlDelta.direction === "improved") {
+    summaryAdvice = `Note what worked in ${bLabel} and repeat it.`;
+  } else if (pnlDelta.direction === "regressed") {
+    summaryAdvice = `Compare logs — find setups you stopped taking in ${bLabel}.`;
+  }
+
+  pushInsight(out, {
+    id: "summary",
+    title: "Overview",
+    analysis: summaryAnalysis,
+    advice: summaryAdvice,
+    tone: pnlDelta.direction === "improved" ? "positive" : pnlDelta.direction === "regressed" ? "negative" : "neutral",
+  });
+
+  // —— 2. Edge & consistency ——
+  const aPF = aStats.profitFactor;
+  const bPF = bStats.profitFactor;
+  const edgeAnalysis =
+    `PF ${fmtPF(aPF)} → ${fmtPF(bPF)} · Exp ${fmtMoney(aStats.expectancy)} → ${fmtMoney(bStats.expectancy)}.`;
+
+  let edgeAdvice: string | undefined;
+  if (bPF < 1 && isFinite(bPF)) {
+    edgeAdvice = "Cut weak setups until PF is back above 1.";
+  } else if (pfDelta.direction === "improved" && bPF >= 1.5) {
+    edgeAdvice = "Strong edge — keep sizing steady.";
+  } else if (wrDelta.direction === "regressed" && expDelta.direction !== "regressed") {
+    edgeAdvice = "Lower WR but better expectancy — let winners run.";
+  } else if (wrDelta.direction === "improved" && expDelta.direction === "regressed") {
+    edgeAdvice = "More wins, smaller payoffs — review exits.";
+  }
+
+  pushInsight(out, {
+    id: "edge",
+    title: "Edge",
+    analysis: edgeAnalysis,
+    advice: edgeAdvice,
+    tone: pfDelta.direction === "improved" ? "positive" : pfDelta.direction === "regressed" ? "negative" : "neutral",
+  });
+
+  // —— 3. Risk / reward ——
+  const aRR = riskReward(aStats);
+  const bRR = riskReward(bStats);
+  const rrDelta = computeDelta(isFinite(aRR) ? aRR : 0, isFinite(bRR) ? bRR : 0, "higher-better");
+
+  if (aStats.avgWin > 0 || aStats.avgLoss < 0 || bStats.avgWin > 0 || bStats.avgLoss < 0) {
+    let rrAdvice: string | undefined;
+    const avgLossDelta = computeDelta(aStats.avgLoss, bStats.avgLoss, "avgLoss");
+
+    if (avgLossDelta.direction === "regressed") {
+      rrAdvice = `Avg loss up to ${fmtMoney(bStats.avgLoss)} — tighten stops or size.`;
+    } else if (bRR < 1 && isFinite(bRR)) {
+      rrAdvice = "R:R below 1:1 — improve entries or targets.";
+    } else if (rrDelta.direction === "improved" && bRR >= 1.5) {
+      rrAdvice = "Solid R:R — keep exit discipline.";
+    }
+
+    pushInsight(out, {
+      id: "risk-reward",
+      title: "R:R",
+      analysis:
+        `Win ${fmtMoney(aStats.avgWin)} → ${fmtMoney(bStats.avgWin)} · ` +
+        `Loss ${fmtMoney(aStats.avgLoss)} → ${fmtMoney(bStats.avgLoss)} · ` +
+        `R:R ${isFinite(aRR) ? aRR.toFixed(1) : "∞"} → ${isFinite(bRR) ? bRR.toFixed(1) : "∞"}.`,
+      advice: rrAdvice,
+      tone: rrDelta.direction === "improved" ? "positive" : avgLossDelta.direction === "regressed" ? "negative" : "neutral",
+    });
+  }
+
+  // —— 4. Trade frequency ——
+  if (
+    tradeDelta.pct !== null &&
+    Math.abs(tradeDelta.pct) >= 15 &&
+    (aStats.totalTrades >= 3 || bStats.totalTrades >= 3)
+  ) {
+    const freqUp = tradeDelta.abs > 0;
+    const pnlPerTradeA = aStats.expectancy;
+    const pnlPerTradeB = bStats.expectancy;
+    let freqAdvice: string | undefined;
+
+    if (freqUp && pnlDelta.direction === "regressed") {
+      freqAdvice = "More trades, worse P&L — cap daily volume.";
+    } else if (freqUp && pnlDelta.direction === "improved") {
+      freqAdvice = "Higher volume worked — watch quality weekly.";
+    } else if (!freqUp && pnlDelta.direction === "improved") {
+      freqAdvice = "Fewer trades, better results — stay selective.";
+    }
+
+    pushInsight(out, {
+      id: "frequency",
+      title: "Volume",
+      analysis:
+        `${aStats.totalTrades} → ${bStats.totalTrades} trades (${freqUp ? "+" : ""}${tradeDelta.pct?.toFixed(0)}%) · ` +
+        `${aStats.avgTradesPerDay.toFixed(1)} → ${bStats.avgTradesPerDay.toFixed(1)}/day.`,
+      advice: freqAdvice,
+      tone: freqUp && pnlDelta.direction === "regressed" ? "negative" : "neutral",
+    });
+  }
+
+  // —— 5. Pair / asset breakdown ——
+  const assetRows = buildGroupBreakdown(aTrades, bTrades, (t) => t.pair);
+  const topGainer = assetRows.find((r) => r.pnlDelta > 0 && (r.aTrades > 0 || r.bTrades > 0));
+  const topLoser = assetRows.find((r) => r.pnlDelta < 0 && (r.aTrades > 0 || r.bTrades > 0));
+
+  if (topGainer || topLoser) {
+    const parts: string[] = [];
+    if (topGainer) {
+      parts.push(
+        `${topGainer.key} +${fmtMoney(topGainer.pnlDelta)} (${fmtMoney(topGainer.aPnL)} → ${fmtMoney(topGainer.bPnL)})`,
+      );
+    }
+    if (topLoser) {
+      parts.push(
+        `${topLoser.key} ${fmtMoney(topLoser.pnlDelta)} (${fmtMoney(topLoser.aPnL)} → ${fmtMoney(topLoser.bPnL)})`,
+      );
+    }
+
+    let pairAdvice: string | undefined;
+    if (topLoser && topLoser.bPnL < 0 && topLoser.bTrades >= 3) {
+      pairAdvice = `Reduce size or pause ${topLoser.key}.`;
+    }
+    if (topGainer && topGainer.bPnL > 0 && !pairAdvice) {
+      pairAdvice = `Lean into ${topGainer.key} setups.`;
+    }
+
+    pushInsight(out, {
+      id: "pairs",
+      title: "Pairs",
+      analysis: parts.join(" · "),
+      advice: pairAdvice,
+      tone: topLoser && !topGainer ? "negative" : topGainer && !topLoser ? "positive" : "neutral",
+    });
+  }
+
+  // —— 6. Session timing ——
+  const aSessions = buildSessionBuckets(aTrades);
+  const bSessions = buildSessionBuckets(bTrades);
+  const aBest = bestBucket(aSessions);
+  const bBest = bestBucket(bSessions);
+  const aWorst = worstBucket(aSessions);
+  const bWorst = worstBucket(bSessions);
+
+  if (aBest && bBest && (aBest.count >= 2 || bBest.count >= 2)) {
+    const sessionShift = aBest.label !== bBest.label;
+    let sessionAdvice: string | undefined;
+
+    if (sessionShift && bBest.pnl > 0) {
+      sessionAdvice = `Edge moved to ${bBest.label} — protect that window.`;
+    }
+    if (bWorst && bWorst.pnl < 0 && bWorst.count >= 2) {
+      sessionAdvice = (sessionAdvice ? sessionAdvice + " " : "") +
+        `Cut size in ${bWorst.label} (${fmtMoney(bWorst.pnl)}).`;
+    }
+
+    pushInsight(out, {
+      id: "sessions",
+      title: "Sessions",
+      analysis: sessionShift
+        ? `Best: ${aBest.label} → ${bBest.label} (${fmtMoney(bBest.pnl)}).`
+        : `${bBest.label} still strongest (${fmtMoney(bBest.pnl)}).`,
+      advice: sessionAdvice,
+      tone: bBest.pnl > 0 && sessionShift ? "advice" : "neutral",
+    });
+  }
+
+  // —— 7. Day-of-week pattern ——
+  const aDow = buildDayOfWeekBuckets(aTrades);
+  const bDow = buildDayOfWeekBuckets(bTrades);
+  const aBestDay = bestBucket(aDow.map((d) => ({ label: d.day, count: d.count, pnl: d.pnl })));
+  const bBestDay = bestBucket(bDow.map((d) => ({ label: d.day, count: d.count, pnl: d.pnl })));
+  const bWorstDay = worstBucket(bDow.map((d) => ({ label: d.day, count: d.count, pnl: d.pnl })));
+
+  if (bWorstDay && bWorstDay.pnl < 0 && bWorstDay.count >= 2) {
+    pushInsight(out, {
+      id: "dow",
+      title: "Weekdays",
+      analysis: `${bWorstDay.label}s weakest (${fmtMoney(bWorstDay.pnl)})${bBestDay ? ` · ${bBestDay.label}s best (${fmtMoney(bBestDay.pnl)}).` : "."}`,
+      advice: `Light size on ${bWorstDay.label}s; plan A+ setups on ${bBestDay?.label ?? "strong"} days.`,
+      tone: "advice",
+    });
+  }
+
+  // —— 8. Profit concentration / consistency ——
+  const concentrationFor = (trades: Trade[], label: string) => {
+    if (trades.length < 4) return null;
+    const winners = trades.filter((t) => t.result > 0).sort((a, b) => b.result - a.result);
+    if (winners.length < 3) return null;
+    const top3 = winners.slice(0, 3).reduce((s, t) => s + t.result, 0);
+    const grossWin = winners.reduce((s, t) => s + t.result, 0);
+    if (grossWin <= 0) return null;
+    const share = top3 / grossWin;
+    if (share >= 0.65) return { label, share, count: winners.length };
+    return null;
+  };
+
+  const bConc = concentrationFor(bTrades, bLabel);
+  if (bConc) {
+    pushInsight(out, {
+      id: "concentration",
+      title: "Consistency",
+      analysis: `${(bConc.share * 100).toFixed(0)}% of profit from top 3 winners.`,
+      advice: "Don't scale up on a few big wins — repeat the process.",
+      tone: "advice",
+    });
+  }
+
+  // —— 9. Direction bias ——
+  if (Math.abs(aStats.longRatio - bStats.longRatio) >= 0.2 && aStats.totalTrades >= 5 && bStats.totalTrades >= 5) {
+    const longDelta = computeDelta(aStats.longRatio, bStats.longRatio, "neutral");
+    pushInsight(out, {
+      id: "direction",
+      title: "Bias",
+      analysis:
+        `Long ${(aStats.longRatio * 100).toFixed(0)}% → ${(bStats.longRatio * 100).toFixed(0)}%.`,
+      advice: longDelta.abs > 0.25
+        ? "Trade the setup, not a directional habit."
+        : undefined,
+      tone: "neutral",
+    });
+  }
+
+  // —— 10. Holding time ——
+  if (aStats.avgHoldingMinutes > 0 && bStats.avgHoldingMinutes > 0) {
+    const holdDelta = computeDelta(aStats.avgHoldingMinutes, bStats.avgHoldingMinutes, "neutral");
+    if (holdDelta.pct !== null && Math.abs(holdDelta.pct) >= 25) {
+      const fmtHold = (m: number) =>
+        m < 60 ? `${Math.round(m)}m` : `${(m / 60).toFixed(1)}h`;
+      pushInsight(out, {
+        id: "holding",
+        title: "Hold time",
+        analysis: `${fmtHold(aStats.avgHoldingMinutes)} → ${fmtHold(bStats.avgHoldingMinutes)} (${holdDelta.pct > 0 ? "+" : ""}${holdDelta.pct.toFixed(0)}%).`,
+        advice: holdDelta.abs > 0 && pnlDelta.direction === "regressed"
+          ? "Longer holds, worse P&L — review exit rules."
+          : holdDelta.abs < 0 && pnlDelta.direction === "improved"
+            ? "Shorter holds helped — keep exits decisive."
+            : undefined,
+        tone: "neutral",
+      });
+    }
+  }
+
+  // Length mismatch note as final advice insight
+  if (lengthMismatch && out.length < 5) {
+    pushInsight(out, {
+      id: "length-note",
+      title: "Period length",
+      analysis: `${aDays} vs ${bDays} days — per-day figures normalize totals.`,
+      advice: "Use full months or equal windows for fair compares.",
+      tone: "neutral",
+    });
+  }
+
+  return out.slice(0, 5);
+};
+
+/** @deprecated Use buildCompareInsights — kept for compatibility */
 export const buildInsights = (
   aStats: PeriodStats,
   bStats: PeriodStats,
@@ -281,98 +642,9 @@ export const buildInsights = (
   bTrades: Trade[],
   aLabel: string,
   bLabel: string,
-): string[] => {
-  const out: string[] = [];
-
-  // 1) Win rate change
-  const wrDelta = computeDelta(aStats.winRate, bStats.winRate, "winRate");
-  if (Math.abs(wrDelta.abs) > 0.005) {
-    const verb = wrDelta.direction === "improved" ? "rose" : "dropped";
-    // Try to attribute to top regressing asset
-    const assetRows = buildGroupBreakdown(aTrades, bTrades, (t) => t.pair);
-    const topNeg = assetRows.find((r) => r.pnlDelta < 0);
-    const detail = topNeg && wrDelta.direction === "regressed"
-      ? `, driven mainly by losses on ${topNeg.key}`
-      : "";
-    out.push(
-      `Your win rate ${verb} ${Math.abs(wrDelta.abs * 100).toFixed(1)}% in ${bLabel} vs ${aLabel}${detail}.`,
-    );
-  }
-
-  // 2) Trade count vs avg win
-  const tradeDelta = computeDelta(aStats.totalTrades, bStats.totalTrades, "neutral");
-  const avgWinDelta = computeDelta(aStats.avgWin, bStats.avgWin, "avgWin");
-  if (
-    aStats.totalTrades > 0 &&
-    bStats.totalTrades > 0 &&
-    tradeDelta.pct !== null &&
-    Math.abs(tradeDelta.pct) >= 20 &&
-    avgWinDelta.pct !== null &&
-    Math.abs(avgWinDelta.pct) >= 15
-  ) {
-    const tDir = tradeDelta.abs > 0 ? "more" : "fewer";
-    const wDir = avgWinDelta.abs > 0 ? "larger" : "smaller";
-    const expWord = bStats.expectancy >= aStats.expectancy ? "up" : "down";
-    out.push(
-      `You took ${Math.abs(tradeDelta.pct).toFixed(0)}% ${tDir} trades in ${bLabel} but with ${Math.abs(avgWinDelta.pct).toFixed(0)}% ${wDir} average wins — expectancy is ${expWord}.`,
-    );
-  }
-
-  // 3) Concentration insight on the better period
-  const concentrationFor = (trades: Trade[], label: string) => {
-    if (trades.length < 3) return null;
-    const winners = trades.filter((t) => t.result > 0).sort((a, b) => b.result - a.result);
-    if (winners.length < 3) return null;
-    const top3 = winners.slice(0, 3).reduce((s, t) => s + t.result, 0);
-    const grossWin = winners.reduce((s, t) => s + t.result, 0);
-    if (grossWin <= 0) return null;
-    const share = top3 / grossWin;
-    if (share >= 0.7) {
-      // Day-of-week pattern of those top3
-      const days = winners.slice(0, 3).map((t) => {
-        const d = t.openTime ? new Date(t.openTime) : new Date(t.date);
-        return DAY_LABELS[d.getDay()];
-      });
-      const sameDay = days.every((d) => d === days[0]);
-      if (sameDay) {
-        return `${label}'s gains came almost entirely from 3 trades on ${days[0]}s.`;
-      }
-      return `${label}'s gains came almost entirely from its top 3 trades.`;
-    }
-    return null;
-  };
-  const ai = concentrationFor(aTrades, aLabel);
-  if (ai && out.length < 3) out.push(ai);
-  if (out.length < 3) {
-    const bi = concentrationFor(bTrades, bLabel);
-    if (bi) out.push(bi);
-  }
-
-  // 4) Net P&L sign flip — high signal
-  if (
-    out.length < 3 &&
-    Math.sign(aStats.netPnL) !== Math.sign(bStats.netPnL) &&
-    aStats.totalTrades > 0 &&
-    bStats.totalTrades > 0
-  ) {
-    out.unshift(
-      `Net P&L flipped from ${fmtMoney(aStats.netPnL)} in ${aLabel} to ${fmtMoney(bStats.netPnL)} in ${bLabel}.`,
-    );
-  }
-
-  // Fallback if nothing generated
-  if (out.length === 0) {
-    if (aStats.totalTrades === 0 && bStats.totalTrades === 0) {
-      out.push("No trades in either period yet — log some trades to compare.");
-    } else {
-      const pnlDelta = computeDelta(aStats.netPnL, bStats.netPnL, "netPnL");
-      out.push(
-        `Net P&L ${pnlDelta.direction === "improved" ? "improved" : pnlDelta.direction === "regressed" ? "fell" : "was unchanged"} by ${fmtMoney(Math.abs(pnlDelta.abs))} from ${aLabel} to ${bLabel}.`,
-      );
-    }
-  }
-
-  return out.slice(0, 3);
-};
+): string[] =>
+  buildCompareInsights(aStats, bStats, aTrades, bTrades, aLabel, bLabel).map(
+    (i) => (i.advice ? `${i.analysis} ${i.advice}` : i.analysis),
+  );
 
 export { fmtPct, fmtMoney };

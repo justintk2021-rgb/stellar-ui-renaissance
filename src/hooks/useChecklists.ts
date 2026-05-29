@@ -1,36 +1,38 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { Json } from "@/integrations/supabase/types";
+import { useEffect, useCallback, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Json } from '@/integrations/supabase/types';
+import { queryKeys } from '@/lib/queries/keys';
+import { subscribeChecklistsRealtime } from '@/lib/queries/checklists';
 
-// Deep nested sub-item for conditional checklists (can have unlimited depth)
 interface ConditionalSubItem {
   id: string;
   text: string;
   checked: boolean;
-  children?: ConditionalSubItem[]; // For conditional checklists - reveals when parent is checked
+  children?: ConditionalSubItem[];
 }
 
-type PercentageType = "fixed" | "conditional";
+type PercentageType = 'fixed' | 'conditional';
 
 interface ChecklistSubItem {
   id: string;
   text: string;
   checked: boolean;
-  percentage?: number; // Custom percentage weight for sub-items
-  children?: ConditionalSubItem[]; // Support deep nesting for conditional checklists
+  percentage?: number;
+  children?: ConditionalSubItem[];
 }
 
 interface ChecklistItem {
   id: string;
   text: string;
   checked: boolean;
-  percentage?: number; // Custom percentage weight (defaults to equal distribution)
-  percentageType?: PercentageType; // "fixed" = full % when any sub-item selected, "conditional" = sum of selected sub-items
-  subItems?: ChecklistSubItem[]; // Conditional sub-items that appear when parent is checked
+  percentage?: number;
+  percentageType?: PercentageType;
+  subItems?: ChecklistSubItem[];
 }
 
-type ChecklistType = "fixed" | "conditional";
+type ChecklistType = 'fixed' | 'conditional';
 
 interface Checklist {
   id: string;
@@ -43,14 +45,46 @@ interface Checklist {
 
 export type { ChecklistItem, ChecklistSubItem, ConditionalSubItem, Checklist, ChecklistType, PercentageType };
 
+function mapDbToChecklist(c: Record<string, unknown>): Checklist {
+  const items = c.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType } | ChecklistItem[];
+
+  if (Array.isArray(items)) {
+    return {
+      id: c.id as string,
+      name: c.name as string,
+      type: 'fixed',
+      items: items || [],
+      notes: (c.notes as string) || '',
+      createdAt: c.created_at as string,
+    };
+  }
+
+  return {
+    id: c.id as string,
+    name: c.name as string,
+    type: (items?.type || 'fixed') as ChecklistType,
+    items: items?.items || [],
+    notes: (c.notes as string) || '',
+    createdAt: c.created_at as string,
+  };
+}
+
+async function fetchChecklists(userId: string): Promise<Checklist[]> {
+  const { data, error } = await supabase
+    .from('checklists')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data || []).map((c) => mapDbToChecklist(c as Record<string, unknown>));
+}
+
 export function useChecklists() {
-  const [checklists, setChecklists] = useState<Checklist[]>([]);
-  const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const queryClient = useQueryClient();
 
-  // Get current user
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -65,161 +99,28 @@ export function useChecklists() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch checklists from database
-  const fetchChecklists = useCallback(async () => {
-    if (!userId) {
-      setChecklists([]);
-      setLoading(false);
-      return;
-    }
+  const { data: checklists = [], isLoading: loading } = useQuery({
+    queryKey: queryKeys.checklists.list(userId ?? ''),
+    queryFn: () => fetchChecklists(userId!),
+    enabled: !!userId,
+    staleTime: 60_000,
+  });
 
-    try {
-      const { data, error } = await supabase
-        .from('checklists')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const mapped = (data || []).map((c) => {
-        const items = c.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType } | ChecklistItem[];
-        
-        // Handle both old format (array) and new format (object with type)
-        if (Array.isArray(items)) {
-          return {
-            id: c.id,
-            name: c.name,
-            type: "fixed" as ChecklistType,
-            items: items || [],
-            notes: c.notes || '',
-            createdAt: c.created_at,
-          };
-        } else {
-          return {
-            id: c.id,
-            name: c.name,
-            type: (items?.type || "fixed") as ChecklistType,
-            items: items?.items || [],
-            notes: c.notes || '',
-            createdAt: c.created_at,
-          };
-        }
-      });
-
-      setChecklists(mapped);
-    } catch (error) {
-      console.error('Error fetching checklists:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load checklists",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, toast]);
-
-  // Set up realtime subscription
   useEffect(() => {
     if (!userId) return;
+    return subscribeChecklistsRealtime(userId, () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.checklists.all });
+    });
+  }, [userId, queryClient]);
 
-    // Clean up existing channel first
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
+  const invalidate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.checklists.all });
+  }, [queryClient]);
 
-    const channelName = `checklists-realtime-${userId}-${Date.now()}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'checklists',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          console.log('Checklists realtime update:', payload.eventType);
-          
-          if (payload.eventType === 'INSERT') {
-            const items = payload.new.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType } | ChecklistItem[];
-            let newChecklist: Checklist;
-            
-            if (Array.isArray(items)) {
-              newChecklist = {
-                id: payload.new.id,
-                name: payload.new.name,
-                type: "fixed" as ChecklistType,
-                items: items || [],
-                notes: payload.new.notes || '',
-                createdAt: payload.new.created_at,
-              };
-            } else {
-              newChecklist = {
-                id: payload.new.id,
-                name: payload.new.name,
-                type: (items?.type || "fixed") as ChecklistType,
-                items: items?.items || [],
-                notes: payload.new.notes || '',
-                createdAt: payload.new.created_at,
-              };
-            }
-            
-            setChecklists(prev => {
-              if (prev.some(c => c.id === newChecklist.id)) return prev;
-              return [newChecklist, ...prev];
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            const items = payload.new.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType } | ChecklistItem[];
-            
-            setChecklists(prev => prev.map(c => {
-              if (c.id !== payload.new.id) return c;
-              
-              if (Array.isArray(items)) {
-                return {
-                  ...c,
-                  name: payload.new.name,
-                  items: items || [],
-                  notes: payload.new.notes || '',
-                };
-              } else {
-                return {
-                  ...c,
-                  name: payload.new.name,
-                  type: (items?.type || c.type) as ChecklistType,
-                  items: items?.items || [],
-                  notes: payload.new.notes || '',
-                };
-              }
-            }));
-          } else if (payload.eventType === 'DELETE') {
-            setChecklists(prev => prev.filter(c => c.id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe();
-
-    channelRef.current = channel;
-
-    return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
-  }, [userId]);
-
-  useEffect(() => {
-    fetchChecklists();
-  }, [fetchChecklists]);
-
-  const createChecklist = async (name: string, type: ChecklistType = "fixed"): Promise<Checklist | null> => {
+  const createChecklist = async (name: string, type: ChecklistType = 'fixed'): Promise<Checklist | null> => {
     if (!userId || !name.trim()) return null;
 
     try {
-      // Store type alongside items in the JSON column
       const { data, error } = await supabase
         .from('checklists')
         .insert({
@@ -231,25 +132,11 @@ export function useChecklists() {
         .single();
 
       if (error) throw error;
-
-      const newChecklist: Checklist = {
-        id: data.id,
-        name: data.name,
-        type,
-        items: [],
-        notes: '',
-        createdAt: data.created_at,
-      };
-
-      setChecklists(prev => [newChecklist, ...prev]);
-      return newChecklist;
+      invalidate();
+      return mapDbToChecklist(data as Record<string, unknown>);
     } catch (error) {
       console.error('Error creating checklist:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create checklist",
-        variant: "destructive",
-      });
+      toast({ title: 'Error', description: 'Failed to create checklist', variant: 'destructive' });
       return null;
     }
   };
@@ -261,50 +148,29 @@ export function useChecklists() {
       if (updates.name !== undefined) dbUpdates.name = updates.name;
       if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
       if (updates.items !== undefined) {
-        // Store with type preserved
-        dbUpdates.items = { 
-          type: checklist?.type || "fixed", 
-          items: updates.items 
+        dbUpdates.items = {
+          type: checklist?.type || 'fixed',
+          items: updates.items,
         } as unknown as Json;
       }
-      
-      const { error } = await supabase
-        .from('checklists')
-        .update(dbUpdates)
-        .eq('id', id);
 
+      const { error } = await supabase.from('checklists').update(dbUpdates).eq('id', id);
       if (error) throw error;
-
-      setChecklists(prev => prev.map(c => 
-        c.id === id ? { ...c, ...updates } : c
-      ));
+      invalidate();
     } catch (error) {
       console.error('Error updating checklist:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update checklist",
-        variant: "destructive",
-      });
+      toast({ title: 'Error', description: 'Failed to update checklist', variant: 'destructive' });
     }
   };
 
   const deleteChecklist = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('checklists')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('checklists').delete().eq('id', id);
       if (error) throw error;
-
-      setChecklists(prev => prev.filter(c => c.id !== id));
+      invalidate();
     } catch (error) {
       console.error('Error deleting checklist:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete checklist",
-        variant: "destructive",
-      });
+      toast({ title: 'Error', description: 'Failed to delete checklist', variant: 'destructive' });
     }
   };
 

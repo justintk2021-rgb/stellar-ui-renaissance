@@ -1,825 +1,540 @@
-import { useMemo, useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { Trade } from "@/types/trade";
-import { Brain, Sparkles, MousePointerClick } from "lucide-react";
+import {
+  Brain,
+  Sparkles,
+  MousePointerClick,
+  Maximize2,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  X,
+  Filter,
+} from "lucide-react";
+import {
+  buildIntelligenceGraph,
+  buildHealthPillars,
+  extractBreakdown,
+  LAYER_LABELS,
+  SENTIMENT_COLORS,
+  type MapNode,
+  type MapEdge,
+  type NodeType,
+} from "@/lib/intelligenceMap";
+import {
+  ViewTabBar,
+  BreakdownView,
+  HealthView,
+  SignalsView,
+  InsightsSidebar,
+  INTELLIGENCE_VIEWS,
+  type IntelligenceViewMode,
+} from "@/components/Dashboard/IntelligenceMapViews";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 interface TradingIntelligenceMapProps {
   trades: Trade[];
   compact?: boolean;
 }
 
-type NodeType = "trade" | "setup" | "behavior";
-type NodeSentiment = "positive" | "negative" | "neutral";
+type LayerFilter = Record<NodeType, boolean>;
 
-interface MapNode {
-  id: string;
-  label: string;
-  type: NodeType;
-  sentiment: NodeSentiment;
-  size: number; // 8 - 28
-  x: number; // 0-100 percent
-  y: number; // 0-100 percent
-  meta: {
-    count?: number;
-    pnl?: number;
-    pair?: string;
-    date?: string;
-    notes?: string;
-    detail?: string;
+const DEFAULT_LAYERS: LayerFilter = {
+  trade: true,
+  setup: true,
+  behavior: true,
+  weekday: true,
+  direction: true,
+};
+
+function filterGraph(
+  nodes: MapNode[],
+  edges: MapEdge[],
+  layers: LayerFilter,
+): { nodes: MapNode[]; edges: MapEdge[] } {
+  const visible = new Set(
+    nodes.filter((n) => n.id === "core" || layers[n.type]).map((n) => n.id),
+  );
+  return {
+    nodes: nodes.filter((n) => visible.has(n.id)),
+    edges: edges.filter((e) => visible.has(e.from) && visible.has(e.to)),
   };
 }
 
-interface MapEdge {
-  from: string;
-  to: string;
-  strength: number; // 0-1
-}
-
-const COLORS = {
-  positive: "hsl(142 76% 50%)",
-  negative: "hsl(0 75% 58%)",
-  neutral: "hsl(210 90% 62%)",
-} as const;
-
-function buildGraph(trades: Trade[]): { nodes: MapNode[]; edges: MapEdge[] } {
-  const nodes: MapNode[] = [];
-  const edges: MapEdge[] = [];
-
-  if (trades.length === 0) {
-    // Demo skeleton so the visualization isn't empty
-    const demo: MapNode[] = [
-      { id: "core", label: "Your Trading", type: "behavior", sentiment: "neutral", size: 24, x: 50, y: 50, meta: { detail: "Add trades to populate your intelligence map" } },
-      { id: "d1", label: "Discipline", type: "behavior", sentiment: "positive", size: 14, x: 22, y: 28, meta: {} },
-      { id: "d2", label: "Patience", type: "behavior", sentiment: "positive", size: 14, x: 78, y: 30, meta: {} },
-      { id: "d3", label: "FOMO", type: "behavior", sentiment: "negative", size: 12, x: 18, y: 72, meta: {} },
-      { id: "d4", label: "Break & Retest", type: "setup", sentiment: "neutral", size: 14, x: 80, y: 70, meta: {} },
-    ];
-    demo.slice(1).forEach((n) => edges.push({ from: "core", to: n.id, strength: 0.5 }));
-    return { nodes: demo, edges };
-  }
-
-  // Aggregate by pair
-  const pairAgg = new Map<string, { count: number; pnl: number; wins: number }>();
-  trades.forEach((t) => {
-    const key = t.pair || "Unknown";
-    const cur = pairAgg.get(key) || { count: 0, pnl: 0, wins: 0 };
-    cur.count += 1;
-    cur.pnl += t.result || 0;
-    if ((t.result || 0) > 0) cur.wins += 1;
-    pairAgg.set(key, cur);
-  });
-
-  // Aggregate by session — track wins, losses, and best/worst trade for richer insight
-  const sessionAgg = new Map<string, { count: number; pnl: number; wins: number; losses: number; best: number; worst: number }>();
-  trades.forEach((t) => {
-    const key = t.session || "Other";
-    const cur = sessionAgg.get(key) || { count: 0, pnl: 0, wins: 0, losses: 0, best: -Infinity, worst: Infinity };
-    const r = t.result || 0;
-    cur.count += 1;
-    cur.pnl += r;
-    if (r > 0) cur.wins += 1;
-    else if (r < 0) cur.losses += 1;
-    if (r > cur.best) cur.best = r;
-    if (r < cur.worst) cur.worst = r;
-    sessionAgg.set(key, cur);
-  });
-
-  // Pair × Session affinity (which session works best for each pair)
-  const pairSessionAgg = new Map<string, Map<string, { count: number; pnl: number; wins: number }>>();
-  trades.forEach((t) => {
-    const p = t.pair || "Unknown";
-    const s = t.session || "Other";
-    if (!pairSessionAgg.has(p)) pairSessionAgg.set(p, new Map());
-    const inner = pairSessionAgg.get(p)!;
-    const cur = inner.get(s) || { count: 0, pnl: 0, wins: 0 };
-    cur.count += 1;
-    cur.pnl += t.result || 0;
-    if ((t.result || 0) > 0) cur.wins += 1;
-    inner.set(s, cur);
-  });
-
-  // ===== Core stats =====
-  const wins = trades.filter((t) => (t.result || 0) > 0);
-  const losses = trades.filter((t) => (t.result || 0) < 0);
-  const totalWins = wins.length;
-  const totalLosses = losses.length;
-  const sumWins = wins.reduce((s, t) => s + (t.result || 0), 0);
-  const sumLosses = Math.abs(losses.reduce((s, t) => s + (t.result || 0), 0));
-  const avgWin = totalWins ? sumWins / totalWins : 0;
-  const avgLoss = totalLosses ? sumLosses / totalLosses : 0;
-  const winRate = trades.length ? (totalWins / trades.length) * 100 : 0;
-  const profitFactor = sumLosses > 0 ? sumWins / sumLosses : sumWins > 0 ? Infinity : 0;
-  const expectancy = trades.length
-    ? (winRate / 100) * avgWin - (1 - winRate / 100) * avgLoss
-    : 0;
-  const totalPnl = trades.reduce((s, t) => s + (t.result || 0), 0);
-
-  // Sort once chronologically (oldest -> newest) for streak/recency analysis
-  const chronological = [...trades].sort((a, b) => {
-    const da = new Date(a.date).getTime();
-    const db = new Date(b.date).getTime();
-    return da - db;
-  });
-
-  // ===== Streak analysis (revenge trading & hot streaks) =====
-  let maxLossStreak = 0;
-  let maxWinStreak = 0;
-  let curLoss = 0;
-  let curWin = 0;
-  chronological.forEach((t) => {
-    const r = t.result || 0;
-    if (r < 0) {
-      curLoss += 1;
-      curWin = 0;
-      maxLossStreak = Math.max(maxLossStreak, curLoss);
-    } else if (r > 0) {
-      curWin += 1;
-      curLoss = 0;
-      maxWinStreak = Math.max(maxWinStreak, curWin);
-    } else {
-      curWin = 0;
-      curLoss = 0;
-    }
-  });
-
-  // Revenge trading: trades taken on same day right after a loss
-  let revengeCount = 0;
-  for (let i = 1; i < chronological.length; i++) {
-    const prev = chronological[i - 1];
-    const cur = chronological[i];
-    if ((prev.result || 0) < 0 && (cur.date || "").slice(0, 10) === (prev.date || "").slice(0, 10)) {
-      revengeCount += 1;
-    }
-  }
-  const revengeRate = chronological.length ? (revengeCount / chronological.length) * 100 : 0;
-
-  // ===== Risk consistency (bet-size variance via |result|) =====
-  const absResults = trades.map((t) => Math.abs(t.result || 0)).filter((v) => v > 0);
-  const meanAbs = absResults.length ? absResults.reduce((s, v) => s + v, 0) / absResults.length : 0;
-  const variance = absResults.length
-    ? absResults.reduce((s, v) => s + (v - meanAbs) ** 2, 0) / absResults.length
-    : 0;
-  const stdDev = Math.sqrt(variance);
-  const cv = meanAbs > 0 ? stdDev / meanAbs : 0; // coefficient of variation
-
-  // Catastrophic losses: any loss > 3x avg loss
-  const bigLosses = avgLoss > 0 ? losses.filter((t) => Math.abs(t.result || 0) > 3 * avgLoss).length : 0;
-  const bigLossRate = trades.length ? (bigLosses / trades.length) * 100 : 0;
-
-  // ===== Recency analysis: last 20% vs overall =====
-  const recencyN = Math.max(5, Math.floor(chronological.length * 0.2));
-  const recent = chronological.slice(-recencyN);
-  const recentWins = recent.filter((t) => (t.result || 0) > 0).length;
-  const recentWinRate = recent.length ? (recentWins / recent.length) * 100 : winRate;
-  const recentPnl = recent.reduce((s, t) => s + (t.result || 0), 0);
-
-  // ===== Direction bias =====
-  const longs = trades.filter((t) => t.direction === "Long");
-  const shorts = trades.filter((t) => t.direction === "Short");
-  const longWinRate = longs.length
-    ? (longs.filter((t) => (t.result || 0) > 0).length / longs.length) * 100
-    : 0;
-  const shortWinRate = shorts.length
-    ? (shorts.filter((t) => (t.result || 0) > 0).length / shorts.length) * 100
-    : 0;
-  const directionGap = Math.abs(longWinRate - shortWinRate);
-
-  // ===== Pair concentration =====
-  const pairs = Array.from(pairAgg.entries()).sort((a, b) => b[1].count - a[1].count);
-  const topPairCount = pairs[0] ? pairs[0][1].count : 0;
-  const concentration = trades.length ? (topPairCount / trades.length) * 100 : 0;
-
-  // Core node
-  const coreSentiment: NodeSentiment = totalPnl > 0 ? "positive" : totalPnl < 0 ? "negative" : "neutral";
-  nodes.push({
-    id: "core",
-    label: "Your Trading",
-    type: "behavior",
-    sentiment: coreSentiment,
-    size: 26,
-    x: 50,
-    y: 50,
-    meta: { count: trades.length, pnl: totalPnl, detail: `${trades.length} trades · ${winRate.toFixed(1)}% WR · PF ${profitFactor === Infinity ? "∞" : profitFactor.toFixed(2)}` },
-  });
-
-  // Place pair nodes around the top half
-  const pairsTop = pairs.slice(0, 6);
-  const maxPairCount = Math.max(...pairsTop.map(([, v]) => v.count), 1);
-  pairsTop.forEach(([pair, v], i) => {
-    const angle = (Math.PI / (pairsTop.length + 1)) * (i + 1);
-    const x = 50 + Math.cos(angle) * 38;
-    const y = 28 - Math.sin(angle) * 8;
-    const sentiment: NodeSentiment = v.pnl > 0 ? "positive" : v.pnl < 0 ? "negative" : "neutral";
-    const id = `pair-${pair}`;
-    const pairWinRate = v.count ? (v.wins / v.count) * 100 : 0;
-    nodes.push({
-      id,
-      label: pair,
-      type: "trade",
-      sentiment,
-      size: 10 + (v.count / maxPairCount) * 14,
-      x,
-      y,
-      meta: { count: v.count, pnl: v.pnl, pair, detail: `${v.count} trades · ${pairWinRate.toFixed(0)}% WR · ${v.pnl >= 0 ? "+" : ""}$${v.pnl.toFixed(0)}` },
-    });
-    edges.push({ from: "core", to: id, strength: 0.4 + (v.count / maxPairCount) * 0.6 });
-  });
-
-  // Session nodes (setups) on the sides — sort by trade count
-  const sessions = Array.from(sessionAgg.entries())
-    .sort((a, b) => b[1].count - a[1].count)
-    .slice(0, 4);
-  const maxSessionCount = Math.max(...sessions.map(([, v]) => v.count), 1);
-  sessions.forEach(([session, v], i) => {
-    const onLeft = i % 2 === 0;
-    const x = onLeft ? 12 + (i * 4) : 88 - (i * 4);
-    const y = 50 + (i % 2 === 0 ? -6 : 6) * (i + 1);
-    const id = `session-${session}`;
-    const sessionWinRate = v.count ? (v.wins / v.count) * 100 : 0;
-    const sentiment: NodeSentiment = v.pnl > 0 ? "positive" : v.pnl < 0 ? "negative" : "neutral";
-    nodes.push({
-      id,
-      label: session,
-      type: "setup",
-      sentiment,
-      size: 10 + (v.count / maxSessionCount) * 10,
-      x,
-      y,
-      meta: {
-        count: v.count,
-        pnl: v.pnl,
-        detail: `${session} · ${v.count} trades · ${sessionWinRate.toFixed(0)}% WR · ${v.pnl >= 0 ? "+" : ""}$${v.pnl.toFixed(0)}`,
-      },
-    });
-    edges.push({ from: "core", to: id, strength: 0.3 + (v.count / maxSessionCount) * 0.5 });
-  });
-
-  // ===== Pair × Session affinity edges =====
-  // For each rendered pair, link it to its single best-performing session (if both nodes exist)
-  const renderedPairIds = new Set(pairsTop.map(([p]) => `pair-${p}`));
-  const renderedSessionIds = new Set(sessions.map(([s]) => `session-${s}`));
-  pairsTop.forEach(([pair]) => {
-    const inner = pairSessionAgg.get(pair);
-    if (!inner) return;
-    let bestSession: string | null = null;
-    let bestPnl = -Infinity;
-    inner.forEach((stats, sess) => {
-      if (stats.count >= 2 && stats.pnl > bestPnl) {
-        bestPnl = stats.pnl;
-        bestSession = sess;
-      }
-    });
-    if (bestSession && renderedPairIds.has(`pair-${pair}`) && renderedSessionIds.has(`session-${bestSession}`)) {
-      edges.push({ from: `pair-${pair}`, to: `session-${bestSession}`, strength: 0.55 });
-    }
-  });
-
-  // ===== Best / worst session insight (used in behavior nodes) =====
-  const sessionsRanked = Array.from(sessionAgg.entries())
-    .filter(([, v]) => v.count >= 3)
-    .map(([s, v]) => ({
-      session: s,
-      count: v.count,
-      pnl: v.pnl,
-      wr: v.count ? (v.wins / v.count) * 100 : 0,
-      avg: v.count ? v.pnl / v.count : 0,
-    }));
-  const bestSession = sessionsRanked.slice().sort((a, b) => b.avg - a.avg)[0];
-  const worstSession = sessionsRanked.slice().sort((a, b) => a.avg - b.avg)[0];
-  const sessionGap = bestSession && worstSession ? bestSession.avg - worstSession.avg : 0;
-
-  // ===== Behavior signals (data-driven, evidence-based) =====
-  const sample = trades.length;
-  const behaviors: { label: string; sentiment: NodeSentiment; visible: boolean; detail: string }[] = ([
-    // Positive traits
-    {
-      label: "Edge",
-      sentiment: "positive",
-      visible: sample >= 10 && profitFactor >= 1.5 && expectancy > 0,
-      detail: `Profit factor ${profitFactor.toFixed(2)} · expectancy +$${expectancy.toFixed(0)}/trade`,
-    },
-    {
-      label: "Discipline",
-      sentiment: "positive",
-      visible: sample >= 10 && winRate >= 55 && cv < 0.6,
-      detail: `${winRate.toFixed(0)}% WR with consistent risk (CV ${cv.toFixed(2)})`,
-    },
-    {
-      label: "Risk Control",
-      sentiment: "positive",
-      visible: sample >= 10 && avgWin >= avgLoss && bigLossRate < 5,
-      detail: `R:R ${(avgWin / Math.max(avgLoss, 1)).toFixed(2)} · only ${bigLossRate.toFixed(0)}% outsized losses`,
-    },
-    {
-      label: "Hot Streak",
-      sentiment: "positive",
-      visible: maxWinStreak >= 5,
-      detail: `Best win streak: ${maxWinStreak} in a row`,
-    },
-    {
-      label: "Improving",
-      sentiment: "positive",
-      visible: sample >= 20 && recentWinRate > winRate + 5 && recentPnl > 0,
-      detail: `Recent ${recencyN}: ${recentWinRate.toFixed(0)}% WR (vs ${winRate.toFixed(0)}% overall)`,
-    },
-    {
-      label: "Consistency",
-      sentiment: "positive",
-      visible: sample >= 20 && cv < 0.5 && winRate >= 50,
-      detail: `Stable bet sizing (CV ${cv.toFixed(2)}) over ${sample} trades`,
-    },
-
-    // Negative traits
-    {
-      label: "Revenge Trading",
-      sentiment: "negative",
-      visible: sample >= 15 && revengeRate >= 25,
-      detail: `${revengeRate.toFixed(0)}% of trades follow a same-day loss`,
-    },
-    {
-      label: "Tilt Risk",
-      sentiment: "negative",
-      visible: maxLossStreak >= 4,
-      detail: `Worst loss streak: ${maxLossStreak} in a row`,
-    },
-    {
-      label: "Oversized Losses",
-      sentiment: "negative",
-      visible: sample >= 10 && bigLossRate >= 8,
-      detail: `${bigLossRate.toFixed(0)}% of trades are >3× avg loss`,
-    },
-    {
-      label: "Inconsistent Sizing",
-      sentiment: "negative",
-      visible: sample >= 10 && cv >= 1.0,
-      detail: `Risk varies wildly (CV ${cv.toFixed(2)})`,
-    },
-    {
-      label: "Cuts Winners Early",
-      sentiment: "negative",
-      visible: sample >= 10 && avgWin > 0 && avgLoss > 0 && avgWin < avgLoss * 0.7,
-      detail: `Avg win ($${avgWin.toFixed(0)}) much smaller than avg loss ($${avgLoss.toFixed(0)})`,
-    },
-    {
-      label: "Overtrading",
-      sentiment: "negative",
-      visible: sample >= 30 && winRate < 45 && profitFactor < 1,
-      detail: `${sample} trades but only ${winRate.toFixed(0)}% WR · PF ${profitFactor.toFixed(2)}`,
-    },
-    {
-      label: "Slumping",
-      sentiment: "negative",
-      visible: sample >= 20 && recentWinRate < winRate - 10 && recentPnl < 0,
-      detail: `Recent ${recencyN}: ${recentWinRate.toFixed(0)}% WR (down from ${winRate.toFixed(0)}%)`,
-    },
-    {
-      label: "Over-Concentrated",
-      sentiment: "negative",
-      visible: sample >= 15 && concentration >= 60,
-      detail: `${concentration.toFixed(0)}% of trades in one pair`,
-    },
-    {
-      label: "Direction Bias",
-      sentiment: "negative",
-      visible:
-        sample >= 20 &&
-        longs.length >= 5 &&
-        shorts.length >= 5 &&
-        directionGap >= 20,
-      detail: `Long ${longWinRate.toFixed(0)}% vs Short ${shortWinRate.toFixed(0)}% WR`,
-    },
-
-    // ===== Session-aware insights =====
-    {
-      label: bestSession ? `${bestSession.session} Edge` : "Session Edge",
-      sentiment: "positive",
-      visible: !!bestSession && bestSession.pnl > 0 && bestSession.wr >= 55,
-      detail: bestSession
-        ? `${bestSession.session}: ${bestSession.wr.toFixed(0)}% WR · +$${bestSession.avg.toFixed(0)}/trade over ${bestSession.count}`
-        : "",
-    },
-    {
-      label: worstSession ? `${worstSession.session} Drag` : "Session Drag",
-      sentiment: "negative",
-      visible: !!worstSession && worstSession.pnl < 0 && worstSession.count >= 5,
-      detail: worstSession
-        ? `${worstSession.session}: ${worstSession.wr.toFixed(0)}% WR · ${worstSession.avg >= 0 ? "+" : ""}$${worstSession.avg.toFixed(0)}/trade · ${worstSession.count} trades`
-        : "",
-    },
-    {
-      label: "Session Specialist",
-      sentiment: "positive",
-      visible:
-        sessionsRanked.length >= 2 &&
-        !!bestSession &&
-        sessionGap >= Math.max(50, Math.abs(bestSession.avg) * 0.5),
-      detail: bestSession && worstSession
-        ? `${bestSession.session} far outperforms ${worstSession.session} ($${bestSession.avg.toFixed(0)} vs $${worstSession.avg.toFixed(0)} per trade)`
-        : "",
-    },
-    {
-      label: "Session Mismatch",
-      sentiment: "negative",
-      visible:
-        sessionsRanked.length >= 2 &&
-        !!worstSession &&
-        worstSession.count >= Math.max(5, trades.length * 0.25) &&
-        worstSession.pnl < 0,
-      detail: worstSession
-        ? `${(worstSession.count / Math.max(trades.length, 1) * 100).toFixed(0)}% of trades fall in your weakest session (${worstSession.session})`
-        : "",
-    },
-
-    // Neutral / informational
-    {
-      label: "Small Sample",
-      sentiment: "neutral",
-      visible: sample > 0 && sample < 10,
-      detail: `Only ${sample} trades — patterns not yet reliable`,
-    },
-  ] as { label: string; sentiment: NodeSentiment; visible: boolean; detail: string }[]).filter((b) => b.visible);
-
-  // Cap to top 7 to keep the canvas readable
-  const topBehaviors = behaviors.slice(0, 7);
-
-  topBehaviors.forEach((b, i) => {
-    const angle = (Math.PI / (topBehaviors.length + 1)) * (i + 1);
-    const x = 50 - Math.cos(angle) * 36;
-    const y = 78 + Math.sin(angle) * 6;
-    const id = `behavior-${b.label}`;
-    nodes.push({
-      id,
-      label: b.label,
-      type: "behavior",
-      sentiment: b.sentiment,
-      size: 12,
-      x,
-      y,
-      meta: { detail: b.detail },
-    });
-    edges.push({ from: "core", to: id, strength: 0.5 });
-  });
-
-  // (Pair × Session affinity edges already created above)
-
-  return { nodes, edges };
-}
-
-export function TradingIntelligenceMap({ trades, compact = false }: TradingIntelligenceMapProps) {
-  const { nodes, edges } = useMemo(() => buildGraph(trades), [trades]);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+function MapCanvas({
+  nodes,
+  edges,
+  height,
+  compact,
+  activeId,
+  onSelect,
+  onHover,
+  showAllLabels,
+  interactive = true,
+}: {
+  nodes: MapNode[];
+  edges: MapEdge[];
+  height: number;
+  compact?: boolean;
+  activeId: string | null;
+  onSelect: (id: string | null) => void;
+  onHover: (id: string | null) => void;
+  showAllLabels?: boolean;
+  interactive?: boolean;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 800, h: 420 });
-  const [isVisible, setIsVisible] = useState(true);
+  const [size, setSize] = useState({ w: 800, h: height });
+  const gradPrefix = compact ? "im-c" : "im-e";
 
   useEffect(() => {
     if (!containerRef.current) return;
     const ro = new ResizeObserver((entries) => {
       for (const e of entries) {
-        const cr = e.contentRect;
-        setSize({ w: cr.width, h: cr.height });
+        setSize({ w: e.contentRect.width, h: height });
       }
     });
     ro.observe(containerRef.current);
     return () => ro.disconnect();
-  }, []);
-
-  // Pause expensive animations when off-screen for perf
-  useEffect(() => {
-    if (!wrapperRef.current) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) setIsVisible(e.isIntersecting);
-      },
-      { threshold: 0.05 }
-    );
-    io.observe(wrapperRef.current);
-    return () => io.disconnect();
-  }, []);
-
-  // Respect reduced motion preference
-  const prefersReducedMotion = useMemo(
-    () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
-    []
-  );
-  const animationsEnabled = isVisible && !prefersReducedMotion;
+  }, [height]);
 
   const nodeById = useMemo(() => Object.fromEntries(nodes.map((n) => [n.id, n])), [nodes]);
-  const activeId = hoveredId || selectedId;
-  const activeNode = activeId ? nodeById[activeId] : null;
-
   const toX = (p: number) => (p / 100) * size.w;
   const toY = (p: number) => (p / 100) * size.h;
 
   return (
-    <motion.div
-      ref={wrapperRef}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.4, duration: 0.5 }}
-      className={`group relative rounded-2xl bg-gradient-to-br from-card/60 via-card/40 to-card/20 backdrop-blur-xl border border-border/40 shadow-xl overflow-hidden ${compact ? "flex flex-col flex-1 min-h-0" : ""}`}
+    <div
+      ref={containerRef}
+      className="relative w-full overflow-hidden"
+      style={{ height }}
+      onClick={() => interactive && onSelect(null)}
     >
-      {/* Ambient gradient glow */}
-      <div className="pointer-events-none absolute -top-20 -left-20 w-64 h-64 rounded-full bg-primary/10 blur-3xl opacity-60" />
-      <div className="pointer-events-none absolute -bottom-20 -right-20 w-64 h-64 rounded-full bg-primary/5 blur-3xl opacity-60" />
+      <div
+        className="absolute inset-0 opacity-[0.04] pointer-events-none"
+        style={{
+          backgroundImage: "radial-gradient(circle at 1px 1px, hsl(var(--foreground)) 1px, transparent 0)",
+          backgroundSize: "28px 28px",
+        }}
+      />
+      <svg width={size.w} height={size.h} className="absolute inset-0">
+        <defs>
+          {(["positive", "negative", "neutral"] as const).map((s) => (
+            <radialGradient key={s} id={`${gradPrefix}-grad-${s}`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor={SENTIMENT_COLORS[s]} stopOpacity="1" />
+              <stop offset="60%" stopColor={SENTIMENT_COLORS[s]} stopOpacity="0.6" />
+              <stop offset="100%" stopColor={SENTIMENT_COLORS[s]} stopOpacity="0.2" />
+            </radialGradient>
+          ))}
+        </defs>
 
-      {/* Header */}
-      <div className={`relative flex items-center justify-between ${compact ? "px-3 pt-3 pb-2" : "px-5 pt-5 pb-3"}`}>
-        <div className="flex items-center gap-2.5">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 15 }}
-            className={`relative ${compact ? "w-8 h-8 rounded-lg" : "w-10 h-10 rounded-xl"} bg-primary/10 flex items-center justify-center overflow-hidden`}
-          >
-            <Brain className={compact ? "w-4 h-4 text-primary relative z-10" : "w-5 h-5 text-primary relative z-10"} />
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-tr from-primary/0 via-primary/20 to-primary/0"
-              animate={{ x: ["-100%", "100%"] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+        {edges.map((e, i) => {
+          const a = nodeById[e.from];
+          const b = nodeById[e.to];
+          if (!a || !b) return null;
+          const isConnected = activeId === e.from || activeId === e.to;
+          const isDimmed = activeId && !isConnected;
+          const stroke =
+            b.sentiment === "negative" || a.sentiment === "negative"
+              ? SENTIMENT_COLORS.negative
+              : b.sentiment === "positive" || a.sentiment === "positive"
+                ? SENTIMENT_COLORS.positive
+                : SENTIMENT_COLORS.neutral;
+          const x1 = toX(a.x);
+          const y1 = toY(a.y);
+          const x2 = toX(b.x);
+          const y2 = toY(b.y);
+          const mx = (x1 + x2) / 2;
+          const my = (y1 + y2) / 2;
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          const curveAmt = Math.min(50, len * 0.18) * (i % 2 === 0 ? 1 : -1);
+          const cx1 = mx + (-dy / len) * curveAmt;
+          const cy1 = my + (dx / len) * curveAmt;
+          const path = `M ${x1} ${y1} Q ${cx1} ${cy1} ${x2} ${y2}`;
+          return (
+            <path
+              key={`edge-${i}`}
+              d={path}
+              fill="none"
+              stroke={stroke}
+              strokeOpacity={isConnected ? 0.75 : isDimmed ? 0.06 : 0.18}
+              strokeWidth={isConnected ? 2 : 1}
+              strokeLinecap="round"
             />
-          </motion.div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h3 className={compact ? "text-xs font-semibold text-foreground leading-tight" : "text-base font-semibold text-foreground"}>
-                Intelligence Map
-              </h3>
-              <Sparkles className={compact ? "w-2.5 h-2.5 text-primary/60" : "w-3 h-3 text-primary/60"} />
-            </div>
-            {!compact && <p className="text-xs text-muted-foreground">Your trading mind, visualized</p>}
-          </div>
-        </div>
-        {!compact && (
-          <div className="hidden md:flex items-center gap-3 text-xs text-muted-foreground">
-            <Legend color={COLORS.positive} label="Profitable" />
-            <Legend color={COLORS.negative} label="Losing" />
-            <Legend color={COLORS.neutral} label="Setup" />
-          </div>
-        )}
-      </div>
+          );
+        })}
 
-      {/* Canvas */}
-      <div
-        ref={containerRef}
-        className={`relative w-full ${compact ? "flex-1 min-h-[200px]" : "h-[420px]"} overflow-hidden`}
-        onClick={() => setSelectedId(null)}
-      >
-        {/* Subtle grid backdrop */}
-        <div
-          className="absolute inset-0 opacity-[0.04] pointer-events-none"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 1px 1px, hsl(var(--foreground)) 1px, transparent 0)",
-            backgroundSize: "24px 24px",
-          }}
-        />
-
-        <svg width={size.w} height={size.h} className="absolute inset-0">
-          <defs>
-            {(["positive", "negative", "neutral"] as NodeSentiment[]).map((s) => (
-              <radialGradient key={s} id={`grad-${s}`} cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor={COLORS[s]} stopOpacity="1" />
-                <stop offset="60%" stopColor={COLORS[s]} stopOpacity="0.6" />
-                <stop offset="100%" stopColor={COLORS[s]} stopOpacity="0.2" />
-              </radialGradient>
-            ))}
-          </defs>
-
-          {/* Edges */}
-          {edges.map((e, i) => {
-            const a = nodeById[e.from];
-            const b = nodeById[e.to];
-            if (!a || !b) return null;
-            const isConnected = activeId === e.from || activeId === e.to;
-            const isDimmed = activeId && !isConnected;
-            const stroke =
-              b.sentiment === "negative" || a.sentiment === "negative"
-                ? COLORS.negative
-                : b.sentiment === "positive" || a.sentiment === "positive"
-                ? COLORS.positive
-                : COLORS.neutral;
-            const x1 = toX(a.x);
-            const y1 = toY(a.y);
-            const x2 = toX(b.x);
-            const y2 = toY(b.y);
-            // Curved path for organic flow
-            const mx = (x1 + x2) / 2;
-            const my = (y1 + y2) / 2;
-            const dx = x2 - x1;
-            const dy = y2 - y1;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1;
-            // Perpendicular offset for curvature (small, consistent direction by edge index)
-            const curveAmt = Math.min(40, len * 0.15) * (i % 2 === 0 ? 1 : -1);
-            const cx1 = mx + (-dy / len) * curveAmt;
-            const cy1 = my + (dx / len) * curveAmt;
-            const path = `M ${x1} ${y1} Q ${cx1} ${cy1} ${x2} ${y2}`;
-            return (
-              <g key={`edge-${i}`}>
-                {/* Base edge */}
-                <path
-                  d={path}
-                  fill="none"
-                  stroke={stroke}
-                  strokeOpacity={isConnected ? 0.85 : isDimmed ? 0.05 : 0.18}
-                  strokeWidth={isConnected ? 2 : 1}
-                  strokeLinecap="round"
-                  style={{ transition: "stroke-opacity 300ms ease, stroke-width 300ms ease" }}
-                />
-                {/* Animated dashed flow on connected edges to clearly show the link */}
-                {isConnected && animationsEnabled && (
-                  <>
-                    <path
-                      d={path}
-                      fill="none"
-                      stroke={stroke}
-                      strokeOpacity={0.9}
-                      strokeWidth={2.2}
-                      strokeLinecap="round"
-                      strokeDasharray="6 8"
-                      style={{ filter: `drop-shadow(0 0 4px ${stroke})` }}
-                    >
-                      <animate
-                        attributeName="stroke-dashoffset"
-                        from="0"
-                        to="-28"
-                        dur="0.9s"
-                        repeatCount="indefinite"
-                      />
-                    </path>
-                    {/* Travelling particle for unmistakable directional flow */}
-                    <circle r={3} fill={stroke} opacity={0.95} style={{ filter: `drop-shadow(0 0 6px ${stroke})` }}>
-                      <animateMotion dur="1.6s" repeatCount="indefinite" path={path} rotate="auto" />
-                    </circle>
-                  </>
-                )}
-              </g>
-            );
-          })}
-
-          {/* Nodes */}
-          {nodes.map((n, idx) => {
-            const cx = toX(n.x);
-            const cy = toY(n.y);
-            const isActive = activeId === n.id;
-            const isDimmed = activeId && !isActive;
-            const isCore = n.id === "core";
-            const sizeFactor = compact ? 0.6 : 1;
-            const r = Math.max(4, n.size * sizeFactor);
-            return (
-              <motion.g
-                key={n.id}
-                initial={{ opacity: 0, scale: 0 }}
-                animate={{ opacity: isDimmed ? 0.35 : 1, scale: 1 }}
-                transition={{
-                  delay: 0.15 + idx * 0.04,
-                  type: "spring",
-                  stiffness: 180,
-                  damping: 14,
-                }}
-                style={{ cursor: "pointer", transformOrigin: `${cx}px ${cy}px` }}
-                onMouseEnter={() => setHoveredId(n.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                onClick={(ev) => {
-                  ev.stopPropagation();
-                  setSelectedId((prev) => (prev === n.id ? null : n.id));
-                }}
-              >
-                <g>
-                  {/* Outer pulse ring on active only — no continuous per-node animations */}
-                  {isActive && animationsEnabled && (
-                    <circle
-                      cx={cx}
-                      cy={cy}
-                      r={r}
-                      fill="none"
-                      stroke={COLORS[n.sentiment]}
-                      strokeOpacity={0.6}
-                      strokeWidth={1.5}
-                    >
-                      <animate attributeName="r" values={`${r};${r + 14}`} dur="1.4s" repeatCount="indefinite" />
-                      <animate attributeName="stroke-opacity" values="0.6;0" dur="1.4s" repeatCount="indefinite" />
-                    </circle>
-                  )}
-                  {/* Soft halo */}
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={r + (isActive ? 10 : 6)}
-                    fill={COLORS[n.sentiment]}
-                    opacity={isActive ? 0.22 : 0.1}
-                    style={{ transition: "all 250ms ease" }}
-                  />
-                  {/* Core node (no SVG blur filter — too expensive for paint) */}
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={isActive ? r + 1.5 : r}
-                    fill={`url(#grad-${n.sentiment})`}
-                    stroke={COLORS[n.sentiment]}
-                    strokeOpacity={isActive ? 1 : 0.7}
-                    strokeWidth={isActive ? 1.5 : 1}
-                    style={{ transition: "all 250ms ease" }}
-                  />
-                  {/* Label */}
-                  {(!compact || isActive || isCore) && (
-                    <text
-                      x={cx}
-                      y={cy + r + (compact ? 10 : 14)}
-                      textAnchor="middle"
-                      fill="hsl(var(--foreground))"
-                      fillOpacity={isActive ? 1 : isDimmed ? 0.3 : 0.75}
-                      fontSize={compact ? (isCore ? 9 : 8) : isCore ? 12 : 10}
-                      fontWeight={isCore ? 600 : 500}
-                      style={{ transition: "fill-opacity 200ms ease", pointerEvents: "none" }}
-                    >
-                      {n.label}
-                    </text>
-                  )}
-                </g>
-              </motion.g>
-            );
-          })}
-        </svg>
-      </div>
-
-      {/* Detail / hint footer - outside canvas so it never blocks nodes */}
-      <div
-        className={`relative border-t border-border/30 bg-background/30 backdrop-blur-sm ${
-          compact ? "px-3 py-2 min-h-[48px]" : "px-5 py-3 min-h-[60px]"
-        } flex items-center`}
-      >
-        <AnimatePresence mode="wait">
-          {activeNode ? (
-            <motion.div
-              key={activeNode.id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.18 }}
-              className="flex items-center gap-2.5 w-full min-w-0"
+        {nodes.map((n) => {
+          const cx = toX(n.x);
+          const cy = toY(n.y);
+          const isActive = activeId === n.id;
+          const isDimmed = activeId && !isActive;
+          const isCore = n.id === "core";
+          const sizeFactor = compact ? 0.65 : 1;
+          const r = Math.max(5, n.size * sizeFactor);
+          const showLabel = showAllLabels || !compact || isActive || isCore;
+          return (
+            <g
+              key={n.id}
+              style={{ cursor: interactive ? "pointer" : "default", opacity: isDimmed ? 0.35 : 1 }}
+              onMouseEnter={() => interactive && onHover(n.id)}
+              onMouseLeave={() => interactive && onHover(null)}
+              onClick={(ev) => {
+                if (!interactive) return;
+                ev.stopPropagation();
+                onSelect(isActive ? null : n.id);
+              }}
             >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{
-                  backgroundColor: COLORS[activeNode.sentiment],
-                  boxShadow: `0 0 10px ${COLORS[activeNode.sentiment]}`,
-                }}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={r + (isActive ? 8 : 5)}
+                fill={SENTIMENT_COLORS[n.sentiment]}
+                opacity={isActive ? 0.2 : 0.08}
               />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2 min-w-0">
-                  <p className="text-xs font-semibold text-foreground truncate">{activeNode.label}</p>
-                  <span className="text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">
-                    {activeNode.type}
-                  </span>
-                </div>
-                {activeNode.meta.detail && (
-                  <p className="text-[10px] text-muted-foreground truncate">{activeNode.meta.detail}</p>
-                )}
-              </div>
-              {typeof activeNode.meta.pnl === "number" && (
-                <motion.span
-                  initial={{ opacity: 0, x: 4 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="text-[11px] font-mono font-semibold shrink-0 px-2 py-0.5 rounded-md"
-                  style={{
-                    color: activeNode.meta.pnl >= 0 ? COLORS.positive : COLORS.negative,
-                    backgroundColor: `${activeNode.meta.pnl >= 0 ? COLORS.positive : COLORS.negative}1a`,
-                  }}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={isActive ? r + 1.5 : r}
+                fill={`url(#${gradPrefix}-grad-${n.sentiment})`}
+                stroke={SENTIMENT_COLORS[n.sentiment]}
+                strokeOpacity={isActive ? 1 : 0.7}
+                strokeWidth={isCore ? 2 : isActive ? 1.5 : 1}
+              />
+              {showLabel && (
+                <text
+                  x={cx}
+                  y={cy + r + (compact ? 11 : 15)}
+                  textAnchor="middle"
+                  fill="hsl(var(--foreground))"
+                  fillOpacity={isActive ? 1 : isDimmed ? 0.3 : 0.75}
+                  fontSize={compact ? (isCore ? 9 : 8) : isCore ? 13 : 10}
+                  fontWeight={isCore ? 700 : 500}
+                  style={{ pointerEvents: "none" }}
                 >
-                  {activeNode.meta.pnl >= 0 ? "+" : ""}${activeNode.meta.pnl.toFixed(2)}
-                </motion.span>
+                  {n.label}
+                </text>
               )}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="hint"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70"
-            >
-              <MousePointerClick className="w-3 h-3" />
-              Hover a node to inspect
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.div>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
   );
 }
 
-function Legend({ color, label }: { color: string; label: string }) {
+function NodeDetail({ node }: { node: MapNode }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <span
-        className="w-2 h-2 rounded-full"
-        style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }}
+    <div className="flex items-start gap-2.5 min-w-0">
+      <div
+        className="w-2.5 h-2.5 rounded-full mt-1 shrink-0"
+        style={{ backgroundColor: SENTIMENT_COLORS[node.sentiment], boxShadow: `0 0 8px ${SENTIMENT_COLORS[node.sentiment]}` }}
       />
-      <span>{label}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <p className="text-sm font-semibold text-foreground truncate">{node.label}</p>
+          <span className="text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">{LAYER_LABELS[node.type]}</span>
+        </div>
+        {node.meta.detail && <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{node.meta.detail}</p>}
+      </div>
+      {typeof node.meta.pnl === "number" && (
+        <span
+          className="text-xs font-mono font-semibold shrink-0 px-2 py-0.5 rounded-md"
+          style={{
+            color: node.meta.pnl >= 0 ? SENTIMENT_COLORS.positive : SENTIMENT_COLORS.negative,
+            backgroundColor: `${node.meta.pnl >= 0 ? SENTIMENT_COLORS.positive : SENTIMENT_COLORS.negative}18`,
+          }}
+        >
+          {node.meta.pnl >= 0 ? "+" : ""}${node.meta.pnl.toFixed(0)}
+        </span>
+      )}
     </div>
+  );
+}
+
+function HealthBadge({ summary }: { summary: import("@/lib/intelligenceMap").IntelligenceSummary }) {
+  const gradeColors: Record<string, string> = {
+    A: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
+    B: "bg-primary/15 text-primary border-primary/30",
+    C: "bg-yellow-500/15 text-yellow-600 border-yellow-500/30",
+    D: "bg-orange-500/15 text-orange-500 border-orange-500/30",
+    F: "bg-red-500/15 text-red-500 border-red-500/30",
+  };
+  const MomentumIcon =
+    summary.momentum === "improving" ? TrendingUp : summary.momentum === "declining" ? TrendingDown : Minus;
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className={cn("text-xs font-bold px-2.5 py-1 rounded-lg border", gradeColors[summary.grade])}>
+        Grade {summary.grade} · {summary.healthScore}
+      </span>
+      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+        <MomentumIcon className="w-3 h-3" />
+        {summary.momentum}
+      </span>
+    </div>
+  );
+}
+
+function LayerToggles({ layers, onChange }: { layers: LayerFilter; onChange: (l: LayerFilter) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {(Object.keys(LAYER_LABELS) as NodeType[]).map((type) => (
+        <button
+          key={type}
+          type="button"
+          onClick={() => onChange({ ...layers, [type]: !layers[type] })}
+          className={cn(
+            "text-[10px] px-2 py-1 rounded-full border transition-colors",
+            layers[type]
+              ? "bg-primary/15 text-primary border-primary/30"
+              : "bg-muted/30 text-muted-foreground border-border/40",
+          )}
+        >
+          {LAYER_LABELS[type]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function TradingIntelligenceMap({ trades, compact = false }: TradingIntelligenceMapProps) {
+  const graph = useMemo(() => buildIntelligenceGraph(trades), [trades]);
+  const [expanded, setExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<IntelligenceViewMode>("network");
+  const [compactHoverId, setCompactHoverId] = useState<string | null>(null);
+  const [expandedHoverId, setExpandedHoverId] = useState<string | null>(null);
+  const [expandedSelectedId, setExpandedSelectedId] = useState<string | null>(null);
+  const [layers, setLayers] = useState<LayerFilter>(DEFAULT_LAYERS);
+
+  const breakdown = useMemo(() => extractBreakdown(graph.nodes), [graph.nodes]);
+  const healthPillars = useMemo(() => buildHealthPillars(graph.summary), [graph.summary]);
+  const activeViewMeta = INTELLIGENCE_VIEWS.find((v) => v.id === viewMode);
+
+  const filtered = useMemo(
+    () => filterGraph(graph.nodes, graph.edges, layers),
+    [graph.nodes, graph.edges, layers],
+  );
+
+  const nodeById = useMemo(() => Object.fromEntries(graph.nodes.map((n) => [n.id, n])), [graph.nodes]);
+  const compactActiveId = compactHoverId;
+  const expandedActiveId = expandedHoverId || expandedSelectedId;
+  const expandedActiveNode = expandedActiveId ? nodeById[expandedActiveId] : null;
+
+  const openExpanded = useCallback(() => {
+    setCompactHoverId(null);
+    setExpanded(true);
+  }, []);
+
+  const handleExpandedChange = useCallback((open: boolean) => {
+    setExpanded(open);
+    if (!open) {
+      setExpandedHoverId(null);
+      setExpandedSelectedId(null);
+      setViewMode("network");
+    }
+  }, []);
+
+  return (
+    <>
+      <div
+        className={cn(
+          "group relative rounded-2xl bg-gradient-to-br from-card/60 via-card/40 to-card/20 backdrop-blur-xl border border-border/40 shadow-xl overflow-hidden",
+          compact ? "flex flex-col flex-1 min-h-0 cursor-pointer" : "",
+          expanded && "opacity-60",
+        )}
+        onClick={compact && !expanded ? openExpanded : undefined}
+        role={compact ? "button" : undefined}
+        tabIndex={compact && !expanded ? 0 : undefined}
+        onKeyDown={compact && !expanded ? (e) => { if (e.key === "Enter" || e.key === " ") openExpanded(); } : undefined}
+      >
+        <div className="pointer-events-none absolute -top-20 -left-20 w-64 h-64 rounded-full bg-primary/10 blur-3xl opacity-60" />
+        <div className="pointer-events-none absolute -bottom-20 -right-20 w-64 h-64 rounded-full bg-violet-500/5 blur-3xl opacity-60" />
+
+        <div className={cn("relative flex items-center justify-between", compact ? "px-3 pt-3 pb-2" : "px-5 pt-5 pb-3")}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={cn("relative bg-primary/10 flex items-center justify-center shrink-0", compact ? "w-8 h-8 rounded-lg" : "w-10 h-10 rounded-xl")}>
+              <Brain className={cn("text-primary", compact ? "w-4 h-4" : "w-5 h-5")} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h3 className={cn("font-semibold text-foreground truncate", compact ? "text-xs" : "text-base")}>
+                  Intelligence Map
+                </h3>
+                <Sparkles className={cn("text-primary/60 shrink-0", compact ? "w-2.5 h-2.5" : "w-3 h-3")} />
+              </div>
+              {compact ? (
+                <HealthBadge summary={graph.summary} />
+              ) : (
+                <p className="text-xs text-muted-foreground">Your trading mind, visualized</p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); openExpanded(); }}
+            className={cn(
+              "shrink-0 rounded-lg border border-border/40 bg-background/50 hover:bg-primary/10 hover:border-primary/30 transition-colors flex items-center gap-1 text-muted-foreground hover:text-primary",
+              compact ? "px-2 py-1 text-[10px]" : "px-2.5 py-1.5 text-xs",
+            )}
+            aria-label="Expand intelligence map"
+          >
+            <Maximize2 className={compact ? "w-3 h-3" : "w-3.5 h-3.5"} />
+            {!compact && "Expand"}
+          </button>
+        </div>
+
+        <div onClick={(e) => e.stopPropagation()}>
+          {expanded ? (
+            <div
+              className={cn(
+                "flex flex-col items-center justify-center bg-muted/10 text-muted-foreground",
+                compact ? "h-[200px]" : "h-[420px]",
+              )}
+            >
+              <Maximize2 className="w-5 h-5 mb-2 opacity-40" />
+              <p className="text-xs">Viewing expanded map</p>
+            </div>
+          ) : (
+            <MapCanvas
+              nodes={filtered.nodes}
+              edges={filtered.edges}
+              height={compact ? 200 : 420}
+              compact={compact}
+              activeId={compactActiveId}
+              onSelect={() => {}}
+              onHover={setCompactHoverId}
+            />
+          )}
+        </div>
+
+        <div
+          className={cn(
+            "relative border-t border-border/30 bg-background/30 backdrop-blur-sm flex items-center",
+            compact ? "px-3 py-2 min-h-[52px]" : "px-5 py-3 min-h-[60px]",
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {expanded ? (
+            <p className="text-[10px] text-muted-foreground">Close expanded view to interact here</p>
+          ) : compactActiveId && nodeById[compactActiveId] ? (
+            <NodeDetail node={nodeById[compactActiveId]} />
+          ) : (
+            <div className="flex items-center justify-between w-full gap-2">
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/80">
+                <MousePointerClick className="w-3 h-3 shrink-0" />
+                <span>{compact ? "Click to expand" : "Click nodes to inspect"}</span>
+              </div>
+              {graph.summary.totalTrades > 0 && (
+                <span className="text-[10px] text-muted-foreground shrink-0">
+                  {graph.summary.positiveSignals}↑ {graph.summary.negativeSignals}↓
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Dialog open={expanded} onOpenChange={handleExpandedChange}>
+        <DialogContent className="glass border-border/40 max-w-6xl w-[calc(100vw-2rem)] p-0 gap-0 overflow-hidden [&>button:last-child]:hidden">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/30">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                <Brain className="w-5 h-5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="text-base font-semibold">Intelligence Map</DialogTitle>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {graph.summary.totalTrades} trades · {graph.summary.winRate.toFixed(1)}% WR · ${graph.summary.netPnL.toFixed(0)} net
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="w-8 h-8 rounded-full border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/40 shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="px-4 py-2.5 border-b border-border/20 bg-muted/5 space-y-2">
+            <ViewTabBar active={viewMode} onChange={setViewMode} />
+            {activeViewMeta && (
+              <p className="text-[11px] text-muted-foreground">{activeViewMeta.description}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] max-h-[min(85vh,720px)] min-h-0 overflow-hidden">
+            <div className="flex flex-col min-h-0 overflow-hidden border-b lg:border-b-0 lg:border-r border-border/30">
+              {viewMode === "network" && (
+                <>
+                  <div className="px-4 py-2 flex items-center justify-between gap-2 border-b border-border/20 bg-muted/10">
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                      <Filter className="w-3 h-3" />
+                      Layers
+                    </div>
+                    <LayerToggles layers={layers} onChange={setLayers} />
+                  </div>
+                  <div className="flex-1 min-h-[320px] lg:min-h-[440px]">
+                    <MapCanvas
+                      nodes={filtered.nodes}
+                      edges={filtered.edges}
+                      height={440}
+                      activeId={expandedActiveId}
+                      onSelect={setExpandedSelectedId}
+                      onHover={setExpandedHoverId}
+                      showAllLabels
+                    />
+                  </div>
+                  <div className="px-4 py-3 border-t border-border/20 min-h-[68px]">
+                    {expandedActiveNode ? (
+                      <NodeDetail node={expandedActiveNode} />
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Select a node to inspect connections and stats.</p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {viewMode === "breakdown" && (
+                <BreakdownView
+                  pairs={breakdown.pairs}
+                  sessions={breakdown.sessions}
+                  weekdays={breakdown.weekdays}
+                  directions={breakdown.directions}
+                />
+              )}
+
+              {viewMode === "health" && (
+                <HealthView summary={graph.summary} pillars={healthPillars} />
+              )}
+
+              {viewMode === "signals" && (
+                <SignalsView
+                  strengths={breakdown.strengths}
+                  weaknesses={breakdown.weaknesses}
+                  positiveCount={graph.summary.positiveSignals}
+                  negativeCount={graph.summary.negativeSignals}
+                />
+              )}
+            </div>
+
+            <div className="hidden lg:flex flex-col min-h-0 max-h-[min(85vh,720px)]">
+              <InsightsSidebar summary={graph.summary} insights={graph.insights} />
+            </div>
+          </div>
+
+          {/* Mobile insights — below main view */}
+          <div className="lg:hidden max-h-[240px] overflow-hidden border-t border-border/30">
+            <InsightsSidebar summary={graph.summary} insights={graph.insights} />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

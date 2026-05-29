@@ -155,7 +155,7 @@ function TradingViewChartComponent({ pair, direction, existingImage }: TradingVi
         <div className="space-y-2 pt-4 border-t border-border/30">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Saved Chart</span>
           <div className="rounded-xl overflow-hidden border border-border/50">
-            <img src={existingImage} alt="Saved trade chart" className="w-full" />
+            <img src={existingImage} alt="Saved trade chart" loading="lazy" className="w-full" />
           </div>
         </div>
       )}

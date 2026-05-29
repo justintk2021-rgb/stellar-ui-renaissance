@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList, CalendarClock, Calculator, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import bookLogo from "@/assets/book-logo.png";
@@ -23,36 +23,12 @@ const navItems = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
-export function Sidebar({ currentPage, onPageChange, isCollapsed = false, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggleCollapse }: SidebarProps) {
   const [userName, setUserName] = useState<string>("NSYNC JOURNAL");
   const [isHovering, setIsHovering] = useState(false);
-  const [isPinned, setIsPinned] = useState(!isCollapsed);
+  const [isPinned, setIsPinned] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<HTMLButtonElement>(null);
-
-  // Sync pinned state with collapsed prop
-  useEffect(() => {
-    setIsPinned(!isCollapsed);
-  }, [isCollapsed]);
-
-  // Handle click outside to close
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        isPinned &&
-        sidebarRef.current &&
-        !sidebarRef.current.contains(e.target as Node) &&
-        arrowRef.current &&
-        !arrowRef.current.contains(e.target as Node)
-      ) {
-        setIsPinned(false);
-        onToggleCollapse?.();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isPinned, onToggleCollapse]);
 
   // Fetch user name once; re-fetch only when the user actually changes
   useEffect(() => {
@@ -94,10 +70,20 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = false, onTogg
 
   const showSidebar = isPinned || isHovering;
 
+  const closeSidebar = useCallback(() => {
+    setIsPinned(false);
+    setIsHovering(false);
+    if (!isCollapsed) {
+      onToggleCollapse?.();
+    }
+  }, [isCollapsed, onToggleCollapse]);
+
   const handleArrowClick = () => {
     const newPinned = !isPinned;
     setIsPinned(newPinned);
-    onToggleCollapse?.();
+    if (newPinned !== !isCollapsed) {
+      onToggleCollapse?.();
+    }
   };
 
   const handleArrowHover = () => {
@@ -112,9 +98,27 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = false, onTogg
     }
   };
 
+  // Close when clicking outside the pinned panel
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        isPinned &&
+        sidebarRef.current &&
+        !sidebarRef.current.contains(e.target as Node) &&
+        arrowRef.current &&
+        !arrowRef.current.contains(e.target as Node)
+      ) {
+        closeSidebar();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isPinned, closeSidebar]);
+
   return (
     <>
-      {/* Arrow toggle - always visible on the left edge so the nav is never "missing" on load */}
+      {/* Arrow toggle — collapsed by default on load; user opens manually */}
       <button
         ref={arrowRef}
         onClick={handleArrowClick}
@@ -155,6 +159,7 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = false, onTogg
                 <img 
                   src={bookLogo} 
                   alt="NSYNC Journal Logo" 
+                  loading="lazy"
                   className="w-12 h-12 object-contain"
                   style={{ filter: 'drop-shadow(0 0 8px hsl(var(--primary) / 0.5))' }}
                 />
@@ -226,11 +231,7 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = false, onTogg
       {showSidebar && (
         <div 
           className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => {
-            setIsPinned(false);
-            setIsHovering(false);
-            onToggleCollapse?.();
-          }}
+          onClick={closeSidebar}
         />
       )}
     </>

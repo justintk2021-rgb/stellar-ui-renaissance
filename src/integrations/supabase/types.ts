@@ -21,8 +21,11 @@ export type Database = {
           account_name: string | null
           broker_connection_id: string
           created_at: string
+          goal_balance: number | null
           id: string
           is_active: boolean | null
+          profit_target: number | null
+          starting_balance: number | null
           updated_at: string
         }
         Insert: {
@@ -31,8 +34,11 @@ export type Database = {
           account_name?: string | null
           broker_connection_id: string
           created_at?: string
+          goal_balance?: number | null
           id?: string
           is_active?: boolean | null
+          profit_target?: number | null
+          starting_balance?: number | null
           updated_at?: string
         }
         Update: {
@@ -41,8 +47,11 @@ export type Database = {
           account_name?: string | null
           broker_connection_id?: string
           created_at?: string
+          goal_balance?: number | null
           id?: string
           is_active?: boolean | null
+          profit_target?: number | null
+          starting_balance?: number | null
           updated_at?: string
         }
         Relationships: [

@@ -7,8 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveBrokerConnectionId, useBrokerPositions } from "@/hooks/useBrokerPositions";
+import { subscribeBrokerOrdersRealtime } from "@/lib/queries/broker";
 
 interface RecentTradesProps {
   trades: Trade[];
@@ -54,113 +56,60 @@ const rowVariants = {
 };
 
 export function RecentTrades({ trades }: RecentTradesProps) {
-  const [positions, setPositions] = useState<OpenPosition[]>([]);
+  const activeBrokerConnId = useActiveBrokerConnectionId();
+  const { positions: brokerPositions } = useBrokerPositions(activeBrokerConnId);
   const [orders, setOrders] = useState<PendingOrder[]>([]);
-  const [connIds, setConnIds] = useState<string[]>([]);
 
-  const fetchBrokerData = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  const positions: OpenPosition[] = useMemo(() => brokerPositions.map(p => ({
+    id: p.id,
+    symbol: p.symbol,
+    side: p.side,
+    volume: p.volume,
+    open_price: p.open_price,
+    current_price: p.current_price,
+    floating_pl: p.floating_pl,
+    open_time: p.open_time,
+    stop_loss: p.stop_loss,
+    take_profit: p.take_profit,
+  })), [brokerPositions]);
 
-    // Only show data for the active broker connection
-    const activeBrokerConnId = localStorage.getItem('activeBrokerConnectionId');
-    
+  useEffect(() => {
     if (!activeBrokerConnId) {
-      // Fallback: no active connection selected, show nothing
-      setConnIds([]);
-      setPositions([]);
       setOrders([]);
       return;
     }
 
-    // Verify this connection belongs to the user and is connected
-    const { data: conn } = await supabase
-      .from('broker_connections')
-      .select('id')
-      .eq('id', activeBrokerConnId)
-      .eq('user_id', user.id)
-      .eq('connection_status', 'connected')
-      .maybeSingle();
+    const fetchOrders = async () => {
+      const { data } = await supabase
+        .from('broker_orders')
+        .select('*')
+        .eq('broker_connection_id', activeBrokerConnId)
+        .eq('status', 'pending');
 
-    if (!conn) {
-      setConnIds([]);
-      setPositions([]);
-      setOrders([]);
-      return;
-    }
-
-    const ids = [conn.id];
-    setConnIds(ids);
-
-    const [posRes, ordRes] = await Promise.all([
-      supabase.from('broker_positions').select('*').eq('broker_connection_id', conn.id).is('closed_at', null),
-      supabase.from('broker_orders').select('*').eq('broker_connection_id', conn.id).eq('status', 'pending'),
-    ]);
-
-    if (posRes.data) setPositions(posRes.data.map(p => ({
-      id: p.id, symbol: p.symbol, side: p.side, volume: p.volume,
-      open_price: Number(p.open_price), current_price: p.current_price ? Number(p.current_price) : null,
-      floating_pl: Number(p.floating_pl || 0), open_time: p.open_time,
-      stop_loss: p.stop_loss ? Number(p.stop_loss) : null,
-      take_profit: p.take_profit ? Number(p.take_profit) : null,
-    })));
-    if (ordRes.data) setOrders(ordRes.data.map(o => ({
-      id: o.id, symbol: o.symbol, side: o.side, size: Number(o.size),
-      order_type: o.order_type, entry_price: o.entry_price ? Number(o.entry_price) : null,
-      stop_loss: o.stop_loss ? Number(o.stop_loss) : null,
-      take_profit: o.take_profit ? Number(o.take_profit) : null,
-      status: o.status || 'pending', created_broker_at: o.created_broker_at,
-    })));
-  };
-
-  // Initial fetch
-  useEffect(() => {
-    fetchBrokerData();
-  }, [trades]);
-
-  // Re-fetch when active broker connection changes
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'activeBrokerConnectionId') {
-        fetchBrokerData();
+      if (data) {
+        setOrders(data.map(o => ({
+          id: o.id, symbol: o.symbol, side: o.side, size: Number(o.size),
+          order_type: o.order_type, entry_price: o.entry_price ? Number(o.entry_price) : null,
+          stop_loss: o.stop_loss ? Number(o.stop_loss) : null,
+          take_profit: o.take_profit ? Number(o.take_profit) : null,
+          status: o.status || 'pending', created_broker_at: o.created_broker_at,
+        })));
+      } else {
+        setOrders([]);
       }
     };
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also poll localStorage on a short interval to catch same-tab changes
-    const interval = setInterval(() => {
-      const current = localStorage.getItem('activeBrokerConnectionId');
-      if (!connIds.includes(current || '')) {
-        fetchBrokerData();
-      }
-    }, 2000);
 
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, [connIds]);
+    fetchOrders();
 
-  // Realtime subscription for broker positions and orders
-  useEffect(() => {
-    const channel = supabase
-      .channel(`dashboard-broker-realtime-${Date.now()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'broker_positions' }, () => {
-        fetchBrokerData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'broker_orders' }, () => {
-        fetchBrokerData();
-      })
-      .subscribe();
+    return subscribeBrokerOrdersRealtime(activeBrokerConnId, fetchOrders);
+  }, [activeBrokerConnId]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const recentTrades = [...trades]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 10);
+  const recentTrades = useMemo(() =>
+    [...trades]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10),
+    [trades]
+  );
 
   return (
     <motion.div

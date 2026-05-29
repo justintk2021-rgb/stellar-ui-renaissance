@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -168,15 +169,31 @@ const formatDuration = (ms: number) => {
 // (Broker open/close times now live directly on the trade row, populated by
 // the TradeLocker sync function — no separate fetch needed.)
 
-// Live ticker that re-renders every second so open-trade durations update in real time
-function useNowTicker(active: boolean, intervalMs = 1000) {
+// Isolated live duration cell — only this component re-renders on the 1s ticker
+function OpenTradeDuration({ openTime, closeTime }: { openTime?: string; closeTime?: string }) {
+  const isOpen = !closeTime;
+  const openMs = openTime ? new Date(openTime).getTime() : NaN;
+  const closeMs = closeTime ? new Date(closeTime).getTime() : null;
   const [now, setNow] = useState(() => Date.now());
+
   useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    if (!isOpen || !isFinite(openMs)) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [active, intervalMs]);
-  return now;
+  }, [isOpen, openMs]);
+
+  const durationMs = isOpen
+    ? (isFinite(openMs) ? now - openMs : NaN)
+    : (isFinite(openMs) && closeMs ? closeMs - openMs : NaN);
+
+  return (
+    <span className={cn(
+      "font-mono text-xs font-semibold tabular-nums",
+      isOpen ? "text-primary" : "text-foreground"
+    )}>
+      {formatDuration(durationMs)}
+    </span>
+  );
 }
 
 // Animated Line Chart Component
@@ -215,7 +232,7 @@ function AnimatedLineChart({ trades, isExpanded }: { trades: Trade[]; isExpanded
   
   const finalValue = cumulative[cumulative.length - 1] || 0;
   const isPositive = finalValue >= 0;
-  const gradientId = `gradient-${trades[0]?.id}-${Date.now()}`;
+  const gradientId = useMemo(() => `gradient-${trades[0]?.id ?? 'empty'}`, [trades]);
 
   // Calculate path length for animation
   let pathLength = 0;
@@ -343,7 +360,6 @@ interface TradeRowGroupProps {
   trades: Trade[];
   notebookEntries: NotebookEntry[];
   checklists: Checklist[];
-  now: number;
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
   onViewNotes: (trade: Trade, allDayTrades?: Trade[]) => void;
@@ -352,7 +368,7 @@ interface TradeRowGroupProps {
   onToggle: () => void;
 }
 
-function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit, onDelete, onViewNotes, index, isExpanded, onToggle }: TradeRowGroupProps) {
+function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDelete, onViewNotes, index, isExpanded, onToggle }: TradeRowGroupProps) {
   const metrics = calculateGroupMetrics(trades);
   const isProfit = metrics.grossPnL >= 0;
 
@@ -586,12 +602,8 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit,
                     </div>
                     {/* Time + Duration row (for imported broker trades) */}
                     {trade.importedFromBroker && (trade.openTime || trade.closeTime) && (() => {
-                      const openMs = trade.openTime ? new Date(trade.openTime).getTime() : NaN;
                       const closeMs = trade.closeTime ? new Date(trade.closeTime).getTime() : null;
                       const isOpen = !closeMs;
-                      const durationMs = isOpen
-                        ? (isFinite(openMs) ? now - openMs : NaN)
-                        : (isFinite(openMs) && closeMs ? closeMs - openMs : NaN);
                       return (
                         <div className="flex justify-center mt-2.5 mb-1.5 animate-fade-in">
                           <div className="inline-flex items-stretch gap-0 rounded-full bg-muted/40 backdrop-blur-sm px-1 py-0.5 shadow-sm">
@@ -648,12 +660,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, now, onEdit,
                               </div>
                               <div className="flex flex-col leading-tight">
                                 <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 font-medium">Duration</span>
-                                <span className={cn(
-                                  "font-mono text-xs font-semibold tabular-nums",
-                                  isOpen ? "text-primary" : "text-foreground"
-                                )}>
-                                  {formatDuration(durationMs)}
-                                </span>
+                                <OpenTradeDuration openTime={trade.openTime} closeTime={trade.closeTime} />
                               </div>
                             </div>
                           </div>
@@ -736,16 +743,21 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
   const isFilterActive = historyPeriod !== "all" || historySymbol !== "__all__";
   const activePeriodLabel = PERIOD_OPTIONS.find(p => p.value === historyPeriod)?.label ?? "All time";
 
-  const groupedTrades = groupTradesByDate(filteredTrades);
-  const sortedDates = Object.keys(groupedTrades).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-
-  // Tick once per second so durations of still-open imported positions update
-  // in real time when a row is expanded.
-  const hasOpenImported = useMemo(
-    () => filteredTrades.some(t => t.importedFromBroker && t.openTime && !t.closeTime),
-    [filteredTrades]
+  const groupedTrades = useMemo(() => groupTradesByDate(filteredTrades), [filteredTrades]);
+  const sortedDates = useMemo(
+    () => Object.keys(groupedTrades).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()),
+    [groupedTrades]
   );
-  const now = useNowTicker(expandedDate !== null && hasOpenImported, 1000);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: sortedDates.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: (index) => (expandedDate === sortedDates[index] ? 280 : 72),
+    overscan: 8,
+    getItemKey: (index) => sortedDates[index] ?? index,
+  });
 
   // Collapse when clicking outside
   useEffect(() => {
@@ -938,7 +950,7 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
 
         <div className="rounded-xl overflow-hidden bg-card/50 backdrop-blur-sm">
           {/* Body */}
-          <div className="max-h-[calc(100vh-320px)] min-h-[400px] overflow-y-auto custom-scrollbar">
+          <div ref={scrollContainerRef} className="max-h-[calc(100vh-320px)] min-h-[400px] overflow-y-auto custom-scrollbar">
             {trades.length === 0 ? (
               <motion.div 
                 initial={{ opacity: 0 }}
@@ -952,22 +964,44 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                 <p className="text-xs text-muted-foreground/70 mt-1">Click "Add New Trade" to log your first trade.</p>
               </motion.div>
             ) : (
-              sortedDates.map((date, index) => (
-                <TradeRowGroup
-                  key={date}
-                  date={date}
-                  trades={groupedTrades[date]}
-                  notebookEntries={notebookEntries}
-                  checklists={checklists}
-                  now={now}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                  onViewNotes={handleViewNotes}
-                  index={index}
-                  isExpanded={expandedDate === date}
-                  onToggle={() => setExpandedDate(expandedDate === date ? null : date)}
-                />
-              ))
+              <div
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const date = sortedDates[virtualRow.index];
+                  return (
+                    <div
+                      key={date}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                      ref={rowVirtualizer.measureElement}
+                      data-index={virtualRow.index}
+                    >
+                      <TradeRowGroup
+                        date={date}
+                        trades={groupedTrades[date]}
+                        notebookEntries={notebookEntries}
+                        checklists={checklists}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onViewNotes={handleViewNotes}
+                        index={virtualRow.index}
+                        isExpanded={expandedDate === date}
+                        onToggle={() => setExpandedDate(expandedDate === date ? null : date)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>

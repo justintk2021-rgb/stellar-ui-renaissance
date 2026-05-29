@@ -21,9 +21,9 @@ export function useCountUp({
   const [isAnimating, setIsAnimating] = useState(false);
   const prevEndRef = useRef(end);
   const frameRef = useRef<number>();
+  const frameSkipRef = useRef(0);
 
   useEffect(() => {
-    // Reset animation when end value changes
     if (prevEndRef.current !== end) {
       prevEndRef.current = end;
     }
@@ -31,20 +31,24 @@ export function useCountUp({
     setIsAnimating(true);
     const startTime = performance.now();
     const startValue = count;
+    frameSkipRef.current = 0;
 
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      
-      // Easing function for smooth animation
       const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-      
       const currentValue = startValue + (end - startValue) * easeOutQuart;
-      setCount(currentValue);
+
+      // Batch React updates to every 2 frames to reduce re-render churn
+      frameSkipRef.current += 1;
+      if (frameSkipRef.current % 2 === 0 || progress >= 1) {
+        setCount(currentValue);
+      }
 
       if (progress < 1) {
         frameRef.current = requestAnimationFrame(animate);
       } else {
+        setCount(end);
         setIsAnimating(false);
       }
     };
@@ -58,7 +62,6 @@ export function useCountUp({
     };
   }, [end, duration]);
 
-  // Truncate instead of rounding to show exact values
   const factor = Math.pow(10, decimals);
   const truncated = Math.trunc(count * factor) / factor;
   const formattedValue = `${prefix}${truncated.toFixed(decimals)}${suffix}`;

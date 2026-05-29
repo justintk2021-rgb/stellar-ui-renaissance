@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { useThemeTransition } from "@/hooks/useThemeTransition";
 import { useTrades } from "@/hooks/useTrades";
@@ -11,14 +12,19 @@ import { Sidebar } from "@/components/Layout/Sidebar";
 import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
 import { BalanceCards } from "@/components/Dashboard/BalanceCards";
+import { useAccountProjection } from "@/hooks/useAccountProjection";
 import { DashboardStatsLayout } from "@/components/Dashboard/DashboardStatsLayout";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
-import { TradeTable } from "@/components/Journal/TradeTable";
 import { MiniCalendar } from "@/components/Journal/MiniCalendar";
-import { CompareView, readCompareFromURL, clearCompareFromURL } from "@/components/Journal/CompareView";
+import { readCompareFromURL, clearCompareFromURL } from "@/lib/compareUrl";
 import { YearMonthPicker, type MonthSelection } from "@/components/Journal/YearMonthPicker";
 import { AccountSelector } from "@/components/Dashboard/AccountSelector";
 import { formatLocalDateKey, getTradeLocalDateKey } from "@/lib/tradeFormat";
+import { queryKeys } from "@/lib/queries/keys";
+import { fetchTradesList } from "@/lib/queries/trades";
+
+const TradeTable = lazy(() => import("@/components/Journal/TradeTable").then(m => ({ default: m.TradeTable })));
+const CompareView = lazy(() => import("@/components/Journal/CompareView").then(m => ({ default: m.CompareView })));
 
 // Lazy-load heavy/secondary pages so the dashboard paints instantly.
 const NotebookView = lazy(() => import("@/components/Notebook/NotebookView").then(m => ({ default: m.NotebookView })));
@@ -95,7 +101,7 @@ const Index = () => {
       localStorage.removeItem('selectedBrokerAccountId');
     }
   }, []);
-  
+
   // Use trading accounts
   const {
     accounts,
@@ -271,8 +277,17 @@ const Index = () => {
   }, [selectedBrokerAccountId]);
 
 
-  // Use the account's starting balance (manual accounts only; broker accounts derive it)
-  const accountStartBalance = selectedAccount?.starting_balance || 10000;
+
+  const accountProjection = useAccountProjection({
+    userId: user?.id,
+    trades,
+    manualAccount: selectedAccount,
+    selectedAccountId: selectedBrokerAccountId ? null : selectedAccountId,
+    brokerAccountExternalId: selectedBrokerAccountId,
+    brokerBalance,
+    brokerEquity,
+    updateManualAccount: updateAccount,
+  });
   
   // Use database-backed notebook entries
   const { 
@@ -291,6 +306,7 @@ const Index = () => {
     setTheme,
     setAccentColor,
     setCustomColor,
+    setCustomAccent,
     setCustomGradient,
     setSidebarCollapsed,
     setNotebookFont,
@@ -321,49 +337,65 @@ const Index = () => {
   const [pickerSelection, setPickerSelection] = useState<
     { month: number; year: number }[] | undefined
   >(undefined);
-  const [allUserTrades, setAllUserTrades] = useState<Trade[]>([]);
+  /** Bumps when the user confirms a new A/B month pair so CompareView remounts. */
+  const [compareRevision, setCompareRevision] = useState(0);
 
-  // Lazily fetch ALL of the user's trades (across every account) when Compare opens,
-  // so the "Account" comparison mode has data from both sides regardless of the
-  // currently-selected account at the top of the page.
-  useEffect(() => {
-    if (!compareOpen || !user?.id) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('trades')
-          .select('*')
-          .eq('user_id', user.id);
-        if (error) throw error;
-        if (cancelled) return;
-        const formatted: Trade[] = (data || []).map((t: any) => ({
-          id: t.id,
-          date: t.date,
-          pair: t.pair,
-          direction: t.direction as 'Long' | 'Short',
-          result: Number(t.result),
-          session: t.session || undefined,
-          notes: t.notes || undefined,
-          notebook: t.notebook || undefined,
-          accountId: t.account_id || undefined,
-          openTime: t.open_time || undefined,
-          closeTime: t.close_time || undefined,
-        }));
-        setAllUserTrades(formatted);
-      } catch (e) {
-        console.error('Compare: failed to load all-account trades', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [compareOpen, user?.id]);
+  const journalViewData = useMemo(() => {
+    const winLossFiltered = journalFilter === 'all'
+      ? trades
+      : journalFilter === 'wins'
+        ? trades.filter(t => t.result > 0)
+        : trades.filter(t => t.result < 0);
+
+    const rangeFiltered = journalDateRange
+      ? (() => {
+          const startStr = formatLocalDateKey(journalDateRange.start);
+          const endStr = formatLocalDateKey(journalDateRange.end);
+          return winLossFiltered.filter(t => {
+            const d = getTradeLocalDateKey(t);
+            return d >= startStr && d <= endStr;
+          });
+        })()
+      : winLossFiltered;
+
+    const pnlByDate: Record<string, number> = {};
+    rangeFiltered.forEach(t => {
+      const key = getTradeLocalDateKey(t);
+      if (!key) return;
+      pnlByDate[key] = (pnlByDate[key] || 0) + (t.result || 0);
+    });
+
+    return {
+      rangeFiltered,
+      dayPnLs: Object.entries(pnlByDate).map(([date, pnl]) => ({ date, pnl })),
+    };
+  }, [trades, journalFilter, journalDateRange]);
+
+  const { data: allUserTrades = [] } = useQuery({
+    queryKey: queryKeys.trades.list(user?.id ?? '', null, null),
+    queryFn: () => fetchTradesList(user!.id, null, null),
+    enabled: compareOpen && !!user?.id,
+    staleTime: 60_000,
+  });
 
   // Notes are now manually created only — no automatic generation for trades
 
   // Change page without forcing the sidebar to collapse — keeps nav visible on load and during navigation
-  const handlePageChange = useCallback((page: string) => {
-    setCurrentPage(page);
+  const closeCompareView = useCallback(() => {
+    clearCompareFromURL();
+    setCompareOpen(false);
+    setComparePickerOpen(false);
+    setPickerInitial(null);
+    setPickerSelection(undefined);
+    setCompareRevision(0);
   }, []);
+
+  const handlePageChange = useCallback((page: string) => {
+    if (page !== 'journal') {
+      closeCompareView();
+    }
+    setCurrentPage(page);
+  }, [closeCompareView]);
 
   // Fetch user profile
   const fetchProfile = useCallback(async (userId: string) => {
@@ -499,22 +531,11 @@ const Index = () => {
   }, [clearAllTrades, notebookEntries, deleteNotebookEntry]);
 
   const handleSetBalance = useCallback(async (value: number) => {
+    if (selectedBrokerAccountId) return;
     if (selectedAccountId) {
       await updateAccount(selectedAccountId, { starting_balance: value });
     }
-  }, [selectedAccountId, updateAccount]);
-
-  const handleSetGoalBalance = useCallback(async (value: number) => {
-    if (selectedAccountId) {
-      await updateAccount(selectedAccountId, { goal_balance: value });
-    }
-  }, [selectedAccountId, updateAccount]);
-
-  const handleSetProfitTarget = useCallback(async (value: number) => {
-    if (selectedAccountId) {
-      await updateAccount(selectedAccountId, { profit_target: value });
-    }
-  }, [selectedAccountId, updateAccount]);
+  }, [selectedAccountId, selectedBrokerAccountId, updateAccount]);
 
   const handleSaveNotes = useCallback(async (id: string, notes: string) => {
     await updateTrade(id, { notebook: notes });
@@ -671,16 +692,25 @@ const Index = () => {
                   <motion.div variants={staggerItem}>
                     <BalanceCards
                       trades={trades}
-                      startBalance={accountStartBalance}
-                      goalBalance={selectedAccount?.goal_balance || null}
-                      profitTarget={selectedAccount?.profit_target || null}
+                      startBalance={accountProjection.startBalance}
                       brokerBalance={brokerBalance}
                       brokerEquity={brokerEquity}
                       brokerFloatingPl={brokerFloatingPl}
                       brokerHasOpenPositions={brokerHasOpenPositions}
                       onSetBalance={handleSetBalance}
-                      onSetGoalBalance={handleSetGoalBalance}
-                      onSetProfitTarget={handleSetProfitTarget}
+                      projection={{
+                        accountLabel: accountProjection.accountLabel,
+                        accountSubtitle: accountProjection.accountSubtitle,
+                        isBroker: accountProjection.isBroker,
+                        isLoading: accountProjection.isLoading,
+                        currentBalance: accountProjection.currentBalance,
+                        startBalance: accountProjection.startBalance,
+                        goalBalance: accountProjection.goalBalance,
+                        profitTarget: accountProjection.profitTarget,
+                        metrics: accountProjection.metrics,
+                        onSetGoalBalance: accountProjection.setGoalBalance,
+                        onSetProfitTarget: accountProjection.setProfitTarget,
+                      }}
                     />
                   </motion.div>
                   
@@ -770,7 +800,9 @@ const Index = () => {
                   {/* Main Content with Calendar Sidebar */}
                   <motion.div variants={staggerItem} className={cn(compareOpen ? "block w-full" : "flex gap-6")}>
                     {compareOpen ? (
-                      <CompareView
+                      <Suspense fallback={<div className="rounded-2xl bg-card/30 border border-border/30 animate-pulse min-h-[400px]" />}>
+                        <CompareView
+                        key={compareRevision}
                         trades={trades}
                         allAccountTrades={allUserTrades.length ? allUserTrades : trades}
                         accounts={accounts}
@@ -778,58 +810,22 @@ const Index = () => {
                         initialA={pickerInitial?.a ?? readCompareFromURL(window.location.search)?.a}
                         initialB={pickerInitial?.b ?? readCompareFromURL(window.location.search)?.b}
                         onEditPeriods={({ a, b }) => {
-                          // Seed the picker with the current A/B months so the
-                          // user sees their existing selection preloaded.
                           setPickerSelection([
                             { month: a.start.getMonth(), year: a.start.getFullYear() },
                             { month: b.start.getMonth(), year: b.start.getFullYear() },
                           ]);
                           setComparePickerOpen(true);
                         }}
-                        onClose={() => {
-                          clearCompareFromURL();
-                          setCompareOpen(false);
-                          setPickerInitial(null);
-                          setPickerSelection(undefined);
-                        }}
-                      />
-                    ) : (() => {
-                      // Build a single shared filtered list — used by BOTH the trade log AND the mini calendar dots
-                      const winLossFiltered = journalFilter === 'all'
-                        ? trades
-                        : journalFilter === 'wins'
-                          ? trades.filter(t => t.result > 0)
-                          : trades.filter(t => t.result < 0);
-
-                      const fmt = formatLocalDateKey;
-                      const getOpenDateKey = (t: typeof winLossFiltered[number]) =>
-                        getTradeLocalDateKey(t);
-
-                      const rangeFiltered = journalDateRange
-                        ? (() => {
-                            const startStr = fmt(journalDateRange.start);
-                            const endStr = fmt(journalDateRange.end);
-                            return winLossFiltered.filter(t => {
-                              const d = getOpenDateKey(t);
-                              return d >= startStr && d <= endStr;
-                            });
-                          })()
-                        : winLossFiltered;
-
-                      const pnlByDate: Record<string, number> = {};
-                      rangeFiltered.forEach(t => {
-                        const key = getOpenDateKey(t);
-                        if (!key) return;
-                        pnlByDate[key] = (pnlByDate[key] || 0) + (t.result || 0);
-                      });
-                      const dayPnLs = Object.entries(pnlByDate).map(([date, pnl]) => ({ date, pnl }));
-
-                      return (
+                        onClose={closeCompareView}
+                        />
+                      </Suspense>
+                    ) : (
                         <>
                           {/* Trade Table */}
                           <div className="flex-1 min-w-0">
-                            <TradeTable
-                              trades={rangeFiltered}
+                            <Suspense fallback={<div className="rounded-2xl bg-card/30 border border-border/30 animate-pulse min-h-[300px]" />}>
+                              <TradeTable
+                              trades={journalViewData.rangeFiltered}
                               notebookEntries={notebookEntries}
                               checklists={checklists}
                               onEdit={(trade) => {
@@ -840,13 +836,14 @@ const Index = () => {
                               onSelectForNotebook={handleSelectForNotebook}
                               onClearAll={handleClearAll}
                             />
+                            </Suspense>
                           </div>
 
                           {/* Mini Calendar Sidebar */}
                           <div className="hidden lg:block w-64 flex-shrink-0">
                             <MiniCalendar
                               onRangeChange={setJournalDateRange}
-                              dayPnLs={dayPnLs}
+                              dayPnLs={journalViewData.dayPnLs}
                               onCompareClick={() => {
                                 setPickerSelection(undefined);
                                 setComparePickerOpen(true);
@@ -854,8 +851,7 @@ const Index = () => {
                             />
                           </div>
                         </>
-                      );
-                    })()}
+                    )}
                   </motion.div>
 
                   {/* Year-view month picker — available from BOTH the sidebar
@@ -876,6 +872,7 @@ const Index = () => {
                       setComparePickerOpen(false);
                       setPickerSelection(undefined);
                       setCompareOpen(true);
+                      setCompareRevision((r) => r + 1);
                     }}
                   />
 
@@ -887,6 +884,7 @@ const Index = () => {
                       setEditingTrade(null);
                     }}
                     editingTrade={editingTrade}
+                    userId={user?.id}
                     onSubmit={handleAddTrade}
                     onCancelEdit={() => setEditingTrade(null)}
                   />
@@ -899,6 +897,7 @@ const Index = () => {
                   <Suspense fallback={<PageFallback />}>
                     <NotebookView
                       trades={trades}
+                      userId={user?.id}
                       selectedTradeId={selectedTradeId}
                       onSelectTrade={setSelectedTradeId}
                       onSaveNotes={handleSaveNotes}
@@ -943,6 +942,7 @@ const Index = () => {
                       onLogout={handleLogout}
                       customColor={customColor}
                       onCustomColorChange={setCustomColor}
+                      onCustomAccentChange={setCustomAccent}
                       customGradient={customGradient}
                       onCustomGradientChange={setCustomGradient}
                     />
@@ -983,7 +983,7 @@ const Index = () => {
 
         {/* Mobile Navigation - hidden on chart page */}
         {!isChartPage && (
-          <MobileNav currentPage={currentPage} onPageChange={setCurrentPage} />
+          <MobileNav currentPage={currentPage} onPageChange={handlePageChange} />
         )}
 
       </div>

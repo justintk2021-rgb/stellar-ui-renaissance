@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { ChevronDown, Plus, Settings, Check, Trash2, Star, Link2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { ChevronDown, Plus, Settings, Check, Trash2, Star, Link2, PenLine, RefreshCw, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,12 +15,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TradingAccount } from "@/hooks/useTradingAccounts";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { BrokerConnectDialog } from "@/components/Dashboard/BrokerConnectDialog";
 
 interface BrokerAccountInfo {
   connectionId: string;
@@ -55,7 +57,10 @@ export const AccountSelector = ({
   onDeleteAccount,
   onSetDefault,
 }: AccountSelectorProps) => {
+  const [isAccountTypeDialogOpen, setIsAccountTypeDialogOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isBrokerInfoDialogOpen, setIsBrokerInfoDialogOpen] = useState(false);
+  const [isBrokerConnectDialogOpen, setIsBrokerConnectDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<TradingAccount | null>(null);
   const [newAccountName, setNewAccountName] = useState("");
@@ -72,76 +77,95 @@ export const AccountSelector = ({
   const [renamingBroker, setRenamingBroker] = useState<BrokerAccountInfo | null>(null);
   const [brokerDisplayName, setBrokerDisplayName] = useState("");
 
-  // Fetch broker-connected accounts
-  useEffect(() => {
-    const fetchBrokerAccounts = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  const fetchBrokerAccounts = useCallback(async (selectLatest = false) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-      const { data: connections } = await supabase
-        .from('broker_connections')
-        .select('id, broker_name, environment, connection_status, active_account_id, active_acc_num, account_balance, account_currency')
-        .eq('user_id', user.id)
-        .eq('connection_status', 'connected');
+    const { data: connections } = await supabase
+      .from('broker_connections')
+      .select('id, broker_name, environment, connection_status, active_account_id, active_acc_num, account_balance, account_currency')
+      .eq('user_id', user.id)
+      .eq('connection_status', 'connected');
 
-      if (!connections?.length) {
-        setBrokerAccounts([]);
-        return;
-      }
+    if (!connections?.length) {
+      setBrokerAccounts([]);
+      return;
+    }
 
-      const brokerAccs: BrokerAccountInfo[] = [];
+    const brokerAccs: BrokerAccountInfo[] = [];
 
-      for (const conn of connections) {
-        const { data: accs } = await supabase
-          .from('broker_accounts')
-          .select('account_id_external, acc_num, account_name, is_active')
-          .eq('broker_connection_id', conn.id);
+    for (const conn of connections) {
+      const { data: accs } = await supabase
+        .from('broker_accounts')
+        .select('account_id_external, acc_num, account_name, is_active')
+        .eq('broker_connection_id', conn.id);
 
-        if (accs) {
-          for (const acc of accs) {
-            brokerAccs.push({
-              connectionId: conn.id,
-              accountId: acc.account_id_external,
-              accNum: acc.acc_num,
-              accountName: acc.account_name || `Account ${acc.acc_num}`,
-              environment: conn.environment || 'demo',
-              brokerName: conn.broker_name,
-              balance: acc.is_active ? conn.account_balance : null,
-              currency: conn.account_currency || 'USD',
-              status: conn.connection_status || 'disconnected',
-            });
-          }
+      if (accs) {
+        for (const acc of accs) {
+          brokerAccs.push({
+            connectionId: conn.id,
+            accountId: acc.account_id_external,
+            accNum: acc.acc_num,
+            accountName: acc.account_name || `Account ${acc.acc_num}`,
+            environment: conn.environment || 'demo',
+            brokerName: conn.broker_name,
+            balance: acc.is_active ? conn.account_balance : null,
+            currency: conn.account_currency || 'USD',
+            status: conn.connection_status || 'disconnected',
+          });
         }
       }
+    }
 
-      setBrokerAccounts(brokerAccs);
+    setBrokerAccounts(brokerAccs);
 
-      // Restore persisted broker selection — fall back to default-broker if no live selection.
-      const persistedBrokerId = localStorage.getItem('selectedBrokerInternalId');
-      const storedDefault = localStorage.getItem('defaultDashboardAccount');
-      let defaultBrokerId: string | null = null;
-      if (storedDefault?.startsWith('broker:')) {
-        const [, connId, accNumStr] = storedDefault.split(':');
-        if (connId && accNumStr) defaultBrokerId = `broker-${connId}-${accNumStr}`;
+    const persistedBrokerId = localStorage.getItem('selectedBrokerInternalId');
+    const storedDefault = localStorage.getItem('defaultDashboardAccount');
+    let defaultBrokerId: string | null = null;
+    if (storedDefault?.startsWith('broker:')) {
+      const [, connId, accNumStr] = storedDefault.split(':');
+      if (connId && accNumStr) defaultBrokerId = `broker-${connId}-${accNumStr}`;
+    }
+
+    let targetBroker: BrokerAccountInfo | undefined;
+
+    if (selectLatest && brokerAccs.length > 0) {
+      const activeConn = connections.find((c) => c.active_account_id && c.active_acc_num != null);
+      if (activeConn) {
+        targetBroker = brokerAccs.find(
+          (b) => b.connectionId === activeConn.id && b.accNum === activeConn.active_acc_num
+        );
       }
+      targetBroker = targetBroker || brokerAccs[brokerAccs.length - 1];
+    } else {
       const targetBrokerId = persistedBrokerId || defaultBrokerId;
-
       if (targetBrokerId) {
-        const match = brokerAccs.find(b => `broker-${b.connectionId}-${b.accNum}` === targetBrokerId);
-        if (match) {
-          setSelectedBrokerAccount(targetBrokerId);
-          localStorage.setItem('selectedBrokerInternalId', targetBrokerId);
-          localStorage.setItem('activeBrokerConnectionId', match.connectionId);
-          onSelectBrokerAccount?.(match.accountId);
-        } else if (persistedBrokerId) {
-          localStorage.removeItem('selectedBrokerInternalId');
-          setSelectedBrokerAccount(null);
-        }
+        targetBroker = brokerAccs.find(b => `broker-${b.connectionId}-${b.accNum}` === targetBrokerId);
       }
-    };
+    }
 
+    if (targetBroker) {
+      const brokerId = `broker-${targetBroker.connectionId}-${targetBroker.accNum}`;
+      setSelectedBrokerAccount(brokerId);
+      localStorage.setItem('selectedBrokerInternalId', brokerId);
+      localStorage.setItem('activeBrokerConnectionId', targetBroker.connectionId);
+      onSelectBrokerAccount?.(targetBroker.accountId);
+    } else if (persistedBrokerId && !selectLatest) {
+      localStorage.removeItem('selectedBrokerInternalId');
+      setSelectedBrokerAccount(null);
+    }
+  }, [onSelectBrokerAccount]);
+
+  useEffect(() => {
     fetchBrokerAccounts();
-  }, []);
+  }, [fetchBrokerAccounts]);
+
+  const handleBrokerConnectionComplete = () => {
+    setIsBrokerConnectDialogOpen(false);
+    setIsBrokerInfoDialogOpen(false);
+    setIsAccountTypeDialogOpen(false);
+    fetchBrokerAccounts(true);
+  };
 
   const isBrokerSelected = !!selectedBrokerAccount;
   const displayName = isBrokerSelected
@@ -399,7 +423,7 @@ export const AccountSelector = ({
           
           <DropdownMenuItem
             className="cursor-pointer text-primary"
-            onClick={() => setIsAddDialogOpen(true)}
+            onClick={() => setIsAccountTypeDialogOpen(true)}
           >
             <Plus className="w-4 h-4 mr-2" />
             Add New Account
@@ -407,11 +431,64 @@ export const AccountSelector = ({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Add Account Dialog */}
+      {/* Account Type Selection Dialog */}
+      <Dialog open={isAccountTypeDialogOpen} onOpenChange={setIsAccountTypeDialogOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Add New Account</DialogTitle>
+            <DialogDescription>
+              Choose how you want to track this account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsAccountTypeDialogOpen(false);
+                setIsAddDialogOpen(true);
+              }}
+              className="flex flex-col items-start gap-3 rounded-xl border border-border/50 bg-background/50 p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <PenLine className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">Manual</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Log trades yourself and set a starting balance.
+                </p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsAccountTypeDialogOpen(false);
+                setIsBrokerInfoDialogOpen(true);
+              }}
+              className="flex flex-col items-start gap-3 rounded-xl border border-border/50 bg-background/50 p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Link2 className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">Broker</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Connect TradeLocker for live sync.
+                </p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Account Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Add Trading Account</DialogTitle>
+            <DialogTitle>Add Manual Account</DialogTitle>
+            <DialogDescription>
+              Create an account to log trades and track performance manually.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -453,6 +530,56 @@ export const AccountSelector = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Broker Information Dialog */}
+      <Dialog open={isBrokerInfoDialogOpen} onOpenChange={setIsBrokerInfoDialogOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Connect Broker Account</DialogTitle>
+            <DialogDescription>
+              Connect TradeLocker to sync balances, equity, and open positions automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-xl border border-border/50 bg-background/50 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm font-medium">Supported Platforms</span>
+              </div>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <ChevronRight className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span><strong className="text-foreground">TradeLocker</strong> — live sync with realtime balance and position updates</span>
+                </li>
+              </ul>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Connect your broker below. Once linked, your account will appear in the selector automatically.
+            </p>
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button
+              className="w-full"
+              onClick={() => {
+                setIsBrokerInfoDialogOpen(false);
+                setIsBrokerConnectDialogOpen(true);
+              }}
+            >
+              <Link2 className="w-4 h-4 mr-2" />
+              Open Broker Settings
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => setIsBrokerInfoDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <BrokerConnectDialog
+        open={isBrokerConnectDialogOpen}
+        onOpenChange={setIsBrokerConnectDialogOpen}
+        onConnectionComplete={handleBrokerConnectionComplete}
+      />
 
       {/* Edit Account Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

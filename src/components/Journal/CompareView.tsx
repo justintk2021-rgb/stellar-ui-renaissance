@@ -2,17 +2,24 @@ import { useEffect, useMemo, useState } from "react";
 import { Trade } from "@/types/trade";
 import type { TradingAccount } from "@/hooks/useTradingAccounts";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
-  ArrowRight,
   Sparkles,
   Trophy,
   AlertTriangle,
   Pencil,
   TrendingUp,
   TrendingDown,
+  Calendar,
+  BarChart3,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { format, subDays, differenceInCalendarDays, eachDayOfInterval } from "date-fns";
 import {
   formatLocalDateKey,
@@ -24,8 +31,10 @@ import {
   computePeriodStats,
   computeDelta,
   bestAndWorst,
-  buildInsights,
+  buildCompareInsights,
+  type CompareInsight,
   type Delta,
+  type PeriodStats,
 } from "@/lib/compareMetrics";
 import {
   Area,
@@ -35,98 +44,23 @@ import {
   XAxis,
 } from "recharts";
 
-/* --------------------------------- Types --------------------------------- */
-
-export type CompareMode = "range" | "account" | "tag" | "asset" | "dayOfWeek";
-
-interface SlotConfig {
-  start: Date;
-  end: Date;
-  accountId?: string | null;
-  tag?: string;
-  asset?: string;
-  dayOfWeek?: number;
-}
+import { CompareMode, CompareSlotConfig, readCompareFromURL, writeCompareToURL, clearCompareFromURL } from '@/lib/compareUrl';
 
 interface CompareViewProps {
   trades: Trade[];
   allAccountTrades: Trade[];
   accounts: TradingAccount[];
   initialMode?: CompareMode;
-  initialA?: SlotConfig;
-  initialB?: SlotConfig;
+  initialA?: CompareSlotConfig;
+  initialB?: CompareSlotConfig;
   onClose: () => void;
-  onEditPeriods?: (current: { a: SlotConfig; b: SlotConfig }) => void;
-  onChange?: (state: { mode: CompareMode; a: SlotConfig; b: SlotConfig }) => void;
+  onEditPeriods?: (current: { a: CompareSlotConfig; b: CompareSlotConfig }) => void;
+  onChange?: (state: { mode: CompareMode; a: CompareSlotConfig; b: CompareSlotConfig }) => void;
 }
 
-/* ------------------------------ URL helpers ------------------------------ */
-
-const dateToParam = (d: Date) => formatLocalDateKey(d);
-const paramToDate = (s: string | null, fallback: Date): Date => {
-  if (!s) return fallback;
-  try { return parseLocalDateKey(s); } catch { return fallback; }
-};
-
-export const readCompareFromURL = (
-  search: string,
-): { mode: CompareMode; a: SlotConfig; b: SlotConfig } | null => {
-  const sp = new URLSearchParams(search);
-  if (sp.get("compare") !== "true") return null;
-  const mode = (sp.get("mode") as CompareMode) || "range";
-  const today = new Date();
-  const a: SlotConfig = {
-    start: paramToDate(sp.get("aStart"), subDays(today, 14)),
-    end: paramToDate(sp.get("aEnd"), subDays(today, 8)),
-    accountId: sp.get("aAccount") || undefined,
-    tag: sp.get("aTag") || undefined,
-    asset: sp.get("aAsset") || undefined,
-    dayOfWeek: sp.get("aDow") ? Number(sp.get("aDow")) : undefined,
-  };
-  const b: SlotConfig = {
-    start: paramToDate(sp.get("bStart"), subDays(today, 7)),
-    end: paramToDate(sp.get("bEnd"), today),
-    accountId: sp.get("bAccount") || undefined,
-    tag: sp.get("bTag") || undefined,
-    asset: sp.get("bAsset") || undefined,
-    dayOfWeek: sp.get("bDow") ? Number(sp.get("bDow")) : undefined,
-  };
-  return { mode, a, b };
-};
-
-export const writeCompareToURL = (state: {
-  mode: CompareMode; a: SlotConfig; b: SlotConfig;
-}) => {
-  const sp = new URLSearchParams(window.location.search);
-  sp.set("compare", "true");
-  sp.set("mode", state.mode);
-  sp.set("aStart", dateToParam(state.a.start));
-  sp.set("aEnd", dateToParam(state.a.end));
-  sp.set("bStart", dateToParam(state.b.start));
-  sp.set("bEnd", dateToParam(state.b.end));
-  const setOrDel = (k: string, v: string | number | null | undefined) => {
-    if (v === undefined || v === null || v === "") sp.delete(k);
-    else sp.set(k, String(v));
-  };
-  setOrDel("aAccount", state.a.accountId);
-  setOrDel("bAccount", state.b.accountId);
-  setOrDel("aTag", state.a.tag);
-  setOrDel("bTag", state.b.tag);
-  setOrDel("aAsset", state.a.asset);
-  setOrDel("bAsset", state.b.asset);
-  setOrDel("aDow", state.a.dayOfWeek);
-  setOrDel("bDow", state.b.dayOfWeek);
-  const newUrl = `${window.location.pathname}?${sp.toString()}${window.location.hash}`;
-  window.history.replaceState({}, "", newUrl);
-};
-
-export const clearCompareFromURL = () => {
-  const sp = new URLSearchParams(window.location.search);
-  ["compare","mode","aStart","aEnd","bStart","bEnd","aAccount","bAccount","aTag","bTag","aAsset","bAsset","aDow","bDow"].forEach((k) => sp.delete(k));
-  const qs = sp.toString();
-  const newUrl = `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`;
-  window.history.replaceState({}, "", newUrl);
-};
+/* Re-export URL helpers for backward compatibility */
+export { readCompareFromURL, writeCompareToURL, clearCompareFromURL } from '@/lib/compareUrl';
+export type { CompareMode, CompareSlotConfig };
 
 /* --------------------------- Filtering by slot --------------------------- */
 
@@ -141,7 +75,7 @@ const tradeDateInRange = (t: Trade, start: Date, end: Date) => {
 const filterTradesForSlot = (
   scopedTrades: Trade[],
   allAccountTrades: Trade[],
-  slot: SlotConfig,
+  slot: CompareSlotConfig,
   mode: CompareMode,
 ): Trade[] => {
   const base = mode === "account" ? allAccountTrades : scopedTrades;
@@ -170,8 +104,47 @@ const deltaColor = (d: Delta) =>
 const pnlTextColor = (n: number) =>
   n > 0 ? "text-emerald-500" : n < 0 ? "text-red-500" : "text-foreground";
 
-const formatNumber = (n: number, digits = 2) => isFinite(n) ? n.toFixed(digits) : "∞";
 const deltaSign = (n: number) => (n > 0 ? "+" : n < 0 ? "" : "");
+
+type GradeLetter = "A" | "B" | "C" | "D" | "F";
+
+const GRADE_STYLES: Record<GradeLetter, { bar: string; text: string; bg: string }> = {
+  A: { bar: "bg-emerald-500", text: "text-emerald-500", bg: "bg-emerald-500/15" },
+  B: { bar: "bg-primary", text: "text-primary", bg: "bg-primary/15" },
+  C: { bar: "bg-yellow-500", text: "text-yellow-500", bg: "bg-yellow-500/15" },
+  D: { bar: "bg-orange-500", text: "text-orange-500", bg: "bg-orange-500/15" },
+  F: { bar: "bg-red-500", text: "text-red-500", bg: "bg-red-500/15" },
+};
+
+function performanceScore(stats: PeriodStats): number {
+  const wr = stats.winRate * 100;
+  const pf = isFinite(stats.profitFactor)
+    ? (Math.min(stats.profitFactor, 3) / 3) * 100
+    : stats.profitFactor === Infinity
+      ? 100
+      : 0;
+  const pnlBonus = stats.netPnL > 0 ? 12 : stats.netPnL < 0 ? -8 : 0;
+  return Math.max(0, Math.min(100, Math.round(wr * 0.55 + pf * 0.35 + pnlBonus)));
+}
+
+function letterGrade(score: number): GradeLetter {
+  if (score >= 85) return "A";
+  if (score >= 75) return "B";
+  if (score >= 65) return "C";
+  if (score >= 55) return "D";
+  return "F";
+}
+
+function getInitials(label: string): string {
+  const words = label.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return label.slice(0, 2).toUpperCase();
+}
+
+function metricBarPct(value: number, max: number): number {
+  if (max <= 0) return 0;
+  return Math.max(4, Math.min(100, (Math.abs(value) / max) * 100));
+}
 
 /* ---------------------- Sparkline data builder ---------------------- */
 
@@ -223,8 +196,8 @@ export function CompareView({
 }: CompareViewProps) {
   const today = new Date();
   const [mode] = useState<CompareMode>(initialMode);
-  const [aSlot] = useState<SlotConfig>(initialA || { start: subDays(today, 14), end: subDays(today, 8) });
-  const [bSlot] = useState<SlotConfig>(initialB || { start: subDays(today, 7), end: today });
+  const [aSlot] = useState<CompareSlotConfig>(initialA || { start: subDays(today, 14), end: subDays(today, 8) });
+  const [bSlot] = useState<CompareSlotConfig>(initialB || { start: subDays(today, 7), end: today });
 
   useEffect(() => {
     const state = { mode, a: aSlot, b: bSlot };
@@ -240,63 +213,41 @@ export function CompareView({
   const bLabel = useMemo(() => slotLabel(bSlot, mode, accounts, "B"), [bSlot, mode, accounts]);
   const aShort = useMemo(() => shortLabel(aSlot, mode, accounts), [aSlot, mode, accounts]);
   const bShort = useMemo(() => shortLabel(bSlot, mode, accounts), [bSlot, mode, accounts]);
-  const insights = useMemo(() => buildInsights(aStats, bStats, aTrades, bTrades, aLabel, bLabel), [aStats, bStats, aTrades, bTrades, aLabel, bLabel]);
-
   const aDays = differenceInCalendarDays(aSlot.end, aSlot.start) + 1;
   const bDays = differenceInCalendarDays(bSlot.end, bSlot.start) + 1;
-  const lengthMismatch = mode === "range" && aDays !== bDays;
+  const insights = useMemo(
+    () => buildCompareInsights(aStats, bStats, aTrades, bTrades, aLabel, bLabel, { aDays, bDays }),
+    [aStats, bStats, aTrades, bTrades, aLabel, bLabel, aDays, bDays],
+  );
 
-  // Sparkline data
   const aSparkline = useMemo(() => buildDailyPnL(aTrades, aSlot.start, aSlot.end), [aTrades, aSlot]);
   const bSparkline = useMemo(() => buildDailyPnL(bTrades, bSlot.start, bSlot.end), [bTrades, bSlot]);
-
-  // Top 3 stat cards with sparklines (like the reference image)
-  const topCards = useMemo(() => {
-    return [
-      {
-        label: "NET P&L",
-        aVal: aStats.netPnL,
-        bVal: bStats.netPnL,
-        format: formatPnL,
-        direction: "higher-better" as const,
-        isPnL: true,
-        aData: aSparkline,
-        bData: bSparkline,
-      },
-      {
-        label: "WIN RATE",
-        aVal: aStats.winRate,
-        bVal: bStats.winRate,
-        format: (n: number) => `${(n * 100).toFixed(1)}%`,
-        direction: "higher-better" as const,
-        isPnL: false,
-        aData: null,
-        bData: null,
-      },
-      {
-        label: "TOTAL TRADES",
-        aVal: aStats.totalTrades,
-        bVal: bStats.totalTrades,
-        format: (n: number) => String(Math.round(n)),
-        direction: "neutral" as const,
-        isPnL: false,
-        aData: null,
-        bData: null,
-      },
-    ];
-  }, [aStats, bStats, aSparkline, bSparkline]);
+  const aScore = useMemo(() => performanceScore(aStats), [aStats]);
+  const bScore = useMemo(() => performanceScore(bStats), [bStats]);
+  const aGrade = letterGrade(aScore);
+  const bGrade = letterGrade(bScore);
 
   const aBW = useMemo(() => bestAndWorst(aTrades), [aTrades]);
   const bBW = useMemo(() => bestAndWorst(bTrades), [bTrades]);
   const aAssetRows = useMemo(() => buildSinglePeriodAssetRows(aTrades), [aTrades]);
   const bAssetRows = useMemo(() => buildSinglePeriodAssetRows(bTrades), [bTrades]);
 
+  const tableMetrics = useMemo(() => {
+    return METRICS.map((m) => {
+      const aVal = m.raw(aStats);
+      const bVal = m.raw(bStats);
+      const delta = computeDelta(aVal, bVal, m.direction);
+      const max = Math.max(Math.abs(aVal), Math.abs(bVal), m.key === "winRate" ? 1 : 0.01);
+      return { ...m, aVal, bVal, delta, max };
+    });
+  }, [aStats, bStats]);
+
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.06 } },
+    show: { opacity: 1, transition: { staggerChildren: 0.05 } },
   };
   const itemVariants = {
-    hidden: { opacity: 0, y: 12 },
+    hidden: { opacity: 0, y: 14 },
     show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0, 0, 0.2, 1] as const } },
   };
 
@@ -305,251 +256,375 @@ export function CompareView({
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="flex-1 min-w-0 w-full space-y-5 mx-auto px-2"
-      style={{ maxWidth: "95%" }}
+      className="flex-1 min-w-0 w-full mx-auto"
+      style={{ maxWidth: "1200px" }}
     >
-      {/* Top bar */}
-      <motion.div variants={itemVariants} className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-foreground">Compare</h1>
-          <span className="text-muted-foreground text-sm">·</span>
-          <span className="text-sm text-muted-foreground">{aShort} vs {bShort}</span>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {onEditPeriods && (
-            <button
-              onClick={() => onEditPeriods({ a: aSlot, b: bSlot })}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/25 text-primary text-xs font-medium border border-primary/30 transition-colors"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit periods
-            </button>
-          )}
-          <button
-            onClick={() => { clearCompareFromURL(); onClose(); }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card/80 hover:bg-card text-xs font-medium border border-border/40 transition-colors"
-          >
-            <X className="w-3.5 h-3.5" />
-            Exit
-          </button>
-        </div>
-      </motion.div>
-
-      {/* Top stat cards row — 3 cards with sparkline charts */}
-      <motion.div variants={itemVariants} className="grid grid-cols-3 gap-4">
-        {topCards.map((card, idx) => {
-          const delta = computeDelta(card.aVal, card.bVal, card.direction);
-          const sparkData = card.aData;
-          const isPositive = card.bVal >= card.aVal;
-          const sparkColor = delta.direction === "improved" ? "#10b981" : delta.direction === "regressed" ? "#ef4444" : "hsl(var(--primary))";
-
-          return (
-            <div
-              key={idx}
-              className="rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4 space-y-3 hover:border-border/50 transition-colors"
-            >
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">
-                {card.label}
-              </div>
-              <div className="flex items-baseline gap-2.5">
-                <span className={cn("text-2xl font-bold tabular-nums font-mono", card.isPnL ? pnlTextColor(card.bVal) : "text-foreground")}>
-                  {card.format(card.bVal)}
-                </span>
-                <span className="text-sm text-muted-foreground tabular-nums font-mono">
-                  {card.format(card.aVal)}
-                </span>
-                {delta.direction !== "unchanged" && (
-                  <span className={cn("inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums", deltaColor(delta))}>
-                    {delta.direction === "improved" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                    {delta.pct !== null
-                      ? `${deltaSign(delta.pct)}${Math.abs(delta.pct).toFixed(1)}%`
-                      : `${deltaSign(delta.abs)}${formatNumber(Math.abs(delta.abs))}`}
-                  </span>
-                )}
-              </div>
-              {/* Sparkline */}
-              {sparkData && sparkData.length > 1 && (
-                <div className="h-14 -mx-1">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={sparkData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id={`grad-${idx}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={sparkColor} stopOpacity={0.3} />
-                          <stop offset="100%" stopColor={sparkColor} stopOpacity={0.02} />
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="date" hide />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                          fontSize: "11px",
-                          padding: "4px 8px",
-                        }}
-                        labelStyle={{ color: "hsl(var(--muted-foreground))", fontSize: "10px" }}
-                        formatter={(value: number) => [formatPnL(value), "Cumulative"]}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="pnl"
-                        stroke={sparkColor}
-                        strokeWidth={1.5}
-                        fill={`url(#grad-${idx})`}
-                        animationDuration={800}
-                        animationEasing="ease-out"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-              {!sparkData && (
-                <div className="h-14 flex items-end">
-                  {/* Simple bar indicator for non-sparkline cards */}
-                  <div className="w-full flex items-end gap-[2px] h-10">
-                    {[...Array(12)].map((_, i) => {
-                      const h = 20 + Math.random() * 80;
-                      return (
-                        <motion.div
-                          key={i}
-                          initial={{ scaleY: 0 }}
-                          animate={{ scaleY: 1 }}
-                          transition={{ delay: i * 0.03, duration: 0.4 }}
-                          className="flex-1 rounded-sm origin-bottom"
-                          style={{
-                            height: `${h}%`,
-                            backgroundColor: sparkColor,
-                            opacity: 0.15 + (i / 12) * 0.35,
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+      <div className="flex flex-col xl:flex-row gap-5">
+        {/* Main comparison column */}
+        <div className="flex-1 min-w-0 space-y-4">
+          {/* Header */}
+          <motion.div variants={itemVariants} className="flex items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground tracking-tight">Compare</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {aShort} <span className="text-muted-foreground/50">vs</span> {bShort}
+              </p>
             </div>
-          );
-        })}
-      </motion.div>
-
-      {/* Insights row */}
-      <motion.div variants={itemVariants} className="rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">Insights</span>
-        </div>
-        <div className="space-y-2">
-          {insights.map((line, i) => (
-            <motion.p
-              key={i}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 + i * 0.1 }}
-              className="text-sm text-muted-foreground leading-relaxed"
-            >
-              {line}
-            </motion.p>
-          ))}
-          {lengthMismatch && (
-            <p className="text-xs text-muted-foreground/60 italic pt-1">
-              Note: Period A is {aDays} days, Period B is {bDays} days.
-            </p>
-          )}
-        </div>
-      </motion.div>
-
-      {/* Bottom section: Metrics comparison + Per-asset + Best/Worst */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Left: Full metric comparison table */}
-        <motion.div variants={itemVariants} className="rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4">
-          <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-3">
-            Detailed Metrics
-          </div>
-          <div className="space-y-1">
-            {METRICS.map((m) => {
-              const aVal = m.raw(aStats);
-              const bVal = m.raw(bStats);
-              const delta = computeDelta(aVal, bVal, m.direction);
-              return (
-                <div
-                  key={m.key}
-                  className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-muted/20 transition-colors"
+            <div className="flex items-center gap-2 shrink-0">
+              {onEditPeriods && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEditPeriods({ a: aSlot, b: bSlot })}
+                  className="h-8 text-xs gap-1.5 border-border/50"
                 >
-                  <span className="text-xs text-muted-foreground font-medium w-28">{m.label}</span>
-                  <div className="flex items-center gap-6 text-right">
-                    <span className={cn("text-sm tabular-nums font-mono w-20 text-right", m.isPnL ? pnlTextColor(aVal) : "text-foreground")}>
-                      {m.format(aVal)}
-                    </span>
-                    <span className={cn("text-sm tabular-nums font-mono font-semibold w-20 text-right", m.isPnL ? pnlTextColor(bVal) : "text-foreground")}>
-                      {m.format(bVal)}
-                    </span>
-                    <span className={cn("text-xs tabular-nums font-semibold w-16 text-right", deltaColor(delta))}>
-                      {delta.direction === "unchanged"
-                        ? "—"
-                        : delta.pct !== null
-                          ? `${deltaSign(delta.pct)}${Math.abs(delta.pct).toFixed(1)}${m.pctSuffix || "%"}`
-                          : `${deltaSign(delta.abs)}${formatNumber(Math.abs(delta.abs))}`}
-                    </span>
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit periods
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { clearCompareFromURL(); onClose(); }}
+                className="h-8 text-xs gap-1.5"
+              >
+                <X className="w-3.5 h-3.5" />
+                Exit
+              </Button>
+            </div>
+          </motion.div>
+
+          {/* Insights — top placement for immediate takeaways */}
+          <motion.div variants={itemVariants}>
+            <CompareInsightsPanel insights={insights} />
+          </motion.div>
+
+          {/* Side-by-side period cards */}
+          <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <PeriodCompareCard
+              label={aShort}
+              subtitle={aLabel}
+              stats={aStats}
+              score={aScore}
+              grade={aGrade}
+              sparkline={aSparkline}
+              accent="amber"
+              compareStats={bStats}
+            />
+            <PeriodCompareCard
+              label={bShort}
+              subtitle={bLabel}
+              stats={bStats}
+              score={bScore}
+              grade={bGrade}
+              sparkline={bSparkline}
+              accent="primary"
+              compareStats={aStats}
+            />
+          </motion.div>
+
+          {/* Widget row */}
+          <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <NetPnLDonut aPnL={aStats.netPnL} bPnL={bStats.netPnL} aLabel={aShort} bLabel={bShort} />
+            <TradesCompareBars aTrades={aStats.totalTrades} bTrades={bStats.totalTrades} aLabel={aShort} bLabel={bShort} />
+          </motion.div>
+
+          {/* Metrics table with progress bars */}
+          <motion.div variants={itemVariants} className="glass rounded-2xl border border-border/40 p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold text-foreground">Recommendation</span>
+              </div>
+              <div className="flex items-center gap-6 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <span className="w-24 text-right">{aShort}</span>
+                <span className="w-24 text-right">{bShort}</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              {tableMetrics.map((row) => {
+                const aPct = row.key === "winRate" ? row.aVal * 100 : metricBarPct(row.aVal, row.max);
+                const bPct = row.key === "winRate" ? row.bVal * 100 : metricBarPct(row.bVal, row.max);
+                const aG = letterGrade(row.key === "winRate" ? row.aVal * 100 : metricBarPct(row.aVal, row.max));
+                const bG = letterGrade(row.key === "winRate" ? row.bVal * 100 : metricBarPct(row.bVal, row.max));
+                return (
+                  <div
+                    key={row.key}
+                    className="grid grid-cols-[1fr_auto_auto] sm:grid-cols-[minmax(120px,1fr)_1fr_1fr] items-center gap-3 py-2.5 px-1 rounded-lg hover:bg-muted/20 transition-colors"
+                  >
+                    <span className="text-xs text-muted-foreground font-medium">{row.label}</span>
+                    <MetricBarCell
+                      grade={aG}
+                      pct={aPct}
+                      display={row.format(row.aVal)}
+                      valueClass={row.isPnL ? pnlTextColor(row.aVal) : undefined}
+                    />
+                    <MetricBarCell
+                      grade={bG}
+                      pct={bPct}
+                      display={row.format(row.bVal)}
+                      valueClass={row.isPnL ? pnlTextColor(row.bVal) : undefined}
+                    />
                   </div>
-                </div>
-              );
-            })}
-          </div>
-          {/* Column headers */}
-          <div className="flex items-center justify-between px-2 pt-2 border-t border-border/20 mt-1">
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 w-28">Metric</span>
-            <div className="flex items-center gap-6 text-right">
-              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 w-20 text-right">{aShort}</span>
-              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 w-20 text-right">{bShort}</span>
-              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 w-16 text-right">Delta</span>
+                );
+              })}
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
 
-        {/* Right: Per-asset bubble chart + Best/Worst */}
-        <motion.div variants={itemVariants} className="space-y-4">
-          {/* Per-asset Bubble Chart */}
-          <div className="rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4">
-            <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-3">
-              Per-Asset Breakdown
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-2">{aShort}</div>
-                <AssetBubbleChart rows={aAssetRows} period="a" />
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-2">{bShort}</div>
-                <AssetBubbleChart rows={bAssetRows} period="b" />
-              </div>
-            </div>
-          </div>
-
-          {/* Best & Worst */}
-          <div className="rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4">
-            <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-3">
-              Best & Worst Trades
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60">{aShort}</div>
-                <TradeHighlight trade={aBW.best} type="best" />
-                <TradeHighlight trade={aBW.worst} type="worst" />
-              </div>
-              <div className="space-y-2">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60">{bShort}</div>
-                <TradeHighlight trade={bBW.best} type="best" />
-                <TradeHighlight trade={bBW.worst} type="worst" />
-              </div>
-            </div>
-          </div>
-        </motion.div>
+        {/* Report sidebar */}
+        <motion.aside variants={itemVariants} className="xl:w-72 shrink-0 space-y-4">
+          <ReportSidebar
+            aScore={aScore}
+            bScore={bScore}
+            aGrade={aGrade}
+            bGrade={bGrade}
+            aLabel={aShort}
+            bLabel={bShort}
+            aSlot={aSlot}
+            bSlot={bSlot}
+            aStats={aStats}
+            bStats={bStats}
+            aBW={aBW}
+            bBW={bBW}
+            aAssetRows={aAssetRows}
+            bAssetRows={bAssetRows}
+          />
+        </motion.aside>
       </div>
     </motion.div>
   );
 }
 
 /* ----------------------------- Sub-components ----------------------------- */
+
+const INSIGHT_BADGE: Record<
+  CompareInsight["tone"],
+  { label: string; className: string }
+> = {
+  positive: { label: "Improved", className: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" },
+  negative: { label: "Declined", className: "bg-red-500/15 text-red-600 dark:text-red-400" },
+  neutral: { label: "Stable", className: "bg-muted text-muted-foreground" },
+  advice: { label: "Focus", className: "bg-primary/15 text-primary" },
+};
+
+const SUMMARY_BG: Record<CompareInsight["tone"], string> = {
+  positive: "bg-emerald-500/10 border-emerald-500/20",
+  negative: "bg-red-500/10 border-red-500/20",
+  neutral: "bg-muted/30 border-border/40",
+  advice: "bg-primary/10 border-primary/20",
+};
+
+const SUMMARY_BADGE: Record<CompareInsight["tone"], { label: string; className: string }> = {
+  positive: { label: "Improving", className: "bg-emerald-600 text-white" },
+  negative: { label: "Regressing", className: "bg-red-600 text-white" },
+  neutral: { label: "Flat", className: "bg-muted-foreground/80 text-white" },
+  advice: { label: "Review", className: "bg-primary text-primary-foreground" },
+};
+
+function insightBadge(insight: CompareInsight) {
+  if (insight.id === "empty" || insight.id === "one-sided") {
+    return { label: "Incomplete", className: "bg-amber-500/15 text-amber-600 dark:text-amber-400" };
+  }
+  return INSIGHT_BADGE[insight.tone];
+}
+
+function CompareInsightsPanel({ insights }: { insights: CompareInsight[] }) {
+  const [open, setOpen] = useState(false);
+  const [burst, setBurst] = useState(false);
+  const summary = insights.find((i) => i.id === "summary") ?? insights[0];
+  const details = insights.filter((i) => i !== summary);
+  const previewBadge = summary ? insightBadge(summary) : null;
+
+  const handleOpen = () => {
+    setBurst(true);
+    window.setTimeout(() => {
+      setOpen(true);
+      setBurst(false);
+    }, 320);
+  };
+
+  return (
+    <>
+      <motion.button
+        type="button"
+        onClick={handleOpen}
+        whileHover={{ scale: 1.02, y: -1 }}
+        whileTap={{ scale: 0.97 }}
+        className="group relative w-full overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+      >
+        <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/40 via-violet-500/30 to-primary/40 opacity-70 blur-[1px] group-hover:opacity-100 transition-opacity" />
+        <motion.div
+          className="absolute inset-0 rounded-xl opacity-40"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+          style={{
+            background: "conic-gradient(from 0deg, transparent, hsl(var(--primary)/0.5), transparent, hsl(var(--primary)/0.3), transparent)",
+          }}
+        />
+        <motion.div
+          className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none"
+          animate={{ x: ["-120%", "380%"] }}
+          transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", repeatDelay: 0.8 }}
+        />
+
+        <AnimatePresence>
+          {burst && (
+            <>
+              {[0, 1, 2, 3].map((i) => (
+                <motion.span
+                  key={i}
+                  initial={{ scale: 0.4, opacity: 0.8, x: 0, y: 0 }}
+                  animate={{
+                    scale: 0,
+                    opacity: 0,
+                    x: Math.cos((i * Math.PI) / 2) * 48,
+                    y: Math.sin((i * Math.PI) / 2) * 48,
+                  }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                  className="absolute left-1/2 top-1/2 -ml-1 -mt-1 w-2 h-2 rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary))]"
+                />
+              ))}
+              <motion.span
+                initial={{ scale: 0.6, opacity: 0.5 }}
+                animate={{ scale: 2.8, opacity: 0 }}
+                transition={{ duration: 0.45, ease: "easeOut" }}
+                className="absolute inset-2 rounded-[10px] border-2 border-primary/60"
+              />
+            </>
+          )}
+        </AnimatePresence>
+
+        <div className="relative m-[1px] flex items-center gap-3 rounded-[11px] bg-background/90 backdrop-blur-md px-4 py-3 border border-white/5">
+          <motion.div
+            animate={burst ? { scale: [1, 1.25, 1], rotate: [0, 180, 360] } : { rotate: [0, 8, -8, 0] }}
+            transition={
+              burst
+                ? { duration: 0.35 }
+                : { duration: 4, repeat: Infinity, ease: "easeInOut" }
+            }
+            className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center shrink-0 ring-1 ring-primary/25"
+          >
+            <Sparkles className="w-4 h-4 text-primary" />
+          </motion.div>
+          <div className="flex-1 min-w-0 text-left">
+            <div className="text-sm font-semibold text-foreground">AI Insights</div>
+            <div className="text-[11px] text-muted-foreground truncate">
+              Tap to analyze your month comparison
+            </div>
+          </div>
+          {previewBadge && (
+            <span
+              className={cn(
+                "hidden sm:inline-flex text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0",
+                previewBadge.className,
+              )}
+            >
+              {previewBadge.label}
+            </span>
+          )}
+          <motion.span
+            animate={{ x: [0, 3, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            className="text-[11px] font-medium text-primary shrink-0"
+          >
+            Open →
+          </motion.span>
+        </div>
+      </motion.button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="glass border-border/40 max-w-md sm:max-w-lg p-0 gap-0 overflow-hidden [&>button:last-child]:hidden">
+          <div className="flex items-center gap-2.5 px-4 py-3.5 border-b border-border/30">
+            <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4 text-primary" />
+            </div>
+            <DialogTitle className="text-base font-semibold flex-1">AI Insights</DialogTitle>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="w-8 h-8 rounded-full border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors shrink-0"
+              aria-label="Close insights"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <motion.div
+            initial="hidden"
+            animate="show"
+            variants={{
+              hidden: {},
+              show: { transition: { staggerChildren: 0.06, delayChildren: 0.08 } },
+            }}
+            className="max-h-[min(70vh,520px)] overflow-y-auto px-4 py-3"
+          >
+            {summary && (
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, y: 16, scale: 0.96 },
+                  show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 380, damping: 28 } },
+                }}
+                className={cn("rounded-lg border px-3 py-2.5 mb-2", SUMMARY_BG[summary.tone])}
+              >
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="text-xs font-semibold text-foreground">Overall Recommendation</span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0",
+                      SUMMARY_BADGE[summary.tone].className,
+                    )}
+                  >
+                    {SUMMARY_BADGE[summary.tone].label}
+                  </span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  {summary.analysis}
+                  {summary.advice && (
+                    <span className="text-foreground/90"> {summary.advice}</span>
+                  )}
+                </p>
+              </motion.div>
+            )}
+
+            {details.map((insight) => {
+              const badge = insightBadge(insight);
+              return (
+                <motion.div
+                  key={insight.id}
+                  variants={{
+                    hidden: { opacity: 0, x: -12 },
+                    show: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 400, damping: 30 } },
+                  }}
+                  className="border-t border-border/30 py-2.5 first:border-t-0"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-foreground">{insight.title}</span>
+                    <span
+                      className={cn(
+                        "text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0",
+                        badge.className,
+                      )}
+                    >
+                      {badge.label}
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground mt-1">
+                    {insight.analysis}
+                    {insight.advice && (
+                      <span className="text-primary/90"> → {insight.advice}</span>
+                    )}
+                  </p>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 interface AssetRow {
   asset: string;
@@ -575,196 +650,411 @@ function buildSinglePeriodAssetRows(trades: Trade[]): AssetRow[] {
   return rows;
 }
 
-const BUBBLE_COLORS = [
-  { bg: "rgba(99, 102, 241, 0.55)", border: "rgba(99, 102, 241, 0.8)" },   // indigo
-  { bg: "rgba(168, 85, 247, 0.55)", border: "rgba(168, 85, 247, 0.8)" },    // purple
-  { bg: "rgba(236, 72, 153, 0.55)", border: "rgba(236, 72, 153, 0.8)" },    // pink
-  { bg: "rgba(59, 130, 246, 0.55)", border: "rgba(59, 130, 246, 0.8)" },    // blue
-  { bg: "rgba(245, 158, 11, 0.55)", border: "rgba(245, 158, 11, 0.8)" },    // amber
-  { bg: "rgba(16, 185, 129, 0.55)", border: "rgba(16, 185, 129, 0.8)" },    // emerald
-  { bg: "rgba(239, 68, 68, 0.55)", border: "rgba(239, 68, 68, 0.8)" },      // red
-  { bg: "rgba(14, 165, 233, 0.55)", border: "rgba(14, 165, 233, 0.8)" },    // sky
-];
-
-interface BubbleData {
-  asset: string;
-  pnl: number;
-  trades: number;
-  winRate: number;
-  r: number;
-  cx: number;
-  cy: number;
-  color: typeof BUBBLE_COLORS[0];
-}
-
-function packBubbles(rows: AssetRow[], width: number, height: number): BubbleData[] {
-  if (!rows.length) return [];
-  const maxTrades = Math.max(...rows.map((r) => r.trades), 1);
-  const minR = 18;
-  const maxR = Math.min(width, height) * 0.32;
-
-  const bubbles: BubbleData[] = rows.slice(0, 8).map((r, i) => {
-    const ratio = r.trades / maxTrades;
-    const radius = minR + ratio * (maxR - minR);
-    return {
-      ...r,
-      r: radius,
-      cx: width / 2 + (Math.random() - 0.5) * width * 0.3,
-      cy: height / 2 + (Math.random() - 0.5) * height * 0.3,
-      color: BUBBLE_COLORS[i % BUBBLE_COLORS.length],
-    };
-  });
-
-  // Simple force-based packing (few iterations)
-  for (let iter = 0; iter < 80; iter++) {
-    for (let i = 0; i < bubbles.length; i++) {
-      for (let j = i + 1; j < bubbles.length; j++) {
-        const a = bubbles[i], b = bubbles[j];
-        const dx = b.cx - a.cx;
-        const dy = b.cy - a.cy;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const minDist = a.r + b.r + 3;
-        if (dist < minDist) {
-          const push = (minDist - dist) / 2;
-          const nx = dx / dist, ny = dy / dist;
-          a.cx -= nx * push;
-          a.cy -= ny * push;
-          b.cx += nx * push;
-          b.cy += ny * push;
-        }
-      }
-      // Pull toward center
-      const b = bubbles[i];
-      b.cx += (width / 2 - b.cx) * 0.03;
-      b.cy += (height / 2 - b.cy) * 0.03;
-      // Keep in bounds
-      b.cx = Math.max(b.r + 2, Math.min(width - b.r - 2, b.cx));
-      b.cy = Math.max(b.r + 2, Math.min(height - b.r - 2, b.cy));
-    }
-  }
-
-  return bubbles;
-}
-
-const AssetBubbleChart: React.FC<{ rows: AssetRow[]; period: string }> = ({ rows, period }) => {
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-  const W = 260, H = 220;
-  const bubbles = useMemo(() => packBubbles(rows, W, H), [rows]);
-
-  if (!rows.length) return <div className="text-xs text-muted-foreground py-2">No trades.</div>;
-
-  return (
-    <div className="relative" style={{ width: W, height: H }}>
-      <svg width={W} height={H} className="overflow-visible">
-        <defs>
-          {bubbles.map((b, i) => (
-            <radialGradient key={`${period}-grad-${i}`} id={`${period}-bgrad-${i}`} cx="35%" cy="35%">
-              <stop offset="0%" stopColor="white" stopOpacity={0.25} />
-              <stop offset="100%" stopColor={b.color.bg} stopOpacity={1} />
-            </radialGradient>
-          ))}
-        </defs>
-        {bubbles.map((b, i) => {
-          const isHovered = hoveredIdx === i;
-          return (
-            <motion.g
-              key={`${period}-${b.asset}`}
-              onMouseEnter={() => setHoveredIdx(i)}
-              onMouseLeave={() => setHoveredIdx(null)}
-              style={{ cursor: "pointer" }}
-            >
-              <motion.circle
-                cx={b.cx}
-                cy={b.cy}
-                initial={{ r: 0, opacity: 0 }}
-                animate={{
-                  r: isHovered ? b.r * 1.12 : b.r,
-                  opacity: hoveredIdx !== null && !isHovered ? 0.4 : 1,
-                }}
-                transition={{
-                  r: { type: "spring", stiffness: 200, damping: 18, delay: i * 0.08 },
-                  opacity: { duration: 0.2 },
-                }}
-                fill={`url(#${period}-bgrad-${i})`}
-                stroke={b.color.border}
-                strokeWidth={isHovered ? 2 : 1}
-              />
-              {b.r > 22 && (
-                <motion.text
-                  x={b.cx}
-                  y={b.cy - (b.r > 35 ? 4 : 0)}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  className="fill-foreground pointer-events-none select-none"
-                  style={{ fontSize: Math.max(8, Math.min(11, b.r * 0.35)), fontWeight: 600 }}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: hoveredIdx !== null && !isHovered ? 0.3 : 1 }}
-                >
-                  {b.asset}
-                </motion.text>
-              )}
-              {b.r > 35 && (
-                <motion.text
-                  x={b.cx}
-                  y={b.cy + 10}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  className="pointer-events-none select-none"
-                  style={{
-                    fontSize: Math.max(7, b.r * 0.25),
-                    fontFamily: "monospace",
-                    fill: b.pnl >= 0 ? "#10b981" : "#ef4444",
-                    fontWeight: 700,
-                  }}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: hoveredIdx !== null && !isHovered ? 0.3 : 1 }}
-                >
-                  {formatPnL(b.pnl)}
-                </motion.text>
-              )}
-            </motion.g>
-          );
-        })}
-      </svg>
-      {/* Tooltip on hover */}
-      {hoveredIdx !== null && bubbles[hoveredIdx] && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="absolute z-50 pointer-events-none rounded-lg border border-border/50 bg-card/95 backdrop-blur-md px-3 py-2 shadow-xl"
-          style={{
-            left: Math.min(bubbles[hoveredIdx].cx + bubbles[hoveredIdx].r + 8, W - 120),
-            top: Math.max(bubbles[hoveredIdx].cy - 30, 4),
-          }}
-        >
-          <div className="text-xs font-semibold text-foreground">{bubbles[hoveredIdx].asset}</div>
-          <div className={cn("text-xs font-mono tabular-nums font-bold", pnlTextColor(bubbles[hoveredIdx].pnl))}>
-            {formatPnL(bubbles[hoveredIdx].pnl)}
-          </div>
-          <div className="text-[10px] text-muted-foreground">
-            {bubbles[hoveredIdx].trades} trades · {(bubbles[hoveredIdx].winRate * 100).toFixed(0)}% win
-          </div>
-        </motion.div>
-      )}
-    </div>
-  );
+const ACCENT_CHART: Record<"amber" | "primary", string> = {
+  amber: "#f59e0b",
+  primary: "hsl(var(--primary))",
 };
 
-const AssetList: React.FC<{ rows: AssetRow[] }> = ({ rows }) => {
-  if (!rows.length) return <div className="text-xs text-muted-foreground py-2">No trades.</div>;
+function PeriodCompareCard({
+  label,
+  subtitle,
+  stats,
+  score,
+  grade,
+  sparkline,
+  accent,
+  compareStats,
+}: {
+  label: string;
+  subtitle: string;
+  stats: PeriodStats;
+  score: number;
+  grade: GradeLetter;
+  sparkline: { date: string; pnl: number }[];
+  accent: "amber" | "primary";
+  compareStats: PeriodStats;
+}) {
+  const styles = GRADE_STYLES[grade];
+  const chartColor = ACCENT_CHART[accent];
+  const pnlDelta = computeDelta(compareStats.netPnL, stats.netPnL, "higher-better");
+  const wrDelta = computeDelta(compareStats.winRate, stats.winRate, "higher-better");
+  const gradientId = `spark-${label.replace(/\s/g, "")}`;
+
   return (
-    <div className="space-y-1.5">
-      {rows.slice(0, 5).map((r) => (
-        <div key={r.asset} className="flex items-center justify-between gap-2">
-          <span className="text-xs font-medium truncate text-foreground/80">{r.asset}</span>
-          <span className={cn("text-xs tabular-nums font-mono font-semibold shrink-0", pnlTextColor(r.pnl))}>
-            {formatPnL(r.pnl)}
+    <motion.div
+      whileHover={{ y: -2 }}
+      transition={{ type: "spring", stiffness: 400, damping: 28 }}
+      className={cn(
+        "glass rounded-2xl border p-4 sm:p-5 flex flex-col gap-4 overflow-hidden",
+        accent === "amber" ? "border-amber-500/25" : "border-primary/25",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={cn(
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold",
+            accent === "amber" ? "bg-amber-500/15 text-amber-500" : "bg-primary/15 text-primary",
+          )}
+        >
+          {getInitials(label)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-foreground truncate">{label}</div>
+          <div className="text-[11px] text-muted-foreground truncate">{subtitle}</div>
+        </div>
+      </div>
+
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <div className="flex items-baseline gap-2">
+            <span className={cn("text-3xl font-bold tabular-nums", styles.text)}>{grade}</span>
+            <span className="text-lg text-muted-foreground tabular-nums">({score}%)</span>
+          </div>
+        </div>
+        <div className="text-right space-y-1">
+          <div className="flex items-center justify-end gap-1.5">
+            <span className={cn("text-sm font-mono font-semibold tabular-nums", pnlTextColor(stats.netPnL))}>
+              {formatPnL(stats.netPnL)}
+            </span>
+            {pnlDelta.direction !== "unchanged" && (
+              <span className={cn("inline-flex items-center", deltaColor(pnlDelta))}>
+                {pnlDelta.direction === "improved" ? (
+                  <TrendingUp className="w-3.5 h-3.5" />
+                ) : (
+                  <TrendingDown className="w-3.5 h-3.5" />
+                )}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
+            <span className="tabular-nums">{(stats.winRate * 100).toFixed(0)}% win</span>
+            {wrDelta.direction !== "unchanged" && (
+              <span className={cn("tabular-nums font-medium", deltaColor(wrDelta))}>
+                {wrDelta.pct !== null ? `${deltaSign(wrDelta.pct)}${Math.abs(wrDelta.pct).toFixed(0)}%` : ""}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {sparkline.length > 1 && (
+        <div className="h-16 -mx-1 mt-auto">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={sparkline} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={chartColor} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={chartColor} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="date" hide />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                  fontSize: "11px",
+                }}
+                formatter={(value: number) => [formatPnL(value), "Cumulative"]}
+              />
+              <Area
+                type="monotone"
+                dataKey="pnl"
+                stroke={chartColor}
+                strokeWidth={2}
+                fill={`url(#${gradientId})`}
+                animationDuration={900}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+function NetPnLDonut({
+  aPnL,
+  bPnL,
+  aLabel,
+  bLabel,
+}: {
+  aPnL: number;
+  bPnL: number;
+  aLabel: string;
+  bLabel: string;
+}) {
+  const total = Math.abs(aPnL) + Math.abs(bPnL);
+  const aShare = total > 0 ? Math.abs(aPnL) / total : 0.5;
+  const size = 88;
+  const stroke = 10;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const aLen = circ * aShare;
+  const bLen = circ * (1 - aShare);
+
+  return (
+    <div className="glass rounded-2xl border border-border/40 p-4 flex items-center gap-4">
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} opacity={0.25} />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth={stroke}
+            strokeDasharray={`${aLen} ${circ}`}
+            strokeLinecap="round"
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke="hsl(var(--primary))"
+            strokeWidth={stroke}
+            strokeDasharray={`${bLen} ${circ}`}
+            strokeDashoffset={-aLen}
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Net P&L</span>
+        </div>
+      </div>
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="text-xs font-semibold text-foreground">Total P&L split</div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+            <span className="text-[11px] text-muted-foreground truncate">{aLabel}</span>
+          </div>
+          <span className={cn("text-xs font-mono font-semibold tabular-nums shrink-0", pnlTextColor(aPnL))}>
+            {formatPnL(aPnL)}
           </span>
         </div>
-      ))}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
+            <span className="text-[11px] text-muted-foreground truncate">{bLabel}</span>
+          </div>
+          <span className={cn("text-xs font-mono font-semibold tabular-nums shrink-0", pnlTextColor(bPnL))}>
+            {formatPnL(bPnL)}
+          </span>
+        </div>
+      </div>
     </div>
   );
-};
+}
+
+function TradesCompareBars({
+  aTrades,
+  bTrades,
+  aLabel,
+  bLabel,
+}: {
+  aTrades: number;
+  bTrades: number;
+  aLabel: string;
+  bLabel: string;
+}) {
+  const max = Math.max(aTrades, bTrades, 1);
+  const aH = (aTrades / max) * 100;
+  const bH = (bTrades / max) * 100;
+
+  return (
+    <div className="glass rounded-2xl border border-border/40 p-4">
+      <div className="text-xs font-semibold text-foreground mb-3">Trades taken</div>
+      <div className="flex items-end justify-center gap-8 h-20">
+        <div className="flex flex-col items-center gap-1.5 flex-1 max-w-[72px]">
+          <motion.div
+            initial={{ scaleY: 0 }}
+            animate={{ scaleY: 1 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="w-full rounded-t-md bg-amber-500/80 origin-bottom"
+            style={{ height: `${Math.max(aH, 8)}%` }}
+          />
+          <span className="text-[10px] text-muted-foreground truncate w-full text-center">{aLabel}</span>
+          <span className="text-xs font-mono font-bold tabular-nums">{aTrades}</span>
+        </div>
+        <div className="flex flex-col items-center gap-1.5 flex-1 max-w-[72px]">
+          <motion.div
+            initial={{ scaleY: 0 }}
+            animate={{ scaleY: 1 }}
+            transition={{ duration: 0.5, ease: "easeOut", delay: 0.08 }}
+            className="w-full rounded-t-md bg-primary/80 origin-bottom"
+            style={{ height: `${Math.max(bH, 8)}%` }}
+          />
+          <span className="text-[10px] text-muted-foreground truncate w-full text-center">{bLabel}</span>
+          <span className="text-xs font-mono font-bold tabular-nums">{bTrades}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricBarCell({
+  grade,
+  pct,
+  display,
+  valueClass,
+}: {
+  grade: GradeLetter;
+  pct: number;
+  display: string;
+  valueClass?: string;
+}) {
+  const styles = GRADE_STYLES[grade];
+  return (
+    <div className="flex items-center gap-2 min-w-0 sm:min-w-[140px]">
+      <span className={cn("text-xs font-bold w-4 shrink-0", styles.text)}>{grade}</span>
+      <div className="flex-1 h-1.5 rounded-full bg-muted/40 overflow-hidden min-w-[48px]">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className={cn("h-full rounded-full", styles.bar)}
+        />
+      </div>
+      <span className={cn("text-[11px] font-mono tabular-nums w-16 text-right shrink-0", valueClass || "text-foreground")}>
+        {display}
+      </span>
+    </div>
+  );
+}
+
+function ReportSidebar({
+  aScore,
+  bScore,
+  aGrade,
+  bGrade,
+  aLabel,
+  bLabel,
+  aSlot,
+  bSlot,
+  aStats,
+  bStats,
+  aBW,
+  bBW,
+  aAssetRows,
+  bAssetRows,
+}: {
+  aScore: number;
+  bScore: number;
+  aGrade: GradeLetter;
+  bGrade: GradeLetter;
+  aLabel: string;
+  bLabel: string;
+  aSlot: CompareSlotConfig;
+  bSlot: CompareSlotConfig;
+  aStats: PeriodStats;
+  bStats: PeriodStats;
+  aBW: ReturnType<typeof bestAndWorst>;
+  bBW: ReturnType<typeof bestAndWorst>;
+  aAssetRows: AssetRow[];
+  bAssetRows: AssetRow[];
+}) {
+  return (
+    <>
+      <div className="glass rounded-2xl border border-border/40 p-4 space-y-4">
+        <div className="text-sm font-semibold text-foreground">Report overview</div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-muted/20 p-3 text-center">
+            <div className={cn("text-2xl font-bold", GRADE_STYLES[aGrade].text)}>{aGrade}</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">{aScore}%</div>
+            <div className="text-[10px] text-muted-foreground truncate mt-1">{aLabel}</div>
+          </div>
+          <div className="rounded-xl bg-muted/20 p-3 text-center">
+            <div className={cn("text-2xl font-bold", GRADE_STYLES[bGrade].text)}>{bGrade}</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">{bScore}%</div>
+            <div className="text-[10px] text-muted-foreground truncate mt-1">{bLabel}</div>
+          </div>
+        </div>
+
+        <div className="space-y-2 text-[11px] text-muted-foreground border-t border-border/30 pt-3">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{format(aSlot.start, "MMM d")} – {format(aSlot.end, "MMM d, yyyy")}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{format(bSlot.start, "MMM d")} – {format(bSlot.end, "MMM d, yyyy")}</span>
+          </div>
+          <div className="flex justify-between pt-1">
+            <span>Trades</span>
+            <span className="tabular-nums text-foreground">{aStats.totalTrades} / {bStats.totalTrades}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Trading days</span>
+            <span className="tabular-nums text-foreground">{aStats.uniqueDays} / {bStats.uniqueDays}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="glass rounded-2xl border border-border/40 p-4 space-y-3">
+        <div className="text-xs font-semibold text-foreground">Best & worst</div>
+        <div className="space-y-2">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{aLabel}</div>
+          <TradeHighlight trade={aBW.best} type="best" />
+          <TradeHighlight trade={aBW.worst} type="worst" />
+        </div>
+        <div className="space-y-2 pt-2 border-t border-border/30">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{bLabel}</div>
+          <TradeHighlight trade={bBW.best} type="best" />
+          <TradeHighlight trade={bBW.worst} type="worst" />
+        </div>
+      </div>
+
+      {(aAssetRows.length > 0 || bAssetRows.length > 0) && (
+        <div className="glass rounded-2xl border border-border/40 p-4">
+          <div className="text-xs font-semibold text-foreground mb-3">Top pairs</div>
+          <AssetCompareList aRows={aAssetRows} bRows={bAssetRows} aLabel={aLabel} bLabel={bLabel} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function AssetCompareList({
+  aRows,
+  bRows,
+  aLabel,
+  bLabel,
+}: {
+  aRows: AssetRow[];
+  bRows: AssetRow[];
+  aLabel: string;
+  bLabel: string;
+}) {
+  const keys = [...new Set([...aRows.map((r) => r.asset), ...bRows.map((r) => r.asset)])].slice(0, 4);
+  const aMap = new Map(aRows.map((r) => [r.asset, r]));
+  const bMap = new Map(bRows.map((r) => [r.asset, r]));
+
+  return (
+    <div className="space-y-2">
+      {keys.map((asset) => (
+        <div key={asset} className="flex items-center justify-between gap-2 text-[11px]">
+          <span className="font-medium truncate text-foreground/80">{asset}</span>
+          <div className="flex gap-3 shrink-0">
+            <span className={cn("font-mono tabular-nums", pnlTextColor(aMap.get(asset)?.pnl ?? 0))}>
+              {aMap.has(asset) ? formatPnL(aMap.get(asset)!.pnl) : "—"}
+            </span>
+            <span className={cn("font-mono tabular-nums", pnlTextColor(bMap.get(asset)?.pnl ?? 0))}>
+              {bMap.has(asset) ? formatPnL(bMap.get(asset)!.pnl) : "—"}
+            </span>
+          </div>
+        </div>
+      ))}
+      <div className="flex justify-end gap-3 text-[9px] uppercase tracking-wider text-muted-foreground/60 pt-1">
+        <span>{aLabel}</span>
+        <span>{bLabel}</span>
+      </div>
+    </div>
+  );
+}
 
 const TradeHighlight: React.FC<{ trade: Trade | null; type: "best" | "worst" }> = ({ trade, type }) => {
   if (!trade) return null;
@@ -784,7 +1074,7 @@ const TradeHighlight: React.FC<{ trade: Trade | null; type: "best" | "worst" }> 
 
 /* ------------------------------- Helpers ------------------------------- */
 
-function slotLabel(s: SlotConfig, mode: CompareMode, accounts: TradingAccount[], fallback: string): string {
+function slotLabel(s: CompareSlotConfig, mode: CompareMode, accounts: TradingAccount[], fallback: string): string {
   const range = `${format(s.start, "MMM d")} – ${format(s.end, "MMM d, yyyy")}`;
   if (mode === "account") {
     const acc = accounts.find((a) => a.id === s.accountId);
@@ -799,7 +1089,7 @@ function slotLabel(s: SlotConfig, mode: CompareMode, accounts: TradingAccount[],
   return range;
 }
 
-function shortLabel(s: SlotConfig, mode: CompareMode, accounts: TradingAccount[]): string {
+function shortLabel(s: CompareSlotConfig, mode: CompareMode, accounts: TradingAccount[]): string {
   if (mode === "account") {
     const acc = accounts.find((a) => a.id === s.accountId);
     if (acc) return acc.name;

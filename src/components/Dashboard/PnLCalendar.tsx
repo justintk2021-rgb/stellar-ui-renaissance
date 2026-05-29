@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback } from "react";
 import { Trade, DailyStats, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { cn, truncateNum } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote, Settings, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Link2, Quote, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote, Settings, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Link2, Quote, Plus, ArrowDownLeft } from "lucide-react";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   formatPnL as sharedFormatPnL,
   getTradeLocalDateKey,
+  getTradeCloseLocalDateKey,
+  isMultiDayTrade,
 } from "@/lib/tradeFormat";
 
 import { toast } from "sonner";
@@ -99,40 +101,40 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
     return notes;
   }, [notebookEntries]);
 
-  // Calculate daily stats and trades - memoized to prevent glitches on month switch
-  // Bucket trades by their OPEN date in the user's LOCAL timezone, so a trade
-  // opened on Apr 7 at 11:30pm shows on Apr 7 (not Apr 8 due to UTC drift).
-  const { dailyStats, dailyTrades } = useMemo(() => {
+  // Exit-day stats by close date; entry markers by open date (multi-day only).
+  const { dailyStats, dailyTrades, entryDayTrades } = useMemo(() => {
     const stats: Record<string, DailyStats & { winRate: number }> = {};
     const tradesMap: Record<string, Trade[]> = {};
-
-    // Use the SHARED bucketing helper so dashboard / trade log / mini calendar
-    // can never drift apart again.
-    const getOpenDateKey = (trade: Trade): string | null => {
-      const key = getTradeLocalDateKey(trade);
-      return key || null;
-    };
+    const entryTradesMap: Record<string, Trade[]> = {};
 
     trades.forEach((trade) => {
-      const key = getOpenDateKey(trade);
-      if (!key) return;
-      if (!stats[key]) {
-        stats[key] = { pnl: 0, trades: 0, winRate: 0 };
-        tradesMap[key] = [];
+      const openKey = getTradeLocalDateKey(trade);
+      const closeKey = getTradeCloseLocalDateKey(trade);
+      if (!closeKey) return;
+
+      if (!stats[closeKey]) {
+        stats[closeKey] = { pnl: 0, trades: 0, winRate: 0 };
+        tradesMap[closeKey] = [];
       }
-      stats[key].pnl += trade.result || 0;
-      stats[key].trades += 1;
-      tradesMap[key].push(trade);
+      stats[closeKey].pnl += trade.result || 0;
+      stats[closeKey].trades += 1;
+      tradesMap[closeKey].push(trade);
+
+      if (openKey && isMultiDayTrade(trade)) {
+        if (!entryTradesMap[openKey]) {
+          entryTradesMap[openKey] = [];
+        }
+        entryTradesMap[openKey].push(trade);
+      }
     });
 
-    // Calculate win rate for each day
     Object.keys(tradesMap).forEach((date) => {
       const dayTrades = tradesMap[date];
-      const wins = dayTrades.filter(t => t.result > 0).length;
+      const wins = dayTrades.filter((t) => t.result > 0).length;
       stats[date].winRate = dayTrades.length > 0 ? (wins / dayTrades.length) * 100 : 0;
     });
 
-    return { dailyStats: stats, dailyTrades: tradesMap };
+    return { dailyStats: stats, dailyTrades: tradesMap, entryDayTrades: entryTradesMap };
   }, [trades]);
 
   const year = currentDate.getFullYear();
@@ -199,13 +201,24 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
     setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
   };
 
-  const handleDayClick = (dateStr: string, hasTrades: boolean) => {
-    if (hasTrades) {
+  const handleDayClick = (dateStr: string, hasActivity: boolean) => {
+    if (hasActivity) {
       setSelectedDate(dateStr);
     }
   };
 
-  const selectedTrades = selectedDate ? dailyTrades[selectedDate] || [] : [];
+  const getTradesForDate = (dateStr: string): Trade[] => {
+    const exitTrades = dailyTrades[dateStr] || [];
+    const entryTrades = entryDayTrades[dateStr] || [];
+    const seen = new Set<string>();
+    return [...exitTrades, ...entryTrades].filter((t) => {
+      if (seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+  };
+
+  const selectedTrades = selectedDate ? getTradesForDate(selectedDate) : [];
 
   // Calculate metrics for selected day
   const dayMetrics = selectedTrades.length > 0 ? {
@@ -420,7 +433,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
 
         <div className="flex">
           {/* Calendar Grid */}
-          <div className="flex-1 p-4 overflow-hidden">
+          <div className="flex-1 p-4 lg:p-5 overflow-hidden min-h-[520px]">
             {/* Day headers */}
             <div className="grid grid-cols-7 border-b border-border/30 mb-2">
               {DAY_NAMES.map((day) => (
@@ -442,7 +455,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
               >
                 {/* Empty cells before first day */}
                 {Array.from({ length: firstDayIndex }).map((_, i) => (
-                  <div key={`empty-${year}-${month}-${i}`} className="min-h-[90px]" />
+                  <div key={`empty-${year}-${month}-${i}`} className="min-h-[112px]" />
                 ))}
 
                 {/* Day cells */}
@@ -450,22 +463,28 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                   const day = i + 1;
                   const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                   const stat = dailyStats[dateStr];
-                  const hasTrades = !!stat;
+                  const exitTrades = dailyTrades[dateStr] || [];
+                  const entryTrades = entryDayTrades[dateStr] || [];
+                  const hasExitActivity = !!stat;
+                  const hasEntryOnly = entryTrades.length > 0 && !hasExitActivity;
+                  const hasActivity = hasExitActivity || entryTrades.length > 0;
                   const hasNote = !!dailyNotes[dateStr]?.length;
                   const today = isToday(dateStr);
 
                   return (
                     <div
                       key={dateStr}
-                      onClick={() => handleDayClick(dateStr, hasTrades)}
+                      onClick={() => handleDayClick(dateStr, hasActivity)}
                       className={cn(
-                        "relative min-h-[90px] rounded-xl p-2 transition-all duration-200 group border hover:scale-[1.03] hover:-translate-y-0.5 hover:shadow-lg",
-                        stat
+                        "relative min-h-[112px] rounded-xl p-2.5 transition-all duration-200 group border hover:scale-[1.03] hover:-translate-y-0.5 hover:shadow-lg",
+                        hasExitActivity
                           ? stat.pnl > 0
                             ? "bg-emerald-500/20 border-emerald-500/30 hover:bg-emerald-500/30 hover:border-emerald-500/50 hover:shadow-emerald-500/20 cursor-pointer shadow-sm"
                             : stat.pnl < 0
                             ? "bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/30 hover:border-rose-500/50 hover:shadow-rose-500/20 cursor-pointer shadow-sm"
                             : "bg-muted/30 border-border/40 hover:bg-muted/50 cursor-pointer"
+                          : hasEntryOnly
+                          ? "bg-primary/10 border-primary/20 hover:bg-primary/15 hover:border-primary/30 cursor-pointer shadow-sm"
                           : "bg-card/50 border-border/30 hover:bg-muted/20 hover:border-border/50"
                       )}
                     >
@@ -498,7 +517,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                               <FileText className="w-4 h-4 mr-2" />
                               {hasNote ? "Edit Note" : "Add Note"}
                             </DropdownMenuItem>
-                            {hasTrades && (
+                            {hasActivity && (
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedDate(dateStr); }}>
                                 <BarChart3 className="w-4 h-4 mr-2" />
                                 View Trades
@@ -508,22 +527,31 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                         </DropdownMenu>
                       </div>
 
-                      {/* Trade stats */}
-                      {stat && (
-                        <div className="flex flex-col items-center justify-center mt-2">
+                      {/* Exit-day stats */}
+                      {hasExitActivity && stat && (
+                        <div className="flex flex-col items-center justify-center mt-2 gap-1">
                           <span className={cn(
                             "text-base font-bold font-mono",
                             stat.pnl > 0 ? "text-emerald-600 dark:text-emerald-400" : stat.pnl < 0 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"
                           )}>
                             {formatPnL(stat.pnl)}
                           </span>
-                          <span className="text-[10px] text-muted-foreground">
-                            {stat.trades} trade{stat.trades !== 1 ? 's' : ''}
-                          </span>
+                          <TradeOutcomeDots trades={exitTrades} />
                           <span className="text-[10px] text-muted-foreground">
                             {stat.winRate.toFixed(0)}%
                           </span>
                         </div>
+                      )}
+
+                      {/* Entry-day: $0 realized P&L on open day */}
+                      {hasEntryOnly && (
+                        <div className="flex flex-col items-center justify-center mt-2">
+                          <span className="text-base font-bold font-mono text-primary">$0</span>
+                        </div>
+                      )}
+
+                      {entryTrades.length > 0 && (
+                        <EntryDayMarker count={entryTrades.length} />
                       )}
                     </div>
                   );
@@ -1022,6 +1050,51 @@ interface MetricRowProps {
   value: string;
   isPositive?: boolean;
   isNegative?: boolean;
+}
+
+/** Per-trade win/loss dots — one dot per closed trade that day. */
+function TradeOutcomeDots({ trades }: { trades: Trade[] }) {
+  if (trades.length === 0) return null;
+
+  return (
+    <div className="flex items-center justify-center gap-0.5">
+      {trades.slice(0, 6).map((trade) => (
+        <span
+          key={trade.id}
+          className={cn(
+            "h-1.5 w-1.5 rounded-full",
+            trade.result > 0
+              ? "bg-emerald-500"
+              : trade.result < 0
+              ? "bg-rose-500"
+              : "bg-muted-foreground/60"
+          )}
+        />
+      ))}
+      {trades.length > 6 && (
+        <span className="text-[7px] font-medium text-muted-foreground ml-0.5">
+          +{trades.length - 6}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Bottom-right marker for trades opened this day but closed on another day. */
+function EntryDayMarker({ count }: { count: number }) {
+  return (
+    <div
+      className="absolute bottom-1.5 right-1.5 pointer-events-none flex items-center gap-px"
+      title={count === 1 ? "Trade entered" : `${count} trades entered`}
+    >
+      <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-primary/15">
+        <ArrowDownLeft className="h-2.5 w-2.5 text-primary" strokeWidth={2.5} />
+      </span>
+      {count > 1 && (
+        <span className="text-[8px] font-bold leading-none text-primary">{count}</span>
+      )}
+    </div>
+  );
 }
 
 function MetricRow({ icon: Icon, label, value, isPositive, isNegative }: MetricRowProps) {

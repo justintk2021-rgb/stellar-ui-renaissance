@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,7 +80,21 @@ export function CommunityView() {
   const [showMobileSidebar, setShowMobileSidebar] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const activeMessages = useMemo(
+    () => (view === "channels" ? messages : directMessages) as Array<Message | DirectMessage>,
+    [view, messages, directMessages],
+  );
+
+  const messageVirtualizer = useVirtualizer({
+    count: activeMessages.length,
+    getScrollElement: () => messagesScrollRef.current,
+    estimateSize: () => 72,
+    overscan: 12,
+    getItemKey: (index) => activeMessages[index]?.id ?? index,
+  });
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -377,7 +392,7 @@ export function CommunityView() {
           )}>
             {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
             {msg.image_url && (
-              <img src={msg.image_url} alt="Shared" className="max-w-[280px] rounded-lg mt-1 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(msg.image_url!, "_blank")} />
+              <img src={msg.image_url} alt="Shared" loading="lazy" className="max-w-[280px] rounded-lg mt-1 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(msg.image_url!, "_blank")} />
             )}
           </div>
           {/* Reactions */}
@@ -562,20 +577,41 @@ export function CommunityView() {
         </div>
 
         {/* Messages */}
-        <ScrollArea className="flex-1 p-3">
-          <div className="space-y-1">
-            {view === "channels"
-              ? messages.map((msg) => renderMessageBubble(msg, msg.user_id === currentUserId))
-              : directMessages.map((dm) => renderMessageBubble(dm as any, dm.sender_id === currentUserId))}
-            <div ref={messagesEndRef} />
-          </div>
-          {((view === "channels" && messages.length === 0) || (view === "dms" && directMessages.length === 0)) && (
+        <div ref={messagesScrollRef} className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+          {activeMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
               <MessageSquare className="w-8 h-8 mb-2 opacity-40" />
               <p className="text-sm">No messages yet. Start the conversation!</p>
             </div>
+          ) : (
+            <div style={{ height: `${messageVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+              {messageVirtualizer.getVirtualItems().map((virtualRow) => {
+                const msg = activeMessages[virtualRow.index];
+                if (!msg) return null;
+                const isOwn = view === "channels"
+                  ? (msg as Message).user_id === currentUserId
+                  : (msg as DirectMessage).sender_id === currentUserId;
+                return (
+                  <div
+                    key={msg.id}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                    ref={messageVirtualizer.measureElement}
+                    data-index={virtualRow.index}
+                  >
+                    {renderMessageBubble(msg as Message, isOwn)}
+                  </div>
+                );
+              })}
+              <div ref={messagesEndRef} />
+            </div>
           )}
-        </ScrollArea>
+        </div>
 
         {/* Pending image preview */}
         {pendingImage && (

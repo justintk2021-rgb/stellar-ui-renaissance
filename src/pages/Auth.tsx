@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense, lazy } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,11 +31,12 @@ function GoogleIcon({ className }: { className?: string }) {
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { Float, MeshDistortMaterial, Sphere, Stars } from "@react-three/drei";
-import * as THREE from "three";
 import logo from "@/assets/logo-3d.png";
 import { LoginLoader } from "@/components/Layout/LoginLoader";
+
+const AuthScene = lazy(() =>
+  import("@/components/Layout/AuthScene").then((m) => ({ default: m.AuthScene }))
+);
 
 // Zod schemas for form validation
 const loginSchema = z.object({
@@ -47,90 +48,6 @@ const signupSchema = loginSchema.extend({
   firstName: z.string().trim().min(1, "First name is required").max(50, "First name is too long"),
   lastName: z.string().trim().min(1, "Last name is required").max(50, "Last name is too long"),
 });
-
-// 3D Animated Blob - White/Silver
-function AnimatedBlob() {
-  const meshRef = useRef<THREE.Mesh>(null);
-  
-  useFrame((state) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.x = state.clock.elapsedTime * 0.08;
-      meshRef.current.rotation.y = state.clock.elapsedTime * 0.12;
-    }
-  });
-
-  return (
-    <Float speed={1.2} rotationIntensity={0.4} floatIntensity={1.5}>
-      <Sphere ref={meshRef} args={[2, 128, 128]} scale={1.2}>
-        <MeshDistortMaterial
-          color="#d4d4d4"
-          attach="material"
-          distort={0.35}
-          speed={1.5}
-          roughness={0.1}
-          metalness={0.9}
-        />
-      </Sphere>
-    </Float>
-  );
-}
-
-// Floating Particles - White
-function Particles() {
-  const count = 150;
-  const positions = useMemo(() => {
-    const pos = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 15;
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 15;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 15;
-    }
-    return pos;
-  }, []);
-
-  const pointsRef = useRef<THREE.Points>(null);
-
-  useFrame((state) => {
-    if (pointsRef.current) {
-      pointsRef.current.rotation.y = state.clock.elapsedTime * 0.015;
-      pointsRef.current.rotation.x = state.clock.elapsedTime * 0.008;
-    }
-  });
-
-  return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={count}
-          array={positions}
-          itemSize={3}
-        />
-      </bufferGeometry>
-      <pointsMaterial
-        size={0.025}
-        color="#ffffff"
-        transparent
-        opacity={0.5}
-        sizeAttenuation
-      />
-    </points>
-  );
-}
-
-// 3D Scene - Black and white
-function Scene() {
-  return (
-    <>
-      <ambientLight intensity={0.3} />
-      <directionalLight position={[10, 10, 5]} intensity={1} color="#ffffff" />
-      <pointLight position={[-10, -10, -10]} intensity={0.5} color="#888888" />
-      <AnimatedBlob />
-      <Particles />
-      <Stars radius={80} depth={40} count={2000} factor={3} fade speed={0.8} />
-    </>
-  );
-}
 
 // Page transition variants
 const pageVariants = {
@@ -354,11 +271,9 @@ export function AuthPage() {
       >
       {/* 3D Canvas Background */}
       <div className="absolute inset-0 z-0">
-        <Canvas camera={{ position: [0, 0, 6], fov: 50 }}>
-          <Suspense fallback={null}>
-            <Scene />
-          </Suspense>
-        </Canvas>
+        <Suspense fallback={null}>
+          <AuthScene />
+        </Suspense>
       </div>
 
       {/* Gradient Overlays */}
@@ -411,7 +326,7 @@ export function AuthPage() {
                 whileHover={{ scale: 1.1, rotate: 5 }}
                 className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-glow"
               >
-                <img src={logo} alt="NSYNC" className="w-12 h-12 rounded-xl" />
+                <img src={logo} alt="NSYNC" loading="lazy" className="w-12 h-12 rounded-xl" />
               </motion.div>
 
               <motion.h1

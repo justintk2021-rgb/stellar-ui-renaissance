@@ -33,6 +33,26 @@ export const getTradeLocalDateKey = (trade: Trade): string => {
   return (trade.date || "").slice(0, 10);
 };
 
+/** Resolve the close/exit bucket date in the user's local timezone. */
+export const getTradeCloseLocalDateKey = (trade: Trade): string => {
+  if (trade.closeTime) {
+    const d = new Date(trade.closeTime);
+    if (!isNaN(d.getTime())) return formatLocalDateKey(d);
+  }
+  return getTradeLocalDateKey(trade);
+};
+
+/** True when entry and exit fall on the same local calendar day. */
+export const isSameDayEntryExit = (trade: Trade): boolean => {
+  if (!trade.openTime && !trade.closeTime) return true;
+  const openKey = getTradeLocalDateKey(trade);
+  const closeKey = getTradeCloseLocalDateKey(trade);
+  return !!openKey && !!closeKey && openKey === closeKey;
+};
+
+/** True when a trade opened and closed on different local calendar days. */
+export const isMultiDayTrade = (trade: Trade): boolean => !isSameDayEntryExit(trade);
+
 /**
  * Parse a YYYY-MM-DD key as a LOCAL Date (not UTC). Using `new Date("2025-04-07")`
  * parses as UTC midnight which can shift to the previous day when displayed via

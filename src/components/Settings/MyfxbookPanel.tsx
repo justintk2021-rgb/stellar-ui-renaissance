@@ -25,7 +25,14 @@ import {
   XCircle,
 } from "lucide-react";
 
-export function MyfxbookPanel() {
+export function MyfxbookPanel({
+  variant = "full",
+  onConnectionComplete,
+}: {
+  variant?: "full" | "connect";
+  onConnectionComplete?: () => void;
+}) {
+  const isConnectMode = variant === "connect";
   const {
     connection,
     accounts,
@@ -41,6 +48,13 @@ export function MyfxbookPanel() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const handleAccountSelect = async (accountId: string) => {
+    const ok = await selectAccount(accountId);
+    if (ok && isConnectMode && onConnectionComplete) {
+      onConnectionComplete();
+    }
+  };
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,6 +154,56 @@ export function MyfxbookPanel() {
   // Connected — show account list, status, sync controls
   const activeAccountId = connection.active_account_id;
 
+  if (isConnectMode) {
+    return (
+      <div className="max-w-xl mx-auto space-y-4">
+        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CheckCircle2 className="w-4 h-4 text-primary" />
+              Myfxbook Connected
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">{connection.login}</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                Select account
+              </Label>
+              {accounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No accounts found on this Myfxbook profile.
+                </p>
+              ) : (
+                <Select
+                  value={activeAccountId || ""}
+                  onValueChange={handleAccountSelect}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a Myfxbook account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.account_id_external}>
+                        {a.account_name || `Account ${a.acc_num}`}{" "}
+                        <span className="text-muted-foreground">(#{a.acc_num})</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            {activeAccountId && onConnectionComplete && (
+              <Button onClick={onConnectionComplete} className="w-full">
+                Continue to Dashboard
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
@@ -193,7 +257,7 @@ export function MyfxbookPanel() {
               : (
                 <Select
                   value={activeAccountId || ""}
-                  onValueChange={(v) => selectAccount(v)}
+                  onValueChange={handleAccountSelect}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a Myfxbook account" />

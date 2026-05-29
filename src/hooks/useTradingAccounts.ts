@@ -1,23 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { queryKeys } from '@/lib/queries/keys';
+import {
+  fetchTradingAccounts,
+  subscribeAccountsRealtime,
+  type TradingAccount,
+} from '@/lib/queries/accounts';
 
-export interface TradingAccount {
-  id: string;
-  user_id: string;
-  name: string;
-  broker: string | null;
-  starting_balance: number;
-  goal_balance: number | null;
-  profit_target: number | null;
-  currency: string;
-  is_default: boolean;
-  created_at: string;
-  updated_at: string;
-}
+export type { TradingAccount };
 
 export function useTradingAccounts(userId: string | undefined) {
-  const [accounts, setAccounts] = useState<TradingAccount[]>([]);
+  const queryClient = useQueryClient();
   const [selectedAccountId, setSelectedAccountIdState] = useState<string | null>(() => {
     return localStorage.getItem('selectedManualAccountId') || null;
   });
@@ -30,151 +25,44 @@ export function useTradingAccounts(userId: string | undefined) {
       localStorage.removeItem('selectedManualAccountId');
     }
   }, []);
-  const [isLoading, setIsLoading] = useState(true);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Fetch accounts from database
-  const fetchAccounts = useCallback(async () => {
-    if (!userId) {
-      setAccounts([]);
-      setIsLoading(false);
-      return;
-    }
+  const { data: accounts = [], isLoading, refetch } = useQuery({
+    queryKey: queryKeys.accounts.list(userId ?? ''),
+    queryFn: () => fetchTradingAccounts(userId!),
+    enabled: !!userId,
+    staleTime: 60_000,
+  });
 
-    try {
-      // Fetch all accounts
-      const { data, error } = await supabase
-        .from('trading_accounts')
-        .select('*')
-        .eq('user_id', userId)
-        .order('is_default', { ascending: false })
-        .order('created_at', { ascending: true });
+  // Auto-select account on first load
+  useEffect(() => {
+    if (accounts.length === 0) return;
+    const persistedManual = localStorage.getItem('selectedManualAccountId');
+    const persistedBroker = localStorage.getItem('selectedBrokerAccountId');
 
-      if (error) throw error;
-
-      const formattedAccounts: TradingAccount[] = (data || []).map((a: any) => ({
-        id: a.id,
-        user_id: a.user_id,
-        name: a.name,
-        broker: a.broker,
-        starting_balance: Number(a.starting_balance),
-        goal_balance: a.goal_balance ? Number(a.goal_balance) : null,
-        profit_target: a.profit_target ? Number(a.profit_target) : null,
-        currency: a.currency,
-        is_default: a.is_default,
-        created_at: a.created_at,
-        updated_at: a.updated_at,
-      }));
-
-      setAccounts(formattedAccounts);
-      
-      // Only auto-select default account on initial load when nothing is persisted
-      const persistedManual = localStorage.getItem('selectedManualAccountId');
-      const persistedBroker = localStorage.getItem('selectedBrokerAccountId');
-      
-      // If a broker account is persisted, don't override the manual selection
-      if (persistedBroker) {
-        // Keep current selectedAccountId as-is; broker account takes priority in the UI
-        if (!selectedAccountId && formattedAccounts.length > 0) {
-          const defaultAccount = formattedAccounts.find(a => a.is_default) || formattedAccounts[0];
-          if (defaultAccount) setSelectedAccountId(defaultAccount.id);
-        }
-      } else if (!persistedManual || !formattedAccounts.find(a => a.id === persistedManual)) {
-        // No valid persisted manual account — pick default
-        const defaultAccount = formattedAccounts.find(a => a.is_default) || formattedAccounts[0];
-        if (defaultAccount) {
-          setSelectedAccountId(defaultAccount.id);
-        }
+    if (persistedBroker) {
+      if (!selectedAccountId) {
+        const defaultAccount = accounts.find(a => a.is_default) || accounts[0];
+        if (defaultAccount) setSelectedAccountId(defaultAccount.id);
       }
-    } catch (error: any) {
-      console.error('Error fetching accounts:', error);
-      toast.error('Failed to load trading accounts');
-    } finally {
-      setIsLoading(false);
+    } else if (!persistedManual || !accounts.find(a => a.id === persistedManual)) {
+      const defaultAccount = accounts.find(a => a.is_default) || accounts[0];
+      if (defaultAccount) setSelectedAccountId(defaultAccount.id);
     }
-  }, [userId, selectedAccountId]);
+  }, [accounts, selectedAccountId, setSelectedAccountId]);
 
-  // Set up realtime subscription
   useEffect(() => {
     if (!userId) return;
+    return subscribeAccountsRealtime(userId, () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+    });
+  }, [userId, queryClient]);
 
-    // Clean up existing channel first
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
+  const invalidate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+  }, [queryClient]);
 
-    const channelName = `accounts-realtime-${userId}-${Date.now()}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'trading_accounts',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          console.log('Accounts realtime update:', payload.eventType);
-          
-          if (payload.eventType === 'INSERT') {
-            const newAccount: TradingAccount = {
-              id: payload.new.id,
-              user_id: payload.new.user_id,
-              name: payload.new.name,
-              broker: payload.new.broker,
-              starting_balance: Number(payload.new.starting_balance),
-              goal_balance: payload.new.goal_balance ? Number(payload.new.goal_balance) : null,
-              profit_target: payload.new.profit_target ? Number(payload.new.profit_target) : null,
-              currency: payload.new.currency,
-              is_default: payload.new.is_default,
-              created_at: payload.new.created_at,
-              updated_at: payload.new.updated_at,
-            };
-            setAccounts(prev => {
-              if (prev.some(a => a.id === newAccount.id)) return prev;
-              return [...prev, newAccount];
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            setAccounts(prev => prev.map(a => 
-              a.id === payload.new.id ? {
-                ...a,
-                name: payload.new.name,
-                broker: payload.new.broker,
-                starting_balance: Number(payload.new.starting_balance),
-                goal_balance: payload.new.goal_balance ? Number(payload.new.goal_balance) : null,
-                profit_target: payload.new.profit_target ? Number(payload.new.profit_target) : null,
-                currency: payload.new.currency,
-                is_default: payload.new.is_default,
-                updated_at: payload.new.updated_at,
-              } : a
-            ));
-          } else if (payload.eventType === 'DELETE') {
-            setAccounts(prev => prev.filter(a => a.id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe();
-
-    channelRef.current = channel;
-
-    return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
-  }, [userId]);
-
-  useEffect(() => {
-    fetchAccounts();
-  }, [fetchAccounts]);
-
-  // Add a new account
   const addAccount = useCallback(async (accountData: { name: string; broker?: string; starting_balance?: number; currency?: string }) => {
     if (!userId) return null;
-
     try {
       const { data, error } = await supabase
         .from('trading_accounts')
@@ -188,39 +76,33 @@ export function useTradingAccounts(userId: string | undefined) {
         })
         .select()
         .single();
-
       if (error) throw error;
-
-      const newAccount: TradingAccount = {
+      invalidate();
+      toast.success('Account created successfully');
+      return {
         id: data.id,
         user_id: data.user_id,
         name: data.name,
         broker: data.broker,
         starting_balance: Number(data.starting_balance),
-        goal_balance: (data as any).goal_balance ? Number((data as any).goal_balance) : null,
-        profit_target: (data as any).profit_target ? Number((data as any).profit_target) : null,
+        goal_balance: data.goal_balance ? Number(data.goal_balance) : null,
+        profit_target: data.profit_target ? Number(data.profit_target) : null,
         currency: data.currency,
         is_default: data.is_default,
         created_at: data.created_at,
         updated_at: data.updated_at,
-      };
-
-      setAccounts(prev => [...prev, newAccount]);
-      toast.success('Account created successfully');
-      return newAccount;
-    } catch (error: any) {
+      } as TradingAccount;
+    } catch (error) {
       console.error('Error adding account:', error);
       toast.error('Failed to create account');
       return null;
     }
-  }, [userId]);
+  }, [userId, invalidate]);
 
-  // Update an account
   const updateAccount = useCallback(async (id: string, accountData: Partial<TradingAccount>) => {
     if (!userId) return false;
-
     try {
-      const updateData: Record<string, any> = {};
+      const updateData: Record<string, unknown> = {};
       if (accountData.name !== undefined) updateData.name = accountData.name;
       if (accountData.broker !== undefined) updateData.broker = accountData.broker;
       if (accountData.starting_balance !== undefined) updateData.starting_balance = accountData.starting_balance;
@@ -228,90 +110,53 @@ export function useTradingAccounts(userId: string | undefined) {
       if (accountData.profit_target !== undefined) updateData.profit_target = accountData.profit_target;
       if (accountData.currency !== undefined) updateData.currency = accountData.currency;
 
-      const { error } = await supabase
-        .from('trading_accounts')
-        .update(updateData)
-        .eq('id', id)
-        .eq('user_id', userId);
-
+      const { error } = await supabase.from('trading_accounts').update(updateData).eq('id', id).eq('user_id', userId);
       if (error) throw error;
-
-      setAccounts(prev => prev.map(a => 
-        a.id === id ? { ...a, ...accountData } : a
-      ));
+      invalidate();
       toast.success('Account updated');
       return true;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating account:', error);
       toast.error('Failed to update account');
       return false;
     }
-  }, [userId]);
+  }, [userId, invalidate]);
 
-  // Delete an account
   const deleteAccount = useCallback(async (id: string) => {
     if (!userId) return false;
-
     try {
-      const { error } = await supabase
-        .from('trading_accounts')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', userId);
-
+      const { error } = await supabase.from('trading_accounts').delete().eq('id', id).eq('user_id', userId);
       if (error) throw error;
-
-      setAccounts(prev => prev.filter(a => a.id !== id));
-      
-      // If deleted account was selected, select another
       if (selectedAccountId === id) {
         const remaining = accounts.filter(a => a.id !== id);
         const defaultAcc = remaining.find(a => a.is_default) || remaining[0];
         setSelectedAccountId(defaultAcc?.id || null);
       }
-      
+      invalidate();
       toast.success('Account deleted');
       return true;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting account:', error);
       toast.error('Failed to delete account');
       return false;
     }
-  }, [userId, accounts, selectedAccountId]);
+  }, [userId, accounts, selectedAccountId, setSelectedAccountId, invalidate]);
 
-  // Set default account
   const setDefaultAccount = useCallback(async (id: string) => {
     if (!userId) return false;
-
     try {
-      // First, unset all defaults
-      await supabase
-        .from('trading_accounts')
-        .update({ is_default: false })
-        .eq('user_id', userId);
-
-      // Then set the new default
-      const { error } = await supabase
-        .from('trading_accounts')
-        .update({ is_default: true })
-        .eq('id', id)
-        .eq('user_id', userId);
-
+      await supabase.from('trading_accounts').update({ is_default: false }).eq('user_id', userId);
+      const { error } = await supabase.from('trading_accounts').update({ is_default: true }).eq('id', id).eq('user_id', userId);
       if (error) throw error;
-
-      setAccounts(prev => prev.map(a => ({
-        ...a,
-        is_default: a.id === id
-      })));
-      
+      invalidate();
       toast.success('Default account updated');
       return true;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error setting default account:', error);
       toast.error('Failed to update default account');
       return false;
     }
-  }, [userId]);
+  }, [userId, invalidate]);
 
   const selectedAccount = accounts.find(a => a.id === selectedAccountId) || null;
 
@@ -325,6 +170,6 @@ export function useTradingAccounts(userId: string | undefined) {
     updateAccount,
     deleteAccount,
     setDefaultAccount,
-    refetch: fetchAccounts,
+    refetch,
   };
 }

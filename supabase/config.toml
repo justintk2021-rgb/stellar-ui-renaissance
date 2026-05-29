@@ -9,5 +9,14 @@ verify_jwt = false
 [functions.voice-to-text]
 verify_jwt = true
 
+[functions.tradelocker]
+verify_jwt = true
+
+[functions.mt5-bridge]
+verify_jwt = false
+
+[functions.myfxbook]
+verify_jwt = true
+
 [functions.text-to-voice]
 verify_jwt = true

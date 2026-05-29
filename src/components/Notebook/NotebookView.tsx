@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
+import { useTradeDetail } from "@/hooks/useTrades";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,6 +99,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface NotebookViewProps {
   trades: Trade[];
+  userId?: string;
   selectedTradeId: string | null;
   onSelectTrade: (id: string) => void;
   onSaveNotes: (id: string, notes: string) => void;
@@ -188,6 +191,7 @@ type FontStyle = string;
 
 export function NotebookView({
   trades,
+  userId,
   selectedTradeId,
   onSelectTrade,
   onSaveNotes,
@@ -198,6 +202,11 @@ export function NotebookView({
   onFontChange,
 }: NotebookViewProps) {
   const { checklists } = useChecklists();
+
+  useEffect(() => {
+    import('@/lib/fonts').then(({ loadGoogleFont }) => loadGoogleFont(notebookFont));
+  }, [notebookFont]);
+
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -264,35 +273,86 @@ export function NotebookView({
   }, [selectedEntry?.content]);
 
   // Filter entries by category and search (excluding trash unless viewing trash)
-  const filteredEntries = notebookEntries.filter((entry) => {
-    // Trash filter
+  const filteredEntries = useMemo(() => notebookEntries.filter((entry) => {
     if (selectedCategory === "trash") {
       return entry.isDeleted === true;
     }
-    
-    // For other categories, exclude deleted items
     if (entry.isDeleted) return false;
-    
     const matchesCategory = selectedCategory === "all" || entry.category === selectedCategory;
     const matchesSearch = entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       entry.content.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
-  });
+  }), [notebookEntries, selectedCategory, searchQuery]);
 
-  // Count trash items
-  const trashCount = notebookEntries.filter(e => e.isDeleted).length;
+  const trashCount = useMemo(
+    () => notebookEntries.filter(e => e.isDeleted).length,
+    [notebookEntries],
+  );
 
-  // Group entries by date
-  const groupedEntries = filteredEntries.reduce((acc, entry) => {
-    const date = entry.isDeleted && entry.deletedAt 
-      ? entry.deletedAt.slice(0, 10) 
+  const groupedEntries = useMemo(() => filteredEntries.reduce((acc, entry) => {
+    const date = entry.isDeleted && entry.deletedAt
+      ? entry.deletedAt.slice(0, 10)
       : entry.date;
     if (!acc[date]) acc[date] = [];
     acc[date].push(entry);
     return acc;
-  }, {} as Record<string, NotebookEntry[]>);
+  }, {} as Record<string, NotebookEntry[]>), [filteredEntries]);
 
-  const sortedDates = Object.keys(groupedEntries).sort((a, b) => b.localeCompare(a));
+  const sortedDates = useMemo(
+    () => Object.keys(groupedEntries).sort((a, b) => b.localeCompare(a)),
+    [groupedEntries],
+  );
+
+  const visibleEntries = useMemo(() => notebookEntries
+    .filter(e => {
+      if (e.isDeleted) return false;
+      if (selectedCategory !== "all" && e.category !== selectedCategory) return false;
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        return e.title.toLowerCase().includes(query) ||
+          e.content.toLowerCase().includes(query);
+      }
+      return true;
+    })
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+  [notebookEntries, selectedCategory, searchQuery]);
+
+  type SidebarRow =
+    | { type: 'header'; date: string }
+    | { type: 'entry'; entry: NotebookEntry };
+
+  const sidebarRows = useMemo(() => {
+    const rows: SidebarRow[] = [];
+    for (const date of sortedDates) {
+      rows.push({ type: 'header', date });
+      for (const entry of groupedEntries[date]) {
+        rows.push({ type: 'entry', entry });
+      }
+    }
+    return rows;
+  }, [sortedDates, groupedEntries]);
+
+  const sidebarScrollRef = useRef<HTMLDivElement>(null);
+  const gridScrollRef = useRef<HTMLDivElement>(null);
+
+  const sidebarVirtualizer = useVirtualizer({
+    count: sidebarRows.length,
+    getScrollElement: () => sidebarScrollRef.current,
+    estimateSize: (index) => (sidebarRows[index]?.type === 'header' ? 28 : 40),
+    overscan: 12,
+    getItemKey: (index) => {
+      const row = sidebarRows[index];
+      return row?.type === 'header' ? `h-${row.date}` : `e-${row.entry.id}`;
+    },
+  });
+
+  const gridVirtualizer = useVirtualizer({
+    count: viewMode === 'list' ? visibleEntries.length : 0,
+    getScrollElement: () => gridScrollRef.current,
+    estimateSize: () => 88,
+    overscan: 8,
+    getItemKey: (index) => visibleEntries[index]?.id ?? index,
+  });
 
   // Load entry content into editor — ONLY when switching to a different entry
   // (not on every save). This prevents cursor reset and scroll-to-top while typing.
@@ -979,6 +1039,9 @@ export function NotebookView({
 
   // Find linked trade for entry
   const linkedTrade = selectedEntry?.tradeId ? trades.find((t) => t.id === selectedEntry.tradeId) : null;
+  const { data: linkedTradeDetail } = useTradeDetail(userId, selectedEntry?.tradeId ?? null);
+  const linkedTradeChart = linkedTradeDetail?.chartImage;
+  const linkedTradeChecklistState = linkedTradeDetail?.checklistState ?? linkedTrade?.checklistState;
   
   // Find the checklist used for the linked trade
   const linkedChecklist = linkedTrade?.checklistId 
@@ -1582,27 +1645,62 @@ export function NotebookView({
                 <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-7 text-xs pl-7 bg-muted/30 border-border/50" />
               </div>
             </div>
-            <ScrollArea className="flex-1">
+            <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto custom-scrollbar">
               <div className="p-2">
-                {sortedDates.length === 0 ? (
+                {sidebarRows.length === 0 ? (
                   <div className="text-center text-xs text-muted-foreground py-8">No notes yet</div>
                 ) : (
-                  sortedDates.map((date) => (
-                    <div key={date} className="mb-3">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1">{formatDate(date)}</div>
-                      {groupedEntries[date].map((entry) => (
-                        <button key={entry.id} onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }} className={cn("w-full text-left p-2 rounded-lg transition-all mb-1", selectedEntryId === entry.id ? "bg-primary/20 border border-primary/40" : "hover:bg-muted/50")}>
-                          <div className="flex items-center gap-2">
-                            <ChevronRight className={cn("w-3 h-3", selectedEntryId === entry.id && "rotate-90")} />
-                            <span className="text-xs font-medium truncate">{entry.title}</span>
+                  <div
+                    style={{ height: `${sidebarVirtualizer.getTotalSize()}px`, position: 'relative' }}
+                  >
+                    {sidebarVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const row = sidebarRows[virtualRow.index];
+                      if (!row) return null;
+                      if (row.type === 'header') {
+                        return (
+                          <div
+                            key={`h-${row.date}`}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              transform: `translateY(${virtualRow.start}px)`,
+                            }}
+                            ref={sidebarVirtualizer.measureElement}
+                            data-index={virtualRow.index}
+                          >
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1">{formatDate(row.date)}</div>
                           </div>
-                        </button>
-                      ))}
-                    </div>
-                  ))
+                        );
+                      }
+                      const entry = row.entry;
+                      return (
+                        <div
+                          key={entry.id}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                          ref={sidebarVirtualizer.measureElement}
+                          data-index={virtualRow.index}
+                        >
+                          <button onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }} className={cn("w-full text-left p-2 rounded-lg transition-all mb-1", selectedEntryId === entry.id ? "bg-primary/20 border border-primary/40" : "hover:bg-muted/50")}>
+                            <div className="flex items-center gap-2">
+                              <ChevronRight className={cn("w-3 h-3", selectedEntryId === entry.id && "rotate-90")} />
+                              <span className="text-xs font-medium truncate">{entry.title}</span>
+                            </div>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
-            </ScrollArea>
+            </div>
           </div>
         )}
 
@@ -2294,57 +2392,81 @@ export function NotebookView({
             </div>
 
             {/* Notes Grid/List */}
-            <ScrollArea className="flex-1 px-6 lg:px-10 py-6">
-              {(() => {
-                const visibleEntries = notebookEntries
-                  .filter(e => {
-                    if (e.isDeleted) return false;
-                    if (selectedCategory !== "all" && e.category !== selectedCategory) return false;
-                    if (searchQuery) {
-                      const query = searchQuery.toLowerCase();
-                      return e.title.toLowerCase().includes(query) || 
-                             e.content.toLowerCase().includes(query);
-                    }
-                    return true;
-                  })
-                  .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-
-                if (visibleEntries.length === 0) {
-                  return (
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-                      className="flex flex-col items-center justify-center py-20 text-muted-foreground"
-                    >
-                      <motion.div
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 0.15 }}
-                        transition={{ duration: 0.8, delay: 0.2 }}
+            <div ref={gridScrollRef} className="flex-1 overflow-y-auto px-6 lg:px-10 py-6 custom-scrollbar">
+              {visibleEntries.length === 0 ? (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  className="flex flex-col items-center justify-center py-20 text-muted-foreground"
+                >
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 0.15 }}
+                    transition={{ duration: 0.8, delay: 0.2 }}
+                  >
+                    {searchQuery ? <Search className="w-14 h-14 mb-4" /> : <BookOpen className="w-14 h-14 mb-4" />}
+                  </motion.div>
+                  <p className="text-base font-medium">{searchQuery ? 'No matching notes' : 'No notes yet'}</p>
+                  <p className="text-sm mt-1 text-muted-foreground/70">{searchQuery ? 'Try a different search term' : 'Create your first note to get started'}</p>
+                </motion.div>
+              ) : viewMode === 'list' ? (
+                <div style={{ height: `${gridVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                  {gridVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const entry = visibleEntries[virtualRow.index];
+                    if (!entry) return null;
+                    const index = virtualRow.index;
+                    const colors = getNoteCardColor(entry.category, index);
+                    const plainText = entry.content.replace(/<[^>]*>/g, '').trim();
+                    const contentLines = plainText.split(/[.!?\n]+/).filter(s => s.trim()).slice(0, 3);
+                    const isDark = document.documentElement.classList.contains('dark');
+                    return (
+                      <div
+                        key={entry.id}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                        ref={gridVirtualizer.measureElement}
+                        data-index={virtualRow.index}
+                        className="pb-2"
                       >
-                        {searchQuery ? <Search className="w-14 h-14 mb-4" /> : <BookOpen className="w-14 h-14 mb-4" />}
-                      </motion.div>
-                      <p className="text-base font-medium">{searchQuery ? 'No matching notes' : 'No notes yet'}</p>
-                      <p className="text-sm mt-1 text-muted-foreground/70">{searchQuery ? 'Try a different search term' : 'Create your first note to get started'}</p>
-                    </motion.div>
-                  );
-                }
-
-                return (
-                  <AnimatePresence mode="wait">
-                    <motion.div 
-                      key={selectedCategory + viewMode}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
-                      className={cn(
-                        viewMode === 'grid' 
-                          ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
-                          : "flex flex-col gap-2"
-                      )}
-                    >
-                      {visibleEntries.map((entry, index) => {
+                        <motion.button
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          whileHover={{ x: 4 }}
+                          whileTap={{ scale: 0.99 }}
+                          onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
+                          className="w-full text-left rounded-xl overflow-hidden group relative border transition-all duration-300 flex items-center gap-4 p-4 bg-card/50 border-border/30 hover:border-primary/30"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-sm truncate">{entry.title || 'Untitled'}</h4>
+                            {contentLines.length > 0 && (
+                              <p className="text-xs text-muted-foreground mt-1 truncate">{contentLines[0]}</p>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: colors.border, color: isDark ? colors.textDark : colors.text }}>
+                            {CATEGORIES.find(c => c.id === entry.category)?.label || entry.category}
+                          </Badge>
+                        </motion.button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <AnimatePresence mode="wait">
+                  <motion.div 
+                    key={selectedCategory + viewMode}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                  >
+                    {visibleEntries.map((entry, index) => {
                         const colors = getNoteCardColor(entry.category, index);
                         const plainText = entry.content.replace(/<[^>]*>/g, '').trim();
                         const contentLines = plainText.split(/[.!?\n]+/).filter(s => s.trim()).slice(0, 3);
@@ -2461,9 +2583,8 @@ export function NotebookView({
                       })}
                     </motion.div>
                   </AnimatePresence>
-                );
-              })()}
-            </ScrollArea>
+              )}
+            </div>
           </motion.div>
         )}
         </div>
@@ -2527,8 +2648,8 @@ export function NotebookView({
                   </div>
                   
                   {/* Checklist Grade */}
-                  {linkedTrade.checklistState && linkedTrade.checklistState.length > 0 && (() => {
-                    const state = linkedTrade.checklistState;
+                  {linkedTradeChecklistState && linkedTradeChecklistState.length > 0 && (() => {
+                    const state = linkedTradeChecklistState;
                     const hasCustomPercentages = state.some((item: any) => item.percentage !== undefined);
                     let percentage: number;
                     
@@ -2564,11 +2685,11 @@ export function NotebookView({
             </div>
             
             {/* Checklist Details */}
-            {linkedTrade.checklistState && linkedTrade.checklistState.length > 0 && (
+            {linkedTradeChecklistState && linkedTradeChecklistState.length > 0 && (
               <div className="mt-3 pt-3 border-t border-border/30">
                 <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-2">Checklist Items</div>
                 <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {linkedTrade.checklistState.map((item: any, index: number) => (
+                  {linkedTradeChecklistState.map((item: any, index: number) => (
                     <div 
                       key={item.id || index}
                       className={cn(
@@ -2594,14 +2715,15 @@ export function NotebookView({
             )}
 
             {/* Trade Chart Image */}
-            {linkedTrade.chartImage && (
+            {linkedTradeChart && (
               <div className="mt-3 pt-3 border-t border-border/30">
                 <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-2">Chart</div>
                 <img
-                  src={linkedTrade.chartImage}
+                  src={linkedTradeChart}
                   alt="Trade chart"
+                  loading="lazy"
                   className="w-full rounded-lg border border-border/30 cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => setImagePreview(linkedTrade.chartImage!)}
+                  onClick={() => setImagePreview(linkedTradeChart!)}
                 />
               </div>
             )}

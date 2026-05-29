@@ -1,11 +1,13 @@
-import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, X, MoreHorizontal, Target, TrendingUp, Wallet, Trophy, Activity, Radio } from "lucide-react";
+import { Check, X, TrendingUp, Wallet, Trophy, Activity } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { AccountProjectionCard } from "./AccountProjectionCard";
+import type { ProjectionMetrics } from "@/lib/accountProjection";
 import {
   AreaChart,
   Area,
@@ -15,15 +17,24 @@ import {
 interface BalanceCardsProps {
   trades: Trade[];
   startBalance: number;
-  goalBalance: number | null;
-  profitTarget: number | null;
   brokerBalance?: number | null;
   brokerEquity?: number | null;
   brokerFloatingPl?: number;
   brokerHasOpenPositions?: boolean;
   onSetBalance: (balance: number) => void;
-  onSetGoalBalance: (balance: number) => void;
-  onSetProfitTarget: (target: number) => void;
+  projection: {
+    accountLabel: string;
+    accountSubtitle: string;
+    isBroker: boolean;
+    isLoading?: boolean;
+    currentBalance: number;
+    startBalance: number;
+    goalBalance: number | null;
+    profitTarget: number | null;
+    metrics: ProjectionMetrics;
+    onSetGoalBalance: (value: number) => Promise<boolean>;
+    onSetProfitTarget: (value: number) => Promise<boolean>;
+  };
 }
 
 interface AnimatedValueProps {
@@ -123,17 +134,19 @@ const iconVariants = {
 
 // Removed animated glow variants to reduce visual interference
 
-export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, brokerBalance, brokerEquity, brokerFloatingPl = 0, brokerHasOpenPositions = false, onSetBalance, onSetGoalBalance, onSetProfitTarget }: BalanceCardsProps) {
+export function BalanceCards({
+  trades,
+  startBalance,
+  brokerBalance,
+  brokerEquity,
+  brokerFloatingPl = 0,
+  brokerHasOpenPositions = false,
+  onSetBalance,
+  projection,
+}: BalanceCardsProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [isEditingGoal, setIsEditingGoal] = useState(false);
-  const [isEditingProfitTarget, setIsEditingProfitTarget] = useState(false);
-  const [projectionTab, setProjectionTab] = useState<'goal' | 'profit'>('goal');
   const [editValue, setEditValue] = useState(startBalance.toString());
-  const [editGoalValue, setEditGoalValue] = useState((goalBalance || 0).toString());
-  const [editProfitTargetValue, setEditProfitTargetValue] = useState((profitTarget || 0).toString());
   const inputRef = useRef<HTMLInputElement>(null);
-  const goalInputRef = useRef<HTMLInputElement>(null);
-  const profitTargetInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isEditing) {
@@ -142,37 +155,11 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
   }, [startBalance, isEditing]);
 
   useEffect(() => {
-    if (!isEditingGoal) {
-      setEditGoalValue((goalBalance || 0).toString());
-    }
-  }, [goalBalance, isEditingGoal]);
-
-  useEffect(() => {
-    if (!isEditingProfitTarget) {
-      setEditProfitTargetValue((profitTarget || 0).toString());
-    }
-  }, [profitTarget, isEditingProfitTarget]);
-
-  useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
   }, [isEditing]);
-
-  useEffect(() => {
-    if (isEditingGoal && goalInputRef.current) {
-      goalInputRef.current.focus();
-      goalInputRef.current.select();
-    }
-  }, [isEditingGoal]);
-
-  useEffect(() => {
-    if (isEditingProfitTarget && profitTargetInputRef.current) {
-      profitTargetInputRef.current.focus();
-      profitTargetInputRef.current.select();
-    }
-  }, [isEditingProfitTarget]);
 
   const handleStartEdit = () => {
     setEditValue(startBalance.toString());
@@ -197,55 +184,7 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
     if (e.key === "Escape") handleCancel();
   };
 
-  // Goal balance handlers
-  const handleStartEditGoal = () => {
-    setEditGoalValue((goalBalance || 0).toString());
-    setIsEditingGoal(true);
-  };
-
-  const handleConfirmGoal = () => {
-    const value = parseFloat(editGoalValue);
-    if (!isNaN(value) && value >= 0) {
-      onSetGoalBalance(value);
-    }
-    setIsEditingGoal(false);
-  };
-
-  const handleCancelGoal = () => {
-    setEditGoalValue((goalBalance || 0).toString());
-    setIsEditingGoal(false);
-  };
-
-  const handleKeyDownGoal = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleConfirmGoal();
-    if (e.key === "Escape") handleCancelGoal();
-  };
-
-  // Profit target handlers
-  const handleStartEditProfitTarget = () => {
-    setEditProfitTargetValue((profitTarget || 0).toString());
-    setIsEditingProfitTarget(true);
-  };
-
-  const handleConfirmProfitTarget = () => {
-    const value = parseFloat(editProfitTargetValue);
-    if (!isNaN(value) && value >= 0) {
-      onSetProfitTarget(value);
-    }
-    setIsEditingProfitTarget(false);
-  };
-
-  const handleCancelProfitTarget = () => {
-    setEditProfitTargetValue((profitTarget || 0).toString());
-    setIsEditingProfitTarget(false);
-  };
-
-  const handleKeyDownProfitTarget = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleConfirmProfitTarget();
-    if (e.key === "Escape") handleCancelProfitTarget();
-  };
-
-  const { currentBalance, balanceChange, balancePercent, profit, profitPercent, fees, highestBalance, sparklineData, netPnL } = useMemo(() => {
+  const { currentBalance, balanceChange, balancePercent, profit, fees, highestBalance, sparklineData } = useMemo(() => {
     const sortedTrades = [...trades].sort((a, b) => {
       if (a.date === b.date) return parseInt(a.id) - parseInt(b.id);
       return a.date < b.date ? -1 : 1;
@@ -291,18 +230,13 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
       balanceChange: change,
       balancePercent: percentChange,
       profit: totalProfit,
-      profitPercent: profitPct,
       fees: totalFees,
       highestBalance: highest,
       sparklineData: equityPoints.length > 1 ? equityPoints : [effectiveStart, effectiveStart],
-      netPnL: totalNetPnL,
     };
   }, [trades, startBalance, brokerBalance]);
 
   const isPositive = balanceChange >= 0;
-  const isProfitPositive = profit >= 0;
-  const goalProgress = goalBalance && goalBalance > 0 ? Math.min(100, (currentBalance / goalBalance) * 100) : 0;
-  const profitTargetProgress = profitTarget && profitTarget > 0 ? Math.min(100, (Math.max(0, netPnL) / profitTarget) * 100) : 0;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -539,220 +473,8 @@ export function BalanceCards({ trades, startBalance, goalBalance, profitTarget, 
       })()}
 
 
-      {/* Account Projection Card */}
-      <motion.div
-        variants={cardVariants}
-        initial="hidden"
-        animate="visible"
-        whileHover="hover"
-        custom={2}
-        className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
-      >
-        <div className="relative">
-          {/* Header with tab switcher */}
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <motion.div
-                variants={iconVariants}
-                initial="initial"
-                whileHover="hover"
-                className="w-10 h-10 rounded-xl bg-secondary/15 flex items-center justify-center"
-              >
-                <Target className="w-5 h-5 text-primary" />
-              </motion.div>
-              <span className="text-sm font-medium text-muted-foreground">Account Projection</span>
-            </div>
-            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                onClick={projectionTab === 'goal' ? handleStartEditGoal : handleStartEditProfitTarget}
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
-            </motion.div>
-          </div>
-
-          {/* Tab switcher pills */}
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/20 mb-5">
-            <button
-              onClick={() => setProjectionTab('goal')}
-              className={cn(
-                "flex-1 text-xs font-medium py-1.5 px-3 rounded-md transition-all duration-200",
-                projectionTab === 'goal'
-                  ? "bg-primary/15 text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Goal Balance
-            </button>
-            <button
-              onClick={() => setProjectionTab('profit')}
-              className={cn(
-                "flex-1 text-xs font-medium py-1.5 px-3 rounded-md transition-all duration-200",
-                projectionTab === 'profit'
-                  ? "bg-primary/15 text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Profit Target
-            </button>
-          </div>
-          
-          <div className="space-y-4">
-            <AnimatePresence mode="wait">
-              {projectionTab === 'goal' ? (
-                <motion.div
-                  key="goal-tab"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-4"
-                >
-                  {/* Goal Balance value */}
-                  <div className="flex items-baseline gap-3">
-                    <AnimatePresence mode="wait">
-                      {isEditingGoal ? (
-                        <motion.div
-                          key="editing-goal"
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.9 }}
-                          className="flex items-center gap-2"
-                        >
-                          <span className="text-3xl font-bold font-mono">$</span>
-                          <Input
-                            ref={goalInputRef}
-                            type="number"
-                            value={editGoalValue}
-                            onChange={(e) => setEditGoalValue(e.target.value)}
-                            onKeyDown={handleKeyDownGoal}
-                            className="w-36 h-10 text-2xl font-bold font-mono px-2 py-0 bg-background/50 border-primary/50"
-                          />
-                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-primary hover:bg-primary/20" onClick={handleConfirmGoal}>
-                              <Check className="w-4 h-4" />
-                            </Button>
-                          </motion.div>
-                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:bg-destructive/20 hover:text-destructive" onClick={handleCancelGoal}>
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </motion.div>
-                        </motion.div>
-                      ) : (
-                        <motion.div key="display-goal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-baseline gap-3">
-                          <AnimatedValue value={goalBalance || 0} prefix="$" className="text-3xl font-bold font-mono" />
-                          {goalBalance && goalBalance > 0 && currentBalance >= goalBalance && (
-                            <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-sm font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
-                              ✓ Reached
-                            </motion.span>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Goal Progress */}
-                  <div>
-                    <div className="text-xs text-muted-foreground mb-2">Progress</div>
-                    {goalBalance && goalBalance > 0 ? (
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-3 bg-muted/30 rounded-full overflow-hidden">
-                          <motion.div 
-                            className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${goalProgress}%` }}
-                            transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
-                          />
-                        </div>
-                        <span className="text-sm font-bold font-mono text-primary">{goalProgress.toFixed(0)}%</span>
-                      </div>
-                    ) : (
-                      <span className="text-sm font-medium text-muted-foreground">Set a goal to track progress</span>
-                    )}
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="profit-tab"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-4"
-                >
-                  {/* Profit Target value */}
-                  <div className="flex items-baseline gap-3">
-                    <AnimatePresence mode="wait">
-                      {isEditingProfitTarget ? (
-                        <motion.div
-                          key="editing-profit-target"
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.9 }}
-                          className="flex items-center gap-2"
-                        >
-                          <span className="text-3xl font-bold font-mono">$</span>
-                          <Input
-                            ref={profitTargetInputRef}
-                            type="number"
-                            value={editProfitTargetValue}
-                            onChange={(e) => setEditProfitTargetValue(e.target.value)}
-                            onKeyDown={handleKeyDownProfitTarget}
-                            className="w-36 h-10 text-2xl font-bold font-mono px-2 py-0 bg-background/50 border-primary/50"
-                          />
-                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-primary hover:bg-primary/20" onClick={handleConfirmProfitTarget}>
-                              <Check className="w-4 h-4" />
-                            </Button>
-                          </motion.div>
-                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:bg-destructive/20 hover:text-destructive" onClick={handleCancelProfitTarget}>
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </motion.div>
-                        </motion.div>
-                      ) : (
-                        <motion.div key="display-profit-target" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-baseline gap-3">
-                          <AnimatedValue value={profitTarget || 0} prefix="$" className="text-3xl font-bold font-mono" />
-                          {profitTarget && profitTarget > 0 && netPnL >= profitTarget && (
-                            <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-sm font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
-                              ✓ Hit
-                            </motion.span>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Profit Target Progress */}
-                  <div>
-                    <div className="text-xs text-muted-foreground mb-2">Progress</div>
-                    {profitTarget && profitTarget > 0 ? (
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-3 bg-muted/30 rounded-full overflow-hidden">
-                          <motion.div 
-                            className="h-full bg-gradient-to-r from-accent to-primary rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${profitTargetProgress}%` }}
-                            transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
-                          />
-                        </div>
-                        <span className="text-sm font-bold font-mono text-primary">{profitTargetProgress.toFixed(0)}%</span>
-                      </div>
-                    ) : (
-                      <span className="text-sm font-medium text-muted-foreground">Set a profit target to track</span>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </motion.div>
+      {/* Account Projection */}
+      <AccountProjectionCard {...projection} />
     </div>
   );
 }
