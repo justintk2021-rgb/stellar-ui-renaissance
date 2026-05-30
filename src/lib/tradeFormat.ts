@@ -63,12 +63,27 @@ export const parseLocalDateKey = (key: string): Date => {
   return new Date(y, (m || 1) - 1, d || 1);
 };
 
+/** Set by useBrokerDayPnL — broker_trade_history realized P/L per position. */
+let brokerPlByPositionCache: Map<string, number> | null = null;
+
+export function setBrokerPlByPositionCache(map: Map<string, number> | null): void {
+  brokerPlByPositionCache = map;
+}
+
 /**
- * Net P&L for a trade as the broker reports it (profit + swap + commission).
- * TradeLocker/MT5 sync used to store gross price P/L in `result` with fees in
- * separate columns; Myfxbook stores an all-in net in `result` already.
+ * P&L for a trade as the broker reports it (broker history / today gross).
+ * TradeLocker journal rows prefer synced broker_trade_history over inflated result.
  */
 export const getTradeNetResult = (trade: Trade): number => {
+  const posId = trade.brokerPositionId;
+  if (
+    trade.importedFromBroker &&
+    posId &&
+    brokerPlByPositionCache?.has(posId)
+  ) {
+    return brokerPlByPositionCache.get(posId)!;
+  }
+
   const base = trade.result || 0;
   if (!trade.importedFromBroker) return base;
 
@@ -77,8 +92,6 @@ export const getTradeNetResult = (trade: Trade): number => {
   const commission = trade.commission ?? 0;
   const fees = swap + commission;
 
-  // Legacy TradeLocker/MT5 rows stored gross P/L in result with fees in columns.
-  // After re-sync, result is net and swap/commission are cleared (0).
   if (
     fees !== 0 &&
     (broker === "TradeLocker" ||
@@ -119,10 +132,27 @@ export type BrokerTodayPnL = {
   syncedAt: string | null;
 };
 
-/** Build per-day net P&L keyed by local close date. */
+/** Local calendar day bounds for sync/reconcile (browser timezone). */
+export const getClientDayBoundsISO = (): {
+  dateKey: string;
+  start: string;
+  end: string;
+} => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  return {
+    dateKey: formatLocalDateKey(now),
+    start: start.toISOString(),
+    end: end.toISOString(),
+  };
+};
+
+/** Build per-day P&L keyed by local close date (broker gross when available). */
 export const buildDailyPnLMap = (
   trades: Trade[],
   brokerToday?: BrokerTodayPnL | null,
+  brokerDayTotals?: Map<string, number> | null,
 ): Map<string, number> => {
   const map = new Map<string, number>();
   const deduped = dedupeTradesForPnL(trades);
@@ -133,18 +163,16 @@ export const buildDailyPnLMap = (
     map.set(key, (map.get(key) || 0) + getTradeNetResult(trade));
   }
 
+  // Broker history totals (TradeLocker gross per day) override journal sums.
+  if (brokerDayTotals?.size) {
+    for (const [day, pnl] of brokerDayTotals) {
+      map.set(day, pnl);
+    }
+  }
+
   const todayKey = formatLocalDateKey(new Date());
   if (brokerToday != null && Number.isFinite(brokerToday.net)) {
-    const syncedAt = brokerToday.syncedAt ? new Date(brokerToday.syncedAt) : null;
-    const syncedToday =
-      syncedAt && !isNaN(syncedAt.getTime()) && formatLocalDateKey(syncedAt) === todayKey;
-    const syncedRecently =
-      syncedAt &&
-      !isNaN(syncedAt.getTime()) &&
-      Date.now() - syncedAt.getTime() < 6 * 60 * 60 * 1000;
-    if (syncedToday || syncedRecently) {
-      map.set(todayKey, brokerToday.net);
-    }
+    map.set(todayKey, brokerToday.net);
   }
 
   return map;

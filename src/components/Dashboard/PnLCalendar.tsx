@@ -38,8 +38,10 @@ import { toast } from "sonner";
 
 interface PnLCalendarProps {
   trades: Trade[];
-  /** When set, today's cell uses broker-reported today gross P&L (TradeLocker sync). */
+  /** Broker today gross (e.g. TradeLocker day P&L). */
   brokerTodayPnL?: BrokerTodayPnL | null;
+  /** Per-day gross totals from broker_trade_history (all calendar days). */
+  brokerDayTotals?: Map<string, number> | null;
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void;
   notebookEntries?: NotebookEntry[];
   onSaveEntry?: (entry: NotebookEntry) => void;
@@ -65,6 +67,7 @@ const formatPnL = (value: number): string => sharedFormatPnL(value, { showPlus: 
 export function PnLCalendar({
   trades,
   brokerTodayPnL = null,
+  brokerDayTotals = null,
   onUpdateTrade,
   notebookEntries = [],
   onSaveEntry,
@@ -119,7 +122,7 @@ export function PnLCalendar({
   // Exit-day stats by close date; entry markers by open date (multi-day only).
   const { dailyStats, dailyTrades, entryDayTrades } = useMemo(() => {
     const deduped = dedupeTradesForPnL(trades);
-    const pnlByDay = buildDailyPnLMap(deduped, brokerTodayPnL);
+    const pnlByDay = buildDailyPnLMap(deduped, brokerTodayPnL, brokerDayTotals);
     const stats: Record<string, DailyStats & { winRate: number }> = {};
     const tradesMap: Record<string, Trade[]> = {};
     const entryTradesMap: Record<string, Trade[]> = {};
@@ -155,7 +158,7 @@ export function PnLCalendar({
     });
 
     return { dailyStats: stats, dailyTrades: tradesMap, entryDayTrades: entryTradesMap };
-  }, [trades, brokerTodayPnL]);
+  }, [trades, brokerTodayPnL, brokerDayTotals]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();

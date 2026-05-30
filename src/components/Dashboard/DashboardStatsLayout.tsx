@@ -6,7 +6,7 @@ import { StatCard } from "./StatCard";
 import { PnLCalendar } from "./PnLCalendar";
 import { WinRatioCard } from "./WinRatioCard";
 import { NotebookEntry } from "@/types/trade";
-import { useActiveBrokerConnectionId, useBrokerPositions, sumFloatingPl } from "@/hooks/useBrokerPositions";
+import { useBrokerPositions, sumFloatingPl } from "@/hooks/useBrokerPositions";
 import { dedupeTradesForPnL, getTradeNetResult, type BrokerTodayPnL } from "@/lib/tradeFormat";
 
 // Lazy-load heavy widgets so the dashboard top section paints first.
@@ -27,6 +27,9 @@ const WidgetFallback = ({ minHeight = 200 }: { minHeight?: number }) => (
 interface DashboardStatsLayoutProps {
   trades: Trade[];
   brokerTodayPnL?: BrokerTodayPnL | null;
+  brokerDayTotals?: Map<string, number> | null;
+  /** When null, open-position stats are hidden (avoids stale broker rows on manual accounts). */
+  brokerConnectionId?: string | null;
   notebookEntries: NotebookEntry[];
   onUpdateTrade: (id: string, updates: Partial<Trade>) => Promise<void>;
   onSaveEntry: (entry: NotebookEntry) => void;
@@ -36,18 +39,22 @@ interface DashboardStatsLayoutProps {
 export function DashboardStatsLayout({
   trades,
   brokerTodayPnL = null,
+  brokerDayTotals = null,
+  brokerConnectionId = null,
   notebookEntries,
   onUpdateTrade,
   onSaveEntry,
   onAddTrade,
 }: DashboardStatsLayoutProps) {
-  const activeBrokerConnId = useActiveBrokerConnectionId();
-  const { positions: brokerPositions } = useBrokerPositions(activeBrokerConnId);
+  const { positions: brokerPositions } = useBrokerPositions(brokerConnectionId);
 
-  const openPositions = useMemo(() => ({
-    count: brokerPositions.length,
-    floatingPl: sumFloatingPl(brokerPositions),
-  }), [brokerPositions]);
+  const openPositions = useMemo(
+    () => ({
+      count: brokerConnectionId ? brokerPositions.length : 0,
+      floatingPl: brokerConnectionId ? sumFloatingPl(brokerPositions) : 0,
+    }),
+    [brokerConnectionId, brokerPositions],
+  );
 
   const pnlTrades = useMemo(() => dedupeTradesForPnL(trades), [trades]);
 
@@ -163,6 +170,7 @@ export function DashboardStatsLayout({
           <PnLCalendar
             trades={trades}
             brokerTodayPnL={brokerTodayPnL}
+            brokerDayTotals={brokerDayTotals}
             onUpdateTrade={onUpdateTrade}
             notebookEntries={notebookEntries}
             onSaveEntry={onSaveEntry}
@@ -202,7 +210,7 @@ export function DashboardStatsLayout({
           className="lg:col-span-3 min-w-0"
         >
           <Suspense fallback={<WidgetFallback minHeight={280} />}>
-            <RecentTrades trades={trades} />
+            <RecentTrades trades={trades} brokerConnectionId={brokerConnectionId} />
           </Suspense>
         </motion.div>
       </div>

@@ -254,6 +254,30 @@ function isoToLocalDateKey(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
+function parseClientDayBounds(body: Record<string, unknown>) {
+  const clientToday =
+    typeof body.clientToday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.clientToday)
+      ? body.clientToday
+      : isoToLocalDateKey(new Date().toISOString());
+  const clientDayStart =
+    typeof body.clientDayStart === 'string' ? body.clientDayStart : `${clientToday}T00:00:00.000Z`;
+  const clientDayEnd =
+    typeof body.clientDayEnd === 'string' ? body.clientDayEnd : `${clientToday}T23:59:59.999Z`;
+  return { clientToday, clientDayStart, clientDayEnd };
+}
+
+function journalDateForClose(
+  closedAt: string | null,
+  openedAt: string,
+  clientToday: string,
+  clientDayStart: string,
+  clientDayEnd: string,
+): string {
+  const closeIso = closedAt || openedAt;
+  if (closeIso >= clientDayStart && closeIso <= clientDayEnd) return clientToday;
+  return closedAt ? isoToLocalDateKey(closedAt) : isoToLocalDateKey(openedAt);
+}
+
 const NET_PL_FIELD_PRIORITY = [
   'netProfit', 'netPnl', 'netPl', 'realizedPl', 'realizedPL', 'profit', 'pnl', 'grossPl', 'grossPL',
 ];
@@ -268,8 +292,8 @@ function firstFinitePl(obj: any, keys: string[]): number | null {
 }
 
 /**
- * Net P/L for a closed position. TradeLocker reports realized P/L on the
- * closing fill only — summing open + close legs double-counts (e.g. $583 vs $418).
+ * Gross P/L for a closed position (matches broker UI / todayGross).
+ * Uses the closing fill only — summing open + close legs double-counts (e.g. $583 vs $418).
  */
 function extractBrokerNetPl(
   openOrder: any,
@@ -281,16 +305,11 @@ function extractBrokerNetPl(
   const primary = closeOrder || openOrder;
   if (!primary) return fallbackGross + orderSwap + orderCommission;
 
+  const profit = firstFinitePl(primary, ['profit', 'pnl', 'grossPl', 'grossPL']);
+  if (profit != null) return profit;
+
   const net = firstFinitePl(primary, ['netProfit', 'netPnl', 'netPl']);
   if (net != null) return net;
-
-  const profit = firstFinitePl(primary, ['profit', 'pnl', 'grossPl', 'grossPL']);
-  if (profit != null) {
-    if (orderSwap !== 0 || orderCommission !== 0) {
-      return profit + orderSwap + orderCommission;
-    }
-    return profit;
-  }
 
   const realized = firstFinitePl(primary, ['realizedPl', 'realizedPL']);
   if (realized != null) return realized;
@@ -716,6 +735,7 @@ serve(async (req) => {
 
       try {
         const { accessToken, environment, accountId, accNum } = tokenInfo;
+        const { clientToday, clientDayStart, clientDayEnd } = parseClientDayBounds(body);
 
         // 0. Fetch config for column definitions
         const config = await tlGetConfig(accessToken, accNum, environment);
@@ -777,6 +797,13 @@ serve(async (req) => {
               await supabase.from('broker_positions').delete().eq('id', ep.id);
             }
           }
+        }
+
+        if (currentPosIds.size === 0) {
+          await supabase
+            .from('broker_positions')
+            .delete()
+            .eq('broker_connection_id', connectionId);
         }
 
         for (const pos of positions) {
@@ -948,7 +975,13 @@ serve(async (req) => {
 
           // Auto-journal: create/update journal entry
           const tradeDate = new Date(closedAt || openedAt);
-          const dateStr = closedAt ? isoToLocalDateKey(closedAt) : isoToLocalDateKey(openedAt);
+          const dateStr = journalDateForClose(
+            closedAt,
+            openedAt,
+            clientToday,
+            clientDayStart,
+            clientDayEnd,
+          );
 
           const { data: existingJournal } = await supabase
             .from('trades')
@@ -1056,9 +1089,14 @@ serve(async (req) => {
           // Journal entry for order-based trades
           if (realizedPl !== 0) {
             const closedIso = trade.filledAt || trade.closedAt || trade.createdAt || now;
+            const openedIso = trade.createdAt || closedIso;
             const tradeDate = new Date(closedIso);
-            const dateStr = isoToLocalDateKey(
-              typeof closedIso === 'string' ? closedIso : tradeDate.toISOString()
+            const dateStr = journalDateForClose(
+              typeof closedIso === 'string' ? closedIso : tradeDate.toISOString(),
+              typeof openedIso === 'string' ? openedIso : tradeDate.toISOString(),
+              clientToday,
+              clientDayStart,
+              clientDayEnd,
             );
 
             const { data: existingJournal } = await supabase
@@ -1103,11 +1141,74 @@ serve(async (req) => {
           }
         }
 
-        // Reconcile today's journal P/L with broker day gross when fills lack P/L fields
-        if (state?.todayGross != null) {
-          const todayUtc = new Date().toISOString().slice(0, 10);
-          const dayStart = `${todayUtc}T00:00:00.000Z`;
-          const dayEnd = `${todayUtc}T23:59:59.999Z`;
+        // Align every journal row with broker_trade_history (broker gross per position)
+        const { data: historyRows } = await supabase
+          .from('broker_trade_history')
+          .select('broker_position_id, realized_pl')
+          .eq('broker_connection_id', connectionId);
+
+        const plByPosition = new Map<string, number>();
+        for (const h of historyRows || []) {
+          if (h.broker_position_id) {
+            plByPosition.set(String(h.broker_position_id), Number(h.realized_pl) || 0);
+          }
+        }
+
+        const { data: journalTrades } = await supabase
+          .from('trades')
+          .select('id, broker_position_id, result')
+          .eq('user_id', user.id)
+          .eq('imported_from_broker', true)
+          .eq('broker_name', 'TradeLocker')
+          .eq('broker_account_id', accountId);
+
+        for (const t of journalTrades || []) {
+          const posId = t.broker_position_id ? String(t.broker_position_id) : '';
+          if (!posId || !plByPosition.has(posId)) continue;
+          const target = plByPosition.get(posId)!;
+          if (Math.abs((Number(t.result) || 0) - target) > 0.01) {
+            await supabase
+              .from('trades')
+              .update({ result: target, swap: 0, commission: 0 })
+              .eq('id', t.id);
+            stats.journalUpdated++;
+          }
+        }
+
+        // Reconcile today's journal day total with broker todayGross (418-style)
+        const { data: todayHist } = await supabase
+          .from('broker_trade_history')
+          .select('realized_pl')
+          .eq('broker_connection_id', connectionId)
+          .gte('closed_at', clientDayStart)
+          .lte('closed_at', clientDayEnd);
+        const historyTodaySum = (todayHist || []).reduce(
+          (s, r) => s + (Number(r.realized_pl) || 0),
+          0,
+        );
+
+        let todayGrossStored = state?.todayGross != null ? Number(state.todayGross) : null;
+        if (
+          todayGrossStored != null &&
+          Math.abs(todayGrossStored) < 0.01 &&
+          Math.abs(historyTodaySum) > 0.01
+        ) {
+          todayGrossStored = historyTodaySum;
+          await supabase
+            .from('broker_connections')
+            .update({
+              today_gross_pnl: historyTodaySum,
+              today_pnl_synced_at: new Date().toISOString(),
+            })
+            .eq('id', connectionId);
+        }
+
+        const todayTarget =
+          todayGrossStored != null && Math.abs(todayGrossStored) > 0.01
+            ? todayGrossStored
+            : historyTodaySum;
+
+        if (todayTarget != null && Math.abs(todayTarget) > 0.01) {
           const { data: todayTrades } = await supabase
             .from('trades')
             .select('id, result, broker_position_id')
@@ -1115,12 +1216,12 @@ serve(async (req) => {
             .eq('imported_from_broker', true)
             .eq('broker_name', 'TradeLocker')
             .eq('broker_account_id', accountId)
-            .gte('close_time', dayStart)
-            .lte('close_time', dayEnd);
+            .gte('close_time', clientDayStart)
+            .lte('close_time', clientDayEnd);
 
           if (todayTrades?.length) {
             const sum = todayTrades.reduce((s, t) => s + (Number(t.result) || 0), 0);
-            const target = Number(state.todayGross);
+            const target = todayTarget;
             if (Math.abs(sum - target) > 0.5) {
               if (todayTrades.length === 1) {
                 await supabase
@@ -1312,7 +1413,11 @@ serve(async (req) => {
       const state = await tlGetAccountState(tokenInfo.accessToken, tokenInfo.accountId, tokenInfo.accNum, tokenInfo.environment);
       if (!state) return jsonResponse({ error: 'Failed to get account state' }, 500);
 
-      const { count: posCount } = await supabase.from('broker_positions').select('*', { count: 'exact', head: true }).eq('broker_connection_id', connectionId);
+      const { count: posCount } = await supabase
+        .from('broker_positions')
+        .select('*', { count: 'exact', head: true })
+        .eq('broker_connection_id', connectionId)
+        .is('closed_at', null);
       const { count: ordCount } = await supabase.from('broker_orders').select('*', { count: 'exact', head: true }).eq('broker_connection_id', connectionId);
 
       return jsonResponse({
@@ -1321,7 +1426,7 @@ serve(async (req) => {
         marginUsed: state.usedMargin || 0,
         freeMargin: state.freeMargin || (state.equity - (state.usedMargin || 0)),
         floatingPl: state.unrealizedPl || 0,
-        openPositions: posCount || 0,
+        openPositions: state.positionsCount ?? posCount ?? 0,
         pendingOrders: ordCount || 0,
         todayNet: state.todayNet ?? 0,
         todayGross: state.todayGross ?? 0,
@@ -1332,7 +1437,11 @@ serve(async (req) => {
     // ====================== GET POSITIONS ======================
     if (action === 'positions') {
       const { connectionId } = body;
-      const { data } = await supabase.from('broker_positions').select('*').eq('broker_connection_id', connectionId);
+      const { data } = await supabase
+        .from('broker_positions')
+        .select('*')
+        .eq('broker_connection_id', connectionId)
+        .is('closed_at', null);
       return jsonResponse({ positions: data || [] });
     }
 

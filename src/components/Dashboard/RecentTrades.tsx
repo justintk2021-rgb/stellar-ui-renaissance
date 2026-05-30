@@ -9,11 +9,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useActiveBrokerConnectionId, useBrokerPositions } from "@/hooks/useBrokerPositions";
+import { useBrokerPositions } from "@/hooks/useBrokerPositions";
 import { subscribeBrokerOrdersRealtime } from "@/lib/queries/broker";
 
 interface RecentTradesProps {
   trades: Trade[];
+  brokerConnectionId?: string | null;
 }
 
 interface OpenPosition {
@@ -55,9 +56,8 @@ const rowVariants = {
   },
 };
 
-export function RecentTrades({ trades }: RecentTradesProps) {
-  const activeBrokerConnId = useActiveBrokerConnectionId();
-  const { positions: brokerPositions } = useBrokerPositions(activeBrokerConnId);
+export function RecentTrades({ trades, brokerConnectionId = null }: RecentTradesProps) {
+  const { positions: brokerPositions } = useBrokerPositions(brokerConnectionId);
   const [orders, setOrders] = useState<PendingOrder[]>([]);
 
   const positions: OpenPosition[] = useMemo(() => brokerPositions.map(p => ({
@@ -74,7 +74,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
   })), [brokerPositions]);
 
   useEffect(() => {
-    if (!activeBrokerConnId) {
+    if (!brokerConnectionId) {
       setOrders([]);
       return;
     }
@@ -83,7 +83,7 @@ export function RecentTrades({ trades }: RecentTradesProps) {
       const { data } = await supabase
         .from('broker_orders')
         .select('*')
-        .eq('broker_connection_id', activeBrokerConnId)
+        .eq('broker_connection_id', brokerConnectionId)
         .eq('status', 'pending');
 
       if (data) {
@@ -101,8 +101,8 @@ export function RecentTrades({ trades }: RecentTradesProps) {
 
     fetchOrders();
 
-    return subscribeBrokerOrdersRealtime(activeBrokerConnId, fetchOrders);
-  }, [activeBrokerConnId]);
+    return subscribeBrokerOrdersRealtime(brokerConnectionId, fetchOrders);
+  }, [brokerConnectionId]);
 
   const recentTrades = useMemo(() =>
     [...trades]

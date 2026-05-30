@@ -92,7 +92,19 @@ async function main() {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ action: "sync", connectionId }),
+      body: JSON.stringify({
+        action: "sync",
+        connectionId,
+        clientToday: new Date().toLocaleDateString("en-CA"),
+        clientDayStart: (() => {
+          const n = new Date();
+          return new Date(n.getFullYear(), n.getMonth(), n.getDate()).toISOString();
+        })(),
+        clientDayEnd: (() => {
+          const n = new Date();
+          return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 23, 59, 59, 999).toISOString();
+        })(),
+      }),
     });
     const text = await res.text();
     let payload;

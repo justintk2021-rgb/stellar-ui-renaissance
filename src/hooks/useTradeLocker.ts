@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queries/keys';
 import { readTradeLockerConnectionId, writeTradeLockerConnectionId } from '@/lib/brokerStorage';
+import { getClientDayBoundsISO } from '@/lib/tradeFormat';
 import type { BrokerPosition } from '@/types/broker';
 
 export type { BrokerPosition };
@@ -254,7 +255,14 @@ export function useTradeLocker() {
     }
     setSyncing(true);
     try {
-      const result = await invokeTradeLocker('sync', { connectionId: connection.id });
+      const dayBounds = getClientDayBoundsISO();
+      const result = await invokeTradeLocker('sync', {
+        connectionId: connection.id,
+        clientToday: dayBounds.dateKey,
+        clientDayStart: dayBounds.start,
+        clientDayEnd: dayBounds.end,
+      });
+      window.dispatchEvent(new CustomEvent('broker-sync-complete'));
       toast.success(result.message || 'Synced');
       await Promise.all([fetchPositions(), fetchOrders(), fetchHistory(), fetchSummary(), fetchConnections()]);
       return true;

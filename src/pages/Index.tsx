@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { useThemeTransition } from "@/hooks/useThemeTransition";
 import { useTrades } from "@/hooks/useTrades";
@@ -21,11 +21,12 @@ import { YearMonthPicker, type MonthSelection } from "@/components/Journal/YearM
 import { AccountSelector } from "@/components/Dashboard/AccountSelector";
 import {
   buildDailyPnLMap,
-  formatLocalDateKey,
+  getClientDayBoundsISO,
   getTradeCloseLocalDateKey,
 } from "@/lib/tradeFormat";
 import { queryKeys } from "@/lib/queries/keys";
 import { fetchTradesList } from "@/lib/queries/trades";
+import { useBrokerTodayPnL } from "@/hooks/useBrokerTodayPnL";
 
 const TradeTable = lazy(() => import("@/components/Journal/TradeTable").then(m => ({ default: m.TradeTable })));
 const CompareView = lazy(() => import("@/components/Journal/CompareView").then(m => ({ default: m.CompareView })));
@@ -114,9 +115,13 @@ const Index = () => {
   const [brokerEquity, setBrokerEquity] = useState<number | null>(null);
   const [brokerFloatingPl, setBrokerFloatingPl] = useState<number>(0);
   const [brokerHasOpenPositions, setBrokerHasOpenPositions] = useState<boolean>(false);
-  const [brokerTodayNet, setBrokerTodayNet] = useState<number | null>(null);
-  const [brokerTodayPnLSyncedAt, setBrokerTodayPnLSyncedAt] = useState<string | null>(null);
   const [brokerSyncing, setBrokerSyncing] = useState(false);
+  const queryClient = useQueryClient();
+  const {
+    brokerToday: brokerTodayPnL,
+    brokerDayTotals,
+    connectionId: brokerConnectionId,
+  } = useBrokerTodayPnL(user?.id, selectedBrokerAccountId);
 
   // Persist broker account selection
   const handleSetBrokerAccountId = useCallback((id: string | null) => {
@@ -179,6 +184,7 @@ const Index = () => {
       const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
       const anonKey = (import.meta as any).env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+      const dayBounds = getClientDayBoundsISO();
       await Promise.allSettled(
         connections.map(async (conn) => {
           try {
@@ -189,7 +195,13 @@ const Index = () => {
                 apikey: anonKey,
                 Authorization: `Bearer ${token ?? anonKey}`,
               },
-              body: JSON.stringify({ action: 'sync', connectionId: conn.id }),
+              body: JSON.stringify({
+                action: 'sync',
+                connectionId: conn.id,
+                clientToday: dayBounds.dateKey,
+                clientDayStart: dayBounds.start,
+                clientDayEnd: dayBounds.end,
+              }),
             });
             if (res.status === 401) {
               await supabase
@@ -204,13 +216,18 @@ const Index = () => {
           }
         })
       );
+      window.dispatchEvent(new CustomEvent('broker-sync-complete'));
+      queryClient.invalidateQueries({ queryKey: queryKeys.trades.all });
+      for (const conn of connections) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.broker.positions(conn.id) });
+      }
     } catch (e) {
       console.warn('Auto broker sync check failed:', e);
     } finally {
       setBrokerSyncing(false);
       inFlightSyncRef.current = false;
     }
-  }, [user?.id]);
+  }, [user?.id, queryClient]);
 
   // Initial sync (deferred well past first paint) + 5-minute interval
   useEffect(() => {
@@ -237,8 +254,6 @@ const Index = () => {
       setBrokerEquity(null);
       setBrokerFloatingPl(0);
       setBrokerHasOpenPositions(false);
-      setBrokerTodayNet(null);
-      setBrokerTodayPnLSyncedAt(null);
       return;
     }
     let brokerConnectionId: string | null = null;
@@ -276,14 +291,6 @@ const Index = () => {
         if (conn?.account_equity != null) {
           setBrokerEquity(Number(conn.account_equity));
         }
-        const brokerToday =
-          conn?.today_gross_pnl != null
-            ? Number(conn.today_gross_pnl)
-            : conn?.today_net_pnl != null
-              ? Number(conn.today_net_pnl)
-              : null;
-        setBrokerTodayNet(brokerToday);
-        setBrokerTodayPnLSyncedAt(conn?.today_pnl_synced_at ?? null);
         await fetchOpenPositions(data.broker_connection_id);
       }
     };
@@ -299,14 +306,6 @@ const Index = () => {
           }
           if (payload.new.account_equity != null) {
             setBrokerEquity(Number(payload.new.account_equity));
-          }
-          if (payload.new.today_gross_pnl != null) {
-            setBrokerTodayNet(Number(payload.new.today_gross_pnl));
-          } else if (payload.new.today_net_pnl != null) {
-            setBrokerTodayNet(Number(payload.new.today_net_pnl));
-          }
-          if (payload.new.today_pnl_synced_at != null) {
-            setBrokerTodayPnLSyncedAt(String(payload.new.today_pnl_synced_at));
           }
         }
       })
@@ -404,18 +403,13 @@ const Index = () => {
 
     const rangeFiltered = winLossFiltered;
 
-    const pnlMap = buildDailyPnLMap(
-      rangeFiltered,
-      brokerTodayNet != null
-        ? { net: brokerTodayNet, syncedAt: brokerTodayPnLSyncedAt }
-        : null,
-    );
+    const pnlMap = buildDailyPnLMap(rangeFiltered, brokerTodayPnL, brokerDayTotals);
 
     return {
       rangeFiltered,
       dayPnLs: Array.from(pnlMap.entries()).map(([date, pnl]) => ({ date, pnl })),
     };
-  }, [journalBaseTrades, journalFilter, showJournalWinLossFilter, brokerTodayNet, brokerTodayPnLSyncedAt]);
+  }, [journalBaseTrades, journalFilter, showJournalWinLossFilter, brokerTodayPnL, brokerDayTotals]);
 
   const { data: allUserTrades = [] } = useQuery({
     queryKey: queryKeys.trades.list(user?.id ?? '', null, null),
@@ -777,11 +771,9 @@ const Index = () => {
                   <motion.div variants={staggerItem}>
                     <DashboardStatsLayout
                       trades={trades}
-                      brokerTodayPnL={
-                        brokerTodayNet != null
-                          ? { net: brokerTodayNet, syncedAt: brokerTodayPnLSyncedAt }
-                          : null
-                      }
+                      brokerTodayPnL={brokerTodayPnL}
+                      brokerDayTotals={brokerDayTotals}
+                      brokerConnectionId={selectedBrokerAccountId ? brokerConnectionId : null}
                       notebookEntries={notebookEntries}
                       onUpdateTrade={async (id, updates) => {
                         await updateTrade(id, updates);

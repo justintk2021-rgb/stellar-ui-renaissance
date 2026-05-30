@@ -134,6 +134,26 @@ const formatDate = (dateStr: string) => {
   }
 };
 
+const formatDateOrDash = (dateStr?: string | null) => {
+  if (!dateStr?.trim() || dateStr === "Unknown") return "—";
+  return formatDate(dateStr);
+};
+
+const isValidDateKey = (key: string) => /^\d{4}-\d{2}-\d{2}$/.test(key);
+
+const sortTradesChronologically = (trades: Trade[]): Trade[] => {
+  const sortTime = (t: Trade) => {
+    if (t.openTime) {
+      const ms = new Date(t.openTime).getTime();
+      if (!isNaN(ms)) return ms;
+    }
+    const key = getTradeLocalDateKey(t);
+    if (key && key !== "Unknown") return parseLocalDateKey(key).getTime();
+    return 0;
+  };
+  return [...trades].sort((a, b) => sortTime(a) - sortTime(b));
+};
+
 // Format a timestamp into a short HH:MM (date) string
 const formatTimestamp = (iso?: string | null) => {
   if (!iso) return null;
@@ -210,8 +230,10 @@ function AnimatedLineChart({ trades, isExpanded }: { trades: Trade[]; isExpanded
     }
   }, [isExpanded]);
 
-  // Build cumulative P&L array starting from 0
-  const cumulative = [0, ...trades.reduce<number[]>((acc, trade, i) => {
+  const sortedTrades = useMemo(() => sortTradesChronologically(trades), [trades]);
+
+  // Build cumulative P&L array starting from 0 (chronological order)
+  const cumulative = [0, ...sortedTrades.reduce<number[]>((acc, trade, i) => {
     const prev = i > 0 ? acc[i - 1] : 0;
     acc.push(prev + (trade.result || 0));
     return acc;
@@ -232,7 +254,7 @@ function AnimatedLineChart({ trades, isExpanded }: { trades: Trade[]; isExpanded
   
   const finalValue = cumulative[cumulative.length - 1] || 0;
   const isPositive = finalValue >= 0;
-  const gradientId = useMemo(() => `gradient-${trades[0]?.id ?? 'empty'}`, [trades]);
+  const gradientId = useMemo(() => `gradient-${sortedTrades[0]?.id ?? 'empty'}`, [sortedTrades]);
 
   // Calculate path length for animation
   let pathLength = 0;
@@ -733,7 +755,9 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
     return trades.filter(t => {
       if (historySymbol !== "__all__" && t.pair !== historySymbol) return false;
       if (cutoff) {
-        const td = new Date(t.date);
+        const key = getTradeLocalDateKey(t);
+        if (!key || key === "Unknown") return false;
+        const td = parseLocalDateKey(key);
         if (isNaN(td.getTime()) || td < cutoff) return false;
       }
       return true;
@@ -745,8 +769,16 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
 
   const groupedTrades = useMemo(() => groupTradesByDate(filteredTrades), [filteredTrades]);
   const sortedDates = useMemo(
-    () => Object.keys(groupedTrades).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()),
-    [groupedTrades]
+    () =>
+      Object.keys(groupedTrades).sort((a, b) => {
+        const aValid = isValidDateKey(a);
+        const bValid = isValidDateKey(b);
+        if (!aValid && !bValid) return a.localeCompare(b);
+        if (!aValid) return 1;
+        if (!bValid) return -1;
+        return parseLocalDateKey(b).getTime() - parseLocalDateKey(a).getTime();
+      }),
+    [groupedTrades],
   );
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -754,7 +786,12 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
   const rowVirtualizer = useVirtualizer({
     count: sortedDates.length,
     getScrollElement: () => scrollContainerRef.current,
-    estimateSize: (index) => (expandedDate === sortedDates[index] ? 280 : 72),
+    estimateSize: (index) => {
+      const date = sortedDates[index];
+      if (expandedDate !== date) return 72;
+      const count = groupedTrades[date]?.length ?? 0;
+      return Math.min(220 + 110 * count, 2000);
+    },
     overscan: 8,
     getItemKey: (index) => sortedDates[index] ?? index,
   });
@@ -1028,7 +1065,7 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                     <div>
                       <span className="block">Trade Notes</span>
                       <span className="text-sm font-normal text-muted-foreground">
-                        {dayTrades[0]?.date} • {dayTrades.length} trades
+                        {formatDateOrDash(dayTrades[0]?.date)} • {dayTrades.length} trades
                       </span>
                     </div>
                   </DialogTitle>
@@ -1140,7 +1177,7 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                     <div>
                       <span className="block">{selectedTrade.pair} • {selectedTrade.direction}</span>
                       <span className="text-sm font-normal text-muted-foreground">
-                        {selectedTrade.date}
+                        {formatDateOrDash(selectedTrade.date)}
                       </span>
                     </div>
                   </DialogTitle>
