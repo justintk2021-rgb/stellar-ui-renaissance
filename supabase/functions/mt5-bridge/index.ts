@@ -47,6 +47,15 @@ function getSession(date: Date): string {
   return "New York";
 }
 
+function isoToLocalDateKey(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso.slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function mapDirection(side: string): "Long" | "Short" {
   return side?.toLowerCase() === "sell" ? "Short" : "Long";
 }
@@ -475,7 +484,9 @@ async function syncSnapshot(req: Request, body: Record<string, unknown>, supabas
       size: numberOrZero(trade.volume || trade.size),
       entry_price: numberOrZero(trade.entry_price || trade.price_open || trade.price),
       exit_price: numberOrNull(trade.exit_price || trade.price_close),
-      realized_pl: numberOrZero(trade.realized_pl || trade.profit),
+      realized_pl: numberOrZero(trade.realized_pl || trade.profit) +
+        numberOrZero(trade.swap) +
+        numberOrZero(trade.commission),
       fees: numberOrZero(trade.fees) + numberOrZero(trade.commission) + numberOrZero(trade.swap),
       opened_at: openedAt,
       closed_at: closedAt,
@@ -510,12 +521,16 @@ async function syncSnapshot(req: Request, body: Record<string, unknown>, supabas
       : await journalMatch.eq("broker_position_id", positionId).maybeSingle();
 
     const tradeDate = new Date(closedAt);
+    const swap = numberOrZero(trade.swap);
+    const commission = numberOrZero(trade.commission);
+    const gross = numberOrZero(trade.realized_pl || trade.profit);
+    const netPl = gross + swap + commission;
     const journalPayload = {
       user_id: auth.connection.user_id,
       pair: String(trade.symbol || "UNKNOWN"),
       direction: mapDirection(side),
-      result: numberOrZero(trade.realized_pl || trade.profit),
-      date: tradeDate.toISOString().split("T")[0],
+      result: netPl,
+      date: isoToLocalDateKey(closedAt),
       session: getSession(tradeDate),
       broker_name: brokerName,
       broker_environment: "local",
@@ -530,8 +545,8 @@ async function syncSnapshot(req: Request, body: Record<string, unknown>, supabas
       close_price: numberOrNull(trade.exit_price || trade.price_close),
       open_time: openedAt,
       close_time: closedAt,
-      swap: numberOrZero(trade.swap),
-      commission: numberOrZero(trade.commission),
+      swap: 0,
+      commission: 0,
     };
 
     if (existingJournal) {
@@ -624,6 +639,49 @@ async function pollCommands(req: Request, body: Record<string, unknown>, supabas
   return jsonResponse({ commands: commands || [] });
 }
 
+async function disconnectConnection(req: Request, body: Record<string, unknown>, supabase: SupabaseClient) {
+  const { user, response } = await requireUser(req, supabase);
+  if (response || !user) return response;
+
+  const connectionId = String(body.connectionId || "");
+  if (!connectionId) {
+    return jsonResponse({ error: "Missing connectionId" }, 400);
+  }
+
+  const { data: owned } = await supabase
+    .from("broker_connections")
+    .select("id")
+    .eq("id", connectionId)
+    .eq("user_id", user.id)
+    .eq("platform", "mt5")
+    .maybeSingle();
+
+  if (!owned) {
+    return jsonResponse({ error: "Connection not found" }, 404);
+  }
+
+  await supabase.from("broker_positions").delete().eq("broker_connection_id", connectionId);
+  await supabase.from("broker_orders").delete().eq("broker_connection_id", connectionId);
+  await supabase.from("broker_trade_history").delete().eq("broker_connection_id", connectionId);
+  await supabase.from("broker_sync_logs").delete().eq("broker_connection_id", connectionId);
+  await supabase.from("broker_trade_commands").delete().eq("broker_connection_id", connectionId);
+  await supabase.from("broker_bridges").delete().eq("broker_connection_id", connectionId);
+  await supabase.from("broker_accounts").delete().eq("broker_connection_id", connectionId);
+
+  const { error: deleteError } = await supabase
+    .from("broker_connections")
+    .delete()
+    .eq("id", connectionId)
+    .eq("user_id", user.id);
+
+  if (deleteError) {
+    console.error("MT5 disconnect delete error:", deleteError);
+    return jsonResponse({ error: deleteError.message || "Failed to remove connection" }, 500);
+  }
+
+  return jsonResponse({ success: true, message: "MT5 connection removed" });
+}
+
 async function commandResult(req: Request, body: Record<string, unknown>, supabase: SupabaseClient) {
   const { auth, response } = await requireBridge(req, body, supabase);
   if (response || !auth) return response;
@@ -664,6 +722,8 @@ serve(async (req) => {
     switch (action) {
       case "create-connection":
         return await createConnection(req, body, supabase);
+      case "disconnect":
+        return await disconnectConnection(req, body, supabase);
       case "status":
         return await getConnectionStatus(req, body, supabase);
       case "bridge-config":

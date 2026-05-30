@@ -19,7 +19,11 @@ import { MiniCalendar } from "@/components/Journal/MiniCalendar";
 import { readCompareFromURL, clearCompareFromURL } from "@/lib/compareUrl";
 import { YearMonthPicker, type MonthSelection } from "@/components/Journal/YearMonthPicker";
 import { AccountSelector } from "@/components/Dashboard/AccountSelector";
-import { formatLocalDateKey, getTradeLocalDateKey } from "@/lib/tradeFormat";
+import {
+  buildDailyPnLMap,
+  formatLocalDateKey,
+  getTradeCloseLocalDateKey,
+} from "@/lib/tradeFormat";
 import { queryKeys } from "@/lib/queries/keys";
 import { fetchTradesList } from "@/lib/queries/trades";
 
@@ -76,13 +80,33 @@ interface UserProfile {
   created_at: string;
 }
 
+/** Dev-only: capture real UI for marketing screenshots (?preview=marketing). */
+const isMarketingPreview =
+  import.meta.env.DEV && new URLSearchParams(window.location.search).get("preview") === "marketing";
+
+const PREVIEW_USER = {
+  id: "00000000-0000-4000-8000-000000000001",
+  email: "preview@local.dev",
+  app_metadata: {},
+  user_metadata: {},
+  aud: "authenticated",
+  created_at: new Date().toISOString(),
+} as User;
+
 const Index = () => {
   const navigate = useNavigate();
   const { setThemeWithTransition } = useThemeTransition();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [profileLoaded, setProfileLoaded] = useState(isMarketingPreview);
+  const [currentPage, setCurrentPage] = useState(() => {
+    if (isMarketingPreview) {
+      const page = new URLSearchParams(window.location.search).get("page");
+      if (page) return page;
+    }
+    return "dashboard";
+  });
   const [selectedBrokerAccountId, setSelectedBrokerAccountId] = useState<string | null>(() => {
     return localStorage.getItem('selectedBrokerAccountId') || null;
   });
@@ -90,6 +114,8 @@ const Index = () => {
   const [brokerEquity, setBrokerEquity] = useState<number | null>(null);
   const [brokerFloatingPl, setBrokerFloatingPl] = useState<number>(0);
   const [brokerHasOpenPositions, setBrokerHasOpenPositions] = useState<boolean>(false);
+  const [brokerTodayNet, setBrokerTodayNet] = useState<number | null>(null);
+  const [brokerTodayPnLSyncedAt, setBrokerTodayPnLSyncedAt] = useState<string | null>(null);
   const [brokerSyncing, setBrokerSyncing] = useState(false);
 
   // Persist broker account selection
@@ -211,6 +237,8 @@ const Index = () => {
       setBrokerEquity(null);
       setBrokerFloatingPl(0);
       setBrokerHasOpenPositions(false);
+      setBrokerTodayNet(null);
+      setBrokerTodayPnLSyncedAt(null);
       return;
     }
     let brokerConnectionId: string | null = null;
@@ -239,7 +267,7 @@ const Index = () => {
         brokerConnectionId = data.broker_connection_id;
         const { data: conn } = await supabase
           .from('broker_connections')
-          .select('account_balance, account_equity')
+          .select('account_balance, account_equity, today_gross_pnl, today_net_pnl, today_pnl_synced_at')
           .eq('id', data.broker_connection_id)
           .single();
         if (conn?.account_balance != null) {
@@ -248,6 +276,14 @@ const Index = () => {
         if (conn?.account_equity != null) {
           setBrokerEquity(Number(conn.account_equity));
         }
+        const brokerToday =
+          conn?.today_gross_pnl != null
+            ? Number(conn.today_gross_pnl)
+            : conn?.today_net_pnl != null
+              ? Number(conn.today_net_pnl)
+              : null;
+        setBrokerTodayNet(brokerToday);
+        setBrokerTodayPnLSyncedAt(conn?.today_pnl_synced_at ?? null);
         await fetchOpenPositions(data.broker_connection_id);
       }
     };
@@ -263,6 +299,14 @@ const Index = () => {
           }
           if (payload.new.account_equity != null) {
             setBrokerEquity(Number(payload.new.account_equity));
+          }
+          if (payload.new.today_gross_pnl != null) {
+            setBrokerTodayNet(Number(payload.new.today_gross_pnl));
+          } else if (payload.new.today_net_pnl != null) {
+            setBrokerTodayNet(Number(payload.new.today_net_pnl));
+          }
+          if (payload.new.today_pnl_synced_at != null) {
+            setBrokerTodayPnLSyncedAt(String(payload.new.today_pnl_synced_at));
           }
         }
       })
@@ -321,10 +365,7 @@ const Index = () => {
   const [journalDateRange, setJournalDateRange] = useState<{ start: Date; end: Date } | null>(null);
 
   // Compare view state — hydrated from URL so the view is shareable.
-  const [compareOpen, setCompareOpen] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return new URLSearchParams(window.location.search).get('compare') === 'true';
-  });
+  const [compareOpen, setCompareOpen] = useState(false);
   const [comparePickerOpen, setComparePickerOpen] = useState<boolean>(false);
   // When the user picks two months, we feed those date ranges into CompareView
   // as initialA / initialB (overriding URL hydration for that single open).
@@ -340,36 +381,41 @@ const Index = () => {
   /** Bumps when the user confirms a new A/B month pair so CompareView remounts. */
   const [compareRevision, setCompareRevision] = useState(0);
 
-  const journalViewData = useMemo(() => {
-    const winLossFiltered = journalFilter === 'all'
-      ? trades
-      : journalFilter === 'wins'
-        ? trades.filter(t => t.result > 0)
-        : trades.filter(t => t.result < 0);
+  const showJournalWinLossFilter = !compareOpen;
 
-    const rangeFiltered = journalDateRange
-      ? (() => {
-          const startStr = formatLocalDateKey(journalDateRange.start);
-          const endStr = formatLocalDateKey(journalDateRange.end);
-          return winLossFiltered.filter(t => {
-            const d = getTradeLocalDateKey(t);
-            return d >= startStr && d <= endStr;
-          });
-        })()
-      : winLossFiltered;
-
-    const pnlByDate: Record<string, number> = {};
-    rangeFiltered.forEach(t => {
-      const key = getTradeLocalDateKey(t);
-      if (!key) return;
-      pnlByDate[key] = (pnlByDate[key] || 0) + (t.result || 0);
+  const journalBaseTrades = useMemo(() => {
+    if (!journalDateRange) return trades;
+    const startStr = formatLocalDateKey(journalDateRange.start);
+    const endStr = formatLocalDateKey(journalDateRange.end);
+    return trades.filter((t) => {
+      const d = getTradeCloseLocalDateKey(t);
+      return d >= startStr && d <= endStr;
     });
+  }, [trades, journalDateRange]);
+
+  const journalViewData = useMemo(() => {
+    const activeFilter = showJournalWinLossFilter ? journalFilter : 'all';
+    const winLossFiltered =
+      activeFilter === 'all'
+        ? journalBaseTrades
+        : activeFilter === 'wins'
+          ? journalBaseTrades.filter((t) => t.result > 0)
+          : journalBaseTrades.filter((t) => t.result < 0);
+
+    const rangeFiltered = winLossFiltered;
+
+    const pnlMap = buildDailyPnLMap(
+      rangeFiltered,
+      brokerTodayNet != null
+        ? { net: brokerTodayNet, syncedAt: brokerTodayPnLSyncedAt }
+        : null,
+    );
 
     return {
       rangeFiltered,
-      dayPnLs: Object.entries(pnlByDate).map(([date, pnl]) => ({ date, pnl })),
+      dayPnLs: Array.from(pnlMap.entries()).map(([date, pnl]) => ({ date, pnl })),
     };
-  }, [trades, journalFilter, journalDateRange]);
+  }, [journalBaseTrades, journalFilter, showJournalWinLossFilter, brokerTodayNet, brokerTodayPnLSyncedAt]);
 
   const { data: allUserTrades = [] } = useQuery({
     queryKey: queryKeys.trades.list(user?.id ?? '', null, null),
@@ -391,11 +437,15 @@ const Index = () => {
   }, []);
 
   const handlePageChange = useCallback((page: string) => {
-    if (page !== 'journal') {
-      closeCompareView();
-    }
+    closeCompareView();
     setCurrentPage(page);
   }, [closeCompareView]);
+
+  useEffect(() => {
+    if (currentPage !== 'journal' && compareOpen) {
+      closeCompareView();
+    }
+  }, [currentPage, compareOpen, closeCompareView]);
 
   // Fetch user profile
   const fetchProfile = useCallback(async (userId: string) => {
@@ -413,10 +463,18 @@ const Index = () => {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
+    } finally {
+      setProfileLoaded(true);
     }
   }, []);
 
   useEffect(() => {
+    if (isMarketingPreview) {
+      setUser(PREVIEW_USER);
+      setSession({ user: PREVIEW_USER } as Session);
+      return;
+    }
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -430,6 +488,7 @@ const Index = () => {
           }, 0);
         } else {
           setUserProfile(null);
+          setProfileLoaded(false);
           navigate('/');
         }
       }
@@ -655,6 +714,7 @@ const Index = () => {
                 showRank={currentPage === 'dashboard'}
                 showGreeting={currentPage === 'dashboard'}
                 greetingName={userProfile?.first_name || null}
+                profileReady={profileLoaded}
                 rightSlot={currentPage === 'dashboard' ? (
                   <div className="flex items-center gap-3">
                     <AccountSelector
@@ -717,6 +777,11 @@ const Index = () => {
                   <motion.div variants={staggerItem}>
                     <DashboardStatsLayout
                       trades={trades}
+                      brokerTodayPnL={
+                        brokerTodayNet != null
+                          ? { net: brokerTodayNet, syncedAt: brokerTodayPnLSyncedAt }
+                          : null
+                      }
                       notebookEntries={notebookEntries}
                       onUpdateTrade={async (id, updates) => {
                         await updateTrade(id, updates);
@@ -759,11 +824,17 @@ const Index = () => {
                     </motion.button>
                   </motion.div>
                   
-                  {/* Filter Tabs */}
+                  {/* Filter Tabs — hidden during compare only */}
+                  {showJournalWinLossFilter && (
                   <motion.div variants={staggerItem} className="flex items-center gap-1 p-1 rounded-xl bg-muted/40 border border-border/30 w-fit">
                     {(['all', 'wins', 'losses'] as const).map((filter) => {
                       const isActive = journalFilter === filter;
-                      const count = filter === 'all' ? trades.length : filter === 'wins' ? trades.filter(t => t.result > 0).length : trades.filter(t => t.result < 0).length;
+                      const count =
+                        filter === 'all'
+                          ? journalBaseTrades.length
+                          : filter === 'wins'
+                            ? journalBaseTrades.filter((t) => t.result > 0).length
+                            : journalBaseTrades.filter((t) => t.result < 0).length;
                       return (
                         <motion.button
                           key={filter}
@@ -796,6 +867,7 @@ const Index = () => {
                       );
                     })}
                   </motion.div>
+                  )}
 
                   {/* Main Content with Calendar Sidebar */}
                   <motion.div variants={staggerItem} className={cn(compareOpen ? "block w-full" : "flex gap-6")}>
@@ -859,6 +931,9 @@ const Index = () => {
                   <YearMonthPicker
                     open={comparePickerOpen}
                     initialSelection={pickerSelection}
+                    accentColor={accentColor}
+                    customColor={customColor}
+                    customGradient={customGradient}
                     onClose={() => setComparePickerOpen(false)}
                     onConfirm={(a: MonthSelection, b: MonthSelection) => {
                       const aStart = new Date(a.year, a.month, 1);

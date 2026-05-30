@@ -409,6 +409,12 @@
   .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
+
+  .font-greeting {
+    font-family: 'Dancing Script', cursive;
+    font-synthesis: none;
+  }
+
 }
 
 @layer utilities {
@@ -430,12 +436,47 @@
     @apply backdrop-blur-xl bg-card/90 border border-border/60;
   }
 
+  /* Floating popovers, dialogs, dropdown panels */
+  .glass-overlay {
+    @apply bg-black/45 backdrop-blur-md;
+  }
+
+  .glass-popup {
+    @apply backdrop-blur-2xl bg-card/60 border border-white/10 shadow-2xl shadow-black/30;
+  }
+
+  .glass-popup-panel {
+    @apply backdrop-blur-xl bg-card/45 border border-white/[0.08] shadow-lg shadow-black/20;
+  }
+
+  /* P&L calendar — days with no trades */
+  .calendar-day-empty {
+    @apply bg-[#F5F6F8] border-[#E9ECF0];
+  }
+
+  .dark .calendar-day-empty {
+    @apply bg-[hsl(0_0%_8%)] border-[hsl(0_0%_11%)];
+  }
+
   @media (prefers-reduced-transparency: reduce) {
     .glass,
     .glass-strong {
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
       @apply bg-card;
+    }
+
+    .glass-overlay {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      @apply bg-black/70;
+    }
+
+    .glass-popup,
+    .glass-popup-panel {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      @apply bg-card border-border/50;
     }
   }
 

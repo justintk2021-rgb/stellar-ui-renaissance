@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTradeLocker } from '@/hooks/useTradeLocker';
 import { MetaTraderManagement } from '@/components/Settings/MetaTraderManagement';
+import { MyfxbookPanel } from '@/components/Settings/MyfxbookPanel';
 import { toast } from 'sonner';
 import {
   Link2, Unlink, RefreshCw, Loader2, CheckCircle2, XCircle, AlertCircle,
@@ -68,7 +69,19 @@ export function BrokerManagement({
   const [diagnosticResults, setDiagnosticResults] = useState<DiagnosticResult[] | null>(null);
   const [runningDiagnostic, setRunningDiagnostic] = useState(false);
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
-  const [showDebug, setShowDebug] = useState(false);
+  const [activeTab, setActiveTab] = useState('positions');
+
+  useEffect(() => {
+    if (activeTab !== 'debug' || !connection) return;
+    let cancelled = false;
+    (async () => {
+      const logs = await fetchSyncLogs();
+      if (!cancelled) setSyncLogs(logs);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, connection?.id, fetchSyncLogs]);
 
   // Connection form
   const [showConnectForm, setShowConnectForm] = useState(false);
@@ -139,7 +152,8 @@ export function BrokerManagement({
 
   const handleReconnect = async () => {
     if (!reconnectEmail || !reconnectPassword) return;
-    await reconnect(reconnectEmail, reconnectPassword);
+    const ok = await reconnect(reconnectEmail, reconnectPassword);
+    if (!ok) return;
     setReconnectOpen(false);
     setReconnectEmail('');
     setReconnectPassword('');
@@ -150,17 +164,27 @@ export function BrokerManagement({
       toast.error('Fill symbol, instrument ID, and quantity');
       return;
     }
+    const qty = parseFloat(tradeQty);
+    const instrumentId = parseInt(tradableInstrumentId, 10);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      toast.error('Enter a valid quantity');
+      return;
+    }
+    if (!Number.isFinite(instrumentId)) {
+      toast.error('Enter a valid instrument ID');
+      return;
+    }
     setIsPlacing(true);
     try {
       await placeOrder({
         symbol: tradeSymbol,
         side: tradeSide,
         type: tradeType,
-        qty: parseFloat(tradeQty),
+        qty,
         price: tradePrice ? parseFloat(tradePrice) : undefined,
         stopLoss: tradeSl ? parseFloat(tradeSl) : undefined,
         takeProfit: tradeTp ? parseFloat(tradeTp) : undefined,
-        tradableInstrumentId: parseInt(tradableInstrumentId),
+        tradableInstrumentId: instrumentId,
       });
       setTradeSymbol('');
       setTradeQty('');
@@ -482,8 +506,7 @@ export function BrokerManagement({
       );
     }
 
-    // Account selection (connection exists but no active account)
-    if (!connection.active_account_id && accounts.length > 0) {
+    if (!connection.active_account_id) {
       return (
         <div className="space-y-6">
           {renderConnectionSwitcher()}
@@ -493,17 +516,26 @@ export function BrokerManagement({
                 <CardTitle>Select Trading Account</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {accounts.map((acc) => (
-                  <Button
-                    key={acc.id}
-                    variant="outline"
-                    className="w-full justify-between h-auto py-3"
-                    onClick={() => handleSelectAccount(acc.account_id_external, acc.acc_num)}
-                  >
-                    <span className="font-medium">{acc.account_name || `Account ${acc.acc_num}`}</span>
-                    <Badge variant="secondary">accNum: {acc.acc_num}</Badge>
-                  </Button>
-                ))}
+                {accounts.length > 0 ? (
+                  accounts.map((acc) => (
+                    <Button
+                      key={acc.id}
+                      variant="outline"
+                      className="w-full justify-between h-auto py-3"
+                      onClick={() => handleSelectAccount(acc.account_id_external, acc.acc_num)}
+                    >
+                      <span className="font-medium">{acc.account_name || `Account ${acc.acc_num}`}</span>
+                      <Badge variant="secondary">accNum: {acc.acc_num}</Badge>
+                    </Button>
+                  ))
+                ) : (
+                  <div className="text-center space-y-3 py-4">
+                    <p className="text-sm text-muted-foreground">No accounts loaded yet.</p>
+                    <Button variant="outline" onClick={() => fetchConnection()}>
+                      Reload accounts
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -616,19 +648,13 @@ export function BrokerManagement({
         )}
 
         {/* Tabs */}
-        <Tabs defaultValue="positions" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full justify-start flex-wrap">
             <TabsTrigger value="positions">Positions ({positions.length})</TabsTrigger>
             <TabsTrigger value="orders">Orders ({orders.length})</TabsTrigger>
             <TabsTrigger value="history">History ({history.length})</TabsTrigger>
             <TabsTrigger value="trade">Place Trade</TabsTrigger>
-            <TabsTrigger value="debug" onClick={async () => {
-              if (!showDebug) {
-                setShowDebug(true);
-                const logs = await fetchSyncLogs();
-                setSyncLogs(logs);
-              }
-            }}>Debug / Logs</TabsTrigger>
+            <TabsTrigger value="debug">Debug / Logs</TabsTrigger>
           </TabsList>
 
           {/* POSITIONS */}
@@ -1003,8 +1029,8 @@ export function BrokerManagement({
                 <Input type="number" value={modifyTp} onChange={(e) => setModifyTp(e.target.value)} />
               </div>
               <Button onClick={async () => {
-                await modifyPosition(modifyPosId, modifySl ? parseFloat(modifySl) : undefined, modifyTp ? parseFloat(modifyTp) : undefined);
-                setModifyPosOpen(false);
+                const ok = await modifyPosition(modifyPosId, modifySl ? parseFloat(modifySl) : undefined, modifyTp ? parseFloat(modifyTp) : undefined);
+                if (ok) setModifyPosOpen(false);
               }} className="w-full">Save Changes</Button>
             </div>
           </DialogContent>
@@ -1031,12 +1057,12 @@ export function BrokerManagement({
                 <Input type="number" value={modifyOrdTp} onChange={(e) => setModifyOrdTp(e.target.value)} />
               </div>
               <Button onClick={async () => {
-                await modifyOrder(modifyOrdId, {
+                const ok = await modifyOrder(modifyOrdId, {
                   price: modifyOrdPrice ? parseFloat(modifyOrdPrice) : undefined,
                   stopLoss: modifyOrdSl ? parseFloat(modifyOrdSl) : undefined,
                   takeProfit: modifyOrdTp ? parseFloat(modifyOrdTp) : undefined,
                 });
-                setModifyOrdOpen(false);
+                if (ok) setModifyOrdOpen(false);
               }} className="w-full">Save Changes</Button>
             </div>
           </DialogContent>
@@ -1067,6 +1093,7 @@ export function BrokerManagement({
   };
 
   const renderMT5 = () => <MetaTraderManagement />;
+  const renderMyfxbook = () => <MyfxbookPanel variant={isConnectMode ? 'connect' : 'full'} onConnectionComplete={onConnectionComplete} />;
 
   if (isConnectMode) {
     return (
@@ -1082,12 +1109,16 @@ export function BrokerManagement({
         <TabsList>
           <TabsTrigger value="tradelocker">TradeLocker</TabsTrigger>
           <TabsTrigger value="mt5">MetaTrader 5</TabsTrigger>
+          <TabsTrigger value="myfxbook">Myfxbook</TabsTrigger>
         </TabsList>
         <TabsContent value="tradelocker" className="mt-6">
           {renderTradeLocker()}
         </TabsContent>
         <TabsContent value="mt5" className="mt-6">
           {renderMT5()}
+        </TabsContent>
+        <TabsContent value="myfxbook" className="mt-6">
+          {renderMyfxbook()}
         </TabsContent>
       </Tabs>
     </div>

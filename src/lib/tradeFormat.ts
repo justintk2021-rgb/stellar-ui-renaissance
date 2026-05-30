@@ -63,9 +63,119 @@ export const parseLocalDateKey = (key: string): Date => {
   return new Date(y, (m || 1) - 1, d || 1);
 };
 
-/** Sum trade results at full precision. Always sum first, round/truncate later. */
+/**
+ * Net P&L for a trade as the broker reports it (profit + swap + commission).
+ * TradeLocker/MT5 sync used to store gross price P/L in `result` with fees in
+ * separate columns; Myfxbook stores an all-in net in `result` already.
+ */
+export const getTradeNetResult = (trade: Trade): number => {
+  const base = trade.result || 0;
+  if (!trade.importedFromBroker) return base;
+
+  const broker = trade.brokerName || "";
+  const swap = trade.swap ?? 0;
+  const commission = trade.commission ?? 0;
+  const fees = swap + commission;
+
+  // Legacy TradeLocker/MT5 rows stored gross P/L in result with fees in columns.
+  // After re-sync, result is net and swap/commission are cleared (0).
+  if (
+    fees !== 0 &&
+    (broker === "TradeLocker" ||
+      broker === "MetaTrader 5" ||
+      broker === "MT5")
+  ) {
+    const withFees = base + fees;
+    if (Math.abs(withFees) > Math.abs(base)) return withFees;
+  }
+
+  return base;
+};
+
+/** Drop duplicate broker journal rows (same position synced more than once). */
+export const dedupeTradesForPnL = (trades: Trade[]): Trade[] => {
+  const manual: Trade[] = [];
+  const byPosition = new Map<string, Trade>();
+
+  for (const trade of trades) {
+    const posId = trade.brokerPositionId;
+    if (!trade.importedFromBroker || !posId) {
+      manual.push(trade);
+      continue;
+    }
+    const prev = byPosition.get(posId);
+    const prevAt = prev?.lastBrokerSyncAt || "";
+    const nextAt = trade.lastBrokerSyncAt || "";
+    if (!prev || nextAt >= prevAt) {
+      byPosition.set(posId, trade);
+    }
+  }
+
+  return [...manual, ...byPosition.values()];
+};
+
+export type BrokerTodayPnL = {
+  net: number;
+  syncedAt: string | null;
+};
+
+/** Build per-day net P&L keyed by local close date. */
+export const buildDailyPnLMap = (
+  trades: Trade[],
+  brokerToday?: BrokerTodayPnL | null,
+): Map<string, number> => {
+  const map = new Map<string, number>();
+  const deduped = dedupeTradesForPnL(trades);
+
+  for (const trade of deduped) {
+    const key = getTradeCloseLocalDateKey(trade);
+    if (!key) continue;
+    map.set(key, (map.get(key) || 0) + getTradeNetResult(trade));
+  }
+
+  const todayKey = formatLocalDateKey(new Date());
+  if (brokerToday != null && Number.isFinite(brokerToday.net)) {
+    const syncedAt = brokerToday.syncedAt ? new Date(brokerToday.syncedAt) : null;
+    const syncedToday =
+      syncedAt && !isNaN(syncedAt.getTime()) && formatLocalDateKey(syncedAt) === todayKey;
+    const syncedRecently =
+      syncedAt &&
+      !isNaN(syncedAt.getTime()) &&
+      Date.now() - syncedAt.getTime() < 6 * 60 * 60 * 1000;
+    if (syncedToday || syncedRecently) {
+      map.set(todayKey, brokerToday.net);
+    }
+  }
+
+  return map;
+};
+
+/** Sum net trade P&L at full precision. Always sum first, round/truncate later. */
 export const sumPnL = (trades: Trade[]): number =>
-  trades.reduce((acc, t) => acc + (t.result || 0), 0);
+  dedupeTradesForPnL(trades).reduce((acc, t) => acc + getTradeNetResult(t), 0);
+
+/**
+ * Per-trade P&L for UI when the day total was overridden (e.g. broker today gross).
+ * Scales each trade proportionally so rows sum to `dayPnL`.
+ */
+export const getTradesDisplayPnL = (
+  trades: Trade[],
+  dayPnL: number,
+): Map<string, number> => {
+  const deduped = dedupeTradesForPnL(trades);
+  const map = new Map<string, number>();
+  if (!deduped.length) return map;
+
+  const rawSum = deduped.reduce((s, t) => s + getTradeNetResult(t), 0);
+  if (Math.abs(rawSum) < 1e-9 || Math.abs(rawSum - dayPnL) < 0.01) {
+    deduped.forEach((t) => map.set(t.id, getTradeNetResult(t)));
+    return map;
+  }
+
+  const scale = dayPnL / rawSum;
+  deduped.forEach((t) => map.set(t.id, getTradeNetResult(t) * scale));
+  return map;
+};
 
 /**
  * Format a P&L value the same way the Dashboard calendar does: truncate (not

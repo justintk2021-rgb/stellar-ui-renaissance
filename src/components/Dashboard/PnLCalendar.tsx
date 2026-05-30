@@ -24,7 +24,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   formatPnL as sharedFormatPnL,
   getTradeLocalDateKey,
+  buildDailyPnLMap,
   getTradeCloseLocalDateKey,
+  getTradeNetResult,
+  getTradesDisplayPnL,
+  dedupeTradesForPnL,
+  parseLocalDateKey,
+  type BrokerTodayPnL,
   isMultiDayTrade,
 } from "@/lib/tradeFormat";
 
@@ -32,6 +38,8 @@ import { toast } from "sonner";
 
 interface PnLCalendarProps {
   trades: Trade[];
+  /** When set, today's cell uses broker-reported today gross P&L (TradeLocker sync). */
+  brokerTodayPnL?: BrokerTodayPnL | null;
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void;
   notebookEntries?: NotebookEntry[];
   onSaveEntry?: (entry: NotebookEntry) => void;
@@ -54,7 +62,14 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // log, and mini calendar always agree to the cent.
 const formatPnL = (value: number): string => sharedFormatPnL(value, { showPlus: false });
 
-export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSaveEntry, onAddTrade }: PnLCalendarProps) {
+export function PnLCalendar({
+  trades,
+  brokerTodayPnL = null,
+  onUpdateTrade,
+  notebookEntries = [],
+  onSaveEntry,
+  onAddTrade,
+}: PnLCalendarProps) {
   const { checklists } = useChecklists();
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
@@ -103,21 +118,20 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
 
   // Exit-day stats by close date; entry markers by open date (multi-day only).
   const { dailyStats, dailyTrades, entryDayTrades } = useMemo(() => {
+    const deduped = dedupeTradesForPnL(trades);
+    const pnlByDay = buildDailyPnLMap(deduped, brokerTodayPnL);
     const stats: Record<string, DailyStats & { winRate: number }> = {};
     const tradesMap: Record<string, Trade[]> = {};
     const entryTradesMap: Record<string, Trade[]> = {};
 
-    trades.forEach((trade) => {
+    deduped.forEach((trade) => {
       const openKey = getTradeLocalDateKey(trade);
       const closeKey = getTradeCloseLocalDateKey(trade);
       if (!closeKey) return;
 
-      if (!stats[closeKey]) {
-        stats[closeKey] = { pnl: 0, trades: 0, winRate: 0 };
+      if (!tradesMap[closeKey]) {
         tradesMap[closeKey] = [];
       }
-      stats[closeKey].pnl += trade.result || 0;
-      stats[closeKey].trades += 1;
       tradesMap[closeKey].push(trade);
 
       if (openKey && isMultiDayTrade(trade)) {
@@ -128,14 +142,20 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
       }
     });
 
-    Object.keys(tradesMap).forEach((date) => {
-      const dayTrades = tradesMap[date];
-      const wins = dayTrades.filter((t) => t.result > 0).length;
-      stats[date].winRate = dayTrades.length > 0 ? (wins / dayTrades.length) * 100 : 0;
+    const allDayKeys = new Set([...pnlByDay.keys(), ...Object.keys(tradesMap)]);
+    allDayKeys.forEach((date) => {
+      const dayTrades = tradesMap[date] || [];
+      const pnl = pnlByDay.get(date) ?? 0;
+      const wins = dayTrades.filter((t) => getTradeNetResult(t) > 0).length;
+      stats[date] = {
+        pnl,
+        trades: dayTrades.length,
+        winRate: dayTrades.length > 0 ? (wins / dayTrades.length) * 100 : 0,
+      };
     });
 
     return { dailyStats: stats, dailyTrades: tradesMap, entryDayTrades: entryTradesMap };
-  }, [trades]);
+  }, [trades, brokerTodayPnL]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -220,28 +240,48 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
 
   const selectedTrades = selectedDate ? getTradesForDate(selectedDate) : [];
 
-  // Calculate metrics for selected day
-  const dayMetrics = selectedTrades.length > 0 ? {
-    totalTrades: selectedTrades.length,
-    wins: selectedTrades.filter(t => t.result > 0).length,
-    losses: selectedTrades.filter(t => t.result < 0).length,
-    breakeven: selectedTrades.filter(t => t.result === 0).length,
-    grossProfit: selectedTrades.filter(t => t.result > 0).reduce((sum, t) => sum + t.result, 0),
-    grossLoss: selectedTrades.filter(t => t.result < 0).reduce((sum, t) => sum + t.result, 0),
-    netPnL: selectedTrades.reduce((sum, t) => sum + t.result, 0),
-    winRate: (selectedTrades.filter(t => t.result > 0).length / selectedTrades.length) * 100,
-    avgWin: selectedTrades.filter(t => t.result > 0).length > 0 
-      ? selectedTrades.filter(t => t.result > 0).reduce((sum, t) => sum + t.result, 0) / selectedTrades.filter(t => t.result > 0).length 
-      : 0,
-    avgLoss: selectedTrades.filter(t => t.result < 0).length > 0 
-      ? selectedTrades.filter(t => t.result < 0).reduce((sum, t) => sum + t.result, 0) / selectedTrades.filter(t => t.result < 0).length 
-      : 0,
-    sessions: [...new Set(selectedTrades.map(t => t.session).filter(Boolean))],
-    pairs: [...new Set(selectedTrades.map(t => t.pair).filter(Boolean))],
-  } : null;
+  const selectedDayPnL = selectedDate ? (dailyStats[selectedDate]?.pnl ?? 0) : 0;
+  const displayPnLByTradeId = useMemo(
+    () => getTradesDisplayPnL(selectedTrades, selectedDayPnL),
+    [selectedTrades, selectedDayPnL],
+  );
+
+  const displayResult = (trade: Trade) =>
+    displayPnLByTradeId.get(trade.id) ?? getTradeNetResult(trade);
+
+  // Calculate metrics for selected day (aligned with calendar cell / broker day total)
+  const dayMetrics = selectedTrades.length > 0 ? (() => {
+    const results = selectedTrades.map((t) => displayResult(t));
+    const netPnL = selectedDayPnL;
+    const wins = results.filter((r) => r > 0).length;
+    const losses = results.filter((r) => r < 0).length;
+    const breakeven = results.filter((r) => r === 0).length;
+    const grossProfit = results.filter((r) => r > 0).reduce((sum, r) => sum + r, 0);
+    const grossLoss = results.filter((r) => r < 0).reduce((sum, r) => sum + r, 0);
+    const winResults = results.filter((r) => r > 0);
+    const lossResults = results.filter((r) => r < 0);
+    return {
+      totalTrades: selectedTrades.length,
+      wins,
+      losses,
+      breakeven,
+      grossProfit,
+      grossLoss,
+      netPnL,
+      winRate: (wins / selectedTrades.length) * 100,
+      avgWin: winResults.length > 0
+        ? winResults.reduce((sum, r) => sum + r, 0) / winResults.length
+        : 0,
+      avgLoss: lossResults.length > 0
+        ? lossResults.reduce((sum, r) => sum + r, 0) / lossResults.length
+        : 0,
+      sessions: [...new Set(selectedTrades.map((t) => t.session).filter(Boolean))],
+      pairs: [...new Set(selectedTrades.map((t) => t.pair).filter(Boolean))],
+    };
+  })() : null;
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseLocalDateKey(dateStr);
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   };
 
@@ -476,16 +516,17 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                       key={dateStr}
                       onClick={() => handleDayClick(dateStr, hasActivity)}
                       className={cn(
-                        "relative min-h-[112px] rounded-xl p-2.5 transition-all duration-200 group border hover:scale-[1.03] hover:-translate-y-0.5 hover:shadow-lg",
+                        "relative min-h-[112px] rounded-xl p-2.5 transition-all duration-200 group border",
+                        hasActivity && "cursor-pointer hover:scale-[1.03] hover:-translate-y-0.5 hover:shadow-lg",
                         hasExitActivity
                           ? stat.pnl > 0
-                            ? "bg-emerald-500/20 border-emerald-500/30 hover:bg-emerald-500/30 hover:border-emerald-500/50 hover:shadow-emerald-500/20 cursor-pointer shadow-sm"
+                            ? "bg-emerald-500/20 border-emerald-500/30 hover:bg-emerald-500/30 hover:border-emerald-500/50 hover:shadow-emerald-500/20 shadow-sm"
                             : stat.pnl < 0
-                            ? "bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/30 hover:border-rose-500/50 hover:shadow-rose-500/20 cursor-pointer shadow-sm"
-                            : "bg-muted/30 border-border/40 hover:bg-muted/50 cursor-pointer"
+                            ? "bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/30 hover:border-rose-500/50 hover:shadow-rose-500/20 shadow-sm"
+                            : "bg-muted/30 border-border/40 hover:bg-muted/50"
                           : hasEntryOnly
-                          ? "bg-primary/10 border-primary/20 hover:bg-primary/15 hover:border-primary/30 cursor-pointer shadow-sm"
-                          : "bg-card/50 border-border/30 hover:bg-muted/20 hover:border-border/50"
+                          ? "bg-primary/10 border-primary/20 hover:bg-primary/15 hover:border-primary/30 shadow-sm"
+                          : "calendar-day-empty hover:bg-[#EEF0F3] dark:hover:bg-[hsl(0_0%_10%)]"
                       )}
                     >
                       {/* Day number */}
@@ -737,7 +778,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
 
       {/* Trade Details Modal */}
       <Dialog open={!!selectedDate} onOpenChange={() => setSelectedDate(null)}>
-        <DialogContent className="sm:max-w-2xl glass border-border/50 bg-card/95 backdrop-blur-xl max-h-[90vh] overflow-y-auto p-0 gap-0 data-[state=open]:animate-none data-[state=closed]:animate-none">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0 data-[state=open]:animate-none data-[state=closed]:animate-none">
           <motion.div
             initial={{ opacity: 0, scale: 0.92, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -890,7 +931,10 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                   <div className="mb-3">
                     <span className="text-sm font-medium">Cumulative P&L</span>
                   </div>
-                  <DayCumulativeChart trades={selectedTrades} />
+                  <DayCumulativeChart
+                    trades={selectedTrades}
+                    displayPnLByTradeId={displayPnLByTradeId}
+                  />
                 </div>
               </motion.div>
 
@@ -949,6 +993,7 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Trade Details</span>
                 <div className="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
                   {selectedTrades.map((trade, i) => {
+                    const tradePl = displayResult(trade);
                     const tradeChecklist = trade.checklistId 
                       ? checklists.find(c => c.id === trade.checklistId) 
                       : null;
@@ -990,9 +1035,9 @@ export function PnLCalendar({ trades, onUpdateTrade, notebookEntries = [], onSav
                             </Button>
                             <span className={cn(
                               "text-sm font-bold font-mono",
-                              trade.result >= 0 ? "text-primary" : "text-destructive"
+                              tradePl >= 0 ? "text-primary" : "text-destructive"
                             )}>
-                              {trade.result >= 0 ? '+' : ''}${truncateNum(trade.result)}
+                              {tradePl >= 0 ? '+' : ''}${truncateNum(tradePl)}
                             </span>
                           </div>
                         </div>
@@ -1188,7 +1233,13 @@ function DayCircularProgress({
 }
 
 // Cumulative P&L chart for the day
-function DayCumulativeChart({ trades }: { trades: Trade[] }) {
+function DayCumulativeChart({
+  trades,
+  displayPnLByTradeId,
+}: {
+  trades: Trade[];
+  displayPnLByTradeId: Map<string, number>;
+}) {
   const chartData = useMemo(() => {
     if (trades.length === 0) return [];
     
@@ -1197,17 +1248,18 @@ function DayCumulativeChart({ trades }: { trades: Trade[] }) {
     
     let cumulative = 0;
     trades.forEach((trade, index) => {
-      cumulative += trade.result || 0;
+      const pl = displayPnLByTradeId.get(trade.id) ?? getTradeNetResult(trade);
+      cumulative += pl;
       data.push({
         trade: index + 1,
         value: cumulative,
         pair: trade.pair,
-        result: trade.result,
+        result: pl,
       });
     });
     
     return data;
-  }, [trades]);
+  }, [trades, displayPnLByTradeId]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {

@@ -244,6 +244,61 @@ function getContractSize(symbol: string, instrumentType?: string): number {
   return 100000;
 }
 
+/** YYYY-MM-DD in the broker/server timezone of the ISO instant (local components). */
+function isoToLocalDateKey(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso.slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+const NET_PL_FIELD_PRIORITY = [
+  'netProfit', 'netPnl', 'netPl', 'realizedPl', 'realizedPL', 'profit', 'pnl', 'grossPl', 'grossPL',
+];
+
+function firstFinitePl(obj: any, keys: string[]): number | null {
+  if (!obj) return null;
+  for (const key of keys) {
+    const v = Number(obj[key]);
+    if (Number.isFinite(v)) return v;
+  }
+  return null;
+}
+
+/**
+ * Net P/L for a closed position. TradeLocker reports realized P/L on the
+ * closing fill only — summing open + close legs double-counts (e.g. $583 vs $418).
+ */
+function extractBrokerNetPl(
+  openOrder: any,
+  closeOrder: any | null,
+  fallbackGross: number,
+  orderSwap: number,
+  orderCommission: number,
+): number {
+  const primary = closeOrder || openOrder;
+  if (!primary) return fallbackGross + orderSwap + orderCommission;
+
+  const net = firstFinitePl(primary, ['netProfit', 'netPnl', 'netPl']);
+  if (net != null) return net;
+
+  const profit = firstFinitePl(primary, ['profit', 'pnl', 'grossPl', 'grossPL']);
+  if (profit != null) {
+    if (orderSwap !== 0 || orderCommission !== 0) {
+      return profit + orderSwap + orderCommission;
+    }
+    return profit;
+  }
+
+  const realized = firstFinitePl(primary, ['realizedPl', 'realizedPL']);
+  if (realized != null) return realized;
+
+  if (closeOrder) return fallbackGross + orderSwap + orderCommission;
+  return 0;
+}
+
 // Calculate P/L using contract size
 function calculateRealizedPl(
   side: string, entryPrice: number, exitPrice: number, qty: number,
@@ -413,13 +468,41 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return jsonResponse({ error: 'Unauthorized' }, 401);
-    }
-
     const body = await req.json();
     const { action } = body;
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    const isServiceRoleJwt = (() => {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1] || ''));
+        return payload.role === 'service_role';
+      } catch {
+        return false;
+      }
+    })();
+    const isServiceRole =
+      token === serviceRoleKey || isServiceRoleJwt;
+
+    let user: { id: string };
+    if (isServiceRole && action === 'sync' && body.connectionId) {
+      const { data: conn } = await supabase
+        .from('broker_connections')
+        .select('user_id')
+        .eq('id', body.connectionId)
+        .single();
+      if (!conn?.user_id) {
+        return jsonResponse({ error: 'Connection not found' }, 404);
+      }
+      user = { id: conn.user_id };
+      console.log(`TradeLocker service-role sync, connection: ${body.connectionId}`);
+    } else {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !authUser) {
+        return jsonResponse({ error: 'Unauthorized' }, 401);
+      }
+      user = authUser;
+    }
+
     console.log(`TradeLocker action: ${action}, user: ${user.id}`);
 
     // ====================== CONNECT ======================
@@ -666,6 +749,10 @@ serve(async (req) => {
             .update({
               account_balance: state.balance,
               account_equity: state.projectedBalance,
+              today_net_pnl: state.todayNet ?? null,
+              today_gross_pnl: state.todayGross ?? null,
+              today_fees: state.todayFees ?? null,
+              today_pnl_synced_at: new Date().toISOString(),
               last_connected_at: new Date().toISOString(),
               connection_status: 'connected',
               last_error: null,
@@ -796,8 +883,13 @@ serve(async (req) => {
         for (const [posId, filledOrders] of Object.entries(positionGroups)) {
           // Find open order (isOpen === "true") and close order (isOpen === "false")
           const openOrder = filledOrders.find((o: any) => o.isOpen === 'true' || o.isOpen === true);
-          const closeOrder = filledOrders.find((o: any) => o.isOpen === 'false' || o.isOpen === false);
-          
+          const closeOrders = filledOrders.filter((o: any) => o.isOpen === 'false' || o.isOpen === false);
+          const closeOrder = closeOrders.length > 0
+            ? closeOrders.reduce((best: any, o: any) =>
+                Number(o.lastModified || 0) > Number(best?.lastModified || 0) ? o : best
+              )
+            : null;
+
           if (!openOrder) continue; // Need at least an open order
 
           const sym = resolveSymbol(openOrder.tradableInstrumentId);
@@ -807,12 +899,17 @@ serve(async (req) => {
           const qty = Number(openOrder.filledQty || openOrder.qty) || 0;
           const isClosed = !!closeOrder;
 
-          // Calculate realized P/L for closed trades using contract size
-          let realizedPl = 0;
+          const orderSwap = Number(openOrder.swap || 0) + closeOrders.reduce((s: number, o: any) => s + Number(o.swap || 0), 0);
+          const orderCommission = Number(openOrder.commission || 0) + closeOrders.reduce((s: number, o: any) => s + Number(o.commission || 0), 0);
+
+          let grossPl = 0;
           if (isClosed && entryPrice && exitPrice) {
             const instType = resolveType(openOrder.tradableInstrumentId);
-            realizedPl = calculateRealizedPl(side, entryPrice, exitPrice, qty, sym, instType);
+            grossPl = calculateRealizedPl(side, entryPrice, exitPrice, qty, sym, instType);
           }
+          const realizedPl = isClosed
+            ? extractBrokerNetPl(openOrder, closeOrder, grossPl, orderSwap, orderCommission)
+            : 0;
 
           const openedAt = openOrder.createdDate ? new Date(Number(openOrder.createdDate)).toISOString() : now;
           const closedAt = closeOrder?.lastModified ? new Date(Number(closeOrder.lastModified)).toISOString() : (isClosed ? now : null);
@@ -835,7 +932,7 @@ serve(async (req) => {
             entry_price: entryPrice,
             exit_price: exitPrice || null,
             realized_pl: realizedPl,
-            fees: 0,
+            fees: orderSwap + orderCommission,
             opened_at: openedAt,
             closed_at: closedAt,
             raw_payload: { openOrder, closeOrder },
@@ -851,7 +948,7 @@ serve(async (req) => {
 
           // Auto-journal: create/update journal entry
           const tradeDate = new Date(closedAt || openedAt);
-          const dateStr = tradeDate.toISOString().split('T')[0];
+          const dateStr = closedAt ? isoToLocalDateKey(closedAt) : isoToLocalDateKey(openedAt);
 
           const { data: existingJournal } = await supabase
             .from('trades')
@@ -859,10 +956,6 @@ serve(async (req) => {
             .eq('user_id', user.id)
             .eq('broker_position_id', posId)
             .maybeSingle();
-
-          // Extract swap/commission from raw order payloads
-          const orderSwap = Number(openOrder.swap || 0) + Number(closeOrder?.swap || 0);
-          const orderCommission = Number(openOrder.commission || 0) + Number(closeOrder?.commission || 0);
 
           if (existingJournal) {
             await supabase.from('trades').update({
@@ -876,8 +969,8 @@ serve(async (req) => {
               close_price: exitPrice || null,
               open_time: openedAt,
               close_time: closedAt,
-              swap: orderSwap,
-              commission: orderCommission,
+              swap: 0,
+              commission: 0,
             }).eq('id', existingJournal.id);
             stats.journalUpdated++;
           } else {
@@ -901,8 +994,8 @@ serve(async (req) => {
               close_price: exitPrice || null,
               open_time: openedAt,
               close_time: closedAt,
-              swap: orderSwap,
-              commission: orderCommission,
+              swap: 0,
+              commission: 0,
             });
             stats.journalCreated++;
           }
@@ -937,7 +1030,10 @@ serve(async (req) => {
 
           const sym = trade.instrument || resolveSymbol(trade.tradableInstrumentId);
           const side = trade.side || 'buy';
-          const realizedPl = trade.realizedPl || 0;
+          const orderSwap = Number(trade.swap || 0);
+          const orderCommission = Number(trade.commission || 0);
+          const grossPl = Number(trade.realizedPl || trade.profit || trade.pnl || 0);
+          const realizedPl = extractBrokerNetPl(trade, trade, grossPl, orderSwap, orderCommission);
 
           await supabase.from('broker_trade_history').insert({
             broker_connection_id: connectionId,
@@ -959,8 +1055,11 @@ serve(async (req) => {
 
           // Journal entry for order-based trades
           if (realizedPl !== 0) {
-            const tradeDate = new Date(trade.filledAt || trade.closedAt || trade.createdAt || Date.now());
-            const dateStr = tradeDate.toISOString().split('T')[0];
+            const closedIso = trade.filledAt || trade.closedAt || trade.createdAt || now;
+            const tradeDate = new Date(closedIso);
+            const dateStr = isoToLocalDateKey(
+              typeof closedIso === 'string' ? closedIso : tradeDate.toISOString()
+            );
 
             const { data: existingJournal } = await supabase
               .from('trades')
@@ -996,10 +1095,59 @@ serve(async (req) => {
                 close_price: trade.closePrice || null,
                 open_time: trade.createdAt || now,
                 close_time: trade.filledAt || trade.closedAt || now,
-                swap: trade.swap || 0,
-                commission: trade.commission || 0,
+                swap: 0,
+                commission: 0,
               });
               stats.journalCreated++;
+            }
+          }
+        }
+
+        // Reconcile today's journal P/L with broker day gross when fills lack P/L fields
+        if (state?.todayGross != null) {
+          const todayUtc = new Date().toISOString().slice(0, 10);
+          const dayStart = `${todayUtc}T00:00:00.000Z`;
+          const dayEnd = `${todayUtc}T23:59:59.999Z`;
+          const { data: todayTrades } = await supabase
+            .from('trades')
+            .select('id, result, broker_position_id')
+            .eq('user_id', user.id)
+            .eq('imported_from_broker', true)
+            .eq('broker_name', 'TradeLocker')
+            .eq('broker_account_id', accountId)
+            .gte('close_time', dayStart)
+            .lte('close_time', dayEnd);
+
+          if (todayTrades?.length) {
+            const sum = todayTrades.reduce((s, t) => s + (Number(t.result) || 0), 0);
+            const target = Number(state.todayGross);
+            if (Math.abs(sum - target) > 0.5) {
+              if (todayTrades.length === 1) {
+                await supabase
+                  .from('trades')
+                  .update({
+                    result: target,
+                    swap: 0,
+                    commission: Number(state.todayFees) || 0,
+                  })
+                  .eq('id', todayTrades[0].id);
+                if (todayTrades[0].broker_position_id) {
+                  await supabase
+                    .from('broker_trade_history')
+                    .update({ realized_pl: target })
+                    .eq('broker_connection_id', connectionId)
+                    .eq('broker_position_id', todayTrades[0].broker_position_id);
+                }
+              } else if (sum !== 0) {
+                const scale = target / sum;
+                for (const t of todayTrades) {
+                  await supabase
+                    .from('trades')
+                    .update({ result: (Number(t.result) || 0) * scale })
+                    .eq('id', t.id);
+                }
+              }
+              stats.journalUpdated += todayTrades.length;
             }
           }
         }
@@ -1175,6 +1323,9 @@ serve(async (req) => {
         floatingPl: state.unrealizedPl || 0,
         openPositions: posCount || 0,
         pendingOrders: ordCount || 0,
+        todayNet: state.todayNet ?? 0,
+        todayGross: state.todayGross ?? 0,
+        todayFees: state.todayFees ?? 0,
       });
     }
 
@@ -1286,13 +1437,38 @@ serve(async (req) => {
     // ====================== DISCONNECT ======================
     if (action === 'disconnect') {
       const { connectionId } = body;
+      if (!connectionId) {
+        return jsonResponse({ error: 'Missing connectionId' }, 400);
+      }
+
+      const { data: owned } = await supabase
+        .from('broker_connections')
+        .select('id')
+        .eq('id', connectionId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!owned) {
+        return jsonResponse({ error: 'Connection not found' }, 404);
+      }
 
       await supabase.from('broker_positions').delete().eq('broker_connection_id', connectionId);
       await supabase.from('broker_orders').delete().eq('broker_connection_id', connectionId);
       await supabase.from('broker_trade_history').delete().eq('broker_connection_id', connectionId);
       await supabase.from('broker_sync_logs').delete().eq('broker_connection_id', connectionId);
+      await supabase.from('broker_trade_commands').delete().eq('broker_connection_id', connectionId);
+      await supabase.from('broker_bridges').delete().eq('broker_connection_id', connectionId);
       await supabase.from('broker_accounts').delete().eq('broker_connection_id', connectionId);
-      await supabase.from('broker_connections').delete().eq('id', connectionId).eq('user_id', user.id);
+      const { error: deleteError } = await supabase
+        .from('broker_connections')
+        .delete()
+        .eq('id', connectionId)
+        .eq('user_id', user.id);
+
+      if (deleteError) {
+        console.error('Disconnect delete error:', deleteError);
+        return jsonResponse({ error: deleteError.message || 'Failed to remove connection' }, 500);
+      }
 
       return jsonResponse({ success: true, message: 'Broker disconnected' });
     }

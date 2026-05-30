@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queries/keys';
+import { readTradeLockerConnectionId, writeTradeLockerConnectionId } from '@/lib/brokerStorage';
 import type { BrokerPosition } from '@/types/broker';
 
 export type { BrokerPosition };
@@ -106,7 +107,7 @@ async function invokeTradeLocker(action: string, body: Record<string, unknown> =
 
 export function useTradeLocker() {
   const [activeConnectionId, setActiveConnectionId] = useState<string | null>(() => {
-    return localStorage.getItem('activeBrokerConnectionId') || null;
+    return readTradeLockerConnectionId();
   });
   const [accounts, setAccounts] = useState<BrokerAccount[]>([]);
   const [positions, setPositions] = useState<BrokerPosition[]>([]);
@@ -119,11 +120,7 @@ export function useTradeLocker() {
 
   const selectConnection = useCallback((connectionId: string | null) => {
     setActiveConnectionId(connectionId);
-    if (connectionId) {
-      localStorage.setItem('activeBrokerConnectionId', connectionId);
-    } else {
-      localStorage.removeItem('activeBrokerConnectionId');
-    }
+    writeTradeLockerConnectionId(connectionId);
     setPositions([]);
     setOrders([]);
     setHistory([]);
@@ -151,16 +148,20 @@ export function useTradeLocker() {
   });
 
   useEffect(() => {
-    if (connections.length > 0) {
-      const persisted = localStorage.getItem('activeBrokerConnectionId');
-      const match = connections.find(c => c.id === persisted);
-      if (!match && activeConnectionId !== connections[0].id) {
-        selectConnection(connections[0].id);
-      }
-    } else if (connections.length === 0 && activeConnectionId) {
-      selectConnection(null);
+    if (connections.length === 0) {
+      if (activeConnectionId) selectConnection(null);
+      return;
     }
-  }, [connections.length]);
+    const persisted = readTradeLockerConnectionId();
+    const match = connections.find((c) => c.id === persisted);
+    if (match) {
+      if (activeConnectionId !== match.id) selectConnection(match.id);
+      return;
+    }
+    if (!connections.some((c) => c.id === activeConnectionId)) {
+      selectConnection(connections[0].id);
+    }
+  }, [connections, activeConnectionId, selectConnection]);
 
   const fetchConnections = useCallback(async () => {
     await refetchConnections();
@@ -244,18 +245,25 @@ export function useTradeLocker() {
   };
 
   // Sync
-  const sync = async () => {
-    if (!connection || !connection.active_account_id) return;
+  const sync = async (options?: { quiet?: boolean }) => {
+    if (!connection || !connection.active_account_id) {
+      if (!options?.quiet) {
+        toast.warning('Select a trading account before syncing.');
+      }
+      return false;
+    }
     setSyncing(true);
     try {
       const result = await invokeTradeLocker('sync', { connectionId: connection.id });
       toast.success(result.message || 'Synced');
       await Promise.all([fetchPositions(), fetchOrders(), fetchHistory(), fetchSummary(), fetchConnections()]);
+      return true;
     } catch (error: any) {
       // Suppress sync errors when session is expired - don't show toast for background syncs
-      if (!error.message?.includes('expired')) {
+      if (!options?.quiet && !error.message?.includes('expired')) {
         toast.error(error.message);
       }
+      return false;
     } finally {
       setSyncing(false);
     }
@@ -321,49 +329,57 @@ export function useTradeLocker() {
 
   // Close position
   const closePosition = async (positionId: string, qty?: number) => {
-    if (!connection) return;
+    if (!connection) return false;
     try {
       await invokeTradeLocker('close-position', { connectionId: connection.id, positionId, qty });
       toast.success('Position closed');
-      await sync();
+      await sync({ quiet: true });
+      return true;
     } catch (error: any) {
       toast.error(error.message);
+      return false;
     }
   };
 
   // Modify position
   const modifyPosition = async (positionId: string, stopLoss?: number, takeProfit?: number) => {
-    if (!connection) return;
+    if (!connection) return false;
     try {
       await invokeTradeLocker('modify-position', { connectionId: connection.id, positionId, stopLoss, takeProfit });
       toast.success('Position modified');
-      await sync();
+      await sync({ quiet: true });
+      return true;
     } catch (error: any) {
       toast.error(error.message);
+      return false;
     }
   };
 
   // Cancel order
   const cancelOrder = async (orderId: string) => {
-    if (!connection) return;
+    if (!connection) return false;
     try {
       await invokeTradeLocker('cancel-order', { connectionId: connection.id, orderId });
       toast.success('Order cancelled');
-      await sync();
+      await sync({ quiet: true });
+      return true;
     } catch (error: any) {
       toast.error(error.message);
+      return false;
     }
   };
 
   // Modify order
   const modifyOrder = async (orderId: string, params: { stopLoss?: number; takeProfit?: number; price?: number }) => {
-    if (!connection) return;
+    if (!connection) return false;
     try {
       await invokeTradeLocker('modify-order', { connectionId: connection.id, orderId, ...params });
       toast.success('Order modified');
-      await sync();
+      await sync({ quiet: true });
+      return true;
     } catch (error: any) {
       toast.error(error.message);
+      return false;
     }
   };
 
@@ -373,15 +389,14 @@ export function useTradeLocker() {
     try {
       await invokeTradeLocker('disconnect', { connectionId: connection.id });
       toast.success('Disconnected');
-      // Remove from local list and select another
-      const remaining = connections.filter(c => c.id !== connection.id);
-      setConnections(remaining);
-      selectConnection(remaining[0]?.id || null);
+      const remaining = connections.filter((c) => c.id !== connection.id);
+      selectConnection(remaining[0]?.id ?? null);
       setAccounts([]);
       setPositions([]);
       setOrders([]);
       setHistory([]);
       setSummary(null);
+      await refetchConnections();
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -389,13 +404,16 @@ export function useTradeLocker() {
 
   // Reconnect
   const reconnect = async (email: string, password: string) => {
-    if (!connection) return;
+    if (!connection) return false;
     try {
       await invokeTradeLocker('reconnect', { connectionId: connection.id, email, password });
       toast.success('Reconnected');
       await fetchConnections();
+      await Promise.all([fetchPositions(), fetchOrders(), fetchHistory(), fetchSummary()]);
+      return true;
     } catch (error: any) {
       toast.error(error.message);
+      return false;
     }
   };
 
@@ -459,7 +477,7 @@ export function useTradeLocker() {
     if (connection?.auto_sync_enabled && connection.connection_status === 'connected' && connection.active_account_id) {
       const interval = (connection.sync_interval_seconds || 60) * 1000;
       syncIntervalRef.current = setInterval(() => {
-        sync();
+        sync({ quiet: true });
       }, interval);
     }
 

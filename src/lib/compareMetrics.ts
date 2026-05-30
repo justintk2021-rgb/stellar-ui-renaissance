@@ -1,5 +1,5 @@
 import { Trade } from "@/types/trade";
-import { getTradeLocalDateKey, sumPnL } from "@/lib/tradeFormat";
+import { getTradeLocalDateKey, getTradeNetResult, sumPnL } from "@/lib/tradeFormat";
 
 /**
  * Aggregated stats for a single comparison period.
@@ -25,15 +25,15 @@ export interface PeriodStats {
 
 export const computePeriodStats = (trades: Trade[]): PeriodStats => {
   const totalTrades = trades.length;
-  const wins = trades.filter((t) => t.result > 0).length;
-  const losses = trades.filter((t) => t.result < 0).length;
-  const breakeven = trades.filter((t) => t.result === 0).length;
+  const wins = trades.filter((t) => getTradeNetResult(t) > 0).length;
+  const losses = trades.filter((t) => getTradeNetResult(t) < 0).length;
+  const breakeven = trades.filter((t) => getTradeNetResult(t) === 0).length;
   const grossWin = trades
-    .filter((t) => t.result > 0)
-    .reduce((s, t) => s + t.result, 0);
+    .filter((t) => getTradeNetResult(t) > 0)
+    .reduce((s, t) => s + getTradeNetResult(t), 0);
   const grossLoss = trades
-    .filter((t) => t.result < 0)
-    .reduce((s, t) => s + t.result, 0);
+    .filter((t) => getTradeNetResult(t) < 0)
+    .reduce((s, t) => s + getTradeNetResult(t), 0);
   const netPnL = sumPnL(trades);
   const winRate = totalTrades ? wins / totalTrades : 0;
   const avgWin = wins ? grossWin / wins : 0;

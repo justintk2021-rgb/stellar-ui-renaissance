@@ -7,6 +7,7 @@ import { PnLCalendar } from "./PnLCalendar";
 import { WinRatioCard } from "./WinRatioCard";
 import { NotebookEntry } from "@/types/trade";
 import { useActiveBrokerConnectionId, useBrokerPositions, sumFloatingPl } from "@/hooks/useBrokerPositions";
+import { dedupeTradesForPnL, getTradeNetResult, type BrokerTodayPnL } from "@/lib/tradeFormat";
 
 // Lazy-load heavy widgets so the dashboard top section paints first.
 const RecentTrades = lazy(() =>
@@ -25,6 +26,7 @@ const WidgetFallback = ({ minHeight = 200 }: { minHeight?: number }) => (
 
 interface DashboardStatsLayoutProps {
   trades: Trade[];
+  brokerTodayPnL?: BrokerTodayPnL | null;
   notebookEntries: NotebookEntry[];
   onUpdateTrade: (id: string, updates: Partial<Trade>) => Promise<void>;
   onSaveEntry: (entry: NotebookEntry) => void;
@@ -33,6 +35,7 @@ interface DashboardStatsLayoutProps {
 
 export function DashboardStatsLayout({
   trades,
+  brokerTodayPnL = null,
   notebookEntries,
   onUpdateTrade,
   onSaveEntry,
@@ -46,9 +49,11 @@ export function DashboardStatsLayout({
     floatingPl: sumFloatingPl(brokerPositions),
   }), [brokerPositions]);
 
-  const stats = trades.reduce(
+  const pnlTrades = useMemo(() => dedupeTradesForPnL(trades), [trades]);
+
+  const stats = pnlTrades.reduce(
     (acc, trade) => {
-      const pl = trade.result || 0;
+      const pl = getTradeNetResult(trade);
       acc.net += pl;
       if (pl > 0) {
         acc.wins++;
@@ -83,7 +88,7 @@ export function DashboardStatsLayout({
       showTrend: true,
       colorClass: stats.net >= 0 ? "text-primary" : "text-destructive",
       bgClass: stats.net >= 0 ? "bg-primary/10" : "bg-destructive/10",
-      extra: `${trades.length} trades total`,
+      extra: `${pnlTrades.length} trades total`,
     },
     {
       label: "Open Trades",
@@ -157,6 +162,7 @@ export function DashboardStatsLayout({
         <div className="md:col-span-2 lg:col-span-8 order-first md:order-none min-w-0">
           <PnLCalendar
             trades={trades}
+            brokerTodayPnL={brokerTodayPnL}
             onUpdateTrade={onUpdateTrade}
             notebookEntries={notebookEntries}
             onSaveEntry={onSaveEntry}

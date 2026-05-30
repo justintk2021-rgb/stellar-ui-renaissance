@@ -276,6 +276,15 @@ function getSession(date: Date): string {
   return "New York";
 }
 
+function isoToLocalDateKey(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso.slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function parseMfxDate(s: string | undefined | null): Date | null {
   if (!s) return null;
   // Myfxbook returns "MM/DD/YYYY HH:mm" in account timezone
@@ -549,7 +558,9 @@ serve(async (req) => {
 
         const symbol = String(h.symbol || h.tradeSymbol || "Unknown");
         const direction = normalizeDirection(h.action);
-        const dateStr = closeDate.toISOString().slice(0, 10);
+        const closeIso = closeDate.toISOString();
+        const openIso = (openDate || closeDate).toISOString();
+        const dateStr = isoToLocalDateKey(closeIso);
         const sessionLabel = getSession(openDate || closeDate);
         const positionId = String(h.ticket || h.openTicket || h.id || "");
 
@@ -573,6 +584,8 @@ serve(async (req) => {
           close_price: h.closePrice != null ? Number(h.closePrice) : null,
           swap,
           commission,
+          open_time: openIso,
+          close_time: closeIso,
           execution_type: "Market",
           broker_name: "Myfxbook",
           broker_environment: "live",
@@ -698,19 +711,44 @@ serve(async (req) => {
     // ---------------- DISCONNECT ----------------
     if (action === "disconnect") {
       const connectionId = String(body.connectionId || "");
+      if (!connectionId) {
+        return jsonResponse({ error: "Missing connectionId" }, 400);
+      }
+
       const { data: conn } = await adminClient
         .from("broker_connections")
         .select("*")
         .eq("id", connectionId)
         .eq("user_id", userId)
         .maybeSingle();
-      if (conn?.myfxbook_session) {
+
+      if (!conn) {
+        return jsonResponse({ error: "Connection not found" }, 404);
+      }
+
+      if (conn.myfxbook_session) {
         await mfxLogout(conn.myfxbook_session);
       }
-      await adminClient.from("broker_connections").update({
-        connection_status: "disconnected",
-        myfxbook_session: null,
-      }).eq("id", connectionId);
+
+      await adminClient.from("broker_positions").delete().eq("broker_connection_id", connectionId);
+      await adminClient.from("broker_orders").delete().eq("broker_connection_id", connectionId);
+      await adminClient.from("broker_trade_history").delete().eq("broker_connection_id", connectionId);
+      await adminClient.from("broker_sync_logs").delete().eq("broker_connection_id", connectionId);
+      await adminClient.from("broker_trade_commands").delete().eq("broker_connection_id", connectionId);
+      await adminClient.from("broker_bridges").delete().eq("broker_connection_id", connectionId);
+      await adminClient.from("broker_accounts").delete().eq("broker_connection_id", connectionId);
+
+      const { error: deleteError } = await adminClient
+        .from("broker_connections")
+        .delete()
+        .eq("id", connectionId)
+        .eq("user_id", userId);
+
+      if (deleteError) {
+        console.error("Myfxbook disconnect delete error:", deleteError);
+        return jsonResponse({ error: deleteError.message || "Failed to remove connection" }, 500);
+      }
+
       return jsonResponse({ success: true });
     }
 

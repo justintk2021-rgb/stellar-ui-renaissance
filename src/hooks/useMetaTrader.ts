@@ -37,7 +37,20 @@ async function invokeMt5Bridge(action: string, body: Record<string, unknown> = {
   });
 
   if (data?.error) throw new Error(String(data.error));
-  if (error) throw new Error(error.message || 'MT5 bridge request failed');
+
+  if (error) {
+    let message = error.message || 'MT5 bridge request failed';
+    if ('context' in error && error.context instanceof Response) {
+      try {
+        const parsed = await error.context.json();
+        if (parsed?.error) message = String(parsed.error);
+      } catch {
+        // keep default message
+      }
+    }
+    throw new Error(message);
+  }
+
   return data;
 }
 
@@ -195,30 +208,33 @@ export function useMetaTrader() {
   }, [activeConnectionId, fetchAccounts, fetchHistory, fetchOrders, fetchPositions, fetchStatus, refetchConnections]);
 
   const createConnection = async (params: { brokerName?: string; server: string; login: string; password: string }) => {
-    const result = await invokeMt5Bridge('create-connection', params);
-    setLatestBridgeKey(result.bridgeKey || null);
-    if (result.connectionId) {
-      selectConnection(result.connectionId);
-      await refetchConnections();
+    try {
+      const result = await invokeMt5Bridge('create-connection', params);
+      setLatestBridgeKey(result.bridgeKey || null);
+      if (result.connectionId) {
+        selectConnection(result.connectionId);
+        await refetchConnections();
+      }
+      toast.success('MT5 bridge connection created');
+      return result;
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to create MT5 connection'));
+      throw error;
     }
-    toast.success('MT5 bridge connection created');
-    return result;
   };
 
   const disconnect = async () => {
     if (!connection) return;
-    const { error } = await supabase
-      .from('broker_connections')
-      .delete()
-      .eq('id', connection.id);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      await invokeMt5Bridge('disconnect', { connectionId: connection.id });
+      toast.success('MT5 connection removed');
+      setLatestBridgeKey(null);
+      const remaining = connections.filter((c) => c.id !== connection.id);
+      selectConnection(remaining[0]?.id ?? null);
+      await refetchConnections();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to disconnect MT5'));
     }
-    toast.success('MT5 connection removed');
-    setLatestBridgeKey(null);
-    selectConnection(null);
-    await refetchConnections();
   };
 
   const queueCommand = async (commandType: string, payload: Record<string, unknown>) => {

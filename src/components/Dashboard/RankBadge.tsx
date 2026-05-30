@@ -17,14 +17,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-interface Trade {
-  id: string;
-  date: string;
-  result: number;
-  checklist_id?: string | null;
-  checklist_state?: any;
-}
+import { getTradeCloseLocalDateKey, getTradeNetResult } from "@/lib/tradeFormat";
+import type { Trade } from "@/types/trade";
 
 interface RankBadgeProps {
   trades: Trade[];
@@ -59,7 +53,7 @@ function calculateConsistencyScore(trades: Trade[]) {
   const uniqueDays = new Set(trades.map(t => t.date)).size;
   const journalScore = Math.min(uniqueDays * 5, 200);
 
-  const tradesWithChecklist = trades.filter(t => t.checklist_id).length;
+  const tradesWithChecklist = trades.filter(t => t.checklistId).length;
   const checklistUsageRate = (tradesWithChecklist / trades.length) * 100;
   const checklistScore = Math.round(checklistUsageRate * 2);
 
@@ -73,7 +67,8 @@ function calculateConsistencyScore(trades: Trade[]) {
 
   const dailyPnL: Record<string, number> = {};
   trades.forEach(t => {
-    dailyPnL[t.date] = (dailyPnL[t.date] || 0) + t.result;
+    const day = getTradeCloseLocalDateKey(t);
+    dailyPnL[day] = (dailyPnL[day] || 0) + getTradeNetResult(t);
   });
   
   const sortedDays = Object.entries(dailyPnL).sort((a, b) => 

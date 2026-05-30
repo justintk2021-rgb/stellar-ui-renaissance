@@ -31,32 +31,33 @@ interface AccountProjectionCardProps {
 
 function Money({ value, className }: { value: number; className?: string }) {
   const { formattedValue } = useCountUp({ end: value, duration: 700, decimals: 2, prefix: '$' });
-  return <span className={className}>{formattedValue}</span>;
+  return (
+    <span className={cn('text-foreground tabular-nums', className)}>{formattedValue}</span>
+  );
 }
 
 function ProgressRing({
   progress,
-  colorClass,
-  size = 64,
+  size = 56,
 }: {
   progress: number;
-  colorClass: string;
   size?: number;
 }) {
   const stroke = 5;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (Math.min(100, Math.max(0, progress)) / 100) * circumference;
+  const clamped = Math.min(100, Math.max(0, progress));
+  const offset = circumference - (clamped / 100) * circumference;
 
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
+      <svg width={size} height={size} className="-rotate-90 text-primary">
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="hsl(var(--muted) / 0.35)"
+          stroke="hsl(var(--border))"
           strokeWidth={stroke}
         />
         <motion.circle
@@ -64,10 +65,9 @@ function ProgressRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="currentColor"
+          stroke="hsl(var(--primary))"
           strokeWidth={stroke}
           strokeLinecap="round"
-          className={colorClass}
           strokeDasharray={circumference}
           initial={{ strokeDashoffset: circumference }}
           animate={{ strokeDashoffset: offset }}
@@ -75,8 +75,8 @@ function ProgressRing({
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className={cn('text-xs font-bold font-mono leading-none', colorClass)}>
-          {Math.round(progress)}%
+        <span className="text-xs font-bold font-mono leading-none text-primary">
+          {Math.round(clamped)}%
         </span>
       </div>
     </div>
@@ -105,7 +105,6 @@ export function AccountProjectionCard({
   const activeTarget = activeTargetInput;
   const activeProgress = tab === 'goal' ? metrics.goalProgress : metrics.profitProgress;
   const activeRemaining = tab === 'goal' ? metrics.remainingToGoal : metrics.remainingProfit;
-  // Always anchor "Current" to where the account balance actually is — never raw netPnL
   const activeCurrent = currentBalance;
   const isComplete = tab === 'goal' ? metrics.goalReached : metrics.profitTargetHit;
 
@@ -146,22 +145,22 @@ export function AccountProjectionCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 280, damping: 26, delay: 0.15 }}
-      className="relative rounded-2xl p-4 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl h-full"
+      className="relative rounded-2xl p-3 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl h-auto self-start"
     >
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
 
-      <div className="relative flex flex-col h-full gap-3">
+      <div className="relative flex flex-col gap-2">
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
               <Target className="w-3.5 h-3.5 text-primary" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold">Projection</span>
+                <span className="text-xs font-semibold text-foreground">Projection</span>
                 {isBroker && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary font-semibold uppercase tracking-wide flex items-center gap-0.5">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-semibold uppercase tracking-wide flex items-center gap-0.5">
                     <Link2 className="w-2.5 h-2.5" />
                     Live
                   </span>
@@ -180,7 +179,7 @@ export function AccountProjectionCard({
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 p-0.5 rounded-lg bg-muted/25 border border-border/20">
+        <div className="flex gap-1 p-0.5 rounded-lg bg-muted/40 border border-border/40">
           {(['goal', 'profit'] as const).map((key) => (
             <button
               key={key}
@@ -188,7 +187,7 @@ export function AccountProjectionCard({
               className={cn(
                 'flex-1 text-[11px] font-semibold py-1.5 px-2 rounded-md transition-all',
                 tab === key
-                  ? 'bg-background shadow-sm text-primary'
+                  ? 'bg-background shadow-sm text-primary border border-border/30'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -198,7 +197,7 @@ export function AccountProjectionCard({
         </div>
 
         {isLoading ? (
-          <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground animate-pulse">
+          <div className="py-4 text-center text-xs text-muted-foreground animate-pulse">
             Loading…
           </div>
         ) : (
@@ -209,7 +208,7 @@ export function AccountProjectionCard({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18 }}
-              className="flex-1 flex flex-col gap-2.5"
+              className="flex flex-col gap-2"
             >
               {/* Target value + ring */}
               <div className="flex items-center justify-between gap-3">
@@ -219,7 +218,7 @@ export function AccountProjectionCard({
                   </p>
                   {editing ? (
                     <div className="flex items-center gap-1">
-                      <span className="text-base font-bold font-mono">$</span>
+                      <span className="text-base font-bold font-mono text-foreground">$</span>
                       <Input
                         ref={inputRef}
                         type="number"
@@ -240,9 +239,9 @@ export function AccountProjectionCard({
                     </div>
                   ) : activeTargetInput && activeTargetInput > 0 ? (
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <Money value={activeTargetInput} className="text-lg font-bold font-mono text-foreground" />
+                      <Money value={activeTargetInput} className="text-lg font-bold font-mono" />
                       {isComplete && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary flex items-center gap-0.5">
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/20 text-primary flex items-center gap-0.5">
                           <Sparkles className="w-2.5 h-2.5" />
                           {tab === 'goal' ? 'Reached' : 'Hit'}
                         </span>
@@ -259,22 +258,22 @@ export function AccountProjectionCard({
                 </div>
 
                 {activeTargetInput && activeTargetInput > 0 && (
-                  <ProgressRing
-                    progress={activeProgress}
-                    colorClass={isComplete ? 'text-primary' : tab === 'goal' ? 'text-primary' : 'text-accent-foreground'}
-                  />
+                  <ProgressRing progress={activeProgress} />
                 )}
               </div>
 
-              {/* Current / Target / Left */}
               {activeTargetInput && activeTargetInput > 0 && activeTarget != null ? (
                 <div className="grid grid-cols-3 gap-1.5">
                   <div className="rounded-lg bg-muted/20 border border-border/20 p-1.5 text-center">
-                    <div className="text-[9px] uppercase tracking-wide text-muted-foreground">{tab === 'goal' ? 'Current' : 'Balance'}</div>
+                    <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                      {tab === 'goal' ? 'Current' : 'Balance'}
+                    </div>
                     <Money value={activeCurrent} className="text-[11px] font-bold font-mono block leading-tight mt-0.5" />
                   </div>
                   <div className="rounded-lg bg-muted/20 border border-border/20 p-1.5 text-center">
-                    <div className="text-[9px] uppercase tracking-wide text-muted-foreground">{tab === 'goal' ? 'Target' : 'Profit Goal'}</div>
+                    <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                      {tab === 'goal' ? 'Target' : 'Profit Goal'}
+                    </div>
                     <Money value={activeTarget} className="text-[11px] font-bold font-mono block leading-tight mt-0.5" />
                   </div>
                   <div className="rounded-lg bg-primary/5 border border-primary/15 p-1.5 text-center">
@@ -295,13 +294,19 @@ export function AccountProjectionCard({
               )}
 
               {/* Insight row */}
-              <div className="mt-auto pt-1.5 border-t border-border/20 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+              <div className="pt-1.5 border-t border-border/30 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
                 <span>
-                  Start <span className="font-mono font-semibold text-foreground">${startBalance.toFixed(0)}</span>
+                  Start{' '}
+                  <span className="font-mono font-semibold text-foreground">${startBalance.toFixed(0)}</span>
                 </span>
                 <span>
                   Profit{' '}
-                  <span className={cn('font-mono font-semibold', metrics.accountProfit >= 0 ? 'text-primary' : 'text-destructive')}>
+                  <span
+                    className={cn(
+                      'font-mono font-semibold',
+                      metrics.accountProfit >= 0 ? 'text-primary' : 'text-destructive',
+                    )}
+                  >
                     {metrics.accountProfit >= 0 ? '+' : ''}${metrics.accountProfit.toFixed(0)}
                   </span>
                 </span>
@@ -311,9 +316,7 @@ export function AccountProjectionCard({
                     ~{metrics.estimatedDaysToGoal}d
                   </span>
                 )}
-                {metrics.tradingDays > 0 && (
-                  <span>{metrics.tradingDays}d active</span>
-                )}
+                {metrics.tradingDays > 0 && <span>{metrics.tradingDays}d active</span>}
               </div>
             </motion.div>
           </AnimatePresence>

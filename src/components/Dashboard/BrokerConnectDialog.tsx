@@ -37,7 +37,7 @@ export function BrokerConnectDialog({
         <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>Broker Management</DialogTitle>
           <DialogDescription>
-            Connect TradeLocker. Once linked, you&apos;ll return to the dashboard.
+            Connect TradeLocker, MetaTrader 5, or Myfxbook. Once linked, you&apos;ll return to the dashboard.
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="flex-1 px-6 pb-6 max-h-[calc(90vh-7rem)]">

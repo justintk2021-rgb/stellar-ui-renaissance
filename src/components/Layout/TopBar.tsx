@@ -21,15 +21,16 @@ interface TopBarProps {
   trades?: Trade[];
   showRank?: boolean;
   greetingName?: string | null;
+  profileReady?: boolean;
   showGreeting?: boolean;
   rightSlot?: ReactNode;
 }
 
-export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], showRank = false, greetingName, showGreeting = false, rightSlot }: TopBarProps) {
+export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], showRank = false, greetingName, profileReady = true, showGreeting = false, rightSlot }: TopBarProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 pb-3 sm:pb-4 mb-4 sm:mb-6">
       <div className="min-w-0">
-        {showGreeting && <Greeting name={greetingName} />}
+        {showGreeting && <Greeting name={greetingName} profileReady={profileReady} />}
         <h2 className={cn("text-lg sm:text-xl font-semibold tracking-wide truncate", showGreeting && "mt-4 sm:mt-5")}>{title}</h2>
         {!showGreeting && (
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">{subtitle}</p>

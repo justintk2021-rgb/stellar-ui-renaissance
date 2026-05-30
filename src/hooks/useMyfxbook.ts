@@ -57,6 +57,7 @@ export function useMyfxbook() {
       )
       .eq("user_id", userData.user.id)
       .eq("platform", "myfxbook")
+      .neq("connection_status", "disconnected")
       .order("created_at", { ascending: false })
       .limit(1);
 
@@ -80,39 +81,14 @@ export function useMyfxbook() {
     refresh();
   }, [refresh]);
 
-  const connect = useCallback(
-    async (email: string, password: string) => {
-      const { data, error } = await supabase.functions.invoke("myfxbook", {
-        body: { action: "connect", email, password },
-      });
-      if (error || data?.error) {
-        const msg = data?.error || error?.message || "Login failed";
-        toast.error(msg);
-        return null;
-      }
-      const accs = (data.accounts as MyfxbookAccount[]) || [];
-      if (accs.length === 0) {
-        toast.warning(
-          data.warning ||
-            "Connected, but no accounts found on this Myfxbook profile.",
-          { duration: 8000 },
-        );
-      } else {
-        toast.success(`Connected ${accs.length} account(s)`);
-      }
-      await refresh();
-      return accs;
-    },
-    [refresh],
-  );
-
   const selectAccount = useCallback(
-    async (accountId: string) => {
-      if (!connection) return false;
+    async (accountId: string, connectionId?: string) => {
+      const connId = connectionId || connection?.id;
+      if (!connId) return false;
       const { data, error } = await supabase.functions.invoke("myfxbook", {
         body: {
           action: "selectAccount",
-          connectionId: connection.id,
+          connectionId: connId,
           accountId,
         },
       });
@@ -124,6 +100,38 @@ export function useMyfxbook() {
       return true;
     },
     [connection, refresh],
+  );
+
+  const connect = useCallback(
+    async (email: string, password: string) => {
+      const { data, error } = await supabase.functions.invoke("myfxbook", {
+        body: { action: "connect", email, password },
+      });
+      if (error || data?.error) {
+        const msg = data?.error || error?.message || "Login failed";
+        toast.error(msg);
+        return null;
+      }
+      const accs = (data.accounts as MyfxbookAccount[]) || [];
+      const connectionId = data.connectionId as string | undefined;
+      if (accs.length === 0) {
+        toast.warning(
+          data.warning ||
+            "Connected, but no accounts found on this Myfxbook profile.",
+          { duration: 8000 },
+        );
+      } else {
+        toast.success(`Connected ${accs.length} account(s)`);
+      }
+      await refresh();
+
+      if (accs.length === 1 && connectionId) {
+        await selectAccount(String(accs[0].id), connectionId);
+      }
+
+      return accs;
+    },
+    [refresh, selectAccount],
   );
 
   const sync = useCallback(async () => {
@@ -148,14 +156,16 @@ export function useMyfxbook() {
 
   const disconnect = useCallback(async () => {
     if (!connection) return;
-    const { error } = await supabase.functions.invoke("myfxbook", {
+    const { data, error } = await supabase.functions.invoke("myfxbook", {
       body: { action: "disconnect", connectionId: connection.id },
     });
-    if (error) {
-      toast.error("Disconnect failed");
+    if (error || data?.error) {
+      toast.error(String(data?.error || error?.message || "Disconnect failed"));
       return;
     }
     toast.success("Disconnected");
+    setConnection(null);
+    setAccounts([]);
     await refresh();
   }, [connection, refresh]);
 

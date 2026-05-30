@@ -23,9 +23,17 @@ import { TradingAccount } from "@/hooks/useTradingAccounts";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { BrokerConnectDialog } from "@/components/Dashboard/BrokerConnectDialog";
+import { activateBrokerAccount, clearBrokerSelectionStorage } from "@/lib/brokerAccountSwitch";
+import {
+  BROKER_STORAGE_KEYS,
+  writeMt5ConnectionId,
+  writeTradeLockerConnectionId,
+} from "@/lib/brokerStorage";
+import { toast } from "sonner";
 
 interface BrokerAccountInfo {
   connectionId: string;
+  platform: string;
   accountId: string;
   accNum: number;
   accountName: string;
@@ -81,29 +89,48 @@ export const AccountSelector = ({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: connections } = await supabase
+    const { data: connections, error: connError } = await supabase
       .from('broker_connections')
-      .select('id, broker_name, environment, connection_status, active_account_id, active_acc_num, account_balance, account_currency')
+      .select('id, platform, broker_name, environment, connection_status, active_account_id, active_acc_num, account_balance, account_currency')
       .eq('user_id', user.id)
-      .eq('connection_status', 'connected');
+      .neq('connection_status', 'disconnected');
 
-    if (!connections?.length) {
+    if (connError) {
+      toast.error(connError.message);
+      setBrokerAccounts([]);
+      return;
+    }
+
+    const visibleConnections = (connections || []).filter(
+      (conn) =>
+        conn.connection_status === 'connected' ||
+        (conn.platform === 'mt5' &&
+          (conn.connection_status === 'connecting' || conn.connection_status === 'pending')),
+    );
+
+    if (!visibleConnections.length) {
       setBrokerAccounts([]);
       return;
     }
 
     const brokerAccs: BrokerAccountInfo[] = [];
 
-    for (const conn of connections) {
-      const { data: accs } = await supabase
+    for (const conn of visibleConnections) {
+      const { data: accs, error: accError } = await supabase
         .from('broker_accounts')
         .select('account_id_external, acc_num, account_name, is_active')
         .eq('broker_connection_id', conn.id);
+
+      if (accError) {
+        toast.error(accError.message);
+        continue;
+      }
 
       if (accs) {
         for (const acc of accs) {
           brokerAccs.push({
             connectionId: conn.id,
+            platform: conn.platform || 'tradelocker',
             accountId: acc.account_id_external,
             accNum: acc.acc_num,
             accountName: acc.account_name || `Account ${acc.acc_num}`,
@@ -130,7 +157,7 @@ export const AccountSelector = ({
     let targetBroker: BrokerAccountInfo | undefined;
 
     if (selectLatest && brokerAccs.length > 0) {
-      const activeConn = connections.find((c) => c.active_account_id && c.active_acc_num != null);
+      const activeConn = visibleConnections.find((c) => c.active_account_id && c.active_acc_num != null);
       if (activeConn) {
         targetBroker = brokerAccs.find(
           (b) => b.connectionId === activeConn.id && b.accNum === activeConn.active_acc_num
@@ -147,11 +174,15 @@ export const AccountSelector = ({
     if (targetBroker) {
       const brokerId = `broker-${targetBroker.connectionId}-${targetBroker.accNum}`;
       setSelectedBrokerAccount(brokerId);
-      localStorage.setItem('selectedBrokerInternalId', brokerId);
-      localStorage.setItem('activeBrokerConnectionId', targetBroker.connectionId);
+      localStorage.setItem(BROKER_STORAGE_KEYS.selectedBroker, brokerId);
+      if (targetBroker.platform === 'mt5') {
+        writeMt5ConnectionId(targetBroker.connectionId);
+      } else if (targetBroker.platform === 'tradelocker') {
+        writeTradeLockerConnectionId(targetBroker.connectionId);
+      }
       onSelectBrokerAccount?.(targetBroker.accountId);
     } else if (persistedBrokerId && !selectLatest) {
-      localStorage.removeItem('selectedBrokerInternalId');
+      localStorage.removeItem(BROKER_STORAGE_KEYS.selectedBroker);
       setSelectedBrokerAccount(null);
     }
   }, [onSelectBrokerAccount]);
@@ -187,7 +218,8 @@ export const AccountSelector = ({
       setNewAccountBroker("");
       setNewAccountBalance("10000");
       setSelectedBrokerAccount(null);
-      localStorage.removeItem('selectedBrokerInternalId');
+      localStorage.removeItem(BROKER_STORAGE_KEYS.selectedBroker);
+      clearBrokerSelectionStorage();
       onSelectAccount(result.id);
     }
   };
@@ -217,18 +249,48 @@ export const AccountSelector = ({
 
   const handleSelectManualAccount = (accountId: string) => {
     setSelectedBrokerAccount(null);
-    localStorage.removeItem('selectedBrokerInternalId');
-    localStorage.removeItem('activeBrokerConnectionId');
+    localStorage.removeItem(BROKER_STORAGE_KEYS.selectedBroker);
+    clearBrokerSelectionStorage();
     onSelectBrokerAccount?.(null);
     onSelectAccount(accountId);
   };
 
-  const handleSelectBrokerAccount = (broker: BrokerAccountInfo) => {
+  const handleSelectBrokerAccount = async (broker: BrokerAccountInfo) => {
     const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
+    const previous = selectedBrokerAccount;
+    const previousBroker = previous
+      ? brokerAccounts.find((b) => `broker-${b.connectionId}-${b.accNum}` === previous)
+      : null;
     setSelectedBrokerAccount(brokerId);
-    localStorage.setItem('selectedBrokerInternalId', brokerId);
-    localStorage.setItem('activeBrokerConnectionId', broker.connectionId);
+    localStorage.setItem(BROKER_STORAGE_KEYS.selectedBroker, brokerId);
     onSelectBrokerAccount?.(broker.accountId);
+
+    try {
+      await activateBrokerAccount({
+        platform: broker.platform,
+        connectionId: broker.connectionId,
+        accountId: broker.accountId,
+        accNum: broker.accNum,
+      });
+      if (broker.platform === "mt5") {
+        writeMt5ConnectionId(broker.connectionId);
+      } else if (broker.platform === "tradelocker") {
+        writeTradeLockerConnectionId(broker.connectionId);
+      }
+      await fetchBrokerAccounts();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to switch broker account";
+      toast.error(message);
+      if (previous) {
+        setSelectedBrokerAccount(previous);
+        localStorage.setItem(BROKER_STORAGE_KEYS.selectedBroker, previous);
+        onSelectBrokerAccount?.(previousBroker?.accountId ?? null);
+      } else {
+        setSelectedBrokerAccount(null);
+        localStorage.removeItem(BROKER_STORAGE_KEYS.selectedBroker);
+        onSelectBrokerAccount?.(null);
+      }
+    }
   };
 
   const setManualDefault = (accountId: string) => {
@@ -263,15 +325,17 @@ export const AccountSelector = ({
       .update({ account_name: brokerDisplayName.trim() })
       .eq('broker_connection_id', renamingBroker.connectionId)
       .eq('acc_num', renamingBroker.accNum);
-    if (!error) {
-      setBrokerAccounts(prev => prev.map(b =>
-        b.connectionId === renamingBroker.connectionId && b.accNum === renamingBroker.accNum
-          ? { ...b, accountName: brokerDisplayName.trim() }
-          : b
-      ));
-      setIsRenameBrokerOpen(false);
-      setRenamingBroker(null);
+    if (error) {
+      toast.error(error.message);
+      return;
     }
+    setBrokerAccounts(prev => prev.map(b =>
+      b.connectionId === renamingBroker.connectionId && b.accNum === renamingBroker.accNum
+        ? { ...b, accountName: brokerDisplayName.trim() }
+        : b
+    ));
+    setIsRenameBrokerOpen(false);
+    setRenamingBroker(null);
   };
 
   return (
@@ -624,9 +688,9 @@ export const AccountSelector = ({
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    onClick={() => {
-                      onSetDefault(editingAccount.id);
-                      setIsEditDialogOpen(false);
+                    onClick={async () => {
+                      const ok = await onSetDefault(editingAccount.id);
+                      if (ok) setIsEditDialogOpen(false);
                     }}
                   >
                     <Star className="w-4 h-4 mr-1" />
@@ -638,9 +702,9 @@ export const AccountSelector = ({
                     variant="destructive"
                     size="sm"
                     className="flex-1"
-                    onClick={() => {
-                      onDeleteAccount(editingAccount.id);
-                      setIsEditDialogOpen(false);
+                    onClick={async () => {
+                      const ok = await onDeleteAccount(editingAccount.id);
+                      if (ok) setIsEditDialogOpen(false);
                     }}
                   >
                     <Trash2 className="w-4 h-4 mr-1" />

@@ -1,5 +1,5 @@
 import { Trade } from '@/types/trade';
-import { getTradeLocalDateKey } from '@/lib/tradeFormat';
+import { getTradeCloseLocalDateKey, getTradeNetResult } from '@/lib/tradeFormat';
 
 export interface ProjectionMetricsInput {
   trades: Trade[];
@@ -25,15 +25,15 @@ export interface ProjectionMetrics {
 }
 
 export function computeNetPnL(trades: Trade[]): number {
-  return trades.reduce((sum, t) => sum + (t.result || 0), 0);
+  return trades.reduce((sum, t) => sum + getTradeNetResult(t), 0);
 }
 
 export function computeAvgDailyPnL(trades: Trade[]): { avgDailyPnL: number | null; tradingDays: number } {
   const byDay = new Map<string, number>();
   for (const trade of trades) {
-    const key = getTradeLocalDateKey(trade);
+    const key = getTradeCloseLocalDateKey(trade);
     if (!key) continue;
-    byDay.set(key, (byDay.get(key) || 0) + (trade.result || 0));
+    byDay.set(key, (byDay.get(key) || 0) + getTradeNetResult(trade));
   }
   const tradingDays = byDay.size;
   if (tradingDays === 0) return { avgDailyPnL: null, tradingDays: 0 };

@@ -43,8 +43,12 @@ export function MetaTraderManagement() {
   const bridgeOnline = bridgeStatus?.status === 'online';
 
   const copyText = async (value: string, label: string) => {
-    await navigator.clipboard.writeText(value);
-    toast.success(`${label} copied`);
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error('Copy failed — check browser permissions');
+    }
   };
 
   const handleCreateConnection = async () => {
@@ -63,6 +67,8 @@ export function MetaTraderManagement() {
       });
       setPassword('');
       setShowCreateForm(false);
+    } catch {
+      // Toast handled in hook.
     } finally {
       setCreating(false);
     }

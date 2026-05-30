@@ -33,6 +33,10 @@ interface YearMonthPickerProps {
   initialSelection?: MonthSelection[];
   /** P&L per day (YYYY-MM-DD) — used for trade-day highlighting / win-loss dots */
   dayPnLs?: DayPnL[];
+  /** User accent (matches Settings → Appearance) */
+  accentColor?: string;
+  customColor?: string | null;
+  customGradient?: { from: string; to: string } | null;
   /** Cancel/close (Escape, outside click, ✕) */
   onClose: () => void;
   /** Confirm with exactly two months selected */
@@ -58,9 +62,18 @@ export function YearMonthPicker({
   initialYear,
   initialSelection,
   dayPnLs = [],
+  accentColor,
+  customColor,
+  customGradient,
   onClose,
   onConfirm,
 }: YearMonthPickerProps) {
+  const compareButtonStyle =
+    accentColor === "custom" && customGradient
+      ? { background: `linear-gradient(90deg, ${customGradient.from}, ${customGradient.to})` }
+      : accentColor === "custom" && customColor
+        ? { backgroundColor: customColor }
+        : undefined;
   const [year, setYear] = useState<number>(
     initialYear ?? new Date().getFullYear(),
   );
@@ -154,7 +167,7 @@ export function YearMonthPicker({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="absolute inset-0 bg-background/60 backdrop-blur-sm"
+            className="absolute inset-0 glass-overlay"
             onClick={onClose}
           />
 
@@ -168,7 +181,7 @@ export function YearMonthPicker({
             aria-modal="true"
             aria-label="Select two months to compare"
             className={cn(
-              "relative z-10 flex flex-col rounded-2xl bg-card/95 backdrop-blur-md border border-border/50 shadow-2xl overflow-hidden",
+              "relative z-10 flex flex-col rounded-2xl glass-popup overflow-hidden",
               // Sizing: ~80% of viewport, capped at 1200×800
               "w-[80vw] h-[80vh] max-w-[1200px] max-h-[800px]",
             )}
@@ -287,10 +300,14 @@ export function YearMonthPicker({
                   whileTap={canConfirm ? { scale: 0.98 } : undefined}
                   onClick={handleConfirm}
                   disabled={!canConfirm}
+                  style={canConfirm ? compareButtonStyle : undefined}
                   className={cn(
                     "inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-lg text-xs font-semibold transition-colors",
                     canConfirm
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      ? cn(
+                          "text-primary-foreground hover:opacity-90",
+                          !compareButtonStyle && "bg-primary hover:bg-primary/90",
+                        )
                       : "bg-muted/50 text-muted-foreground cursor-not-allowed",
                   )}
                 >
@@ -350,8 +367,8 @@ const MonthTile: React.FC<{
       className={cn(
         "flex flex-col items-stretch rounded-xl p-3 text-left transition-colors",
         selected
-          ? "bg-primary/20 ring-1 ring-inset ring-primary/50"
-          : "bg-muted/20 hover:bg-muted/40",
+          ? "bg-primary/20 ring-1 ring-inset ring-primary/50 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.15)]"
+          : "bg-muted/20 hover:bg-muted/40 dark:hover:bg-muted/30",
       )}
     >
       {/* Month name */}
@@ -393,8 +410,8 @@ const MonthTile: React.FC<{
           if (!inMonth) {
             numberColorClass = "text-muted-foreground/25";
           } else if (hasTrade) {
-            if (isWinning) numberColorClass = "text-emerald-500";
-            else if (isLosing) numberColorClass = "text-red-500";
+            if (isWinning) numberColorClass = "text-primary";
+            else if (isLosing) numberColorClass = "text-destructive";
           } else if (isToday) {
             numberColorClass = "text-primary";
           }
@@ -405,8 +422,9 @@ const MonthTile: React.FC<{
               className={cn(
                 "relative flex items-center justify-center text-[10px] leading-none rounded-md",
                 CELL_SIZE,
+                inMonth && !hasTrade && !isToday && "calendar-day-empty",
                 inMonth && hasTrade && "bg-primary/15 font-medium",
-                inMonth && isToday && !hasTrade && "bg-primary/15 font-semibold",
+                inMonth && isToday && !hasTrade && "bg-primary/15 font-semibold ring-1 ring-inset ring-primary/25",
                 numberColorClass,
               )}
             >
@@ -415,8 +433,8 @@ const MonthTile: React.FC<{
                 <span
                   className={cn(
                     "absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full",
-                    isWinning && "bg-emerald-500",
-                    isLosing && "bg-red-500",
+                    isWinning && "bg-primary",
+                    isLosing && "bg-destructive",
                     dayPnL === 0 && "bg-muted-foreground",
                   )}
                 />

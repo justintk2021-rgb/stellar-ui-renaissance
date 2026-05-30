@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { BrokerPosition } from '@/types/broker';
+import { readTradeLockerConnectionId } from '@/lib/brokerStorage';
 import { acquireSharedPostgresChannel } from '@/lib/queries/realtimeChannel';
 
 export async function fetchBrokerPositions(connectionId: string): Promise<BrokerPosition[]> {
@@ -42,7 +43,7 @@ export function subscribeBrokerPositionsRealtime(connectionId: string | null, on
 }
 
 export function getActiveBrokerConnectionId(): string | null {
-  return localStorage.getItem('activeBrokerConnectionId');
+  return readTradeLockerConnectionId();
 }
 
 export function subscribeBrokerOrdersRealtime(connectionId: string, onInvalidate: () => void) {
