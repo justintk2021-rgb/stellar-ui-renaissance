@@ -27,6 +27,7 @@ import {
 import { queryKeys } from "@/lib/queries/keys";
 import { fetchTradesList } from "@/lib/queries/trades";
 import { useBrokerTodayPnL } from "@/hooks/useBrokerTodayPnL";
+import { repairTradeLockerSessions } from "@/lib/repairBrokerSession";
 
 const TradeTable = lazy(() => import("@/components/Journal/TradeTable").then(m => ({ default: m.TradeTable })));
 const CompareView = lazy(() => import("@/components/Journal/CompareView").then(m => ({ default: m.CompareView })));
@@ -169,10 +170,10 @@ const Index = () => {
     try {
       const { data: connections } = await supabase
         .from('broker_connections')
-        .select('id')
+        .select('id, connection_status')
         .eq('user_id', user.id)
         .eq('platform', 'tradelocker')
-        .eq('connection_status', 'connected');
+        .in('connection_status', ['connected', 'expired']);
 
       if (!connections?.length) return;
 
@@ -185,43 +186,52 @@ const Index = () => {
       const anonKey = (import.meta as any).env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
       const dayBounds = getClientDayBoundsISO();
+      const invokeBroker = (payload: Record<string, unknown>) =>
+        fetch(`${supabaseUrl}/functions/v1/tradelocker`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: anonKey,
+            Authorization: `Bearer ${token ?? anonKey}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
       await Promise.allSettled(
         connections.map(async (conn) => {
           try {
-            const res = await fetch(`${supabaseUrl}/functions/v1/tradelocker`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                apikey: anonKey,
-                Authorization: `Bearer ${token ?? anonKey}`,
-              },
-              body: JSON.stringify({
-                action: 'sync',
-                connectionId: conn.id,
-                clientToday: dayBounds.dateKey,
-                clientDayStart: dayBounds.start,
-                clientDayEnd: dayBounds.end,
-              }),
+            if (conn.connection_status === 'expired') {
+              const refreshRes = await invokeBroker({ action: 'refresh-session', connectionId: conn.id });
+              try { await refreshRes.text(); } catch {}
+              if (!refreshRes.ok) return;
+            }
+
+            let res = await invokeBroker({
+              action: 'sync',
+              connectionId: conn.id,
+              clientToday: dayBounds.dateKey,
+              clientDayStart: dayBounds.start,
+              clientDayEnd: dayBounds.end,
             });
+
             if (res.status === 401) {
-              // Try refresh before marking expired (stale access token is common).
-              const refreshRes = await fetch(`${supabaseUrl}/functions/v1/tradelocker`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  apikey: anonKey,
-                  Authorization: `Bearer ${token ?? anonKey}`,
-                },
-                body: JSON.stringify({ action: 'refresh-session', connectionId: conn.id }),
-              });
-              if (!refreshRes.ok) {
+              const refreshRes = await invokeBroker({ action: 'refresh-session', connectionId: conn.id });
+              try { await refreshRes.text(); } catch {}
+              if (refreshRes.ok) {
+                res = await invokeBroker({
+                  action: 'sync',
+                  connectionId: conn.id,
+                  clientToday: dayBounds.dateKey,
+                  clientDayStart: dayBounds.start,
+                  clientDayEnd: dayBounds.end,
+                });
+              } else {
                 await supabase
                   .from('broker_connections')
                   .update({ connection_status: 'expired', last_error: 'Session expired — reconnect in Settings' })
                   .eq('id', conn.id);
               }
             }
-            // Drain the body so the connection can be reused; ignore content.
             try { await res.text(); } catch {}
           } catch {
             // Network errors silently ignored — surfaced via Broker Management UI.
@@ -240,6 +250,23 @@ const Index = () => {
       inFlightSyncRef.current = false;
     }
   }, [user?.id, queryClient]);
+
+  // On login: silently refresh expired TradeLocker tokens, then sync
+  useEffect(() => {
+    if (!user?.id || isMarketingPreview) return;
+    let cancelled = false;
+    (async () => {
+      const { restored } = await repairTradeLockerSessions();
+      if (cancelled) return;
+      if (restored > 0) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.trades.all });
+      }
+      brokerAutoSync(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, brokerAutoSync, queryClient]);
 
   // Initial sync (deferred well past first paint) + 5-minute interval
   useEffect(() => {
@@ -654,12 +681,10 @@ const Index = () => {
         <meta name="description" content="Track your trades, analyze performance, and keep detailed notes with NSYNC Journal - your personal trading journal." />
       </Helmet>
 
-      {/* Animated Stars Background — only mounted on the dashboard tab to keep the GPU idle elsewhere */}
-      {currentPage === 'dashboard' && (
-        <Suspense fallback={null}>
-          <AnimatedBackground />
-        </Suspense>
-      )}
+      {/* Star background — visible in side margins and behind glass panels */}
+      <Suspense fallback={<div className="app-starfield" aria-hidden />}>
+        <AnimatedBackground />
+      </Suspense>
 
       {/* Global Sidebar - works for all pages */}
       <Sidebar 
@@ -670,7 +695,7 @@ const Index = () => {
       />
 
       <div className={cn(
-        "min-h-screen flex flex-col gap-3 p-2 sm:p-3 pb-24 transition-all duration-300 w-full",
+        "relative z-10 min-h-screen flex flex-col gap-3 p-2 sm:p-3 pb-24 transition-all duration-300 w-full",
         !isChartPage && "lg:p-5 lg:pb-5"
       )}>
         {/* Mobile Header */}

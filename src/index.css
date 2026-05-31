@@ -897,3 +897,92 @@ input[type="number"]::-webkit-outer-spin-button {
 .notebook-todo-item .todo-checkbox-wrapper div {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Subtle star field behind glass panels (CSS fallback + layer under WebGL) */
+@layer components {
+  .app-starfield {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 140% 90% at 50% -10%, hsl(var(--primary) / 0.13), transparent 60%),
+      radial-gradient(ellipse 100% 80% at 100% 100%, hsl(var(--primary-glow) / 0.1), transparent 55%),
+      radial-gradient(ellipse 80% 60% at 0% 90%, hsl(var(--secondary) / 0.08), transparent 50%),
+      hsl(var(--background));
+  }
+
+  .app-starfield::before,
+  .app-starfield::after,
+  .app-starfield-glow {
+    content: "";
+    position: absolute;
+    inset: -50%;
+    background-repeat: repeat;
+    animation: app-starfield-drift 100s linear infinite;
+  }
+
+  .app-starfield::before {
+    background-size: 140px 140px;
+    background-image:
+      radial-gradient(2px 2px at 18px 24px, hsl(var(--starfield-neutral) / var(--starfield-neutral-opacity)), transparent),
+      radial-gradient(1.5px 1.5px at 72px 96px, hsl(var(--starfield-neutral) / calc(var(--starfield-neutral-opacity) * 0.8)), transparent),
+      radial-gradient(2.5px 2.5px at 108px 44px, hsl(var(--primary-glow) / var(--starfield-accent-opacity)), transparent),
+      radial-gradient(1.5px 1.5px at 44px 128px, hsl(var(--primary) / calc(var(--starfield-accent-opacity) * 0.9)), transparent),
+      radial-gradient(2px 2px at 124px 118px, hsl(var(--starfield-neutral) / calc(var(--starfield-neutral-opacity) * 0.7)), transparent),
+      radial-gradient(1.5px 1.5px at 32px 68px, hsl(var(--secondary) / calc(var(--starfield-accent-opacity) * 0.75)), transparent);
+    opacity: 0.82;
+  }
+
+  .app-starfield::after {
+    background-size: 180px 180px;
+    background-image:
+      radial-gradient(1.5px 1.5px at 36px 72px, hsl(var(--starfield-neutral) / calc(var(--starfield-neutral-opacity) * 0.85)), transparent),
+      radial-gradient(2px 2px at 92px 28px, hsl(var(--primary) / var(--starfield-accent-opacity)), transparent),
+      radial-gradient(1.5px 1.5px at 128px 104px, hsl(var(--primary-glow) / calc(var(--starfield-accent-opacity) * 0.85)), transparent),
+      radial-gradient(2.5px 2.5px at 24px 148px, hsl(var(--starfield-neutral) / var(--starfield-neutral-opacity)), transparent);
+    animation-duration: 140s;
+    animation-direction: reverse;
+    opacity: 0.78;
+  }
+
+  .app-starfield-glow {
+    inset: 0;
+    background:
+      radial-gradient(circle at 15% 25%, hsl(var(--primary-glow) / 0.08), transparent 35%),
+      radial-gradient(circle at 85% 70%, hsl(var(--primary) / 0.06), transparent 40%);
+    animation: none;
+    opacity: 0.85;
+  }
+
+  .dark {
+    --starfield-neutral: 0 0% 100%;
+    --starfield-neutral-opacity: 0.72;
+    --starfield-accent-opacity: 0.68;
+  }
+
+  .light {
+    --starfield-neutral: var(--foreground);
+    --starfield-neutral-opacity: 0.36;
+    --starfield-accent-opacity: 0.44;
+  }
+
+}
+
+@keyframes app-starfield-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-200px, -120px, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-starfield::before,
+  .app-starfield::after {
+    animation: none;
+  }
+}
+

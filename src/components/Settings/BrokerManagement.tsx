@@ -61,7 +61,7 @@ export function BrokerManagement({
     connections, connection, activeConnectionId, selectConnection,
     accounts, positions, orders, history, summary,
     loading, accountsLoading, syncing,
-    connect, selectAccount, sync, disconnect, reconnect,
+    connect, selectAccount, sync, disconnect, reconnect, refreshSession,
     placeOrder, closePosition, modifyPosition, cancelOrder, modifyOrder,
     updateSyncSettings, runDiagnostic, fetchSyncLogs,
   } = useTradeLocker();
@@ -157,6 +157,19 @@ export function BrokerManagement({
     setReconnectOpen(false);
     setReconnectEmail('');
     setReconnectPassword('');
+  };
+
+  const handleRestoreSession = async () => {
+    if (!connection) return;
+    const ok = await refreshSession(connection.id);
+    if (ok) {
+      await sync();
+      toast.success('Broker session restored');
+      return;
+    }
+    setReconnectEmail(connection.login || '');
+    setReconnectOpen(true);
+    toast.error('Session could not be restored automatically. Enter your password to reconnect.');
   };
 
   const handlePlaceOrder = async () => {
@@ -572,14 +585,26 @@ export function BrokerManagement({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={sync} disabled={syncing || isExpired}>
+                <Button size="sm" variant="outline" onClick={sync} disabled={syncing}>
                   {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
                   Sync
                 </Button>
                 {isExpired && (
-                  <Button size="sm" variant="default" onClick={() => setReconnectOpen(true)}>
-                    <ShieldCheck className="w-4 h-4 mr-1" /> Reconnect
-                  </Button>
+                  <>
+                    <Button size="sm" variant="secondary" onClick={handleRestoreSession} disabled={syncing}>
+                      <RefreshCw className="w-4 h-4 mr-1" /> Restore session
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => {
+                        setReconnectEmail(connection.login || '');
+                        setReconnectOpen(true);
+                      }}
+                    >
+                      <ShieldCheck className="w-4 h-4 mr-1" /> Reconnect
+                    </Button>
+                  </>
                 )}
                 <Button size="sm" variant="destructive" onClick={disconnect}>
                   <Unlink className="w-4 h-4 mr-1" /> Disconnect

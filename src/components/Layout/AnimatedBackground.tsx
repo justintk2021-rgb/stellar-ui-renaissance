@@ -2,9 +2,22 @@ import { useRef, useMemo, Suspense, useEffect, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
 import * as THREE from "three";
+import { useAppearanceStarColors } from "@/hooks/useAppearanceStarColors";
 
-// Floating Particles - White/gray particles
-function Particles({ count }: { count: number }) {
+// Floating Particles — tinted with accent appearance
+function Particles({
+  count,
+  accentPrimary,
+  accentGlow,
+  starWhite,
+  isLight,
+}: {
+  count: number;
+  accentPrimary: string;
+  accentGlow: string;
+  starWhite: string;
+  isLight: boolean;
+}) {
   const positions = useMemo(() => {
     const pos = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
@@ -14,6 +27,19 @@ function Particles({ count }: { count: number }) {
     }
     return pos;
   }, [count]);
+
+  const colors = useMemo(() => {
+    const palette = [starWhite, accentPrimary, accentGlow];
+    const arr = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const hex = palette[i % palette.length];
+      const c = new THREE.Color(hex);
+      arr[i * 3] = c.r;
+      arr[i * 3 + 1] = c.g;
+      arr[i * 3 + 2] = c.b;
+    }
+    return arr;
+  }, [count, starWhite, accentPrimary, accentGlow]);
 
   const pointsRef = useRef<THREE.Points>(null);
 
@@ -33,12 +59,18 @@ function Particles({ count }: { count: number }) {
           array={positions}
           itemSize={3}
         />
+        <bufferAttribute
+          attach="attributes-color"
+          count={count}
+          array={colors}
+          itemSize={3}
+        />
       </bufferGeometry>
       <pointsMaterial
-        size={0.04}
-        color="#ffffff"
+        size={0.065}
+        vertexColors
         transparent
-        opacity={0.4}
+        opacity={isLight ? 0.36 : 0.58}
         sizeAttenuation
       />
     </points>
@@ -46,17 +78,49 @@ function Particles({ count }: { count: number }) {
 }
 
 // Background Scene
-function BackgroundScene({ particleCount, starCount }: { particleCount: number; starCount: number }) {
+function BackgroundScene({
+  particleCount,
+  starCount,
+  colors,
+}: {
+  particleCount: number;
+  starCount: number;
+  colors: ReturnType<typeof useAppearanceStarColors>;
+}) {
   return (
     <>
-      <ambientLight intensity={0.2} />
-      <Particles count={particleCount} />
-      <Stars radius={100} depth={50} count={starCount} factor={3} fade speed={0.3} />
+      <ambientLight intensity={colors.isLight ? 0.35 : 0.2} />
+      <Particles
+        count={particleCount}
+        accentPrimary={colors.accentPrimary}
+        accentGlow={colors.accentGlow}
+        starWhite={colors.starWhite}
+        isLight={colors.isLight}
+      />
+      <Stars
+        radius={100}
+        depth={80}
+        count={starCount}
+        factor={4.8}
+        fade
+        speed={0.2}
+        color={colors.accentGlow}
+      />
+      <Stars
+        radius={80}
+        depth={50}
+        count={Math.floor(starCount * 0.35)}
+        factor={2.1}
+        fade
+        speed={0.15}
+        color={colors.starWhite}
+      />
     </>
   );
 }
 
 export function AnimatedBackground() {
+  const appearanceColors = useAppearanceStarColors();
   // Pause rendering when tab is hidden, and reduce work on small screens / reduced motion
   const [isActive, setIsActive] = useState(true);
   const reduced = useMemo(
@@ -74,24 +138,35 @@ export function AnimatedBackground() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
-  if (reduced) return null;
-
-  const particleCount = isSmall ? 30 : 50;
-  const starCount = isSmall ? 400 : 700;
+  const particleCount = isSmall ? 60 : 100;
+  const starCount = isSmall ? 800 : 2000;
 
   return (
-    <div className="fixed inset-0 z-0 pointer-events-none">
-      <Canvas
-        camera={{ position: [0, 0, 10], fov: 45 }}
-        dpr={[1, 1.5]}
-        frameloop={isActive ? "always" : "never"}
-        gl={{ antialias: false, powerPreference: "low-power" }}
-      >
-        <Suspense fallback={null}>
-          <BackgroundScene particleCount={particleCount} starCount={starCount} />
-        </Suspense>
-      </Canvas>
-    </div>
+    <>
+      {/* CSS stars — always visible in margins and while WebGL loads */}
+      <div className="app-starfield" aria-hidden>
+        <div className="app-starfield-glow" aria-hidden />
+      </div>
+      {!reduced && (
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <Canvas
+            camera={{ position: [0, 0, 10], fov: 45 }}
+            dpr={[1, 1.5]}
+            frameloop={isActive ? "always" : "never"}
+            gl={{ antialias: false, powerPreference: "low-power", alpha: true }}
+            style={{ background: "transparent" }}
+          >
+            <Suspense fallback={null}>
+              <BackgroundScene
+                particleCount={particleCount}
+                starCount={starCount}
+                colors={appearanceColors}
+              />
+            </Suspense>
+          </Canvas>
+        </div>
+      )}
+    </>
   );
 }
 

@@ -58,10 +58,7 @@ export function applySettingsToDocument(s: AppliedSettings) {
     root.style.removeProperty('--ring');
     root.style.removeProperty('--sidebar-primary');
     root.style.removeProperty('--sidebar-ring');
-    return;
-  }
-
-  if (s.customGradient) {
+  } else if (s.customGradient) {
     const fromHsl = hexToHsl(s.customGradient.from);
     const toHsl = hexToHsl(s.customGradient.to);
     root.style.setProperty('--primary', fromHsl);
@@ -77,6 +74,8 @@ export function applySettingsToDocument(s: AppliedSettings) {
     root.style.setProperty('--sidebar-primary', hsl);
     root.style.setProperty('--sidebar-ring', hsl);
   }
+
+  root.dispatchEvent(new CustomEvent('appearance-change'));
 }
 
 const CACHE_KEY = 'atp_settings_cache';

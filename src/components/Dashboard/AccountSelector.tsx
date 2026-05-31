@@ -104,6 +104,7 @@ export const AccountSelector = ({
     const visibleConnections = (connections || []).filter(
       (conn) =>
         conn.connection_status === 'connected' ||
+        conn.connection_status === 'expired' ||
         (conn.platform === 'mt5' &&
           (conn.connection_status === 'connecting' || conn.connection_status === 'pending')),
     );
@@ -256,6 +257,12 @@ export const AccountSelector = ({
   };
 
   const handleSelectBrokerAccount = async (broker: BrokerAccountInfo) => {
+    if (broker.status === 'expired') {
+      toast.error('TradeLocker session expired. Reconnect in Settings → Broker Management.');
+      setIsBrokerConnectDialogOpen(true);
+      return;
+    }
+
     const brokerId = `broker-${broker.connectionId}-${broker.accNum}`;
     const previous = selectedBrokerAccount;
     const previousBroker = previous
@@ -445,7 +452,8 @@ export const AccountSelector = ({
                         <span className="truncate text-sm">{broker.accountName}</span>
                         <span className="text-[10px] text-muted-foreground truncate">
                           {broker.brokerName} · {broker.environment.toUpperCase()}
-                          {broker.balance != null && ` · $${broker.balance.toLocaleString()}`}
+                          {broker.status === 'expired' ? ' · Session expired' : ''}
+                          {broker.balance != null && broker.status !== 'expired' && ` · $${broker.balance.toLocaleString()}`}
                         </span>
                       </div>
                     </div>

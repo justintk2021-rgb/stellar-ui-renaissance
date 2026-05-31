@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queries/keys';
 import { readTradeLockerConnectionId, writeTradeLockerConnectionId } from '@/lib/brokerStorage';
 import { getClientDayBoundsISO } from '@/lib/tradeFormat';
+import { repairTradeLockerSessions } from '@/lib/repairBrokerSession';
 import type { BrokerPosition } from '@/types/broker';
 
 export type { BrokerPosition };
@@ -83,7 +84,7 @@ export interface AccountSummary {
   pendingOrders: number;
 }
 
-async function invokeTradeLocker(action: string, body: Record<string, unknown> = {}) {
+async function invokeTradeLockerOnce(action: string, body: Record<string, unknown> = {}) {
   const { data, error } = await supabase.functions.invoke('tradelocker', {
     body: { action, ...body },
   });
@@ -104,6 +105,34 @@ async function invokeTradeLocker(action: string, body: Record<string, unknown> =
   }
 
   return data;
+}
+
+function isSessionError(message: string): boolean {
+  return /expired|reconnect|invalid session|refresh token/i.test(message);
+}
+
+async function invokeTradeLocker(action: string, body: Record<string, unknown> = {}) {
+  try {
+    return await invokeTradeLockerOnce(action, body);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    const connectionId = body.connectionId as string | undefined;
+    if (
+      action !== 'refresh-session' &&
+      action !== 'reconnect' &&
+      action !== 'connect' &&
+      connectionId &&
+      isSessionError(message)
+    ) {
+      try {
+        await invokeTradeLockerOnce('refresh-session', { connectionId });
+        return await invokeTradeLockerOnce(action, body);
+      } catch {
+        // Fall through to original error.
+      }
+    }
+    throw error;
+  }
 }
 
 export function useTradeLocker() {
@@ -147,6 +176,20 @@ export function useTradeLocker() {
     },
     staleTime: 30_000,
   });
+
+  useEffect(() => {
+    if (connections.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const { restored } = await repairTradeLockerSessions();
+      if (!cancelled && restored > 0) {
+        await refetchConnections();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [connections.length, refetchConnections]);
 
   useEffect(() => {
     if (connections.length === 0) {
@@ -485,20 +528,29 @@ export function useTradeLocker() {
     fetchAccounts();
   }, [fetchAccounts]);
 
-  // Try silent token refresh when marked expired (common after idle / background sync)
+  // Try silent token refresh when expired or nearing expiry
   useEffect(() => {
-    if (!connection?.id || connection.connection_status !== 'expired') return;
+    if (!connection?.id) return;
+    const needsRefresh =
+      connection.connection_status === 'expired' ||
+      (connection.token_expiry &&
+        new Date(connection.token_expiry).getTime() - Date.now() < 5 * 60 * 1000);
+    if (!needsRefresh) return;
+
     let cancelled = false;
     (async () => {
       const ok = await refreshSession(connection.id);
       if (!cancelled && ok) {
-        toast.success('TradeLocker session restored');
+        await refetchConnections();
+        if (connection.connection_status === 'expired') {
+          toast.success('TradeLocker session restored');
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [connection?.id, connection?.connection_status, refreshSession]);
+  }, [connection?.id, connection?.connection_status, connection?.token_expiry, refreshSession, refetchConnections]);
 
   // Load data when connection is active
   useEffect(() => {

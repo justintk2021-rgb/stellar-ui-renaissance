@@ -14,7 +14,12 @@ interface CustomAccentColorPickerProps {
   value: string;
   onCommit: (color: string) => void;
   selected?: boolean;
+  /** Trigger swatch (default: compact circle for accent row) */
   className?: string;
+  /** Panel title */
+  title?: string;
+  /** Shown under hex field */
+  hint?: string;
 }
 
 function clamp(n: number, min: number, max: number) {
@@ -26,6 +31,8 @@ export const CustomAccentColorPicker = memo(function CustomAccentColorPicker({
   onCommit,
   selected = false,
   className,
+  title = "Custom accent",
+  hint = "Pick a color here — your dashboard accent updates when you close this panel.",
 }: CustomAccentColorPickerProps) {
   const [open, setOpen] = useState(false);
   const [draftHex, setDraftHex] = useState(normalizeHex(value));
@@ -115,13 +122,13 @@ export const CustomAccentColorPicker = memo(function CustomAccentColorPicker({
       <PopoverTrigger asChild>
         <button
           type="button"
-          title="Custom accent color"
-          aria-label="Custom accent color"
+          title={title}
+          aria-label={title}
           className={cn(
             "relative w-7 h-7 rounded-lg border-2 border-border/50 shadow-inner shrink-0",
+            className,
             "ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             selected && "ring-2 ring-offset-2 ring-offset-background ring-foreground/50",
-            className,
           )}
           style={{ backgroundColor: open ? draftHex : value }}
         />
@@ -133,7 +140,7 @@ export const CustomAccentColorPicker = memo(function CustomAccentColorPicker({
       >
         <div className="flex items-center gap-2">
           <Pipette className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-          <p className="text-xs font-semibold text-foreground">Custom accent</p>
+          <p className="text-xs font-semibold text-foreground">{title}</p>
         </div>
 
         <div
@@ -184,9 +191,9 @@ export const CustomAccentColorPicker = memo(function CustomAccentColorPicker({
           />
         </div>
 
-        <p className="text-[10px] text-muted-foreground leading-relaxed">
-          Pick a color here — your dashboard accent updates when you close this panel.
-        </p>
+        {hint ? (
+          <p className="text-[10px] text-muted-foreground leading-relaxed">{hint}</p>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

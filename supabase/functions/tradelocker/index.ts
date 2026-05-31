@@ -427,6 +427,61 @@ async function tlModifyPosition(accessToken: string, accountId: string, accNum: 
 
 // ====================== TOKEN MANAGEMENT ======================
 
+const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
+const TOKEN_TTL_MS = 20 * 60 * 1000;
+
+function tokenNeedsRefresh(conn: { token_expiry?: string | null; connection_status?: string | null }): boolean {
+  if (conn.connection_status === 'expired') return true;
+  if (!conn.token_expiry) return false;
+  return new Date(conn.token_expiry).getTime() - Date.now() < TOKEN_REFRESH_BUFFER_MS;
+}
+
+async function refreshConnectionTokens(
+  supabase: any,
+  conn: { id: string; environment?: string | null; metaapi_account_id?: string | null },
+): Promise<{ accessToken: string; refreshToken?: string } | null> {
+  let tokenData: { accessToken?: string; refreshToken?: string };
+  try {
+    tokenData = JSON.parse(conn.metaapi_account_id || '{}');
+  } catch {
+    return null;
+  }
+
+  if (!tokenData.refreshToken) return null;
+
+  const environment = conn.environment || 'demo';
+  const refreshResult = await tlRefresh(tokenData.refreshToken, environment);
+  if (!refreshResult) {
+    await supabase
+      .from('broker_connections')
+      .update({
+        connection_status: 'expired',
+        last_error: 'Token refresh failed — reconnect in Settings',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', conn.id);
+    return null;
+  }
+
+  const newTokenData = {
+    accessToken: refreshResult.accessToken,
+    refreshToken: refreshResult.refreshToken || tokenData.refreshToken,
+  };
+
+  await supabase
+    .from('broker_connections')
+    .update({
+      metaapi_account_id: JSON.stringify(newTokenData),
+      token_expiry: new Date(Date.now() + TOKEN_TTL_MS).toISOString(),
+      connection_status: 'connected',
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', conn.id);
+
+  return newTokenData;
+}
+
 async function getValidToken(supabase: any, connectionId: string): Promise<{ accessToken: string; environment: string; accountId: string; accNum: number } | null> {
   const { data: conn } = await supabase
     .from('broker_connections')
@@ -449,36 +504,10 @@ async function getValidToken(supabase: any, connectionId: string): Promise<{ acc
 
   if (!tokenData.accessToken || !accountId || !accNum) return null;
 
-  // Check if token is expired
-  if (conn.token_expiry && new Date(conn.token_expiry) < new Date()) {
-    if (!tokenData.refreshToken) return null;
-    const refreshResult = await tlRefresh(tokenData.refreshToken, environment);
-    if (!refreshResult) {
-      // Mark as expired
-      await supabase
-        .from('broker_connections')
-        .update({ connection_status: 'expired', last_error: 'Token refresh failed automatically' })
-        .eq('id', connectionId);
-      return null;
-    }
-
-    const newTokenData = {
-      accessToken: refreshResult.accessToken,
-      refreshToken: refreshResult.refreshToken || tokenData.refreshToken,
-    };
-
-    await supabase
-      .from('broker_connections')
-      .update({
-        metaapi_account_id: JSON.stringify(newTokenData),
-        token_expiry: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
-        connection_status: 'connected',
-        last_error: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', connectionId);
-
-    return { accessToken: refreshResult.accessToken, environment, accountId, accNum };
+  if (tokenNeedsRefresh(conn)) {
+    const refreshed = await refreshConnectionTokens(supabase, conn);
+    if (!refreshed) return null;
+    return { accessToken: refreshed.accessToken, environment, accountId, accNum };
   }
 
   return { accessToken: tokenData.accessToken, environment, accountId, accNum };
@@ -710,28 +739,24 @@ serve(async (req) => {
       let tokenData: any;
       try { tokenData = JSON.parse(conn.metaapi_account_id || '{}'); } catch { return jsonResponse({ error: 'Invalid token data' }, 400); }
 
-      const refreshResult = await tlRefresh(tokenData.refreshToken, conn.environment || 'demo');
-      if (!refreshResult) {
-        await supabase
-          .from('broker_connections')
-          .update({ connection_status: 'expired', last_error: 'Token refresh failed' })
-          .eq('id', connectionId);
-        return jsonResponse({ error: 'Session expired. Please reconnect.' }, 401);
+      if (!tokenData.refreshToken) {
+        return jsonResponse({ error: 'No refresh token stored. Please reconnect with your password.' }, 401);
       }
 
-      await supabase
-        .from('broker_connections')
-        .update({
-          metaapi_account_id: JSON.stringify({
-            accessToken: refreshResult.accessToken,
-            refreshToken: refreshResult.refreshToken || tokenData.refreshToken,
-          }),
-          token_expiry: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
-          connection_status: 'connected',
-          last_error: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', connectionId);
+      if (!tokenNeedsRefresh(conn)) {
+        if (conn.connection_status === 'expired') {
+          await supabase
+            .from('broker_connections')
+            .update({ connection_status: 'connected', last_error: null, updated_at: new Date().toISOString() })
+            .eq('id', connectionId);
+        }
+        return jsonResponse({ success: true, message: 'Session still valid' });
+      }
+
+      const refreshed = await refreshConnectionTokens(supabase, conn);
+      if (!refreshed) {
+        return jsonResponse({ error: 'Session expired. Please reconnect.' }, 401);
+      }
 
       return jsonResponse({ success: true, message: 'Session refreshed' });
     }

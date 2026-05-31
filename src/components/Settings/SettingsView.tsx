@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Moon, Sun, User, Mail, Key, Calendar, LogOut, Palette, Save, Check, Trash2, Download, Link2, Pipette, RotateCcw, Settings, ChevronRight, FileText, Database, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -193,47 +193,6 @@ const pulseVariants = {
   },
 };
 
-// Gradient stop picker — local swatch updates only while dragging.
-const GradientStopPicker = memo(function GradientStopPicker({
-  value,
-  onChange,
-  sizeClass = "w-12 h-12",
-}: {
-  value: string;
-  onChange: (color: string) => void;
-  sizeClass?: string;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const swatchRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (inputRef.current) inputRef.current.value = value;
-    if (swatchRef.current) swatchRef.current.style.backgroundColor = value;
-  }, [value]);
-
-  return (
-    <label className="relative cursor-pointer">
-      <input
-        ref={inputRef}
-        type="color"
-        defaultValue={value}
-        onInput={(e) => {
-          if (swatchRef.current) {
-            swatchRef.current.style.backgroundColor = e.currentTarget.value;
-          }
-        }}
-        onChange={(e) => onChange(e.currentTarget.value)}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-      />
-      <div
-        ref={swatchRef}
-        className={cn("rounded-xl border-2 border-border/30 shadow-lg pointer-events-none", sizeClass)}
-        style={{ backgroundColor: value }}
-      />
-    </label>
-  );
-});
-
 // Wrapper component for CSV Import to use the trades hook
 function CSVImportWrapper({ userId }: { userId?: string }) {
   const { importTrades } = useTrades(userId);
@@ -413,6 +372,8 @@ export function SettingsView({
   const handleCustomGradientApply = () => {
     const gradient = { from: customGradientFrom, to: customGradientTo };
     setSelectedGradient(gradient);
+    setGradientEnabled(true);
+    setAccentEnabled(true);
     onAccentColorChange('custom');
   };
 
@@ -1031,15 +992,19 @@ export function SettingsView({
               <div className="flex-1 space-y-2">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground">From</label>
                 <div className="flex items-center gap-3">
-                  <GradientStopPicker
+                  <CustomAccentColorPicker
                     value={customGradientFrom}
-                    onChange={setCustomGradientFrom}
+                    onCommit={setCustomGradientFrom}
+                    title="Gradient start"
+                    hint="Pick a color, close the panel, then press Apply below."
+                    className="!w-12 !h-12 !rounded-xl"
                   />
                   <Input
                     type="text"
                     value={customGradientFrom}
                     onChange={(e) => setCustomGradientFrom(e.target.value)}
                     className="font-mono text-xs bg-background/50 h-9"
+                    spellCheck={false}
                   />
                 </div>
               </div>
@@ -1055,15 +1020,19 @@ export function SettingsView({
               <div className="flex-1 space-y-2">
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground">To</label>
                 <div className="flex items-center gap-3">
-                  <GradientStopPicker
+                  <CustomAccentColorPicker
                     value={customGradientTo}
-                    onChange={setCustomGradientTo}
+                    onCommit={setCustomGradientTo}
+                    title="Gradient end"
+                    hint="Pick a color, close the panel, then press Apply below."
+                    className="!w-12 !h-12 !rounded-xl"
                   />
                   <Input
                     type="text"
                     value={customGradientTo}
                     onChange={(e) => setCustomGradientTo(e.target.value)}
                     className="font-mono text-xs bg-background/50 h-9"
+                    spellCheck={false}
                   />
                 </div>
               </div>

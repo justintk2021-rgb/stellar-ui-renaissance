@@ -48,6 +48,7 @@ export function useThemeTransition() {
       root.classList.add('theme-switching');
       root.classList.remove('light', 'dark');
       root.classList.add(newTheme);
+      root.dispatchEvent(new CustomEvent('appearance-change'));
       scheduleCleanup(root);
 
       // Push the React state update onto the next microtask so the browser
