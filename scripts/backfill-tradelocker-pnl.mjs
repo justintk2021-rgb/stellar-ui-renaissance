@@ -6,6 +6,7 @@
  * Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in env or .env
  */
 import { createClient } from "@supabase/supabase-js";
+import { execSync } from "child_process";
 import { readFileSync, existsSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -26,12 +27,30 @@ function loadEnv() {
 
 loadEnv();
 
+function resolveServiceRoleKey() {
+  const fromEnv =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
+  if (fromEnv) return fromEnv;
+  const projectRef =
+    process.env.VITE_SUPABASE_PROJECT_ID || "nmcrsrszbzitvauzdfrl";
+  try {
+    const keys = JSON.parse(
+      execSync(
+        `npx supabase projects api-keys --project-ref ${projectRef} -o json`,
+        { cwd: root, encoding: "utf8" },
+      ),
+    );
+    return keys.find((k) => k.name === "service_role")?.api_key || null;
+  } catch {
+    return null;
+  }
+}
+
 const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const key =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
+const key = resolveServiceRoleKey();
 
 if (!url || !key) {
-  console.error("Missing SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY");
+  console.error("Missing SUPABASE_URL and service role key");
   process.exit(1);
 }
 
@@ -68,10 +87,38 @@ function extractBrokerNetPl(openOrder, closeOrder, fallbackGross, orderSwap, ord
   return 0;
 }
 
+function calculateForexPlUsd(side, entry, exit, qty, symbol) {
+  const upper = symbol.toUpperCase();
+  const diff = side === "buy" ? exit - entry : entry - exit;
+  const pipSize = upper.includes("JPY") ? 0.01 : 0.0001;
+  const pips = diff / pipSize;
+  const quote = upper.slice(3, 6);
+  const pipValueUsd = {
+    USD: 10, EUR: 10, GBP: 10, JPY: 9, CAD: 7.5, AUD: 7.5, CHF: 10, NZD: 7,
+  };
+  const pipUsd = pipValueUsd[quote] ?? 8;
+  return pips * pipUsd * qty;
+}
+
+function grossPlFromOrders(openOrder, closeOrder, symbol) {
+  if (!openOrder || !closeOrder) return 0;
+  const entry = Number(openOrder.avgPrice) || 0;
+  const exit = Number(closeOrder.avgPrice) || 0;
+  const qty = Number(openOrder.filledQty || openOrder.qty) || 0;
+  const side = openOrder.side || "buy";
+  if (!entry || !exit || !qty) return 0;
+  const upper = (symbol || "").toUpperCase();
+  if (upper.length === 6 && !upper.includes("XAU") && !upper.includes("XAG")) {
+    return calculateForexPlUsd(side, entry, exit, qty, upper);
+  }
+  const priceDiff = side === "buy" ? exit - entry : entry - exit;
+  return priceDiff * qty * 100000;
+}
+
 async function main() {
   const { data: rows, error } = await supabase
     .from("broker_trade_history")
-    .select("id, broker_position_id, realized_pl, raw_payload")
+    .select("id, broker_position_id, realized_pl, symbol, raw_payload")
     .not("raw_payload", "is", null);
 
   if (error) {
@@ -95,10 +142,11 @@ async function main() {
       Number(openOrder?.swap || 0) + Number(closeOrder?.swap || 0);
     const orderCommission =
       Number(openOrder?.commission || 0) + Number(closeOrder?.commission || 0);
+    const gross = grossPlFromOrders(openOrder, closeOrder, row.symbol || "");
     const net = extractBrokerNetPl(
       openOrder,
       closeOrder,
-      Number(row.realized_pl || 0),
+      gross,
       orderSwap,
       orderCommission,
     );

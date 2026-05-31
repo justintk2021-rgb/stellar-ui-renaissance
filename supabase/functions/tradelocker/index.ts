@@ -327,29 +327,63 @@ function extractBrokerNetPl(
   const realized = firstFinitePl(primary, ['realizedPl', 'realizedPL']);
   if (realized != null) return realized;
 
-  // Closed on broker but no P/L on the fill — do not use price×qty (often ~$583 vs ~$418 gross).
-  if (closeOrder) return 0;
+  // Orders history has no P/L columns — use computed gross from open/close fills.
+  if (closeOrder && Math.abs(fallbackGross) > 0.0001) {
+    return fallbackGross + orderSwap + orderCommission;
+  }
 
   return fallbackGross + orderSwap + orderCommission;
 }
 
-// Calculate P/L using contract size
+/** USD P/L for forex (pip-based; aligns closer to TradeLocker than raw × 100k / exit). */
+function calculateForexPlUsd(
+  side: string,
+  entryPrice: number,
+  exitPrice: number,
+  qty: number,
+  symbol: string,
+): number {
+  const upper = symbol.toUpperCase();
+  const diff = side === 'buy' ? exitPrice - entryPrice : entryPrice - exitPrice;
+  const pipSize = upper.includes('JPY') ? 0.01 : 0.0001;
+  const pips = diff / pipSize;
+  const quote = upper.slice(3, 6);
+  const pipValueUsd: Record<string, number> = {
+    USD: 10,
+    EUR: 10,
+    GBP: 10,
+    JPY: 9,
+    CAD: 7.5,
+    AUD: 7.5,
+    CHF: 10,
+    NZD: 7,
+    SEK: 1,
+    NOK: 1,
+  };
+  const pipUsd = pipValueUsd[quote] ?? 8;
+  return pips * pipUsd * qty;
+}
+
+// Calculate P/L using contract size (non-forex) or pip model (forex)
 function calculateRealizedPl(
   side: string, entryPrice: number, exitPrice: number, qty: number,
   symbol: string, instrumentType?: string
 ): number {
   if (!entryPrice || !exitPrice || !qty) return 0;
+  const upperSym = symbol.toUpperCase();
+  const isForex =
+    instrumentType === 'FOREX' ||
+    (upperSym.length === 6 && !upperSym.includes('XAU') && !upperSym.includes('XAG'));
+
+  if (isForex) {
+    return calculateForexPlUsd(side, entryPrice, exitPrice, qty, upperSym);
+  }
+
   const contractSize = getContractSize(symbol, instrumentType);
   const priceDiff = side === 'buy' ? (exitPrice - entryPrice) : (entryPrice - exitPrice);
   const rawPl = priceDiff * qty * contractSize;
-  
-  // For pairs where the quote currency is not USD, convert P/L to USD
-  const upperSym = symbol.toUpperCase();
-  if (upperSym.endsWith('JPY') || upperSym.endsWith('CHF') || upperSym.endsWith('CAD') ||
-      upperSym.endsWith('SEK') || upperSym.endsWith('NOK') || upperSym.endsWith('SGD') ||
-      upperSym.endsWith('HKD') || upperSym.endsWith('MXN') || upperSym.endsWith('ZAR') ||
-      upperSym.endsWith('TRY') || upperSym.endsWith('HUF') || upperSym.endsWith('PLN') ||
-      upperSym.endsWith('CZK') || upperSym.endsWith('DKK')) {
+
+  if (upperSym.endsWith('JPY')) {
     return rawPl / exitPrice;
   }
   return rawPl;

@@ -67,9 +67,10 @@ async function main() {
   } else {
     const { data, error } = await supabase
       .from("broker_connections")
-      .select("id, platform, connection_status")
+      .select("id, platform, connection_status, active_account_id")
       .ilike("platform", "%tradelocker%")
-      .eq("connection_status", "connected");
+      .in("connection_status", ["connected", "expired"])
+      .not("active_account_id", "is", null);
     if (error) {
       console.error("Failed to list connections:", error.message);
       process.exit(1);
@@ -78,14 +79,14 @@ async function main() {
   }
 
   if (connectionIds.length === 0) {
-    console.log("No connected TradeLocker accounts found.");
+    console.log("No TradeLocker accounts with an active account selected.");
     return;
   }
 
   const fnUrl = `${url.replace(/\/$/, "")}/functions/v1/tradelocker`;
 
   for (const connectionId of connectionIds) {
-    console.log(`Syncing connection ${connectionId}...`);
+    console.log(`Repairing + syncing connection ${connectionId}...`);
     const res = await fetch(fnUrl, {
       method: "POST",
       headers: {
