@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { readTradeLockerConnectionId } from "@/lib/brokerStorage";
 import { fetchBrokerPnLData } from "@/lib/queries/brokerPnl";
+import { repairTradeLockerSessions } from "@/lib/repairBrokerSession";
 import {
   formatLocalDateKey,
   getClientDayBoundsISO,
@@ -45,7 +46,8 @@ async function resolveConnectionId(
     .select("id")
     .eq("user_id", userId)
     .eq("platform", "tradelocker")
-    .eq("connection_status", "connected")
+    .in("connection_status", ["connected", "expired"])
+    .not("active_account_id", "is", null)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -72,16 +74,30 @@ function resolveTodayPnL(
   liveOrStored: BrokerTodayPnL | null,
   byDay: Map<string, number>,
 ): BrokerTodayPnL | null {
-  // Always prefer live/DB todayGross from TradeLocker — never substitute inflated history sums.
+  // Prefer live/DB todayGross from TradeLocker (including legitimate $0 days).
   if (liveOrStored != null && Number.isFinite(liveOrStored.net)) {
     return liveOrStored;
   }
 
   const todayKey = formatLocalDateKey(new Date());
   const historyToday = byDay.get(todayKey);
-  if (historyToday != null && Math.abs(historyToday) > 0.01) {
+  if (historyToday != null && Number.isFinite(historyToday)) {
     return { net: historyToday, syncedAt: null };
   }
+
+  // Last closed session day from broker history (e.g. weekend / prior session)
+  let latestKey: string | null = null;
+  let latestPl = 0;
+  for (const [day, pnl] of byDay) {
+    if (day > (latestKey ?? "") && Math.abs(pnl) > 0.01) {
+      latestKey = day;
+      latestPl = pnl;
+    }
+  }
+  if (latestKey) {
+    return { net: latestPl, syncedAt: null };
+  }
+
   return null;
 }
 
@@ -108,14 +124,18 @@ export function useBrokerTodayPnL(
         return;
       }
 
-      const connId = await resolveConnectionId(userId, brokerAccountExternalId);
-      setConnectionId(connId);
+      let connId = await resolveConnectionId(userId, brokerAccountExternalId);
       if (!connId) {
         setBrokerToday(null);
         setBrokerDayTotals(new Map());
+        setConnectionId(null);
         setBrokerPlByPositionCache(null);
         return;
       }
+
+      await repairTradeLockerSessions();
+      connId = (await resolveConnectionId(userId, brokerAccountExternalId)) ?? connId;
+      setConnectionId(connId);
 
       let byDay = new Map<string, number>();
       let byPosition = new Map<string, number>();
@@ -133,16 +153,24 @@ export function useBrokerTodayPnL(
       let stored: BrokerTodayPnL | null = null;
       if (opts?.live) {
         stored = await fetchLiveBrokerToday(connId);
+        if (!stored) {
+          await repairTradeLockerSessions();
+          stored = await fetchLiveBrokerToday(connId);
+        }
       }
 
-      if (!stored || (opts?.live && Math.abs(stored.net) < 0.01)) {
-        const { data: conn } = await supabase
+      if (stored == null || (opts?.live && Math.abs(stored.net) < 0.01)) {
+        const { data: conn, error: connErr } = await supabase
           .from("broker_connections")
           .select("today_gross_pnl, today_net_pnl, today_pnl_synced_at")
           .eq("id", connId)
           .maybeSingle();
-        const fromDb = conn ? parseTodayFromConnection(conn) : null;
-        if (fromDb) stored = fromDb;
+        if (!connErr) {
+          const fromDb = conn ? parseTodayFromConnection(conn) : null;
+          if (fromDb && (stored == null || Math.abs(fromDb.net) >= Math.abs(stored.net))) {
+            stored = fromDb;
+          }
+        }
       }
 
       setBrokerToday(resolveTodayPnL(stored, byDay));
