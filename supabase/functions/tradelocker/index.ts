@@ -314,8 +314,10 @@ function extractBrokerNetPl(
   const realized = firstFinitePl(primary, ['realizedPl', 'realizedPL']);
   if (realized != null) return realized;
 
-  if (closeOrder) return fallbackGross + orderSwap + orderCommission;
-  return 0;
+  // Closed on broker but no P/L on the fill — do not use price×qty (often ~$583 vs ~$418 gross).
+  if (closeOrder) return 0;
+
+  return fallbackGross + orderSwap + orderCommission;
 }
 
 // Calculate P/L using contract size
@@ -1216,8 +1218,9 @@ serve(async (req) => {
             .eq('imported_from_broker', true)
             .eq('broker_name', 'TradeLocker')
             .eq('broker_account_id', accountId)
-            .gte('close_time', clientDayStart)
-            .lte('close_time', clientDayEnd);
+            .or(
+              `date.eq.${clientToday},and(close_time.gte.${clientDayStart},close_time.lte.${clientDayEnd})`,
+            );
 
           if (todayTrades?.length) {
             const sum = todayTrades.reduce((s, t) => s + (Number(t.result) || 0), 0);
@@ -1251,6 +1254,73 @@ serve(async (req) => {
               stats.journalUpdated += todayTrades.length;
             }
           }
+        }
+
+        // Per-day reconcile: scale journal rows on each date to deduped history sum
+        const { data: histForDates } = await supabase
+          .from('broker_trade_history')
+          .select('broker_position_id, realized_pl, closed_at')
+          .eq('broker_connection_id', connectionId)
+          .not('closed_at', 'is', null);
+
+        const latestHist = new Map<string, { pl: number; closed_at: string }>();
+        for (const h of histForDates || []) {
+          const posId = h.broker_position_id ? String(h.broker_position_id) : '';
+          if (!posId) continue;
+          const closedAt = String(h.closed_at);
+          const prev = latestHist.get(posId);
+          if (!prev || closedAt >= prev.closed_at) {
+            latestHist.set(posId, { pl: Number(h.realized_pl) || 0, closed_at: closedAt });
+          }
+        }
+
+        const histByDate = new Map<string, number>();
+        for (const { pl, closed_at } of latestHist.values()) {
+          const dateKey = isoToLocalDateKey(closed_at);
+          histByDate.set(dateKey, (histByDate.get(dateKey) || 0) + pl);
+        }
+
+        const { data: allJournal } = await supabase
+          .from('trades')
+          .select('id, date, result')
+          .eq('user_id', user.id)
+          .eq('imported_from_broker', true)
+          .eq('broker_name', 'TradeLocker')
+          .eq('broker_account_id', accountId);
+
+        const journalByDate = new Map<string, { id: string; result: number }[]>();
+        for (const t of allJournal || []) {
+          const dateKey = String(t.date || '').slice(0, 10);
+          if (!dateKey) continue;
+          if (!journalByDate.has(dateKey)) journalByDate.set(dateKey, []);
+          journalByDate.get(dateKey)!.push({ id: t.id, result: Number(t.result) || 0 });
+        }
+
+        for (const [dateKey, dayTrades] of journalByDate) {
+          let target =
+            dateKey === clientToday && todayTarget != null && Math.abs(todayTarget) > 0.01
+              ? todayTarget
+              : histByDate.get(dateKey);
+          if (target == null || !Number.isFinite(target)) continue;
+
+          const sum = dayTrades.reduce((s, t) => s + t.result, 0);
+          if (Math.abs(sum - target) <= 0.5) continue;
+
+          if (dayTrades.length === 1) {
+            await supabase
+              .from('trades')
+              .update({ result: target, swap: 0, commission: 0 })
+              .eq('id', dayTrades[0].id);
+          } else if (sum !== 0) {
+            const scale = target / sum;
+            for (const t of dayTrades) {
+              await supabase
+                .from('trades')
+                .update({ result: t.result * scale })
+                .eq('id', t.id);
+            }
+          }
+          stats.journalUpdated += dayTrades.length;
         }
 
         // Update sync log

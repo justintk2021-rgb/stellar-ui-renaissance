@@ -72,19 +72,16 @@ function resolveTodayPnL(
   liveOrStored: BrokerTodayPnL | null,
   byDay: Map<string, number>,
 ): BrokerTodayPnL | null {
-  const todayKey = formatLocalDateKey(new Date());
-  const historyToday = byDay.get(todayKey);
-
-  if (liveOrStored != null && Math.abs(liveOrStored.net) > 0.01) {
+  // Always prefer live/DB todayGross from TradeLocker — never substitute inflated history sums.
+  if (liveOrStored != null && Number.isFinite(liveOrStored.net)) {
     return liveOrStored;
   }
+
+  const todayKey = formatLocalDateKey(new Date());
+  const historyToday = byDay.get(todayKey);
   if (historyToday != null && Math.abs(historyToday) > 0.01) {
-    return {
-      net: historyToday,
-      syncedAt: liveOrStored?.syncedAt ?? null,
-    };
+    return { net: historyToday, syncedAt: null };
   }
-  if (liveOrStored != null) return liveOrStored;
   return null;
 }
 

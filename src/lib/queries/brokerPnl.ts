@@ -21,16 +21,29 @@ export async function fetchBrokerPnLData(
 
   if (error) throw error;
 
-  for (const row of data || []) {
-    const pl = Number(row.realized_pl) || 0;
-    const posId = row.broker_position_id as string | null;
-    if (posId) byPosition.set(posId, pl);
+  // One row per position (latest close) — duplicate history rows were inflating day totals.
+  const latestByPosition = new Map<
+    string,
+    { realized_pl: number; closed_at: string }
+  >();
 
+  for (const row of data || []) {
+    const posId = row.broker_position_id as string | null;
     const closedAt = row.closed_at as string;
-    const d = new Date(closedAt);
+    if (!posId || !closedAt) continue;
+    const pl = Number(row.realized_pl) || 0;
+    const prev = latestByPosition.get(posId);
+    if (!prev || closedAt >= prev.closed_at) {
+      latestByPosition.set(posId, { realized_pl: pl, closed_at: closedAt });
+    }
+  }
+
+  for (const [posId, row] of latestByPosition) {
+    byPosition.set(posId, row.realized_pl);
+    const d = new Date(row.closed_at);
     if (isNaN(d.getTime())) continue;
     const key = formatLocalDateKey(d);
-    byDay.set(key, (byDay.get(key) || 0) + pl);
+    byDay.set(key, (byDay.get(key) || 0) + row.realized_pl);
   }
 
   return { byDay, byPosition };

@@ -148,6 +148,35 @@ export const getClientDayBoundsISO = (): {
   };
 };
 
+/**
+ * Calendar day that matches TradeLocker "today" P&L (closes in local day window,
+ * or most recent broker close in the last 7 days).
+ */
+export const resolveBrokerSessionDateKey = (trades: Trade[]): string | null => {
+  const bounds = getClientDayBoundsISO();
+  const inBounds = dedupeTradesForPnL(trades).filter(
+    (t) =>
+      t.importedFromBroker &&
+      t.closeTime &&
+      t.closeTime >= bounds.start &&
+      t.closeTime <= bounds.end,
+  );
+  if (inBounds.length) {
+    return getTradeCloseLocalDateKey(inBounds[0]);
+  }
+
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  let latest: Trade | null = null;
+  for (const t of dedupeTradesForPnL(trades)) {
+    if (!t.importedFromBroker || !t.closeTime) continue;
+    if (new Date(t.closeTime).getTime() < cutoff) continue;
+    if (!latest || new Date(t.closeTime) > new Date(latest.closeTime)) {
+      latest = t;
+    }
+  }
+  return latest ? getTradeCloseLocalDateKey(latest) : null;
+};
+
 /** Build per-day P&L keyed by local close date (broker gross when available). */
 export const buildDailyPnLMap = (
   trades: Trade[],
@@ -163,16 +192,22 @@ export const buildDailyPnLMap = (
     map.set(key, (map.get(key) || 0) + getTradeNetResult(trade));
   }
 
-  // Broker history totals (TradeLocker gross per day) override journal sums.
+  const sessionDayKey =
+    brokerToday != null && Number.isFinite(brokerToday.net)
+      ? resolveBrokerSessionDateKey(trades)
+      : null;
+
+  // History per day (deduped positions) — skip session day; broker today gross wins there.
   if (brokerDayTotals?.size) {
     for (const [day, pnl] of brokerDayTotals) {
+      if (sessionDayKey && day === sessionDayKey) continue;
       map.set(day, pnl);
     }
   }
 
-  const todayKey = formatLocalDateKey(new Date());
+  // TradeLocker today gross (e.g. $418) on the day you actually traded, not only calendar "today".
   if (brokerToday != null && Number.isFinite(brokerToday.net)) {
-    map.set(todayKey, brokerToday.net);
+    map.set(sessionDayKey ?? formatLocalDateKey(new Date()), brokerToday.net);
   }
 
   return map;
