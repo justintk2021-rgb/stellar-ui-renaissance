@@ -204,10 +204,22 @@ const Index = () => {
               }),
             });
             if (res.status === 401) {
-              await supabase
-                .from('broker_connections')
-                .update({ connection_status: 'expired' })
-                .eq('id', conn.id);
+              // Try refresh before marking expired (stale access token is common).
+              const refreshRes = await fetch(`${supabaseUrl}/functions/v1/tradelocker`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  apikey: anonKey,
+                  Authorization: `Bearer ${token ?? anonKey}`,
+                },
+                body: JSON.stringify({ action: 'refresh-session', connectionId: conn.id }),
+              });
+              if (!refreshRes.ok) {
+                await supabase
+                  .from('broker_connections')
+                  .update({ connection_status: 'expired', last_error: 'Session expired — reconnect in Settings' })
+                  .eq('id', conn.id);
+              }
             }
             // Drain the body so the connection can be reused; ignore content.
             try { await res.text(); } catch {}

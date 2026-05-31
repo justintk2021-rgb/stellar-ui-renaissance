@@ -410,14 +410,34 @@ export function useTradeLocker() {
     }
   };
 
+  const refreshSession = useCallback(async (connectionId?: string) => {
+    const connId = connectionId || connection?.id;
+    if (!connId) return false;
+    try {
+      await invokeTradeLocker('refresh-session', { connectionId: connId });
+      await refetchConnections();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [connection?.id, refetchConnections]);
+
   // Reconnect
   const reconnect = async (email: string, password: string) => {
     if (!connection) return false;
     try {
-      await invokeTradeLocker('reconnect', { connectionId: connection.id, email, password });
-      toast.success('Reconnected');
+      const result = await invokeTradeLocker('reconnect', {
+        connectionId: connection.id,
+        email: email.trim(),
+        password,
+      });
+      toast.success(result.message || 'Reconnected');
+      selectConnection(connection.id);
+      writeTradeLockerConnectionId(connection.id);
       await fetchConnections();
+      await fetchAccounts(connection.id);
       await Promise.all([fetchPositions(), fetchOrders(), fetchHistory(), fetchSummary()]);
+      await sync({ quiet: true });
       return true;
     } catch (error: any) {
       toast.error(error.message);
@@ -464,6 +484,21 @@ export function useTradeLocker() {
   useEffect(() => {
     fetchAccounts();
   }, [fetchAccounts]);
+
+  // Try silent token refresh when marked expired (common after idle / background sync)
+  useEffect(() => {
+    if (!connection?.id || connection.connection_status !== 'expired') return;
+    let cancelled = false;
+    (async () => {
+      const ok = await refreshSession(connection.id);
+      if (!cancelled && ok) {
+        toast.success('TradeLocker session restored');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [connection?.id, connection?.connection_status, refreshSession]);
 
   // Load data when connection is active
   useEffect(() => {
@@ -512,6 +547,7 @@ export function useTradeLocker() {
     sync,
     disconnect,
     reconnect,
+    refreshSession,
     placeOrder,
     closePosition,
     modifyPosition,

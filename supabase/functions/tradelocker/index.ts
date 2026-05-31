@@ -100,6 +100,14 @@ async function tlAuth(email: string, password: string, server: string, environme
   }
 }
 
+function normalizeTokens(data: any): { accessToken: string; refreshToken?: string } | null {
+  if (!data || typeof data !== 'object') return null;
+  const accessToken = data.accessToken || data.access_token;
+  const refreshToken = data.refreshToken || data.refresh_token;
+  if (!accessToken) return null;
+  return { accessToken: String(accessToken), refreshToken: refreshToken ? String(refreshToken) : undefined };
+}
+
 async function tlRefresh(refreshToken: string, environment: string) {
   const baseUrl = getBaseUrl(environment);
   try {
@@ -108,9 +116,14 @@ async function tlRefresh(refreshToken: string, environment: string) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
     });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('TL refresh failed:', res.status, text);
+      return null;
+    }
+    return normalizeTokens(await res.json());
+  } catch (e) {
+    console.error('TL refresh error:', e);
     return null;
   }
 }
@@ -451,7 +464,7 @@ async function getValidToken(supabase: any, connectionId: string): Promise<{ acc
 
     const newTokenData = {
       accessToken: refreshResult.accessToken,
-      refreshToken: refreshResult.refreshToken,
+      refreshToken: refreshResult.refreshToken || tokenData.refreshToken,
     };
 
     await supabase
@@ -709,7 +722,10 @@ serve(async (req) => {
       await supabase
         .from('broker_connections')
         .update({
-          metaapi_account_id: JSON.stringify({ accessToken: refreshResult.accessToken, refreshToken: refreshResult.refreshToken }),
+          metaapi_account_id: JSON.stringify({
+            accessToken: refreshResult.accessToken,
+            refreshToken: refreshResult.refreshToken || tokenData.refreshToken,
+          }),
           token_expiry: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
           connection_status: 'connected',
           last_error: null,
@@ -1211,16 +1227,32 @@ serve(async (req) => {
             : historyTodaySum;
 
         if (todayTarget != null && Math.abs(todayTarget) > 0.01) {
-          const { data: todayTrades } = await supabase
+          const { data: byDate } = await supabase
             .from('trades')
             .select('id, result, broker_position_id')
             .eq('user_id', user.id)
             .eq('imported_from_broker', true)
             .eq('broker_name', 'TradeLocker')
             .eq('broker_account_id', accountId)
-            .or(
-              `date.eq.${clientToday},and(close_time.gte.${clientDayStart},close_time.lte.${clientDayEnd})`,
-            );
+            .eq('date', clientToday);
+
+          const { data: byClose } = await supabase
+            .from('trades')
+            .select('id, result, broker_position_id')
+            .eq('user_id', user.id)
+            .eq('imported_from_broker', true)
+            .eq('broker_name', 'TradeLocker')
+            .eq('broker_account_id', accountId)
+            .gte('close_time', clientDayStart)
+            .lte('close_time', clientDayEnd);
+
+          const seenToday = new Set<string>();
+          const todayTrades: { id: string; result: number | null; broker_position_id: string | null }[] = [];
+          for (const t of [...(byDate || []), ...(byClose || [])]) {
+            if (seenToday.has(t.id)) continue;
+            seenToday.add(t.id);
+            todayTrades.push(t);
+          }
 
           if (todayTrades?.length) {
             const sum = todayTrades.reduce((s, t) => s + (Number(t.result) || 0), 0);
@@ -1671,6 +1703,10 @@ serve(async (req) => {
     // ====================== RECONNECT ======================
     if (action === 'reconnect') {
       const { connectionId, email, password } = body;
+      if (!email || !password) {
+        return jsonResponse({ error: 'Email and password are required' }, 400);
+      }
+
       const { data: conn } = await supabase
         .from('broker_connections')
         .select('*')
@@ -1681,14 +1717,33 @@ serve(async (req) => {
       if (!conn) return jsonResponse({ error: 'Connection not found' }, 404);
 
       const authResult = await tlAuth(email, password, conn.server, conn.environment || 'demo');
-      if (!authResult) {
-        return jsonResponse({ error: 'Failed to re-authenticate. Check credentials.' }, 400);
+      if (!authResult || authResult.error || !authResult.accessToken) {
+        return jsonResponse({
+          error: authResult?.error || 'Failed to re-authenticate. Check credentials.',
+        }, 400);
       }
+
+      const tokens = normalizeTokens(authResult);
+      if (!tokens) {
+        return jsonResponse({ error: 'TradeLocker did not return valid tokens.' }, 400);
+      }
+
+      const rawAccounts = await tlGetAccounts(tokens.accessToken, conn.environment || 'demo');
+      const accounts = rawAccounts
+        .map((acc: any, index: number) => normalizeTlAccount(acc, index))
+        .filter(Boolean);
+
+      const prevActiveId = conn.active_account_id;
+      const prevAccNum = conn.active_acc_num;
 
       await supabase
         .from('broker_connections')
         .update({
-          metaapi_account_id: JSON.stringify({ accessToken: authResult.accessToken, refreshToken: authResult.refreshToken }),
+          login: email,
+          metaapi_account_id: JSON.stringify({
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken || authResult.refreshToken,
+          }),
           connection_status: 'connected',
           token_expiry: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
           last_connected_at: new Date().toISOString(),
@@ -1696,7 +1751,52 @@ serve(async (req) => {
         })
         .eq('id', connectionId);
 
-      return jsonResponse({ success: true, message: 'Reconnected successfully' });
+      await supabase.from('broker_accounts').delete().eq('broker_connection_id', connectionId);
+
+      for (const acc of accounts) {
+        await supabase.from('broker_accounts').insert({
+          broker_connection_id: connectionId,
+          account_id_external: acc.id,
+          acc_num: acc.accNum,
+          account_name: acc.name,
+          is_active: prevActiveId === acc.id,
+        });
+      }
+
+      if (prevActiveId && prevAccNum != null) {
+        const stillValid = accounts.some((a: any) => a.id === prevActiveId);
+        if (stillValid) {
+          await supabase
+            .from('broker_connections')
+            .update({
+              active_account_id: prevActiveId,
+              active_acc_num: prevAccNum,
+            })
+            .eq('id', connectionId);
+        } else if (accounts.length === 1) {
+          await supabase
+            .from('broker_connections')
+            .update({
+              active_account_id: accounts[0].id,
+              active_acc_num: accounts[0].accNum,
+            })
+            .eq('id', connectionId);
+        }
+      } else if (accounts.length === 1) {
+        await supabase
+          .from('broker_connections')
+          .update({
+            active_account_id: accounts[0].id,
+            active_acc_num: accounts[0].accNum,
+          })
+          .eq('id', connectionId);
+      }
+
+      return jsonResponse({
+        success: true,
+        message: 'Reconnected successfully',
+        accounts: accounts.map((a: any) => ({ id: a.id, accNum: a.accNum, name: a.name })),
+      });
     }
 
     // ====================== DEBUG RAW ======================
