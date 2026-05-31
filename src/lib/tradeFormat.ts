@@ -197,10 +197,14 @@ export const buildDailyPnLMap = (
       ? resolveBrokerSessionDateKey(trades)
       : null;
 
-  // History per day (deduped positions) — skip session day; broker today gross wins there.
+  // Broker history totals only fill days with no imported journal rows (avoid overwriting).
   if (brokerDayTotals?.size) {
+    const daysWithJournal = new Set(
+      deduped.filter((t) => t.importedFromBroker).map((t) => getTradeCloseLocalDateKey(t)),
+    );
     for (const [day, pnl] of brokerDayTotals) {
       if (sessionDayKey && day === sessionDayKey) continue;
+      if (daysWithJournal.has(day)) continue;
       map.set(day, pnl);
     }
   }

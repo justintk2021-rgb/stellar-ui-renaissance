@@ -85,19 +85,6 @@ function resolveTodayPnL(
     return { net: historyToday, syncedAt: null };
   }
 
-  // Last closed session day from broker history (e.g. weekend / prior session)
-  let latestKey: string | null = null;
-  let latestPl = 0;
-  for (const [day, pnl] of byDay) {
-    if (day > (latestKey ?? "") && Math.abs(pnl) > 0.01) {
-      latestKey = day;
-      latestPl = pnl;
-    }
-  }
-  if (latestKey) {
-    return { net: latestPl, syncedAt: null };
-  }
-
   return null;
 }
 

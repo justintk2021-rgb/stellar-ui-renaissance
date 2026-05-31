@@ -335,6 +335,20 @@ function extractBrokerNetPl(
   return fallbackGross + orderSwap + orderCommission;
 }
 
+/** True only for spot FX majors — not crypto (BTCUSD) or metals (XAUUSD). */
+function isForexSymbol(symbol: string, instrumentType?: string): boolean {
+  if (instrumentType === 'CRYPTO' || instrumentType === 'INDEX') return false;
+  if (instrumentType === 'FOREX') return true;
+  const s = symbol.toUpperCase();
+  if (s.includes('BTC') || s.includes('ETH') || s.includes('SOL') || s.includes('DOGE') ||
+      s.includes('LTC') || s.includes('XRP') || s.includes('ADA') || s.includes('DOT') ||
+      s.includes('XAU') || s.includes('XAG') || s.includes('XPT') || s.includes('XPD') ||
+      s.includes('OIL') || s.includes('USOIL') || s.includes('UKOIL')) {
+    return false;
+  }
+  return /^[A-Z]{6}$/.test(s) && /^(EUR|GBP|AUD|NZD|USD|CAD|CHF|JPY)/.test(s);
+}
+
 /** USD P/L for forex (pip-based; aligns closer to TradeLocker than raw × 100k / exit). */
 function calculateForexPlUsd(
   side: string,
@@ -371,22 +385,15 @@ function calculateRealizedPl(
 ): number {
   if (!entryPrice || !exitPrice || !qty) return 0;
   const upperSym = symbol.toUpperCase();
-  const isForex =
-    instrumentType === 'FOREX' ||
-    (upperSym.length === 6 && !upperSym.includes('XAU') && !upperSym.includes('XAG'));
 
-  if (isForex) {
+  if (isForexSymbol(upperSym, instrumentType)) {
     return calculateForexPlUsd(side, entryPrice, exitPrice, qty, upperSym);
   }
 
-  const contractSize = getContractSize(symbol, instrumentType);
+  const contractSize = getContractSize(upperSym, instrumentType);
   const priceDiff = side === 'buy' ? (exitPrice - entryPrice) : (entryPrice - exitPrice);
-  const rawPl = priceDiff * qty * contractSize;
-
-  if (upperSym.endsWith('JPY')) {
-    return rawPl / exitPrice;
-  }
-  return rawPl;
+  // Crypto/metals: qty is lots/units — P/L = price change × qty × contract size (often 1 or 100).
+  return priceDiff * qty * contractSize;
 }
 
 async function tlPlaceOrder(accessToken: string, accountId: string, accNum: number, environment: string, orderPayload: any) {

@@ -100,6 +100,35 @@ function calculateForexPlUsd(side, entry, exit, qty, symbol) {
   return pips * pipUsd * qty;
 }
 
+function isForexSymbol(symbol) {
+  const s = (symbol || "").toUpperCase();
+  if (
+    s.includes("BTC") ||
+    s.includes("ETH") ||
+    s.includes("SOL") ||
+    s.includes("DOGE") ||
+    s.includes("XAU") ||
+    s.includes("XAG")
+  ) {
+    return false;
+  }
+  return /^[A-Z]{6}$/.test(s) && /^(EUR|GBP|AUD|NZD|USD|CAD|CHF|JPY)/.test(s);
+}
+
+function getContractSize(symbol) {
+  const s = symbol.toUpperCase();
+  if (s.includes("XAU") || s.includes("XAG")) return 100;
+  if (
+    s.includes("BTC") ||
+    s.includes("ETH") ||
+    s.includes("SOL") ||
+    s.includes("DOGE")
+  ) {
+    return 1;
+  }
+  return 100000;
+}
+
 function grossPlFromOrders(openOrder, closeOrder, symbol) {
   if (!openOrder || !closeOrder) return 0;
   const entry = Number(openOrder.avgPrice) || 0;
@@ -108,11 +137,11 @@ function grossPlFromOrders(openOrder, closeOrder, symbol) {
   const side = openOrder.side || "buy";
   if (!entry || !exit || !qty) return 0;
   const upper = (symbol || "").toUpperCase();
-  if (upper.length === 6 && !upper.includes("XAU") && !upper.includes("XAG")) {
+  if (isForexSymbol(upper)) {
     return calculateForexPlUsd(side, entry, exit, qty, upper);
   }
   const priceDiff = side === "buy" ? exit - entry : entry - exit;
-  return priceDiff * qty * 100000;
+  return priceDiff * qty * getContractSize(upper);
 }
 
 async function main() {
