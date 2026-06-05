@@ -1111,9 +1111,9 @@ function TradeOutcomeDots({ trades }: { trades: Trade[] }) {
           key={trade.id}
           className={cn(
             "h-1.5 w-1.5 rounded-full",
-            trade.result > 0
+            getTradeNetResult(trade) > 0
               ? "bg-emerald-500"
-              : trade.result < 0
+              : getTradeNetResult(trade) < 0
               ? "bg-rose-500"
               : "bg-muted-foreground/60"
           )}
