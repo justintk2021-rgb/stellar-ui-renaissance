@@ -265,12 +265,58 @@ export function NotebookView({
   // Find selected entry
   const selectedEntry = notebookEntries.find((e) => e.id === selectedEntryId);
 
-  // Calculate word count
-  const wordCount = useMemo(() => {
-    if (!editorRef.current) return 0;
-    const text = editorRef.current.innerText || '';
-    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
-  }, [selectedEntry?.content]);
+  // Live writing stats (words / characters / reading time) + autosave indicator
+  const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 });
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
+  const updateEditorStats = (el: HTMLElement | null) => {
+    const text = el?.innerText || "";
+    const trimmed = text.trim();
+    setEditorStats({
+      words: trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0,
+      chars: trimmed.length,
+    });
+  };
+
+  /** Focus a contentEditable editor and place the caret at the end. */
+  const focusEditorAtEnd = (el: HTMLElement | null) => {
+    if (!el) return;
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  };
+
+  /** Click-to-write: focus the editor, placing the caret as close to the
+      click as possible (falls back to end of content). */
+  const handleEditorAreaClick = (
+    e: React.MouseEvent,
+    targetEditor: HTMLElement | null,
+  ) => {
+    if (isLocked || selectedEntry?.isDeleted || !targetEditor) return;
+    const target = e.target as HTMLElement;
+    // Don't steal clicks from interactive controls or the editor itself
+    if (targetEditor.contains(target)) return;
+    if (target.closest('button, a, input, textarea, [role="menu"], [contenteditable]')) return;
+
+    targetEditor.focus();
+    // Try to place the caret at the exact click point (works when clicking
+    // beside a line); otherwise collapse to the end of the note.
+    const docAny = document as Document & {
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    };
+    const range = docAny.caretRangeFromPoint?.(e.clientX, e.clientY);
+    const sel = window.getSelection();
+    if (range && targetEditor.contains(range.startContainer)) {
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    } else {
+      focusEditorAtEnd(targetEditor);
+    }
+  };
 
   // Filter entries by category and search (excluding trash unless viewing trash)
   const filteredEntries = useMemo(() => notebookEntries.filter((entry) => {
@@ -365,6 +411,12 @@ export function NotebookView({
     } else if (editorRef.current && isCreatingNew) {
       editorRef.current.innerHTML = "";
     }
+    updateEditorStats(editorRef.current);
+    setLastSavedAt(null);
+    // Auto-focus the editor so the user can start typing immediately.
+    if (editorRef.current && !selectedEntry?.isDeleted && !isLocked && (selectedEntry || isCreatingNew)) {
+      requestAnimationFrame(() => focusEditorAtEnd(editorRef.current));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEntry?.id, isCreatingNew]);
 
@@ -440,6 +492,7 @@ export function NotebookView({
         content,
         updatedAt: new Date().toISOString(),
       });
+      setLastSavedAt(new Date());
     }, 5000);
 
     return () => clearInterval(autoSaveInterval);
@@ -465,6 +518,7 @@ export function NotebookView({
         content,
         updatedAt: new Date().toISOString(),
       });
+      setLastSavedAt(new Date());
     };
 
     const editorEl = (isFullWidth ? fullscreenEditorRef : editorRef).current;
@@ -539,6 +593,7 @@ export function NotebookView({
       onSaveEntry(newEntry);
       setSelectedEntryId(newEntry.id);
       setIsCreatingNew(false);
+      setLastSavedAt(new Date());
       toast.success("Note created!");
     } else if (selectedEntry) {
       onSaveEntry({
@@ -547,6 +602,7 @@ export function NotebookView({
         content,
         updatedAt: new Date().toISOString(),
       });
+      setLastSavedAt(new Date());
       toast.success("Note saved!");
     }
   };
@@ -1234,7 +1290,10 @@ export function NotebookView({
           </motion.div>
 
           {/* Content Area */}
-          <ScrollArea className="flex-1">
+          <ScrollArea
+            className="flex-1 cursor-text"
+            onClick={(e) => handleEditorAreaClick(e, fullscreenEditorRef.current)}
+          >
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1311,6 +1370,8 @@ export function NotebookView({
                 ref={fullscreenEditorRef}
                 contentEditable={!isLocked}
                 style={{ fontFamily: selectedFontFamily }}
+                onInput={(e) => updateEditorStats(e.currentTarget)}
+                data-placeholder="Start writing your notes..."
                 className={cn(
                   "min-h-[calc(100vh-400px)] outline-none focus:outline-none caret-primary",
                   isSmallText ? "text-sm leading-relaxed" : "text-base leading-loose",
@@ -1343,26 +1404,29 @@ export function NotebookView({
       "h-[calc(100vh-200px)] flex gap-4 transition-all duration-300 relative",
       isFullWidth && "invisible"
     )}>
+      {/* Bookmark Tab Toggle - Folders */}
+      {!isEntriesPanelOpen && !isFoldersPanelOpen && (
+        <button
+          onMouseEnter={() => setIsFoldersPanelOpen(true)}
+          className="bookmark-tab bookmark-tab--folders"
+          style={{ top: '72px', animationDelay: '0.05s' }}
+          title="Open folders"
+        >
+          <FolderOpen className="w-4 h-4" />
+          <span className="bookmark-label">Folders</span>
+        </button>
+      )}
+
       {/* Bookmark Tab Toggle - Notes */}
       {!isEntriesPanelOpen && !isFoldersPanelOpen && (
         <button
           onMouseEnter={() => setIsEntriesPanelOpen(true)}
           className="bookmark-tab"
+          style={{ top: '136px', animationDelay: '0.12s' }}
+          title="Open notes list"
         >
           <FileText className="w-4 h-4" />
           <span className="bookmark-label">Notes</span>
-        </button>
-      )}
-
-      {/* Bookmark Tab Toggle - Folders */}
-      {!isEntriesPanelOpen && !isFoldersPanelOpen && (
-        <button
-          onMouseEnter={() => setIsFoldersPanelOpen(true)}
-          className="bookmark-tab"
-          style={{ top: '160px' }}
-        >
-          <FolderOpen className="w-4 h-4" />
-          <span className="bookmark-label">Folders</span>
         </button>
       )}
 
@@ -1372,24 +1436,27 @@ export function NotebookView({
         {isFoldersPanelOpen && !isEntriesPanelOpen && (
           <div 
             className={cn(
-              "w-72 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col",
+              "w-72 flex-shrink-0 notebook-panel rounded-2xl overflow-hidden flex flex-col",
               isFoldersPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
             )}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col h-[400px]">
               {/* Header */}
-              <div className="p-3 border-b border-border/30 space-y-2 shrink-0">
+              <div className="relative p-3 border-b border-border/30 space-y-2 shrink-0">
+                <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" aria-hidden />
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4 text-primary" />
-                    <span className="font-medium text-sm">Folders</span>
+                    <span className="w-7 h-7 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center">
+                      <FolderOpen className="w-3.5 h-3.5 text-primary" />
+                    </span>
+                    <span className="font-semibold text-sm">Folders</span>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setIsAddFolderDialogOpen(true)}
-                    className="h-7 w-7 p-0"
+                    className="h-7 w-7 p-0 hover:bg-primary/10 hover:text-primary transition-colors"
                   >
                     <FolderPlus className="w-4 h-4" />
                   </Button>
@@ -1400,7 +1467,7 @@ export function NotebookView({
                     placeholder="Search folders..."
                     value={folderSearchQuery}
                     onChange={(e) => setFolderSearchQuery(e.target.value)}
-                    className="h-8 pl-7 text-xs bg-muted/50"
+                    className="h-8 pl-7 text-xs rounded-lg border border-border/40 bg-card/50 focus-visible:ring-2 focus-visible:ring-primary/40"
                   />
                 </div>
               </div>
@@ -1421,7 +1488,7 @@ export function NotebookView({
                         {markerColor && (
                           <div 
                             className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full"
-                            style={{ backgroundColor: markerColor }}
+                            style={{ backgroundColor: markerColor, boxShadow: `0 0 8px ${markerColor}` }}
                           />
                         )}
                         <button
@@ -1433,11 +1500,11 @@ export function NotebookView({
                             setIsEntriesPanelOpen(true);
                           }}
                           className={cn(
-                            "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
+                            "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all duration-200",
                             markerColor && "pl-3",
                             selectedCategory === cat.id
-                              ? "bg-primary/20 text-primary"
-                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                              ? "bg-primary/15 text-primary border border-primary/25 shadow-[0_0_12px_hsl(var(--primary)/0.15)]"
+                              : "border border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground hover:translate-x-0.5"
                           )}
                         >
                           <Icon className="w-3.5 h-3.5" />
@@ -1503,7 +1570,7 @@ export function NotebookView({
                             {markerColor && (
                               <div 
                                 className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full"
-                                style={{ backgroundColor: markerColor }}
+                                style={{ backgroundColor: markerColor, boxShadow: `0 0 8px ${markerColor}` }}
                               />
                             )}
                             <button
@@ -1515,11 +1582,11 @@ export function NotebookView({
                                 setIsEntriesPanelOpen(true);
                               }}
                               className={cn(
-                                "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
+                                "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all duration-200",
                                 markerColor && "pl-3",
                                 selectedCategory === folder.id
-                                  ? "bg-primary/20 text-primary"
-                                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                  ? "bg-primary/15 text-primary border border-primary/25 shadow-[0_0_12px_hsl(var(--primary)/0.15)]"
+                                  : "border border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground hover:translate-x-0.5"
                               )}
                             >
                               <FolderOpen className="w-3.5 h-3.5" />
@@ -1621,17 +1688,18 @@ export function NotebookView({
         {isEntriesPanelOpen && (
           <div 
             className={cn(
-              "w-72 flex-shrink-0 glass rounded-xl border border-border/40 overflow-hidden flex flex-col",
+              "w-72 flex-shrink-0 notebook-panel rounded-2xl overflow-hidden flex flex-col",
               isEntriesPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
             )}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-3 border-b border-border/30 space-y-2">
+            <div className="relative p-3 border-b border-border/30 space-y-2">
+              <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" aria-hidden />
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => { closeEntriesPanel(); setIsFoldersPanelOpen(true); }} className="h-8 w-8 p-0">
+                <Button variant="ghost" size="sm" onClick={() => { closeEntriesPanel(); setIsFoldersPanelOpen(true); }} className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary transition-colors">
                   <PanelLeftOpen className="w-4 h-4" />
                 </Button>
-                <span className="text-sm font-medium flex-1">
+                <span className="text-sm font-semibold flex-1">
                   {selectedCategory.startsWith("custom_") 
                     ? customFolders.find(f => f.id === selectedCategory)?.label || "Folder"
                     : CATEGORIES.find((c) => c.id === selectedCategory)?.label}
@@ -1642,7 +1710,7 @@ export function NotebookView({
               </div>
               <div className="relative">
                 <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-7 text-xs pl-7 bg-muted/30 border-border/50" />
+                <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-7 text-xs pl-7 rounded-lg border border-border/40 bg-card/50 focus-visible:ring-2 focus-visible:ring-primary/40" />
               </div>
             </div>
             <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto custom-scrollbar">
@@ -1688,10 +1756,10 @@ export function NotebookView({
                           ref={sidebarVirtualizer.measureElement}
                           data-index={virtualRow.index}
                         >
-                          <button onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }} className={cn("w-full text-left p-2 rounded-lg transition-all mb-1", selectedEntryId === entry.id ? "bg-primary/20 border border-primary/40" : "hover:bg-muted/50")}>
+                          <button onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }} className={cn("w-full text-left p-2 rounded-lg transition-all duration-200 mb-1 border", selectedEntryId === entry.id ? "bg-primary/15 border-primary/30 shadow-[0_0_12px_hsl(var(--primary)/0.15)]" : "border-transparent hover:bg-muted/50 hover:translate-x-0.5")}>
                             <div className="flex items-center gap-2">
-                              <ChevronRight className={cn("w-3 h-3", selectedEntryId === entry.id && "rotate-90")} />
-                              <span className="text-xs font-medium truncate">{entry.title}</span>
+                              <ChevronRight className={cn("w-3 h-3 transition-transform duration-200", selectedEntryId === entry.id && "rotate-90 text-primary")} />
+                              <span className={cn("text-xs font-medium truncate", selectedEntryId === entry.id && "text-primary")}>{entry.title}</span>
                             </div>
                           </button>
                         </div>
@@ -1967,7 +2035,7 @@ export function NotebookView({
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Button variant="outline" size="sm" onClick={handleSave} disabled={isLocked || isSelectedEntryInTrash} className="h-7 px-3 text-xs">
+                  <Button size="sm" onClick={handleSave} disabled={isLocked || isSelectedEntryInTrash} className="h-7 px-3 text-xs rounded-lg bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] text-primary-foreground border-0 shadow-[0_2px_12px_hsl(var(--primary)/0.35)] hover:shadow-[0_4px_18px_hsl(var(--primary)/0.5)] hover:opacity-95 transition-all">
                     <Save className="w-3 h-3 mr-1" />
                     Save
                   </Button>
@@ -1981,7 +2049,7 @@ export function NotebookView({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.15, duration: 0.3 }}
-                className="flex items-center gap-1 px-4 py-2 border-b border-border/20 bg-muted/10"
+                className="flex items-center gap-1 px-4 py-2 mx-3 mt-2 rounded-xl border border-border/40 bg-card/60 backdrop-blur shadow-[0_4px_16px_-8px_hsl(var(--foreground)/0.15)]"
               >
                 {/* Font Selector */}
                 <DropdownMenu>
@@ -2183,24 +2251,10 @@ export function NotebookView({
             <ScrollArea className="flex-1">
               <div 
                 ref={editorContainerRef}
-                className="relative min-h-full"
+                className="relative min-h-full cursor-text"
                 onMouseMove={handleEditorMouseMove}
                 onMouseLeave={handleEditorMouseLeave}
-                onClick={(e) => {
-                  if (isLocked || isSelectedEntryInTrash) return;
-                  if (!editorRef.current) return;
-                  // Ignore clicks inside the editor itself or on interactive controls (block menu, buttons)
-                  if (editorRef.current.contains(e.target as Node)) return;
-                  const target = e.target as HTMLElement;
-                  if (target.closest('button, a, input, textarea, [role="menu"], [contenteditable]')) return;
-                  editorRef.current.focus();
-                  const range = document.createRange();
-                  range.selectNodeContents(editorRef.current);
-                  range.collapse(false);
-                  const sel = window.getSelection();
-                  sel?.removeAllRanges();
-                  sel?.addRange(range);
-                }}
+                onClick={(e) => handleEditorAreaClick(e, editorRef.current)}
               >
                 {/* Floating Block Button */}
                 {showBlockButton && !isLocked && !isSelectedEntryInTrash && (
@@ -2255,8 +2309,9 @@ export function NotebookView({
                   contentEditable={!isLocked && !isSelectedEntryInTrash}
                   style={{ fontFamily: selectedFontFamily }}
                   onContextMenu={handleContextMenu}
+                  onInput={(e) => updateEditorStats(e.currentTarget)}
                   className={cn(
-                    "min-h-full p-4 pl-12 pr-12 outline-none focus:outline-none focus-visible:outline-none transition-all caret-primary",
+                    "min-h-[calc(100vh-430px)] p-4 pl-12 pr-12 pb-16 outline-none focus:outline-none focus-visible:outline-none transition-all caret-primary",
                     isSmallText ? "text-xs" : "text-sm",
                     (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70",
                     "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2",
@@ -2279,15 +2334,48 @@ export function NotebookView({
               </div>
             </ScrollArea>
 
+            {/* Writing status bar — live word/char count, reading time, autosave state */}
+            {!isSelectedEntryInTrash && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="shrink-0 mx-3 mb-2 px-4 py-1.5 rounded-xl border border-border/40 bg-card/60 backdrop-blur flex items-center gap-3 text-[11px] text-muted-foreground"
+              >
+                <span className="font-medium tabular-nums">{editorStats.words} {editorStats.words === 1 ? 'word' : 'words'}</span>
+                <span className="opacity-40">•</span>
+                <span className="tabular-nums">{editorStats.chars.toLocaleString()} characters</span>
+                <span className="opacity-40">•</span>
+                <span className="tabular-nums">~{Math.max(1, Math.ceil(editorStats.words / 200))} min read</span>
+                <span className="flex-1" />
+                {isLocked ? (
+                  <span className="flex items-center gap-1.5 text-yellow-600">
+                    <Lock className="w-3 h-3" />
+                    Locked
+                  </span>
+                ) : lastSavedAt ? (
+                  <span className="flex items-center gap-1.5 text-primary">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    Saved {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3 h-3" />
+                    Auto-saves every 5s
+                  </span>
+                )}
+              </motion.div>
+            )}
+
             {/* Floating Add Note Button — positioned bottom-right so it doesn't cover note text */}
             {!isViewingTrash && (
-              <Button
+              <button
                 onClick={handleNewNote}
-                className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all duration-300 group z-30"
+                className="notebook-fab absolute bottom-6 right-6 w-12 h-12 group z-30"
                 title="New note"
               >
                 <Plus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
-              </Button>
+              </button>
             )}
           </motion.div>
         ) : (
@@ -2310,7 +2398,7 @@ export function NotebookView({
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: 0.1 }}
-                  className="flex items-center gap-1 overflow-x-auto scrollbar-hide"
+                  className="flex items-center gap-1 overflow-x-auto scrollbar-hide p-1 rounded-xl border border-border/40 bg-card/50 backdrop-blur"
                 >
                   {[
                     { id: 'all', label: 'All' },
@@ -2323,16 +2411,22 @@ export function NotebookView({
                     <motion.button
                       key={tab.id}
                       onClick={() => setSelectedCategory(tab.id)}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.97 }}
+                      whileTap={{ scale: 0.96 }}
                       className={cn(
-                        "relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap",
+                        "relative px-4 py-1.5 text-sm font-medium rounded-lg transition-colors duration-200 whitespace-nowrap",
                         selectedCategory === tab.id
-                          ? "bg-primary text-primary-foreground shadow-sm" 
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                          ? "text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      {tab.label}
+                      {selectedCategory === tab.id && (
+                        <motion.span
+                          layoutId="notebookCategoryTab"
+                          className="absolute inset-0 rounded-lg bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] shadow-[0_2px_12px_hsl(var(--primary)/0.4)]"
+                          transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                        />
+                      )}
+                      <span className="relative z-10">{tab.label}</span>
                     </motion.button>
                   ))}
                 </motion.div>
@@ -2344,49 +2438,50 @@ export function NotebookView({
                   className="flex items-center gap-3 shrink-0"
                 >
                   {/* Search */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  <div className="relative group/search">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none transition-colors group-focus-within/search:text-primary" />
                     <Input
                       type="text"
                       placeholder="Search notes..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-48 pl-9 h-9 bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/50 rounded-lg"
+                      className="w-48 focus:w-60 transition-[width] duration-300 pl-9 h-9 rounded-xl border border-border/40 bg-card/50 backdrop-blur focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_16px_hsl(var(--primary)/0.2)]"
                     />
                   </div>
                   {/* View Toggle */}
-                  <div className="flex items-center gap-0.5 p-1 rounded-lg bg-muted/40">
-                    <button
-                      onClick={() => { setViewMode('grid'); localStorage.setItem('notebook-view-mode', 'grid'); }}
-                      className={cn(
-                        "p-1.5 rounded-md transition-all duration-200",
-                        viewMode === 'grid' 
-                          ? "bg-background shadow-sm text-foreground" 
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      <LayoutGrid className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => { setViewMode('list'); localStorage.setItem('notebook-view-mode', 'list'); }}
-                      className={cn(
-                        "p-1.5 rounded-md transition-all duration-200",
-                        viewMode === 'list' 
-                          ? "bg-background shadow-sm text-foreground" 
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      <LayoutList className="w-4 h-4" />
-                    </button>
+                  <div className="relative flex items-center gap-0.5 p-1 rounded-xl border border-border/40 bg-card/50 backdrop-blur">
+                    {([
+                      { id: 'grid' as const, Icon: LayoutGrid },
+                      { id: 'list' as const, Icon: LayoutList },
+                    ]).map(({ id, Icon }) => (
+                      <button
+                        key={id}
+                        onClick={() => { setViewMode(id); localStorage.setItem('notebook-view-mode', id); }}
+                        className={cn(
+                          "relative p-1.5 rounded-lg transition-colors duration-200",
+                          viewMode === id ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {viewMode === id && (
+                          <motion.span
+                            layoutId="notebookViewToggle"
+                            className="absolute inset-0 rounded-lg bg-primary/15 border border-primary/25"
+                            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                          />
+                        )}
+                        <Icon className="relative z-10 w-4 h-4" />
+                      </button>
+                    ))}
                   </div>
-                  <Button
+                  <motion.button
                     onClick={handleNewNote}
-                    variant="ghost"
-                    className="text-primary hover:text-primary hover:bg-primary/5 font-medium"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.96 }}
+                    className="inline-flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-semibold text-primary-foreground bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] shadow-[0_4px_16px_hsl(var(--primary)/0.35)] hover:shadow-[0_6px_24px_hsl(var(--primary)/0.5)] transition-shadow group/add"
                   >
-                    <Plus className="w-4 h-4 mr-2" />
+                    <Plus className="w-4 h-4 transition-transform duration-300 group-hover/add:rotate-90" />
                     Add new note
-                  </Button>
+                  </motion.button>
                 </motion.div>
               </motion.div>
             </div>
@@ -2402,10 +2497,14 @@ export function NotebookView({
                 >
                   <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 0.15 }}
+                    animate={{ scale: 1, opacity: 1 }}
                     transition={{ duration: 0.8, delay: 0.2 }}
+                    className="relative mb-5"
                   >
-                    {searchQuery ? <Search className="w-14 h-14 mb-4" /> : <BookOpen className="w-14 h-14 mb-4" />}
+                    <div className="absolute inset-0 rounded-full bg-primary/20 blur-2xl scale-150" aria-hidden />
+                    <div className="relative w-20 h-20 rounded-3xl border border-primary/20 bg-primary/10 backdrop-blur flex items-center justify-center">
+                      {searchQuery ? <Search className="w-9 h-9 text-primary/60" /> : <BookOpen className="w-9 h-9 text-primary/60" />}
+                    </div>
                   </motion.div>
                   <p className="text-base font-medium">{searchQuery ? 'No matching notes' : 'No notes yet'}</p>
                   <p className="text-sm mt-1 text-muted-foreground/70">{searchQuery ? 'Try a different search term' : 'Create your first note to get started'}</p>
@@ -2440,10 +2539,16 @@ export function NotebookView({
                           whileHover={{ x: 4 }}
                           whileTap={{ scale: 0.99 }}
                           onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
-                          className="w-full text-left rounded-xl overflow-hidden group relative border transition-all duration-300 flex items-center gap-4 p-4 bg-card/50 border-border/30 hover:border-primary/30"
+                          className="note-card w-full text-left rounded-xl overflow-hidden group relative border transition-all duration-300 flex items-center gap-3 p-4 bg-card/50 backdrop-blur border-border/30"
+                          style={{ ['--note-accent' as string]: colors.accent }}
                         >
+                          <span className="note-shine" aria-hidden />
+                          <div
+                            className="w-1 h-10 rounded-full shrink-0 shadow-[0_0_8px_var(--note-accent)]"
+                            style={{ backgroundColor: colors.accent }}
+                          />
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-sm truncate">{entry.title || 'Untitled'}</h4>
+                            <h4 className="font-semibold text-sm truncate transition-colors duration-300 group-hover:[color:var(--note-accent)]">{entry.title || 'Untitled'}</h4>
                             {contentLines.length > 0 && (
                               <p className="text-xs text-muted-foreground mt-1 truncate">{contentLines[0]}</p>
                             )}
@@ -2487,13 +2592,13 @@ export function NotebookView({
                               }
                             }}
                             whileHover={{ 
-                              y: viewMode === 'grid' ? -4 : 0,
+                              y: viewMode === 'grid' ? -5 : 0,
                               transition: { type: "spring", stiffness: 500, damping: 25 } 
                             }}
                             whileTap={{ scale: 0.99 }}
                             onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
                             className={cn(
-                              "text-left rounded-xl overflow-hidden group relative border transition-all duration-300",
+                              "note-card text-left rounded-2xl overflow-hidden group relative border transition-all duration-300",
                               viewMode === 'grid' 
                                 ? "flex flex-col" 
                                 : "flex items-start gap-4 p-4"
@@ -2501,24 +2606,32 @@ export function NotebookView({
                             style={{
                               backgroundColor: isDark ? colors.bgDark : colors.bg,
                               borderColor: isDark ? colors.borderDark : colors.border,
+                              ['--note-accent' as string]: colors.accent,
                             }}
                           >
+                            <span className="note-shine" aria-hidden />
                             {viewMode === 'grid' ? (
                               <>
-                                {/* Color accent bar - top */}
+                                {/* Color accent bar - top (gradient fade) */}
                                 <div 
-                                  className="h-1 w-full"
-                                  style={{ backgroundColor: colors.accent }}
+                                  className="h-1.5 w-full"
+                                  style={{ background: `linear-gradient(90deg, ${colors.accent}, transparent 160%)` }}
                                 />
                                 
                                 <div className="p-4 flex flex-col flex-1 gap-2">
-                                  {/* Date */}
-                                  <p className="text-[11px] text-muted-foreground font-medium">
-                                    {new Date(entry.date).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                  </p>
+                                  {/* Date + accent dot */}
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="w-2 h-2 rounded-full shrink-0 shadow-[0_0_8px_var(--note-accent)]"
+                                      style={{ backgroundColor: colors.accent }}
+                                    />
+                                    <p className="text-[11px] text-muted-foreground font-medium">
+                                      {new Date(entry.date).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </p>
+                                  </div>
                                   
                                   {/* Title */}
-                                  <h3 className="font-semibold text-foreground leading-snug line-clamp-2 text-[15px]">
+                                  <h3 className="font-semibold text-foreground leading-snug line-clamp-2 text-[15px] transition-colors duration-300 group-hover:[color:var(--note-accent)]">
                                     {entry.title || 'Untitled'}
                                   </h3>
                                   
@@ -2530,7 +2643,7 @@ export function NotebookView({
                                           key={i}
                                           className="flex items-start gap-2 text-[13px] text-muted-foreground leading-relaxed"
                                         >
-                                          <span className="text-muted-foreground/50 mt-0.5 shrink-0">•</span>
+                                          <span className="mt-0.5 shrink-0 opacity-60" style={{ color: colors.accent }}>•</span>
                                           <span className="line-clamp-1">{line.trim()}</span>
                                         </div>
                                       ))
@@ -2555,7 +2668,7 @@ export function NotebookView({
                                 {/* List View */}
                                 <div 
                                   className="w-1 h-12 rounded-full shrink-0 self-center"
-                                  style={{ backgroundColor: colors.accent }}
+                                  style={{ backgroundColor: colors.accent, boxShadow: `0 0 10px ${colors.accent}` }}
                                 />
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-0.5">
@@ -2734,9 +2847,15 @@ export function NotebookView({
 
       {/* Add Folder Dialog */}
       <Dialog open={isAddFolderDialogOpen} onOpenChange={setIsAddFolderDialogOpen}>
-        <DialogContent className="sm:max-w-md glass-strong">
+        <DialogContent className="sm:max-w-md overflow-hidden rounded-2xl border border-border/50 bg-card/70 backdrop-blur-2xl shadow-[0_24px_60px_-16px_hsl(var(--foreground)/0.18),0_0_40px_-16px_hsl(var(--primary)/0.3)]">
+          <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" aria-hidden />
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold">Create New Folder</DialogTitle>
+            <DialogTitle className="text-lg font-semibold flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center">
+                <FolderPlus className="w-4 h-4 text-primary" />
+              </span>
+              Create New Folder
+            </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
               Enter a name for your new folder to organize your notes.
             </DialogDescription>
@@ -2746,7 +2865,7 @@ export function NotebookView({
               placeholder="Enter folder name..."
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
-              className="w-full"
+              className="w-full rounded-xl border border-border/40 bg-card/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_16px_hsl(var(--primary)/0.2)]"
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && newFolderName.trim()) {
@@ -2787,7 +2906,7 @@ export function NotebookView({
                   toast.error("Please enter a folder name");
                 }
               }}
-              className="bg-gradient-to-r from-primary to-secondary text-primary-foreground"
+              className="rounded-xl bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] text-primary-foreground shadow-[0_4px_16px_hsl(var(--primary)/0.35)] hover:shadow-[0_6px_24px_hsl(var(--primary)/0.5)] hover:opacity-95 transition-all"
             >
               <Save className="w-4 h-4 mr-2" />
               Save

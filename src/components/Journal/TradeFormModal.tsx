@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChecklistPopup } from "./ChecklistPopup";
 import { Badge } from "@/components/ui/badge";
+import { compressTradeImage } from "@/lib/tradeImage";
 
 // Common trading pairs and assets
 const TRADING_PAIRS = [
@@ -186,25 +187,15 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, userId, onSubmit
     }
   }, [initialDate, editingTrade]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      const maxWidth = 800;
-      const scale = img.width > maxWidth ? maxWidth / img.width : 1;
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      setChartImage(canvas.toDataURL('image/jpeg', 0.8));
-    };
-    img.src = objectUrl;
+    try {
+      setChartImage(await compressTradeImage(file));
+    } catch {
+      // ignore invalid files
+    }
+    e.target.value = "";
   };
 
   const handleSubmit = (e: React.FormEvent) => {

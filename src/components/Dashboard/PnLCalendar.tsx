@@ -4,6 +4,7 @@ import { useChecklists } from "@/hooks/useChecklists";
 import { cn, truncateNum } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote, Settings, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Link2, Quote, Plus, ArrowDownLeft } from "lucide-react";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
+import { TradeScreenshot } from "@/components/Journal/TradeScreenshot";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -30,7 +31,6 @@ import {
   getTradesDisplayPnL,
   dedupeTradesForPnL,
   parseLocalDateKey,
-  type BrokerTodayPnL,
   isMultiDayTrade,
 } from "@/lib/tradeFormat";
 
@@ -38,9 +38,8 @@ import { toast } from "sonner";
 
 interface PnLCalendarProps {
   trades: Trade[];
-  /** Broker today gross (e.g. TradeLocker day P&L). */
-  brokerTodayPnL?: BrokerTodayPnL | null;
-  /** Per-day gross totals from broker_trade_history (all calendar days). */
+  userId?: string;
+  /** Per-day totals from broker_trade_history (gap-fill when no journal row). */
   brokerDayTotals?: Map<string, number> | null;
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void;
   notebookEntries?: NotebookEntry[];
@@ -66,7 +65,7 @@ const formatPnL = (value: number): string => sharedFormatPnL(value, { showPlus: 
 
 export function PnLCalendar({
   trades,
-  brokerTodayPnL = null,
+  userId,
   brokerDayTotals = null,
   onUpdateTrade,
   notebookEntries = [],
@@ -122,7 +121,7 @@ export function PnLCalendar({
   // Exit-day stats by close date; entry markers by open date (multi-day only).
   const { dailyStats, dailyTrades, entryDayTrades } = useMemo(() => {
     const deduped = dedupeTradesForPnL(trades);
-    const pnlByDay = buildDailyPnLMap(deduped, brokerTodayPnL, brokerDayTotals);
+    const pnlByDay = buildDailyPnLMap(deduped, brokerDayTotals);
     const stats: Record<string, DailyStats & { winRate: number }> = {};
     const tradesMap: Record<string, Trade[]> = {};
     const entryTradesMap: Record<string, Trade[]> = {};
@@ -158,7 +157,7 @@ export function PnLCalendar({
     });
 
     return { dailyStats: stats, dailyTrades: tradesMap, entryDayTrades: entryTradesMap };
-  }, [trades, brokerTodayPnL, brokerDayTotals]);
+  }, [trades, brokerDayTotals]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -1051,6 +1050,19 @@ export function PnLCalendar({
                               {tradeChecklist.name}
                             </Badge>
                           </div>
+                        )}
+                        {userId && (
+                          <TradeScreenshot
+                            tradeId={trade.id}
+                            userId={userId}
+                            compact
+                            editable={!!onUpdateTrade}
+                            onUpdate={
+                              onUpdateTrade
+                                ? (chartImage) => onUpdateTrade(trade.id, { chartImage })
+                                : undefined
+                            }
+                          />
                         )}
                       </motion.div>
                     );

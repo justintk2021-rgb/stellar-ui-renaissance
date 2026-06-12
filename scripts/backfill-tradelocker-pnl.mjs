@@ -1,9 +1,8 @@
 /**
- * Recompute TradeLocker journal P/L from stored open/close order payloads
- * (fixes double-counting open + close legs). Run after deploying tradelocker function.
+ * Recompute TradeLocker P/L from stored open/close order payloads.
+ * Mirrors supabase/functions/tradelocker/index.ts (pip FX, contract size elsewhere).
  *
  * Usage: node scripts/backfill-tradelocker-pnl.mjs
- * Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in env or .env
  */
 import { createClient } from "@supabase/supabase-js";
 import { execSync } from "child_process";
@@ -56,6 +55,18 @@ if (!url || !key) {
 
 const supabase = createClient(url, key);
 
+const PL_KEYS = [
+  "netProfit",
+  "netPnl",
+  "netPl",
+  "realizedPl",
+  "realizedPL",
+  "profit",
+  "pnl",
+  "grossPl",
+  "grossPL",
+];
+
 function firstFinite(obj, keys) {
   if (!obj) return null;
   for (const k of keys) {
@@ -65,26 +76,30 @@ function firstFinite(obj, keys) {
   return null;
 }
 
-function extractBrokerNetPl(openOrder, closeOrder, fallbackGross, orderSwap, orderCommission) {
+function extractBrokerNetPl(openOrder, closeOrder, fallbackGross) {
   const primary = closeOrder || openOrder;
-  if (!primary) return fallbackGross + orderSwap + orderCommission;
+  if (!primary) return fallbackGross;
+  const fromBroker = firstFinite(primary, PL_KEYS);
+  if (fromBroker != null) return fromBroker;
+  if (closeOrder && Math.abs(fallbackGross) > 0.0001) return fallbackGross;
+  return fallbackGross;
+}
 
-  const net = firstFinite(primary, ["netProfit", "netPnl", "netPl"]);
-  if (net != null) return net;
-
-  const profit = firstFinite(primary, ["profit", "pnl", "grossPl", "grossPL"]);
-  if (profit != null) {
-    if (orderSwap !== 0 || orderCommission !== 0) {
-      return profit + orderSwap + orderCommission;
-    }
-    return profit;
+function isForexSymbol(symbol) {
+  const s = (symbol || "").toUpperCase();
+  if (
+    s.includes("BTC") ||
+    s.includes("ETH") ||
+    s.includes("SOL") ||
+    s.includes("DOGE") ||
+    s.includes("XAU") ||
+    s.includes("XAG") ||
+    s.includes("OIL") ||
+    s.includes("USOIL")
+  ) {
+    return false;
   }
-
-  const realized = firstFinite(primary, ["realizedPl", "realizedPL"]);
-  if (realized != null) return realized;
-
-  if (closeOrder) return fallbackGross + orderSwap + orderCommission;
-  return 0;
+  return /^[A-Z]{6}$/.test(s) && /^(EUR|GBP|AUD|NZD|USD|CAD|CHF|JPY)/.test(s);
 }
 
 function calculateForexPlUsd(side, entry, exit, qty, symbol) {
@@ -100,29 +115,34 @@ function calculateForexPlUsd(side, entry, exit, qty, symbol) {
   return pips * pipUsd * qty;
 }
 
-function isForexSymbol(symbol) {
-  const s = (symbol || "").toUpperCase();
-  if (
-    s.includes("BTC") ||
-    s.includes("ETH") ||
-    s.includes("SOL") ||
-    s.includes("DOGE") ||
-    s.includes("XAU") ||
-    s.includes("XAG")
-  ) {
-    return false;
-  }
-  return /^[A-Z]{6}$/.test(s) && /^(EUR|GBP|AUD|NZD|USD|CAD|CHF|JPY)/.test(s);
-}
-
 function getContractSize(symbol) {
   const s = symbol.toUpperCase();
-  if (s.includes("XAU") || s.includes("XAG")) return 100;
+  if (s.includes("XAU")) return 100;
+  if (s.includes("XAG")) return 5000;
+  if (s.includes("XPT") || s.includes("XPD")) return 100;
+  if (
+    s.includes("USOIL") ||
+    s.includes("UKOIL") ||
+    s.includes("WTI") ||
+    s.includes("BRENT") ||
+    s.includes("CL")
+  ) {
+    return 1000;
+  }
+  if (s.includes("NGAS")) return 10000;
   if (
     s.includes("BTC") ||
     s.includes("ETH") ||
     s.includes("SOL") ||
     s.includes("DOGE")
+  ) {
+    return 1;
+  }
+  if (
+    s.includes("US30") ||
+    s.includes("US500") ||
+    s.includes("NAS") ||
+    s.includes("SPX")
   ) {
     return 1;
   }
@@ -167,18 +187,8 @@ async function main() {
       continue;
     }
 
-    const orderSwap =
-      Number(openOrder?.swap || 0) + Number(closeOrder?.swap || 0);
-    const orderCommission =
-      Number(openOrder?.commission || 0) + Number(closeOrder?.commission || 0);
     const gross = grossPlFromOrders(openOrder, closeOrder, row.symbol || "");
-    const net = extractBrokerNetPl(
-      openOrder,
-      closeOrder,
-      gross,
-      orderSwap,
-      orderCommission,
-    );
+    const net = extractBrokerNetPl(openOrder, closeOrder, gross);
 
     const { error: histErr } = await supabase
       .from("broker_trade_history")
@@ -204,16 +214,6 @@ async function main() {
   }
 
   console.log(`Backfill complete: ${updated} positions updated, ${skipped} skipped.`);
-
-  const { data: connections } = await supabase
-    .from("broker_connections")
-    .select("id")
-    .eq("platform", "tradelocker")
-    .eq("connection_status", "connected");
-
-  console.log(
-    `Connected TradeLocker accounts: ${connections?.length || 0}. Open the app (or Settings → Sync) once to refresh todayNet on the calendar.`,
-  );
 }
 
 main().catch((e) => {

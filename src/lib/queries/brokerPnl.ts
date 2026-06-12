@@ -6,18 +6,29 @@ export type BrokerPnLData = {
   byPosition: Map<string, number>;
 };
 
-/** Sum broker_trade_history realized P&L by local close day and position id. */
+/**
+ * Sum broker_trade_history realized P&L by local close day and position id.
+ * When `accountIdExternal` is set, only that account's rows are included —
+ * one connection can hold several accounts and the calendar must not mix them.
+ */
 export async function fetchBrokerPnLData(
   connectionId: string,
+  accountIdExternal?: string | null,
 ): Promise<BrokerPnLData> {
   const byDay = new Map<string, number>();
   const byPosition = new Map<string, number>();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("broker_trade_history")
     .select("broker_position_id, realized_pl, closed_at")
     .eq("broker_connection_id", connectionId)
     .not("closed_at", "is", null);
+
+  if (accountIdExternal) {
+    query = query.eq("account_id_external", accountIdExternal);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 

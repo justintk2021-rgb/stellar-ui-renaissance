@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useApplyGlobalSettings } from "./hooks/useApplyGlobalSettings";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { isSupabaseConfigured } from "./integrations/supabase/client";
 
 // Lazy-load route pages so visitors only download the JS they actually need.
 // Landing visitors no longer pay for the entire authenticated dashboard bundle.
@@ -14,6 +15,8 @@ const Landing = lazy(() => import("./pages/Landing"));
 const AuthPage = lazy(() => import("./pages/Auth").then((m) => ({ default: m.AuthPage })));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,7 +42,26 @@ const RouteFallback = () => (
   </div>
 );
 
-const App = () => (
+const ConfigMissing = () => (
+  <div className="min-h-screen flex items-center justify-center p-6 bg-background text-foreground">
+    <div className="max-w-md text-center space-y-3">
+      <h1 className="text-xl font-semibold">App configuration missing</h1>
+      <p className="text-sm text-muted-foreground">
+        Set <code className="text-xs">VITE_SUPABASE_URL</code> and{" "}
+        <code className="text-xs">VITE_SUPABASE_PUBLISHABLE_KEY</code> in your{" "}
+        <code className="text-xs">.env</code> file (local) or Vercel environment
+        variables (production), then rebuild.
+      </p>
+    </div>
+  </div>
+);
+
+const App = () => {
+  if (!isSupabaseConfigured) {
+    return <ConfigMissing />;
+  }
+
+  return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <GlobalSettingsApplier />
@@ -53,6 +75,8 @@ const App = () => (
               <Route path="/dashboard" element={<Index />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
@@ -60,6 +84,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;

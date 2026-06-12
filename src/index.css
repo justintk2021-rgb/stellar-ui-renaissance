@@ -436,13 +436,15 @@
     @apply backdrop-blur-xl bg-card/90 border border-border/60;
   }
 
-  /* Floating popovers, dialogs, dropdown panels */
+  /* Floating popovers, dialogs, dropdown panels.
+     Scrim is tinted with the theme background (not black) so it stays flush
+     with the page in both light and dark mode. */
   .glass-overlay {
-    @apply bg-black/45 backdrop-blur-md;
+    @apply bg-background/55 backdrop-blur-md;
   }
 
   .glass-popup {
-    @apply backdrop-blur-2xl bg-card/60 border border-white/10 shadow-2xl shadow-black/30;
+    @apply backdrop-blur-2xl bg-card/70 border border-border/40 shadow-2xl shadow-black/15;
   }
 
   .glass-popup-panel {
@@ -469,7 +471,7 @@
     .glass-overlay {
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
-      @apply bg-black/70;
+      @apply bg-background/90;
     }
 
     .glass-popup,
@@ -477,6 +479,37 @@
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
       @apply bg-card border-border/50;
+    }
+  }
+
+  /* Post-login boot loading screen (spinner from Uiverse.io by mrhyddenn) */
+  .boot-spinner {
+    width: 3em;
+    height: 3em;
+    cursor: not-allowed;
+    border-radius: 50%;
+    border: 2px solid #444;
+    box-shadow: -10px -10px 10px #6359f8, 0px -10px 10px 0px #9c32e2,
+      10px -10px 10px #f36896, 10px 0 10px #ff0b0b,
+      10px 10px 10px 0px #ff5500, 0 10px 10px 0px #ff9500,
+      -10px 10px 10px 0px #ffb700;
+    animation: rot55 0.7s linear infinite;
+  }
+
+  .boot-spinnerin {
+    border: 2px solid #444;
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  @keyframes rot55 {
+    to {
+      transform: rotate(360deg);
     }
   }
 
@@ -698,62 +731,210 @@
 }
 
 /* Bookmark Tab Styles */
+/* Ribbon bookmark tabs (Notes / Folders) — notched end like a real bookmark */
 .bookmark-tab {
+  --bm-color-a: hsl(var(--primary));
+  --bm-color-b: hsl(var(--primary-glow));
   position: absolute;
   left: 0;
-  top: 50%;
-  transform: translateY(-50%) translateX(-100%);
+  transform: translateX(-100%);
   z-index: 20;
   display: flex;
   flex-direction: row-reverse;
   align-items: center;
-  gap: 4px;
-  padding: 6px 14px 6px 10px;
-  background: hsl(var(--primary));
+  gap: 6px;
+  padding: 8px 16px 8px 20px;
+  background: linear-gradient(135deg, var(--bm-color-a), var(--bm-color-b));
   color: hsl(var(--primary-foreground));
-  border-radius: 8px 0 0 8px;
-  box-shadow: 
-    -4px 0 12px hsl(var(--primary) / 0.25),
-    inset 0 1px 0 hsl(var(--primary-foreground) / 0.1);
+  border-radius: 0;
+  /* V-notch cut into the left end — the bookmark ribbon look */
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 9px 50%);
+  filter: drop-shadow(-3px 3px 8px hsl(var(--foreground) / 0.25));
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
   border: none;
   outline: none;
+  animation: bookmark-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
 
+@keyframes bookmark-in {
+  from {
+    transform: translateX(-100%) translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-100%);
+    opacity: 1;
+  }
+}
+
+/* Stitched edge detail */
 .bookmark-tab::before {
   content: '';
   position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 2px;
-  height: 35%;
-  background: hsl(var(--primary-foreground) / 0.3);
-  border-radius: 2px 0 0 2px;
+  inset: 3px 4px 3px 13px;
+  border: 1px dashed hsl(var(--primary-foreground) / 0.3);
+  border-left: none;
+  border-radius: 0 2px 2px 0;
+  pointer-events: none;
+}
+
+/* Subtle top shine */
+.bookmark-tab::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 50% 9px;
+  background: linear-gradient(to bottom, hsl(0 0% 100% / 0.18), transparent);
+  pointer-events: none;
+}
+
+.bookmark-tab--folders {
+  --bm-color-a: hsl(262, 70%, 55%);
+  --bm-color-b: hsl(290, 65%, 58%);
 }
 
 .bookmark-label {
   font-size: 9px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   white-space: nowrap;
 }
 
 .bookmark-tab:hover {
-  transform: translateY(-50%) translateX(-110%);
-  box-shadow: 
-    -6px 0 20px hsl(var(--primary) / 0.35),
-    inset 0 1px 0 hsl(var(--primary-foreground) / 0.15);
+  transform: translateX(-100%) translateX(-6px);
+  filter: drop-shadow(-5px 4px 12px hsl(var(--foreground) / 0.3))
+    drop-shadow(0 0 10px var(--bm-color-a));
 }
 
 .bookmark-tab:active {
-  transform: translateY(-50%) translateX(-100%) scale(0.98);
+  transform: translateX(-100%) scale(0.97);
 }
 
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ===== Notebook revamp (21st.dev / uiverse-inspired) ===== */
+
+/* Show the editor placeholder when the note is empty */
+[contenteditable][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: hsl(var(--muted-foreground) / 0.45);
+  pointer-events: none;
+  display: block;
+}
+
+/* Note card: accent-tinted glow + lift on hover. Accent comes from the
+   folder's marker color via the --note-accent CSS variable. */
+.note-card {
+  --note-accent: hsl(var(--primary));
+  position: relative;
+  isolation: isolate;
+  transition: box-shadow 0.35s ease, border-color 0.35s ease;
+}
+
+.note-card:hover {
+  box-shadow:
+    0 12px 32px -10px color-mix(in srgb, var(--note-accent) 45%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--note-accent) 35%, transparent);
+}
+
+/* Diagonal shine sweep across the card on hover (uiverse-style) */
+.note-card .note-shine {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    hsl(0 0% 100% / 0.25) 48%,
+    hsl(0 0% 100% / 0.05) 52%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.7s ease;
+}
+
+.note-card:hover .note-shine {
+  transform: translateX(120%);
+}
+
+.dark .note-card .note-shine {
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    hsl(0 0% 100% / 0.08) 48%,
+    hsl(0 0% 100% / 0.02) 52%,
+    transparent 70%
+  );
+}
+
+/* Glowing gradient FAB for "new note" */
+.notebook-fab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+  color: hsl(var(--primary-foreground));
+  box-shadow:
+    0 4px 16px hsl(var(--primary) / 0.4),
+    0 0 0 0 hsl(var(--primary) / 0.4);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+
+.notebook-fab:hover {
+  transform: scale(1.08) translateY(-2px);
+  box-shadow:
+    0 8px 28px hsl(var(--primary) / 0.5),
+    0 0 24px 4px hsl(var(--primary) / 0.25);
+}
+
+.notebook-fab:active {
+  transform: scale(0.95);
+}
+
+.notebook-fab::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 1.5px solid hsl(var(--primary) / 0.35);
+  animation: fab-ring 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes fab-ring {
+  0% {
+    transform: scale(0.9);
+    opacity: 1;
+  }
+  70%,
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+/* Frosted panel for notebook sidebars */
+.notebook-panel {
+  background: hsl(var(--card) / 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid hsl(var(--border) / 0.4);
+  box-shadow:
+    0 16px 40px -16px hsl(var(--foreground) / 0.15),
+    inset 0 1px 0 hsl(0 0% 100% / 0.25);
+}
+
+.dark .notebook-panel {
+  box-shadow:
+    0 16px 40px -16px hsl(0 0% 0% / 0.5),
+    inset 0 1px 0 hsl(0 0% 100% / 0.06);
 }
 
 .animate-shimmer {

@@ -91,7 +91,10 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         .eq('user_id', userId!);
       if (error) throw error;
     },
-    onSuccess: () => invalidate(),
+    onSuccess: (_, { id }) => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: queryKeys.trades.detail(id) });
+    },
     onError: () => toast.error('Failed to update trade'),
   });
 

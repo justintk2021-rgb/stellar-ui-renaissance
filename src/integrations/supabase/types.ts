@@ -339,6 +339,7 @@ export type Database = {
       }
       broker_trade_history: {
         Row: {
+          account_id_external: string | null
           broker_connection_id: string
           broker_order_id: string | null
           broker_position_id: string | null
@@ -358,6 +359,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_id_external?: string | null
           broker_connection_id: string
           broker_order_id?: string | null
           broker_position_id?: string | null
@@ -377,6 +379,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_id_external?: string | null
           broker_connection_id?: string
           broker_order_id?: string | null
           broker_position_id?: string | null

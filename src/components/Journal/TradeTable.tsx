@@ -28,6 +28,7 @@ import {
   formatPnL,
   sumPnL,
 } from "@/lib/tradeFormat";
+import { TradeScreenshot } from "./TradeScreenshot";
 
 type HistoryPeriod = "all" | "week" | "month" | "3months" | "6months" | "year";
 
@@ -65,9 +66,11 @@ interface TradeTableProps {
   trades: Trade[];
   notebookEntries?: NotebookEntry[];
   checklists?: Checklist[];
+  userId?: string;
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
   onSelectForNotebook: (id: string) => void;
+  onUpdateTrade?: (id: string, updates: Partial<Trade>) => void | Promise<void>;
   onClearAll?: () => void;
 }
 
@@ -382,15 +385,17 @@ interface TradeRowGroupProps {
   trades: Trade[];
   notebookEntries: NotebookEntry[];
   checklists: Checklist[];
+  userId?: string;
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
   onViewNotes: (trade: Trade, allDayTrades?: Trade[]) => void;
+  onUpdateTrade?: (id: string, updates: Partial<Trade>) => void | Promise<void>;
   index: number;
   isExpanded: boolean;
   onToggle: () => void;
 }
 
-function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDelete, onViewNotes, index, isExpanded, onToggle }: TradeRowGroupProps) {
+function TradeRowGroup({ date, trades, notebookEntries, checklists, userId, onEdit, onDelete, onViewNotes, onUpdateTrade, index, isExpanded, onToggle }: TradeRowGroupProps) {
   const metrics = calculateGroupMetrics(trades);
   const isProfit = metrics.grossPnL >= 0;
 
@@ -690,6 +695,21 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
                       );
                     })()}
                     {/* Broker details row */}
+                    {(userId || onUpdateTrade) && (
+                      <div className="mt-3 max-w-md">
+                        <TradeScreenshot
+                          tradeId={trade.id}
+                          userId={userId}
+                          compact
+                          editable={!!onUpdateTrade}
+                          onUpdate={
+                            onUpdateTrade
+                              ? (chartImage) => onUpdateTrade(trade.id, { chartImage })
+                              : undefined
+                          }
+                        />
+                      </div>
+                    )}
                     {trade.importedFromBroker && (trade.openPrice || trade.closePrice || trade.swap || trade.commission) && (
                       <div className="flex items-center gap-4 mt-1.5 pl-0 flex-wrap">
                         {trade.openPrice != null && (
@@ -733,7 +753,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, onEdit, onDe
   );
 }
 
-export function TradeTable({ trades, notebookEntries = [], checklists = [], onEdit, onDelete, onSelectForNotebook, onClearAll }: TradeTableProps) {
+export function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onUpdateTrade, onClearAll }: TradeTableProps) {
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [dayTrades, setDayTrades] = useState<Trade[] | null>(null);
@@ -1028,9 +1048,11 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                         trades={groupedTrades[date]}
                         notebookEntries={notebookEntries}
                         checklists={checklists}
+                        userId={userId}
                         onEdit={onEdit}
                         onDelete={onDelete}
                         onViewNotes={handleViewNotes}
+                        onUpdateTrade={onUpdateTrade}
                         index={virtualRow.index}
                         isExpanded={expandedDate === date}
                         onToggle={() => setExpandedDate(expandedDate === date ? null : date)}
@@ -1128,6 +1150,12 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                             </div>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {userId && (
+                            <div className="w-14 hidden sm:block" onClick={(e) => e.stopPropagation()}>
+                              <TradeScreenshot tradeId={trade.id} userId={userId} compact />
+                            </div>
+                          )}
                         {hasNote ? (
                           <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                         ) : (
@@ -1145,6 +1173,7 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                             Create Note
                           </Button>
                         )}
+                        </div>
                       </motion.div>
                     );
                   })}
@@ -1183,6 +1212,21 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], onEd
                   </DialogTitle>
                 </DialogHeader>
                 <div className="flex-1 min-h-0 mt-4 rounded-lg bg-muted/20 flex flex-col overflow-hidden">
+                  {userId && (
+                    <div className="px-5 pt-4 pb-2 border-b border-border/20 flex-shrink-0">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Trade Screenshot</p>
+                      <TradeScreenshot
+                        tradeId={selectedTrade.id}
+                        userId={userId}
+                        editable={!!onUpdateTrade}
+                        onUpdate={
+                          onUpdateTrade
+                            ? (chartImage) => onUpdateTrade(selectedTrade.id, { chartImage })
+                            : undefined
+                        }
+                      />
+                    </div>
+                  )}
                   {selectedTradeNote ? (
                     <>
                       <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 flex-shrink-0 bg-muted/30">

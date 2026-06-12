@@ -44,6 +44,28 @@ export function getEventDateTime(event: EconomicEvent): Date {
   return d;
 }
 
+/** Calendar date in the user's local timezone (YYYY-MM-DD). */
+export function getEventLocalDateKey(event: EconomicEvent): string {
+  return toLocalDateKey(getEventDateTime(event));
+}
+
+/** 12-hour clock in the user's locale and timezone. */
+export function formatEventTime(event: EconomicEvent): string {
+  return getEventDateTime(event).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+/** 12-hour clock for "now" / last-updated labels. */
+export function formatLocalTime(
+  date: Date,
+  opts: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit", hour12: true },
+): string {
+  return date.toLocaleTimeString(undefined, opts);
+}
+
 export function isEventPast(event: EconomicEvent, now = new Date()): boolean {
   return getEventDateTime(event).getTime() < now.getTime();
 }

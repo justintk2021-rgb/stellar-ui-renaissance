@@ -38,7 +38,6 @@ const SettingsView = lazy(() => import("@/components/Settings/SettingsView").the
 const CustomChart = lazy(() => import("@/components/Chart/CustomChart").then(m => ({ default: m.CustomChart })));
 const PlaybookView = lazy(() => import("@/components/Playbook/PlaybookView").then(m => ({ default: m.PlaybookView })));
 const EconomicCalendarView = lazy(() => import("@/components/EconomicCalendar/EconomicCalendarView").then(m => ({ default: m.EconomicCalendarView })));
-const LotSizeCalculator = lazy(() => import("@/components/Calculator/LotSizeCalculator").then(m => ({ default: m.LotSizeCalculator })));
 const CommunityView = lazy(() => import("@/components/Community/CommunityView").then(m => ({ default: m.CommunityView })));
 
 // 3D animated background is ~600KB (three.js + drei). Lazy-load and only mount on the dashboard tab.
@@ -50,7 +49,9 @@ import { User, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
+import { LoadingScreen } from "@/components/Layout/LoadingScreen";
 import { AnimatePresence, motion } from "framer-motion";
 import { RefreshCw } from "lucide-react";
 
@@ -64,7 +65,6 @@ const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
   journal: { title: 'Journal', subtitle: 'Log and manage your trades' },
   chart: { title: 'Chart', subtitle: 'Interactive chart with drawing tools' },
-  calculator: { title: 'Calculator', subtitle: 'Calculate position size and risk' },
   calendar: { title: 'Economic Calendar', subtitle: 'Live economic news and events' },
   playbook: { title: 'Playbook', subtitle: 'Your trading checklists and rules' },
   notebook: { title: 'Notebook', subtitle: 'Your personal trading notes and journal' },
@@ -102,6 +102,11 @@ const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(isMarketingPreview);
+  const [authReady, setAuthReady] = useState(isMarketingPreview);
+  // Post-login boot screen: stays up until the initial data has loaded so the
+  // dashboard appears fully populated instead of popping in piece by piece.
+  const [bootComplete, setBootComplete] = useState(isMarketingPreview);
+  const bootStartRef = useRef<number>(Date.now());
   const [currentPage, setCurrentPage] = useState(() => {
     if (isMarketingPreview) {
       const page = new URLSearchParams(window.location.search).get("page");
@@ -118,11 +123,10 @@ const Index = () => {
   const [brokerHasOpenPositions, setBrokerHasOpenPositions] = useState<boolean>(false);
   const [brokerSyncing, setBrokerSyncing] = useState(false);
   const queryClient = useQueryClient();
-  const {
-    brokerToday: brokerTodayPnL,
-    brokerDayTotals,
-    connectionId: brokerConnectionId,
-  } = useBrokerTodayPnL(user?.id, selectedBrokerAccountId);
+  const { brokerDayTotals, connectionId: brokerConnectionId } = useBrokerTodayPnL(
+    user?.id,
+    selectedBrokerAccountId,
+  );
 
   // Persist broker account selection
   const handleSetBrokerAccountId = useCallback((id: string | null) => {
@@ -157,6 +161,23 @@ const Index = () => {
     clearAllTrades, 
     importTrades 
   } = useTrades(user?.id, selectedBrokerAccountId ? null : selectedAccountId, selectedBrokerAccountId);
+
+  // Dismiss the boot screen once auth + initial data are ready (min 1.2s so
+  // the transition feels intentional, max 8s failsafe so it can never hang).
+  useEffect(() => {
+    if (bootComplete || !authReady || !session) return;
+    if (tradesLoading || accountsLoading) return;
+    const MIN_BOOT_MS = 1200;
+    const elapsed = Date.now() - bootStartRef.current;
+    const t = setTimeout(() => setBootComplete(true), Math.max(0, MIN_BOOT_MS - elapsed));
+    return () => clearTimeout(t);
+  }, [bootComplete, authReady, session, tradesLoading, accountsLoading]);
+
+  useEffect(() => {
+    if (bootComplete) return;
+    const t = setTimeout(() => setBootComplete(true), 8000);
+    return () => clearTimeout(t);
+  }, [bootComplete]);
 
   // Auto-sync with broker - throttled to once per 60s, runs in background
   const lastSyncRef = useRef<number>(0);
@@ -442,13 +463,18 @@ const Index = () => {
 
     const rangeFiltered = winLossFiltered;
 
-    const pnlMap = buildDailyPnLMap(rangeFiltered, brokerTodayPnL, brokerDayTotals);
+    // Broker day totals only apply when that broker account is selected —
+    // otherwise days from other accounts would bleed into this calendar.
+    const pnlMap = buildDailyPnLMap(
+      rangeFiltered,
+      selectedBrokerAccountId ? brokerDayTotals : null,
+    );
 
     return {
       rangeFiltered,
       dayPnLs: Array.from(pnlMap.entries()).map(([date, pnl]) => ({ date, pnl })),
     };
-  }, [journalBaseTrades, journalFilter, showJournalWinLossFilter, brokerTodayPnL, brokerDayTotals]);
+  }, [journalBaseTrades, journalFilter, showJournalWinLossFilter, brokerDayTotals, selectedBrokerAccountId]);
 
   const { data: allUserTrades = [] } = useQuery({
     queryKey: queryKeys.trades.list(user?.id ?? '', null, null),
@@ -505,15 +531,20 @@ const Index = () => {
     if (isMarketingPreview) {
       setUser(PREVIEW_USER);
       setSession({ user: PREVIEW_USER } as Session);
+      setAuthReady(true);
       return;
     }
+
+    let cancelled = false;
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (cancelled) return;
         setSession(session);
         setUser(session?.user ?? null);
-        
+        setAuthReady(true);
+
         if (session?.user) {
           // Defer Supabase calls with setTimeout to avoid deadlock
           setTimeout(() => {
@@ -528,18 +559,32 @@ const Index = () => {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        navigate('/');
-      }
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (cancelled) return;
+        setSession(session);
+        setUser(session?.user ?? null);
+        setAuthReady(true);
 
-    return () => subscription.unsubscribe();
+        if (session?.user) {
+          fetchProfile(session.user.id);
+        } else {
+          navigate('/');
+        }
+      })
+      .catch((err) => {
+        console.error("Auth session check failed:", err);
+        if (!cancelled) {
+          setAuthReady(true);
+          navigate('/auth');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [navigate, fetchProfile]);
 
   const handleLogout = async () => {
@@ -666,9 +711,8 @@ const Index = () => {
 
   const { title, subtitle } = pageInfo[currentPage];
 
-  // Show nothing while checking auth
-  if (!session) {
-    return null;
+  if (!authReady || !session) {
+    return <LoadingScreen />;
   }
 
   // Chart page uses full-width layout
@@ -681,10 +725,17 @@ const Index = () => {
         <meta name="description" content="Track your trades, analyze performance, and keep detailed notes with NSYNC Journal - your personal trading journal." />
       </Helmet>
 
+      {/* Boot overlay — app mounts and loads underneath, then this fades out */}
+      <AnimatePresence>{!bootComplete && <LoadingScreen />}</AnimatePresence>
+
       {/* Star background — visible in side margins and behind glass panels */}
-      <Suspense fallback={<div className="app-starfield" aria-hidden />}>
-        <AnimatedBackground />
-      </Suspense>
+      <ErrorBoundary
+        fallback={<div className="app-starfield fixed inset-0 z-0 pointer-events-none" aria-hidden />}
+      >
+        <Suspense fallback={<div className="app-starfield" aria-hidden />}>
+          <AnimatedBackground />
+        </Suspense>
+      </ErrorBoundary>
 
       {/* Global Sidebar - works for all pages */}
       <Sidebar 
@@ -808,8 +859,8 @@ const Index = () => {
                   <motion.div variants={staggerItem}>
                     <DashboardStatsLayout
                       trades={trades}
-                      brokerTodayPnL={brokerTodayPnL}
-                      brokerDayTotals={brokerDayTotals}
+                      userId={user?.id}
+                      brokerDayTotals={selectedBrokerAccountId ? brokerDayTotals : null}
                       brokerConnectionId={selectedBrokerAccountId ? brokerConnectionId : null}
                       notebookEntries={notebookEntries}
                       onUpdateTrade={async (id, updates) => {
@@ -929,12 +980,16 @@ const Index = () => {
                               trades={journalViewData.rangeFiltered}
                               notebookEntries={notebookEntries}
                               checklists={checklists}
+                              userId={user?.id}
                               onEdit={(trade) => {
                                 setEditingTrade(trade);
                                 setIsTradeFormOpen(true);
                               }}
                               onDelete={handleDeleteTrade}
                               onSelectForNotebook={handleSelectForNotebook}
+                              onUpdateTrade={async (id, updates) => {
+                                await updateTrade(id, updates);
+                              }}
                               onClearAll={handleClearAll}
                             />
                             </Suspense>
@@ -1059,15 +1114,6 @@ const Index = () => {
                 <PageTransition key="chart">
                   <Suspense fallback={<PageFallback />}>
                     <CustomChart />
-                  </Suspense>
-                </PageTransition>
-              )}
-
-              {/* Calculator Page */}
-              {currentPage === 'calculator' && (
-                <PageTransition key="calculator" className="max-w-5xl mx-auto">
-                  <Suspense fallback={<PageFallback />}>
-                    <LotSizeCalculator />
                   </Suspense>
                 </PageTransition>
               )}

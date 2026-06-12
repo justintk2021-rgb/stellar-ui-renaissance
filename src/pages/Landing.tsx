@@ -731,6 +731,12 @@ export default function Landing() {
               <Link to="/auth" className="hover:text-foreground transition-colors">
                 Sign in
               </Link>
+              <Link to="/privacy" className="hover:text-foreground transition-colors">
+                Privacy
+              </Link>
+              <Link to="/terms" className="hover:text-foreground transition-colors">
+                Terms
+              </Link>
             </div>
           </div>
           <p className="text-sm text-muted-foreground">

@@ -70,10 +70,7 @@ export function setBrokerPlByPositionCache(map: Map<string, number> | null): voi
   brokerPlByPositionCache = map;
 }
 
-/**
- * P&L for a trade as the broker reports it (broker history / today gross).
- * TradeLocker journal rows prefer synced broker_trade_history over inflated result.
- */
+/** P&L for a synced broker trade (per-position history, else journal result). */
 export const getTradeNetResult = (trade: Trade): number => {
   const posId = trade.brokerPositionId;
   if (
@@ -83,26 +80,7 @@ export const getTradeNetResult = (trade: Trade): number => {
   ) {
     return brokerPlByPositionCache.get(posId)!;
   }
-
-  const base = trade.result || 0;
-  if (!trade.importedFromBroker) return base;
-
-  const broker = trade.brokerName || "";
-  const swap = trade.swap ?? 0;
-  const commission = trade.commission ?? 0;
-  const fees = swap + commission;
-
-  if (
-    fees !== 0 &&
-    (broker === "TradeLocker" ||
-      broker === "MetaTrader 5" ||
-      broker === "MT5")
-  ) {
-    const withFees = base + fees;
-    if (Math.abs(withFees) > Math.abs(base)) return withFees;
-  }
-
-  return base;
+  return trade.result || 0;
 };
 
 /** Drop duplicate broker journal rows (same position synced more than once). */
@@ -149,38 +127,11 @@ export const getClientDayBoundsISO = (): {
 };
 
 /**
- * Calendar day that matches TradeLocker "today" P&L (closes in local day window,
- * or most recent broker close in the last 7 days).
+ * Per-day P&L from deduped broker journal trades (close date), with history-only
+ * days filled when there is no journal row for that date.
  */
-export const resolveBrokerSessionDateKey = (trades: Trade[]): string | null => {
-  const bounds = getClientDayBoundsISO();
-  const inBounds = dedupeTradesForPnL(trades).filter(
-    (t) =>
-      t.importedFromBroker &&
-      t.closeTime &&
-      t.closeTime >= bounds.start &&
-      t.closeTime <= bounds.end,
-  );
-  if (inBounds.length) {
-    return getTradeCloseLocalDateKey(inBounds[0]);
-  }
-
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  let latest: Trade | null = null;
-  for (const t of dedupeTradesForPnL(trades)) {
-    if (!t.importedFromBroker || !t.closeTime) continue;
-    if (new Date(t.closeTime).getTime() < cutoff) continue;
-    if (!latest || new Date(t.closeTime) > new Date(latest.closeTime)) {
-      latest = t;
-    }
-  }
-  return latest ? getTradeCloseLocalDateKey(latest) : null;
-};
-
-/** Build per-day P&L keyed by local close date (broker gross when available). */
 export const buildDailyPnLMap = (
   trades: Trade[],
-  brokerToday?: BrokerTodayPnL | null,
   brokerDayTotals?: Map<string, number> | null,
 ): Map<string, number> => {
   const map = new Map<string, number>();
@@ -192,26 +143,14 @@ export const buildDailyPnLMap = (
     map.set(key, (map.get(key) || 0) + getTradeNetResult(trade));
   }
 
-  const sessionDayKey =
-    brokerToday != null && Number.isFinite(brokerToday.net)
-      ? resolveBrokerSessionDateKey(trades)
-      : null;
-
-  // Broker history totals only fill days with no imported journal rows (avoid overwriting).
   if (brokerDayTotals?.size) {
     const daysWithJournal = new Set(
       deduped.filter((t) => t.importedFromBroker).map((t) => getTradeCloseLocalDateKey(t)),
     );
     for (const [day, pnl] of brokerDayTotals) {
-      if (sessionDayKey && day === sessionDayKey) continue;
       if (daysWithJournal.has(day)) continue;
       map.set(day, pnl);
     }
-  }
-
-  // TradeLocker today gross (e.g. $418) on the day you actually traded, not only calendar "today".
-  if (brokerToday != null && Number.isFinite(brokerToday.net)) {
-    map.set(sessionDayKey ?? formatLocalDateKey(new Date()), brokerToday.net);
   }
 
   return map;

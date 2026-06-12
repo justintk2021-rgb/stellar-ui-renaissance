@@ -5,7 +5,6 @@ import { fetchBrokerPnLData } from "@/lib/queries/brokerPnl";
 import { repairTradeLockerSessions } from "@/lib/repairBrokerSession";
 import {
   formatLocalDateKey,
-  getClientDayBoundsISO,
   setBrokerPlByPositionCache,
   type BrokerTodayPnL,
 } from "@/lib/tradeFormat";
@@ -55,7 +54,7 @@ async function resolveConnectionId(
   return conn?.id ?? null;
 }
 
-/** Live today gross from TradeLocker (broker UI day P&L). */
+/** Live today gross from TradeLocker account state (dashboard only). */
 async function fetchLiveBrokerToday(connectionId: string): Promise<BrokerTodayPnL | null> {
   const { data, error } = await supabase.functions.invoke("tradelocker", {
     body: { action: "account-summary", connectionId },
@@ -70,26 +69,9 @@ async function fetchLiveBrokerToday(connectionId: string): Promise<BrokerTodayPn
   return { net: value, syncedAt: new Date().toISOString() };
 }
 
-function resolveTodayPnL(
-  liveOrStored: BrokerTodayPnL | null,
-  byDay: Map<string, number>,
-): BrokerTodayPnL | null {
-  // Prefer live/DB todayGross from TradeLocker (including legitimate $0 days).
-  if (liveOrStored != null && Number.isFinite(liveOrStored.net)) {
-    return liveOrStored;
-  }
-
-  const todayKey = formatLocalDateKey(new Date());
-  const historyToday = byDay.get(todayKey);
-  if (historyToday != null && Number.isFinite(historyToday)) {
-    return { net: historyToday, syncedAt: null };
-  }
-
-  return null;
-}
-
 /**
- * Broker day gross for calendar + per-position P/L (418-style, not inflated journal).
+ * Broker per-position P/L cache + optional today gross for account widgets.
+ * Calendar day totals come from synced trades only (buildDailyPnLMap).
  */
 export function useBrokerTodayPnL(
   userId: string | undefined,
@@ -127,7 +109,7 @@ export function useBrokerTodayPnL(
       let byDay = new Map<string, number>();
       let byPosition = new Map<string, number>();
       try {
-        const data = await fetchBrokerPnLData(connId);
+        const data = await fetchBrokerPnLData(connId, brokerAccountExternalId);
         byDay = data.byDay;
         byPosition = data.byPosition;
         setBrokerDayTotals(byDay);
@@ -146,21 +128,18 @@ export function useBrokerTodayPnL(
         }
       }
 
-      if (stored == null || (opts?.live && Math.abs(stored.net) < 0.01)) {
+      if (stored == null) {
         const { data: conn, error: connErr } = await supabase
           .from("broker_connections")
           .select("today_gross_pnl, today_net_pnl, today_pnl_synced_at")
           .eq("id", connId)
           .maybeSingle();
-        if (!connErr) {
-          const fromDb = conn ? parseTodayFromConnection(conn) : null;
-          if (fromDb && (stored == null || Math.abs(fromDb.net) >= Math.abs(stored.net))) {
-            stored = fromDb;
-          }
+        if (!connErr && conn) {
+          stored = parseTodayFromConnection(conn);
         }
       }
 
-      setBrokerToday(resolveTodayPnL(stored, byDay));
+      setBrokerToday(stored);
     },
     [userId, brokerAccountExternalId],
   );
@@ -203,5 +182,3 @@ export function useBrokerTodayPnL(
 
   return { brokerToday, brokerDayTotals, connectionId, refetch: load };
 }
-
-export { getClientDayBoundsISO };

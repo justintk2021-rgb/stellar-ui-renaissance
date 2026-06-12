@@ -1,161 +1,36 @@
 import { useState, useMemo } from "react";
-import { Calculator, DollarSign, Percent, TrendingDown, BarChart3, RefreshCw, Search } from "lucide-react";
+import { Calculator, DollarSign, Percent, TrendingDown, BarChart3, RefreshCw, Search, Wifi, WifiOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useCountUp } from "@/hooks/useCountUp";
+import { useLiveRates } from "@/hooks/useLiveRates";
+import {
+  INSTRUMENTS,
+  type InstrumentCategory,
+  type InstrumentSpec,
+  computeLotSize,
+  findInstrumentForChartSymbol,
+  forexPairPrice,
+  pipLabel,
+  unitLabel,
+} from "@/lib/positionSizing";
 
-// Instrument types with their characteristics
-interface Instrument {
-  symbol: string;
-  name: string;
-  pipValue: number;        // Value per pip/point for 1 standard lot
-  contractSize: number;    // Units per standard lot
-  pipSize: number;         // What constitutes 1 pip (0.0001, 0.01, 1, etc.)
-  category: 'forex' | 'stocks' | 'futures' | 'indices' | 'derived';
-  minLotSize?: number;     // Minimum lot size allowed for this instrument
-}
-
-const instruments: Instrument[] = [
-  // Forex Majors
-  { symbol: "EUR/USD", name: "Euro / US Dollar", pipValue: 10, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "GBP/USD", name: "British Pound / US Dollar", pipValue: 10, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "USD/JPY", name: "US Dollar / Japanese Yen", pipValue: 9.10, contractSize: 100000, pipSize: 0.01, category: 'forex' },
-  { symbol: "USD/CHF", name: "US Dollar / Swiss Franc", pipValue: 10.15, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "AUD/USD", name: "Australian Dollar / US Dollar", pipValue: 10, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "USD/CAD", name: "US Dollar / Canadian Dollar", pipValue: 7.63, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "NZD/USD", name: "New Zealand Dollar / US Dollar", pipValue: 10, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  // Forex Minors & Crosses
-  { symbol: "EUR/GBP", name: "Euro / British Pound", pipValue: 12.70, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "EUR/JPY", name: "Euro / Japanese Yen", pipValue: 9.10, contractSize: 100000, pipSize: 0.01, category: 'forex' },
-  { symbol: "EUR/AUD", name: "Euro / Australian Dollar", pipValue: 6.50, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "EUR/CAD", name: "Euro / Canadian Dollar", pipValue: 7.63, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "EUR/CHF", name: "Euro / Swiss Franc", pipValue: 10.15, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "EUR/NZD", name: "Euro / New Zealand Dollar", pipValue: 6.00, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "GBP/JPY", name: "British Pound / Japanese Yen", pipValue: 9.10, contractSize: 100000, pipSize: 0.01, category: 'forex' },
-  { symbol: "GBP/AUD", name: "British Pound / Australian Dollar", pipValue: 6.50, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "GBP/CAD", name: "British Pound / Canadian Dollar", pipValue: 7.63, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "GBP/CHF", name: "British Pound / Swiss Franc", pipValue: 10.15, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "GBP/NZD", name: "British Pound / New Zealand Dollar", pipValue: 6.00, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "AUD/CAD", name: "Australian Dollar / Canadian Dollar", pipValue: 7.63, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "AUD/CHF", name: "Australian Dollar / Swiss Franc", pipValue: 10.15, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "AUD/JPY", name: "Australian Dollar / Japanese Yen", pipValue: 9.10, contractSize: 100000, pipSize: 0.01, category: 'forex' },
-  { symbol: "AUD/NZD", name: "Australian Dollar / New Zealand Dollar", pipValue: 6.00, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "CAD/CHF", name: "Canadian Dollar / Swiss Franc", pipValue: 10.15, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "CAD/JPY", name: "Canadian Dollar / Japanese Yen", pipValue: 9.10, contractSize: 100000, pipSize: 0.01, category: 'forex' },
-  { symbol: "CHF/JPY", name: "Swiss Franc / Japanese Yen", pipValue: 9.10, contractSize: 100000, pipSize: 0.01, category: 'forex' },
-  { symbol: "NZD/CAD", name: "New Zealand Dollar / Canadian Dollar", pipValue: 7.63, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "NZD/CHF", name: "New Zealand Dollar / Swiss Franc", pipValue: 10.15, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "NZD/JPY", name: "New Zealand Dollar / Japanese Yen", pipValue: 9.10, contractSize: 100000, pipSize: 0.01, category: 'forex' },
-  // Forex Exotics
-  { symbol: "USD/MXN", name: "US Dollar / Mexican Peso", pipValue: 0.55, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "USD/ZAR", name: "US Dollar / South African Rand", pipValue: 0.55, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "USD/SGD", name: "US Dollar / Singapore Dollar", pipValue: 7.50, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "USD/HKD", name: "US Dollar / Hong Kong Dollar", pipValue: 1.28, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "USD/TRY", name: "US Dollar / Turkish Lira", pipValue: 0.35, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "USD/SEK", name: "US Dollar / Swedish Krona", pipValue: 0.95, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "USD/NOK", name: "US Dollar / Norwegian Krone", pipValue: 0.95, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "USD/DKK", name: "US Dollar / Danish Krone", pipValue: 1.45, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "USD/PLN", name: "US Dollar / Polish Zloty", pipValue: 2.50, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "USD/CNH", name: "US Dollar / Chinese Yuan Offshore", pipValue: 1.40, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "EUR/TRY", name: "Euro / Turkish Lira", pipValue: 0.35, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "EUR/SEK", name: "Euro / Swedish Krona", pipValue: 0.95, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "EUR/NOK", name: "Euro / Norwegian Krone", pipValue: 0.95, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "EUR/PLN", name: "Euro / Polish Zloty", pipValue: 2.50, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "EUR/ZAR", name: "Euro / South African Rand", pipValue: 0.55, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  { symbol: "GBP/ZAR", name: "British Pound / South African Rand", pipValue: 0.55, contractSize: 100000, pipSize: 0.0001, category: 'forex' },
-  // Commodities
-  { symbol: "XAU/USD", name: "Gold / US Dollar", pipValue: 10, contractSize: 100, pipSize: 0.01, category: 'forex' },
-  { symbol: "XAG/USD", name: "Silver / US Dollar", pipValue: 50, contractSize: 5000, pipSize: 0.001, category: 'forex' },
-  { symbol: "XPT/USD", name: "Platinum / US Dollar", pipValue: 10, contractSize: 100, pipSize: 0.01, category: 'forex' },
-  { symbol: "XPD/USD", name: "Palladium / US Dollar", pipValue: 10, contractSize: 100, pipSize: 0.01, category: 'forex' },
-  // Crypto
-  { symbol: "BTC/USD", name: "Bitcoin / US Dollar", pipValue: 1, contractSize: 1, pipSize: 1, category: 'forex' },
-  { symbol: "ETH/USD", name: "Ethereum / US Dollar", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'forex' },
-  { symbol: "SOL/USD", name: "Solana / US Dollar", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'forex' },
-  { symbol: "XRP/USD", name: "Ripple / US Dollar", pipValue: 1, contractSize: 1, pipSize: 0.0001, category: 'forex' },
-  { symbol: "LTC/USD", name: "Litecoin / US Dollar", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'forex' },
-  
-  // Stocks (CFDs - typical contract sizes)
-  { symbol: "AAPL", name: "Apple Inc.", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "MSFT", name: "Microsoft Corporation", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "GOOGL", name: "Alphabet Inc.", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "AMZN", name: "Amazon.com Inc.", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "TSLA", name: "Tesla Inc.", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "META", name: "Meta Platforms Inc.", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "NVDA", name: "NVIDIA Corporation", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "AMD", name: "Advanced Micro Devices", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "NFLX", name: "Netflix Inc.", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "DIS", name: "Walt Disney Company", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "BA", name: "Boeing Company", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "JPM", name: "JPMorgan Chase & Co.", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "V", name: "Visa Inc.", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "MA", name: "Mastercard Inc.", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  { symbol: "KO", name: "Coca-Cola Company", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'stocks' },
-  
-  // Futures
-  { symbol: "ES", name: "E-mini S&P 500", pipValue: 12.50, contractSize: 1, pipSize: 0.25, category: 'futures' },
-  { symbol: "NQ", name: "E-mini NASDAQ 100", pipValue: 5, contractSize: 1, pipSize: 0.25, category: 'futures' },
-  { symbol: "YM", name: "E-mini Dow Jones", pipValue: 5, contractSize: 1, pipSize: 1, category: 'futures' },
-  { symbol: "RTY", name: "E-mini Russell 2000", pipValue: 5, contractSize: 1, pipSize: 0.1, category: 'futures' },
-  { symbol: "GC", name: "Gold Futures", pipValue: 10, contractSize: 100, pipSize: 0.1, category: 'futures' },
-  { symbol: "SI", name: "Silver Futures", pipValue: 25, contractSize: 5000, pipSize: 0.005, category: 'futures' },
-  { symbol: "CL", name: "Crude Oil WTI", pipValue: 10, contractSize: 1000, pipSize: 0.01, category: 'futures' },
-  { symbol: "NG", name: "Natural Gas", pipValue: 10, contractSize: 10000, pipSize: 0.001, category: 'futures' },
-  { symbol: "ZB", name: "30-Year T-Bond", pipValue: 31.25, contractSize: 1, pipSize: 0.03125, category: 'futures' },
-  { symbol: "ZN", name: "10-Year T-Note", pipValue: 15.625, contractSize: 1, pipSize: 0.015625, category: 'futures' },
-  { symbol: "6E", name: "Euro FX Futures", pipValue: 12.50, contractSize: 125000, pipSize: 0.0001, category: 'futures' },
-  { symbol: "6B", name: "British Pound Futures", pipValue: 6.25, contractSize: 62500, pipSize: 0.0001, category: 'futures' },
-  { symbol: "MES", name: "Micro E-mini S&P 500", pipValue: 1.25, contractSize: 1, pipSize: 0.25, category: 'futures' },
-  { symbol: "MNQ", name: "Micro E-mini NASDAQ", pipValue: 0.50, contractSize: 1, pipSize: 0.25, category: 'futures' },
-  { symbol: "MGC", name: "Micro Gold Futures", pipValue: 1, contractSize: 10, pipSize: 0.1, category: 'futures' },
-  
-  // Indices (CFDs)
-  { symbol: "US500", name: "S&P 500 Index", pipValue: 1, contractSize: 1, pipSize: 0.1, category: 'indices' },
-  { symbol: "US100", name: "NASDAQ 100 Index", pipValue: 1, contractSize: 1, pipSize: 0.1, category: 'indices' },
-  { symbol: "US30", name: "Dow Jones 30 Index", pipValue: 1, contractSize: 1, pipSize: 1, category: 'indices' },
-  { symbol: "UK100", name: "FTSE 100 Index", pipValue: 1, contractSize: 1, pipSize: 0.1, category: 'indices' },
-  { symbol: "GER40", name: "DAX 40 Index", pipValue: 1, contractSize: 1, pipSize: 0.1, category: 'indices' },
-  { symbol: "FRA40", name: "CAC 40 Index", pipValue: 1, contractSize: 1, pipSize: 0.1, category: 'indices' },
-  { symbol: "JPN225", name: "Nikkei 225 Index", pipValue: 0.009, contractSize: 1, pipSize: 1, category: 'indices' },
-  { symbol: "AUS200", name: "ASX 200 Index", pipValue: 0.65, contractSize: 1, pipSize: 0.1, category: 'indices' },
-  { symbol: "HK50", name: "Hang Seng 50 Index", pipValue: 0.13, contractSize: 1, pipSize: 1, category: 'indices' },
-  { symbol: "EU50", name: "Euro Stoxx 50 Index", pipValue: 1, contractSize: 1, pipSize: 0.1, category: 'indices' },
-  { symbol: "VIX", name: "Volatility Index", pipValue: 100, contractSize: 1, pipSize: 0.01, category: 'indices' },
-  { symbol: "SPX", name: "S&P 500 (Full)", pipValue: 1, contractSize: 1, pipSize: 0.01, category: 'indices' },
-
-  // Derived / Synthetic Indices (Deriv) - pip value is per 1 lot, pip size is minimum tick
-  // For synthetics: Profit = Lot Size × Price Movement × Pip Value
-  // minLotSize: Broker minimum lot size requirement
-  { symbol: "V10", name: "Volatility 10 Index", pipValue: 0.10, contractSize: 1, pipSize: 0.001, category: 'derived', minLotSize: 0.5 },
-  { symbol: "V25", name: "Volatility 25 Index", pipValue: 0.25, contractSize: 1, pipSize: 0.001, category: 'derived', minLotSize: 0.5 },
-  { symbol: "V50", name: "Volatility 50 Index", pipValue: 5.00, contractSize: 1, pipSize: 0.00001, category: 'derived', minLotSize: 4.0 },
-  { symbol: "V75", name: "Volatility 75 Index", pipValue: 10.00, contractSize: 1, pipSize: 0.00001, category: 'derived', minLotSize: 0.001 },
-  { symbol: "V100", name: "Volatility 100 Index", pipValue: 10.00, contractSize: 1, pipSize: 0.00001, category: 'derived' },
-  { symbol: "V10(1s)", name: "Volatility 10 (1s) Index", pipValue: 0.10, contractSize: 1, pipSize: 0.001, category: 'derived', minLotSize: 0.5 },
-  { symbol: "V25(1s)", name: "Volatility 25 (1s) Index", pipValue: 0.25, contractSize: 1, pipSize: 0.001, category: 'derived', minLotSize: 0.5 },
-  { symbol: "V50(1s)", name: "Volatility 50 (1s) Index", pipValue: 5.00, contractSize: 1, pipSize: 0.00001, category: 'derived', minLotSize: 4.0 },
-  { symbol: "V75(1s)", name: "Volatility 75 (1s) Index", pipValue: 10.00, contractSize: 1, pipSize: 0.00001, category: 'derived', minLotSize: 0.001 },
-  { symbol: "V100(1s)", name: "Volatility 100 (1s) Index", pipValue: 10.00, contractSize: 1, pipSize: 0.00001, category: 'derived' },
-  { symbol: "BOOM300", name: "Boom 300 Index", pipValue: 1.00, contractSize: 1, pipSize: 0.01, category: 'derived' },
-  { symbol: "BOOM500", name: "Boom 500 Index", pipValue: 1.00, contractSize: 1, pipSize: 0.01, category: 'derived' },
-  { symbol: "BOOM1000", name: "Boom 1000 Index", pipValue: 1.00, contractSize: 1, pipSize: 0.01, category: 'derived' },
-  { symbol: "CRASH300", name: "Crash 300 Index", pipValue: 1.00, contractSize: 1, pipSize: 0.01, category: 'derived' },
-  { symbol: "CRASH500", name: "Crash 500 Index", pipValue: 1.00, contractSize: 1, pipSize: 0.01, category: 'derived' },
-  { symbol: "CRASH1000", name: "Crash 1000 Index", pipValue: 1.00, contractSize: 1, pipSize: 0.01, category: 'derived' },
-  { symbol: "STEP", name: "Step Index", pipValue: 0.10, contractSize: 1, pipSize: 0.1, category: 'derived' },
-  { symbol: "RB50", name: "Range Break 50 Index", pipValue: 1.00, contractSize: 1, pipSize: 0.01, category: 'derived' },
-  { symbol: "RB100", name: "Range Break 100 Index", pipValue: 1.00, contractSize: 1, pipSize: 0.01, category: 'derived' },
-  { symbol: "RB200", name: "Range Break 200 Index", pipValue: 1.00, contractSize: 1, pipSize: 0.01, category: 'derived' },
-  // Jump Indices
-  { symbol: "JUMP10", name: "Jump 10 Index", pipValue: 0.10, contractSize: 1, pipSize: 0.001, category: 'derived' },
-  { symbol: "JUMP25", name: "Jump 25 Index", pipValue: 0.25, contractSize: 1, pipSize: 0.001, category: 'derived' },
-  { symbol: "JUMP50", name: "Jump 50 Index", pipValue: 5.00, contractSize: 1, pipSize: 0.00001, category: 'derived' },
-  { symbol: "JUMP75", name: "Jump 75 Index", pipValue: 10.00, contractSize: 1, pipSize: 0.00001, category: 'derived' },
-  { symbol: "JUMP100", name: "Jump 100 Index", pipValue: 10.00, contractSize: 1, pipSize: 0.00001, category: 'derived' },
+const CATEGORIES: { id: InstrumentCategory; label: string }[] = [
+  { id: "forex", label: "Forex" },
+  { id: "crypto", label: "Crypto" },
+  { id: "commodities", label: "Commodities" },
+  { id: "indices", label: "Indices" },
+  { id: "synthetic", label: "Synthetics" },
+  { id: "stocks", label: "Stocks" },
+  { id: "futures", label: "Futures" },
 ];
+
+const CRYPTO_BINANCE_SYMBOLS = INSTRUMENTS
+  .filter((i) => i.binanceSymbol)
+  .map((i) => i.binanceSymbol!) as string[];
 
 function AnimatedResult({ value, prefix = "", suffix = "", decimals = 2, className = "" }: {
   value: number;
@@ -179,138 +54,101 @@ function AnimatedResult({ value, prefix = "", suffix = "", decimals = 2, classNa
   );
 }
 
-interface LotSizeCalculatorProps {
-  compact?: boolean;
+/** Decimals needed to display a lot size cleanly (based on the step). */
+function lotDecimals(step: number): number {
+  if (step >= 1) return 0;
+  return Math.min(4, Math.max(0, Math.ceil(-Math.log10(step))));
 }
 
-export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
+interface LotSizeCalculatorProps {
+  compact?: boolean;
+  /** Raw chart ticker (e.g. "OANDA:EURUSD") to pre-select on mount. */
+  initialSymbol?: string;
+}
+
+export function LotSizeCalculator({ compact = false, initialSymbol }: LotSizeCalculatorProps) {
+  // Resolved once on mount — the sheet remounts the calculator each open.
+  const [initialSpec] = useState<InstrumentSpec | null>(
+    () => findInstrumentForChartSymbol(initialSymbol),
+  );
+
   const [accountBalance, setAccountBalance] = useState<string>("10000");
   const [riskPercentage, setRiskPercentage] = useState<string>("1");
   const [riskUsd, setRiskUsd] = useState<string>("100");
   const [riskMode, setRiskMode] = useState<'percent' | 'usd'>('percent');
   const [stopLoss, setStopLoss] = useState<string>("50");
-  const [stopLossMode, setStopLossMode] = useState<'pips' | 'ticks'>('pips');
-  const [selectedSymbol, setSelectedSymbol] = useState<string>("EUR/USD");
+  const [slModeOverride, setSlModeOverride] = useState<'pips' | 'price' | null>(null);
+  const [selectedSymbol, setSelectedSymbol] = useState<string>(initialSpec?.symbol ?? "EUR/USD");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [activeCategory, setActiveCategory] = useState<string>("forex");
-  
+  const [activeCategory, setActiveCategory] = useState<InstrumentCategory>(initialSpec?.category ?? "forex");
+
   // Custom instrument settings
   const [customPipValue, setCustomPipValue] = useState<string>("10");
   const [customContractSize, setCustomContractSize] = useState<string>("100000");
   const [useCustom, setUseCustom] = useState<boolean>(false);
 
-  const selectedInstrument = useMemo(() => {
-    return instruments.find(i => i.symbol === selectedSymbol);
-  }, [selectedSymbol]);
+  const { usdRates, fxIsLive, fxUpdatedAt, cryptoPrices } = useLiveRates(CRYPTO_BINANCE_SYMBOLS);
+
+  const selectedInstrument = useMemo(
+    () => INSTRUMENTS.find((i) => i.symbol === selectedSymbol),
+    [selectedSymbol],
+  );
+
+  const slMode: 'pips' | 'price' =
+    slModeOverride ?? selectedInstrument?.defaultSlMode ?? 'pips';
 
   const filteredInstruments = useMemo(() => {
-    return instruments.filter(i => {
+    return INSTRUMENTS.filter((i) => {
       const matchesCategory = i.category === activeCategory;
-      const matchesSearch = searchQuery === "" || 
+      const matchesSearch = searchQuery === "" ||
         i.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
         i.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
   }, [activeCategory, searchQuery]);
 
+  /** Live reference price for the selected instrument (when derivable). */
+  const livePrice = useMemo(() => {
+    if (!selectedInstrument) return null;
+    if (selectedInstrument.binanceSymbol) {
+      return cryptoPrices[selectedInstrument.binanceSymbol] ?? null;
+    }
+    if (selectedInstrument.category === "forex" && fxIsLive) {
+      return forexPairPrice(selectedInstrument, usdRates);
+    }
+    return null;
+  }, [selectedInstrument, cryptoPrices, fxIsLive, usdRates]);
+
   const calculations = useMemo(() => {
+    const spec: InstrumentSpec = selectedInstrument ?? INSTRUMENTS[0];
     const balance = parseFloat(accountBalance) || 0;
     const riskPercent = parseFloat(riskPercentage) || 0;
     const riskDollar = parseFloat(riskUsd) || 0;
     const sl = parseFloat(stopLoss) || 0;
-    
-    const pipValue = useCustom 
-      ? (parseFloat(customPipValue) || 10) 
-      : (selectedInstrument?.pipValue || 10);
-    
-    const contractSize = useCustom
-      ? (parseFloat(customContractSize) || 100000)
-      : (selectedInstrument?.contractSize || 100000);
 
-    const pipSize = selectedInstrument?.pipSize || 0.0001;
-
-    // Risk amount in dollars - based on mode
-    const riskAmount = riskMode === 'percent' 
-      ? (balance * riskPercent) / 100 
+    const riskAmount = riskMode === 'percent'
+      ? (balance * riskPercent) / 100
       : riskDollar;
 
-    // For derived indices (synthetics), the tick value from TradingView IS the raw price movement
-    // We calculate: Risk Amount / (Price Movement × Pip Value per lot)
-    // For forex/standard instruments, ticks need to be converted to pips using pipSize
-    const isDerived = selectedInstrument?.category === 'derived';
-    
-    let effectiveStopLoss: number;
-    if (stopLossMode === 'ticks') {
-      if (isDerived) {
-        // For derived indices: tick value IS the price movement, use directly
-        // Lot Size = Risk Amount / (Tick Movement × Pip Value)
-        effectiveStopLoss = sl; // Use raw tick value
-      } else {
-        // For forex/standard: convert ticks to pips
-        effectiveStopLoss = sl / pipSize;
-      }
-    } else {
-      // Pips mode - use as entered
-      effectiveStopLoss = sl;
-    }
-
-    // Lot size calculation
-    // For derived: Lot Size = Risk Amount / (Price Movement × Pip Value)
-    // For forex: Lot Size = Risk Amount / (Pips × Pip Value per pip)
-    let calculatedLotSize = effectiveStopLoss > 0 
-      ? (isDerived && stopLossMode === 'ticks' 
-          ? riskAmount / (effectiveStopLoss * pipValue)  // Derived with ticks
-          : riskAmount / (effectiveStopLoss * pipValue)) // Standard pips calculation
-      : 0;
-    
-    // Apply minimum lot size constraint if defined
-    const minLotSize = selectedInstrument?.minLotSize ?? 0;
-    const lotSize = Math.max(calculatedLotSize, minLotSize);
-    const isBelowMinimum = calculatedLotSize > 0 && calculatedLotSize < minLotSize;
-
-    // Position size in units
-    const positionUnits = lotSize * contractSize;
-
-    // Potential loss at stop loss
-    const potentialLoss = lotSize * effectiveStopLoss * pipValue;
-
-    // Get the correct unit label based on instrument type
-    const getUnitLabel = () => {
-      if (!selectedInstrument) return "units";
-      switch (selectedInstrument.category) {
-        case 'forex': return "lots";
-        case 'stocks': return "shares";
-        case 'futures': return "contracts";
-        case 'indices': return "contracts";
-        default: return "units";
-      }
-    };
-
-    const getPipLabel = () => {
-      if (!selectedInstrument) return "pips";
-      switch (selectedInstrument.category) {
-        case 'forex': return "pips";
-        case 'stocks': return "points";
-        case 'futures': return "ticks";
-        case 'indices': return "points";
-        default: return "pips";
-      }
-    };
+    const result = computeLotSize({
+      spec,
+      riskUSD: riskAmount,
+      stopLoss: sl,
+      slMode,
+      usdRates,
+      customPipValueUSD: useCustom ? (parseFloat(customPipValue) || undefined) : undefined,
+      customContractSize: useCustom ? (parseFloat(customContractSize) || undefined) : undefined,
+    });
 
     return {
       riskAmount,
-      lotSize: Math.max(0, lotSize),
-      positionUnits: Math.max(0, positionUnits),
-      potentialLoss: Math.max(0, potentialLoss),
-      pipValue,
-      contractSize,
-      pipSize,
-      unitLabel: getUnitLabel(),
-      pipLabel: getPipLabel(),
-      isBelowMinimum,
-      minLotSize
+      ...result,
+      pipSize: spec.pipSize,
+      unitLabel: unitLabel(spec.category),
+      pipLabel: pipLabel(spec.category),
+      notionalUSD: livePrice ? result.positionUnits * livePrice : null,
     };
-  }, [accountBalance, riskPercentage, riskUsd, riskMode, stopLoss, stopLossMode, selectedInstrument, useCustom, customPipValue, customContractSize]);
+  }, [accountBalance, riskPercentage, riskUsd, riskMode, stopLoss, slMode, selectedInstrument, usdRates, useCustom, customPipValue, customContractSize, livePrice]);
 
   const handleReset = () => {
     setAccountBalance("10000");
@@ -318,7 +156,7 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
     setRiskUsd("100");
     setRiskMode("percent");
     setStopLoss("50");
-    setStopLossMode("pips");
+    setSlModeOverride(null);
     setSelectedSymbol("EUR/USD");
     setSearchQuery("");
     setActiveCategory("forex");
@@ -327,14 +165,51 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
 
   const handleSelectInstrument = (symbol: string) => {
     setSelectedSymbol(symbol);
+    setSlModeOverride(null);
     setUseCustom(false);
   };
+
+  const lotDp = lotDecimals(calculations.lotStep);
+  const pipName = calculations.pipLabel.slice(0, -1); // pip / point / tick
+
+  const slModeToggle = (
+    <div className="flex rounded-lg overflow-hidden border border-border/50">
+      {(['pips', 'price'] as const).map((mode) => (
+        <button
+          key={mode}
+          onClick={() => setSlModeOverride(mode)}
+          className={cn(
+            "px-2 py-1 text-[10px] font-medium transition-all capitalize",
+            slMode === mode
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+          )}
+        >
+          {mode === 'pips' ? calculations.pipLabel : 'Price Δ'}
+        </button>
+      ))}
+    </div>
+  );
+
+  const liveBadge = (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border",
+        fxIsLive
+          ? "text-primary border-primary/40 bg-primary/10"
+          : "text-amber-500 border-amber-500/40 bg-amber-500/10"
+      )}
+      title={fxUpdatedAt ? `FX rates updated ${fxUpdatedAt}` : undefined}
+    >
+      {fxIsLive ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+      {fxIsLive ? "Live rates" : "Offline — approximate rates"}
+    </span>
+  );
 
   // Compact mode for sidebar integration
   if (compact) {
     return (
       <div className="space-y-4 animate-fade-in">
-        {/* Trade Parameters - Compact */}
         <div className="space-y-4">
           {/* Account Balance */}
           <div className="space-y-1.5">
@@ -405,30 +280,7 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
               <Label htmlFor="sl-compact" className="text-xs text-muted-foreground">
                 Stop Loss
               </Label>
-              <div className="flex rounded-md overflow-hidden border border-border/50">
-                <button
-                  onClick={() => setStopLossMode('pips')}
-                  className={cn(
-                    "px-2 py-0.5 text-[10px] font-medium transition-all",
-                    stopLossMode === 'pips'
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
-                  )}
-                >
-                  Pips
-                </button>
-                <button
-                  onClick={() => setStopLossMode('ticks')}
-                  className={cn(
-                    "px-2 py-0.5 text-[10px] font-medium transition-all",
-                    stopLossMode === 'ticks'
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
-                  )}
-                >
-                  Ticks
-                </button>
-              </div>
+              {slModeToggle}
             </div>
             <div className="relative">
               <TrendingDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -438,7 +290,7 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
                 value={stopLoss}
                 onChange={(e) => setStopLoss(e.target.value)}
                 className="pl-9 font-mono h-9 text-sm"
-                placeholder={stopLossMode === 'pips' ? "50" : "0.0050"}
+                placeholder={slMode === 'pips' ? "50" : "1.50"}
               />
             </div>
           </div>
@@ -457,18 +309,18 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
               />
             </div>
             <div className="flex gap-1 flex-wrap">
-              {(['forex', 'stocks', 'futures', 'indices', 'derived'] as const).map((cat) => (
+              {CATEGORIES.map((cat) => (
                 <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
                   className={cn(
-                    "px-2 py-0.5 rounded text-[10px] font-medium capitalize transition-all",
-                    activeCategory === cat
+                    "px-2 py-0.5 rounded text-[10px] font-medium transition-all",
+                    activeCategory === cat.id
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted/50 text-muted-foreground hover:bg-muted"
                   )}
                 >
-                  {cat}
+                  {cat.label}
                 </button>
               ))}
             </div>
@@ -495,16 +347,22 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
         {/* Results - Compact */}
         <div className="glass rounded-lg p-4 border border-border/40 space-y-3">
           <div className="text-center">
+            {selectedInstrument && (
+              <p className="text-xs font-semibold mb-1">
+                {selectedInstrument.symbol}
+                <span className="text-muted-foreground font-normal ml-1.5">{selectedInstrument.name}</span>
+              </p>
+            )}
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Recommended Size</p>
             <AnimatedResult
-              value={calculations.lotSize}
-              suffix=" lots"
-              decimals={2}
+              value={calculations.lots}
+              suffix={` ${calculations.unitLabel}`}
+              decimals={lotDp}
               className="text-2xl font-bold text-primary"
             />
-            {calculations.isBelowMinimum && (
+            {calculations.belowMinimum && (
               <div className="mt-2 text-[10px] text-amber-500 bg-amber-500/10 rounded px-2 py-1">
-                ⚠️ Min lot: {calculations.minLotSize} (adjusted)
+                ⚠️ Min lot: {calculations.minLot} (risk ${calculations.actualRiskUSD.toFixed(2)})
               </div>
             )}
           </div>
@@ -514,8 +372,8 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
               <AnimatedResult value={calculations.riskAmount} prefix="$" decimals={2} className="font-semibold" />
             </div>
             <div className="bg-muted/30 rounded p-2 text-center">
-              <p className="text-muted-foreground text-[10px]">Position Units</p>
-              <AnimatedResult value={calculations.positionUnits} decimals={0} className="font-semibold" />
+              <p className="text-muted-foreground text-[10px]">{pipName} value/lot</p>
+              <AnimatedResult value={calculations.pipValueUSD} prefix="$" decimals={2} className="font-semibold" />
             </div>
           </div>
         </div>
@@ -531,14 +389,19 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
             <Calculator className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="text-lg font-bold">Position Size Calculator</h2>
-            <p className="text-xs text-muted-foreground">Calculate lot size based on risk for any instrument</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-lg font-bold">Position Size Calculator</h2>
+              {liveBadge}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Forex, crypto, commodities, indices, Deriv synthetics, stocks & futures
+            </p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={handleReset} className="gap-2">
@@ -606,7 +469,7 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
                   </button>
                 </div>
               </div>
-              
+
               {riskMode === 'percent' ? (
                 <>
                   <div className="relative">
@@ -680,30 +543,7 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
                 <Label htmlFor="stopLoss" className="text-xs uppercase tracking-wider text-muted-foreground">
                   Stop Loss
                 </Label>
-                <div className="flex rounded-lg overflow-hidden border border-border/50">
-                  <button
-                    onClick={() => setStopLossMode('pips')}
-                    className={cn(
-                      "px-2 py-1 text-[10px] font-medium transition-all",
-                      stopLossMode === 'pips'
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
-                    )}
-                  >
-                    Pips
-                  </button>
-                  <button
-                    onClick={() => setStopLossMode('ticks')}
-                    className={cn(
-                      "px-2 py-1 text-[10px] font-medium transition-all",
-                      stopLossMode === 'ticks'
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
-                    )}
-                  >
-                    Ticks
-                  </button>
-                </div>
+                {slModeToggle}
               </div>
               <div className="relative">
                 <TrendingDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -713,15 +553,15 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
                   value={stopLoss}
                   onChange={(e) => setStopLoss(e.target.value)}
                   className="pl-9 font-mono"
-                  placeholder={stopLossMode === 'pips' ? "50" : "0.0050"}
+                  placeholder={slMode === 'pips' ? "50" : "1.50"}
                   min="0"
-                  step={stopLossMode === 'ticks' ? "0.0001" : "1"}
+                  step="any"
                 />
               </div>
               <p className="text-[10px] text-muted-foreground">
-                {stopLossMode === 'pips' 
-                  ? `1 pip = ${calculations.pipSize} price movement` 
-                  : "Enter raw price movement (e.g., 0.0050)"}
+                {slMode === 'pips'
+                  ? `1 ${pipName} = ${calculations.pipSize} price movement · SL ≈ ${calculations.slPips.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${calculations.pipLabel}`
+                  : `Enter the raw price distance to your stop (e.g. entry 2350.00, SL 2345.00 → 5.00) · ≈ ${calculations.slPips.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${calculations.pipLabel}`}
               </p>
             </div>
           </div>
@@ -745,41 +585,50 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
             </div>
 
             {/* Category Tabs */}
-            <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-              <TabsList className="grid grid-cols-5 w-full">
-                <TabsTrigger value="forex" className="text-xs">Forex</TabsTrigger>
-                <TabsTrigger value="stocks" className="text-xs">Stocks</TabsTrigger>
-                <TabsTrigger value="futures" className="text-xs">Futures</TabsTrigger>
-                <TabsTrigger value="indices" className="text-xs">Indices</TabsTrigger>
-                <TabsTrigger value="derived" className="text-xs">Derived</TabsTrigger>
+            <Tabs value={activeCategory} onValueChange={(v) => setActiveCategory(v as InstrumentCategory)}>
+              <TabsList className="flex w-full h-auto flex-wrap gap-1 justify-start">
+                {CATEGORIES.map((cat) => (
+                  <TabsTrigger key={cat.id} value={cat.id} className="text-xs px-2.5 py-1.5">
+                    {cat.label}
+                  </TabsTrigger>
+                ))}
               </TabsList>
 
-              {['forex', 'stocks', 'futures', 'indices', 'derived'].map((category) => (
-                <TabsContent key={category} value={category} className="mt-3">
+              {CATEGORIES.map(({ id }) => (
+                <TabsContent key={id} value={id} className="mt-3">
                   <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
                     {filteredInstruments.length === 0 ? (
                       <p className="text-xs text-muted-foreground text-center py-4">No instruments found</p>
                     ) : (
-                      filteredInstruments.map((instrument) => (
-                        <button
-                          key={instrument.symbol}
-                          onClick={() => handleSelectInstrument(instrument.symbol)}
-                          className={cn(
-                            "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all",
-                            selectedSymbol === instrument.symbol
-                              ? "bg-primary/20 border border-primary/50 text-foreground"
-                              : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          <div className="flex flex-col items-start">
-                            <span className="font-medium">{instrument.symbol}</span>
-                            <span className="text-[10px] text-muted-foreground">{instrument.name}</span>
-                          </div>
-                          <span className="text-[10px] text-muted-foreground">
-                            ${instrument.pipValue}/pip
-                          </span>
-                        </button>
-                      ))
+                      filteredInstruments.map((instrument) => {
+                        const pv = computeLotSize({
+                          spec: instrument,
+                          riskUSD: 0,
+                          stopLoss: 0,
+                          slMode: 'pips',
+                          usdRates,
+                        }).pipValueUSD;
+                        return (
+                          <button
+                            key={instrument.symbol}
+                            onClick={() => handleSelectInstrument(instrument.symbol)}
+                            className={cn(
+                              "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all",
+                              selectedSymbol === instrument.symbol
+                                ? "bg-primary/20 border border-primary/50 text-foreground"
+                                : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            <div className="flex flex-col items-start">
+                              <span className="font-medium">{instrument.symbol}</span>
+                              <span className="text-[10px] text-muted-foreground">{instrument.name}</span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              ${pv >= 100 ? pv.toFixed(0) : pv.toFixed(2)}/{pipLabel(instrument.category).slice(0, -1)}
+                            </span>
+                          </button>
+                        );
+                      })
                     )}
                   </div>
                 </TabsContent>
@@ -797,12 +646,12 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
               >
                 {useCustom ? "✓ Using custom values" : "Use custom pip value?"}
               </button>
-              
+
               {useCustom && (
                 <div className="grid grid-cols-2 gap-3 mt-3 animate-fade-in">
                   <div className="space-y-1">
                     <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                      Pip Value ($)
+                      Pip Value ($/lot)
                     </Label>
                     <Input
                       type="number"
@@ -834,14 +683,31 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
         <div className="space-y-4">
           {/* Selected Instrument Info */}
           {selectedInstrument && (
-            <div className="glass rounded-xl p-4 border border-border/40 flex items-center justify-between">
+            <div className="glass rounded-xl p-4 border border-border/40 flex items-center justify-between gap-4">
               <div>
                 <div className="text-lg font-bold">{selectedInstrument.symbol}</div>
                 <div className="text-xs text-muted-foreground">{selectedInstrument.name}</div>
               </div>
-              <div className="text-right">
-                <div className="text-xs text-muted-foreground">Contract Size</div>
-                <div className="font-mono text-sm">{calculations.contractSize.toLocaleString()}</div>
+              <div className="flex items-center gap-5 text-right">
+                {livePrice != null && (
+                  <div>
+                    <div className="text-xs text-muted-foreground">Live Price</div>
+                    <div className="font-mono text-sm text-primary">
+                      {livePrice.toLocaleString(undefined, {
+                        minimumFractionDigits: livePrice < 10 ? 4 : 2,
+                        maximumFractionDigits: livePrice < 10 ? 4 : 2,
+                      })}
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <div className="text-xs text-muted-foreground">Contract Size</div>
+                  <div className="font-mono text-sm">{calculations.contractSize.toLocaleString()}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Min Lot</div>
+                  <div className="font-mono text-sm">{calculations.minLot}</div>
+                </div>
               </div>
             </div>
           )}
@@ -853,26 +719,29 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
             </div>
             <div className="flex items-baseline gap-2">
               <AnimatedResult
-                value={calculations.lotSize}
-                decimals={2}
+                value={calculations.lots}
+                decimals={lotDp}
                 className="text-4xl font-bold font-mono text-primary"
               />
               <span className="text-lg text-muted-foreground">{calculations.unitLabel}</span>
             </div>
-            {calculations.isBelowMinimum && (
+            {calculations.belowMinimum && (
               <div className="mt-3 text-xs text-amber-500 bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20">
-                ⚠️ Calculated lot size was below the broker minimum of <span className="font-mono font-semibold">{calculations.minLotSize}</span> lots. Adjusted to minimum.
+                ⚠️ The risk-based size ({calculations.rawLots.toFixed(Math.max(lotDp, 3))}) is below the
+                broker minimum of <span className="font-mono font-semibold">{calculations.minLot}</span>.
+                Using the minimum risks <span className="font-mono font-semibold">${calculations.actualRiskUSD.toFixed(2)}</span> instead
+                of ${calculations.riskAmount.toFixed(2)} — consider a tighter stop or higher risk budget.
               </div>
             )}
             {selectedInstrument?.category === 'forex' && (
               <div className="mt-3 flex gap-4 text-sm">
                 <div>
                   <span className="text-muted-foreground">Mini: </span>
-                  <span className="font-mono font-medium">{(calculations.lotSize * 10).toFixed(2)}</span>
+                  <span className="font-mono font-medium">{(calculations.lots * 10).toFixed(2)}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Micro: </span>
-                  <span className="font-mono font-medium">{(calculations.lotSize * 100).toFixed(2)}</span>
+                  <span className="font-mono font-medium">{(calculations.lots * 100).toFixed(2)}</span>
                 </div>
               </div>
             )}
@@ -898,22 +767,27 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
               </div>
               <AnimatedResult
                 value={calculations.positionUnits}
-                decimals={0}
+                decimals={calculations.positionUnits < 10 ? 2 : 0}
                 className="text-xl font-bold font-mono"
               />
+              {calculations.notionalUSD != null && (
+                <span className="block text-[10px] text-muted-foreground mt-0.5">
+                  ≈ ${calculations.notionalUSD.toLocaleString(undefined, { maximumFractionDigits: 0 })} notional
+                </span>
+              )}
             </div>
 
             <div className="glass rounded-xl p-4 border border-border/40">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                {calculations.pipLabel.charAt(0).toUpperCase() + calculations.pipLabel.slice(1)} Value
+                {pipName.charAt(0).toUpperCase() + pipName.slice(1)} Value (1 lot)
               </div>
               <AnimatedResult
-                value={calculations.pipValue}
+                value={calculations.pipValueUSD}
                 prefix="$"
-                decimals={2}
+                decimals={calculations.pipValueUSD < 0.1 ? 4 : 2}
                 className="text-xl font-bold font-mono"
               />
-              <span className="text-xs text-muted-foreground ml-1">/{calculations.pipLabel.slice(0, -1)}</span>
+              <span className="text-xs text-muted-foreground ml-1">/{pipName}</span>
             </div>
 
             <div className="glass rounded-xl p-4 border border-border/40">
@@ -921,7 +795,7 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
                 Max Loss at SL
               </div>
               <AnimatedResult
-                value={calculations.potentialLoss}
+                value={calculations.actualRiskUSD}
                 prefix="$"
                 decimals={2}
                 className="text-xl font-bold font-mono text-destructive"
@@ -935,9 +809,10 @@ export function LotSizeCalculator({ compact = false }: LotSizeCalculatorProps) {
               How it works
             </h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Position Size = Risk Amount ÷ (Stop Loss × {calculations.pipLabel.charAt(0).toUpperCase() + calculations.pipLabel.slice(1)} Value). 
-              This ensures you only risk the specified percentage of your account on each trade, 
-              regardless of where you place your stop loss.
+              Position Size = Risk Amount ÷ (Stop Loss in {calculations.pipLabel} × {pipName} value per lot).
+              {pipName === 'pip' && ' Pip values for non-USD quote currencies are converted with live exchange rates.'}
+              {selectedInstrument?.category === 'synthetic' && ' For Deriv synthetics, P&L = lots × price movement (contract size 1), so entering the SL as a price distance is most accurate.'}
+              {' '}The result is rounded down to the broker volume step so your actual risk never exceeds the budget.
             </p>
           </div>
         </div>

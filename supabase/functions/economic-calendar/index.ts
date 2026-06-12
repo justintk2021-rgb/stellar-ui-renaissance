@@ -7,6 +7,8 @@ const corsHeaders = {
 
 const FF_CALENDAR_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
 
+type CalendarSource = "forexfactory" | "finnhub";
+
 interface EconomicEvent {
   id: string;
   title: string;
@@ -33,6 +35,24 @@ const currencyToCountry: Record<string, string> = {
   NZD: "NZ",
   CHF: "CH",
   CNY: "CN",
+};
+
+/** Reverse map: Finnhub gives 2-letter country codes — map back to currency. */
+const countryToCurrency: Record<string, string> = {
+  US: "USD",
+  GB: "GBP",
+  UK: "GBP",
+  EU: "EUR",
+  DE: "EUR",
+  FR: "EUR",
+  IT: "EUR",
+  ES: "EUR",
+  JP: "JPY",
+  AU: "AUD",
+  CA: "CAD",
+  NZ: "NZD",
+  CH: "CHF",
+  CN: "CNY",
 };
 
 const countryNames: Record<string, string> = {
@@ -108,7 +128,6 @@ async function fetchForexFactoryWeek(): Promise<EconomicEvent[]> {
     throw new Error("Unexpected calendar feed format");
   }
 
-  const now = Date.now();
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   start.setDate(start.getDate() - 1);
@@ -125,9 +144,78 @@ async function fetchForexFactoryWeek(): Promise<EconomicEvent[]> {
   return events;
 }
 
+/**
+ * Normalize one Finnhub `/calendar/economic` row into the EconomicEvent shape.
+ * Finnhub fields: country (2-letter code), event, time (ISO), impact (1/2/3),
+ * actual, estimate → forecast, prev → previous, unit.
+ */
+function parseFinnhubEvent(row: Record<string, unknown>, index: number): EconomicEvent | null {
+  // `time` is ISO ("2026-06-10 12:30:00" or full ISO); fall back to `date`.
+  const rawTime = String(row.time || row.date || "");
+  if (!rawTime) return null;
+  // Finnhub times are UTC; append Z when no timezone is present.
+  const iso = rawTime.includes("T") ? rawTime : rawTime.replace(" ", "T");
+  const hasTz = /[zZ]|[+-]\d{2}:\d{2}$/.test(iso);
+  const eventDate = new Date(hasTz ? iso : `${iso}Z`);
+  if (Number.isNaN(eventDate.getTime())) return null;
+
+  // impact: 1 = low, 2 = medium, 3 = high (sometimes strings)
+  const impactNum = Number(row.impact);
+  let impact: "low" | "medium" | "high" = "low";
+  if (impactNum >= 3) impact = "high";
+  else if (impactNum === 2) impact = "medium";
+  else if (typeof row.impact === "string") impact = normalizeImpact(row.impact);
+
+  // `country` may be a 2-letter country code OR a currency code.
+  const rawCountry = String(row.country || "US").toUpperCase();
+  let countryCode: string;
+  let currency: string;
+  if (currencyToCountry[rawCountry]) {
+    currency = rawCountry;
+    countryCode = currencyToCountry[rawCountry];
+  } else {
+    countryCode = rawCountry.slice(0, 2);
+    currency = countryToCurrency[countryCode] || "USD";
+  }
+
+  const unit = typeof row.unit === "string" && row.unit.trim() ? row.unit.trim() : "";
+  const fmt = (v: unknown): string | undefined => {
+    if (v == null || v === "") return undefined;
+    // Append short units (%, K, M, B) so values read like the FF feed.
+    return unit.length <= 2 ? `${v}${unit}` : String(v);
+  };
+
+  const dateStr = eventDate.toISOString().split("T")[0];
+  const timeStr = eventDate.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const title = String(row.event || "Economic Event");
+  const slug = title.replace(/[^a-zA-Z0-9]+/g, "-").slice(0, 40);
+
+  return {
+    id: `fh-${dateStr}-${currency}-${slug}-${index}`,
+    title,
+    country: countryNames[countryCode] || rawCountry,
+    countryCode,
+    date: dateStr,
+    time: timeStr,
+    impact,
+    actual: fmt(row.actual),
+    forecast: fmt(row.estimate),
+    previous: fmt(row.prev),
+    currency,
+    timestamp: eventDate.getTime(),
+  };
+}
+
 async function fetchFinnhubCalendar(): Promise<EconomicEvent[] | null> {
   const apiKey = Deno.env.get("FINNHUB_API_KEY");
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.warn("FINNHUB_API_KEY not set — skipping Finnhub fallback");
+    return null;
+  }
 
   const from = new Date();
   from.setDate(from.getDate() - 1);
@@ -139,65 +227,63 @@ async function fetchFinnhubCalendar(): Promise<EconomicEvent[] | null> {
 
   const url = `https://finnhub.io/api/v1/calendar/economic?from=${fromStr}&to=${toStr}&token=${apiKey}`;
   const response = await fetch(url);
-  if (!response.ok) return null;
+  if (!response.ok) {
+    console.error(`Finnhub responded ${response.status}`);
+    return null;
+  }
 
   const data = await response.json();
-  const rows = data?.economicCalendar;
+  const rows = data?.economicCalendar?.economicCalendar ?? data?.economicCalendar;
   if (!Array.isArray(rows)) return null;
 
   return rows
-    .map((row: Record<string, unknown>, i: number) => {
-      const dateStr = String(row.date || "");
-      const timeStr = String(row.time || "00:00");
-      const eventDate = new Date(`${dateStr}T${timeStr}:00`);
-      if (Number.isNaN(eventDate.getTime())) return null;
-
-      const impactNum = Number(row.impact);
-      let impact: "low" | "medium" | "high" = "low";
-      if (impactNum >= 3) impact = "high";
-      else if (impactNum === 2) impact = "medium";
-
-      const currency = String(row.unit || row.currency || "USD").toUpperCase();
-      const countryCode = currencyToCountry[currency] || "US";
-
-      return {
-        id: `fh-${dateStr}-${i}`,
-        title: String(row.event || "Economic Event"),
-        country: countryNames[countryCode] || countryCode,
-        countryCode,
-        date: dateStr,
-        time: timeStr.slice(0, 5),
-        impact,
-        actual: row.actual != null ? String(row.actual) : undefined,
-        forecast: row.estimate != null ? String(row.estimate) : undefined,
-        previous: row.prev != null ? String(row.prev) : undefined,
-        currency,
-        timestamp: eventDate.getTime(),
-      } satisfies EconomicEvent;
-    })
+    .map((row: Record<string, unknown>, i: number) => parseFinnhubEvent(row, i))
     .filter((e: EconomicEvent | null): e is EconomicEvent => e !== null)
     .sort((a: EconomicEvent, b: EconomicEvent) => a.timestamp - b.timestamp);
 }
 
-async function fetchEconomicEvents(): Promise<{
+interface CalendarResult {
   events: EconomicEvent[];
-  source: string;
-}> {
+  source: CalendarSource;
+}
+
+// Simple in-memory cache (per warm function instance) — 5 minutes.
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const cache = new Map<string, { result: CalendarResult; cachedAt: number }>();
+
+async function fetchEconomicEvents(): Promise<CalendarResult> {
+  const cached = cache.get("calendar");
+  if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+    return cached.result;
+  }
+
+  // 1) ForexFactory first
+  let ffEvents: EconomicEvent[] = [];
   try {
-    const events = await fetchForexFactoryWeek();
-    if (events.length > 0) {
-      return { events, source: "ForexFactory (live)" };
-    }
+    ffEvents = await fetchForexFactoryWeek();
   } catch (err) {
     console.error("ForexFactory feed failed:", err);
   }
 
-  const finnhub = await fetchFinnhubCalendar();
-  if (finnhub && finnhub.length > 0) {
-    return { events: finnhub, source: "Finnhub" };
+  let result: CalendarResult;
+  if (ffEvents.length > 0) {
+    result = { events: ffEvents, source: "forexfactory" };
+  } else {
+    // 2) Finnhub fallback (null when key missing or request failed)
+    const finnhub = await fetchFinnhubCalendar();
+    if (finnhub && finnhub.length > 0) {
+      result = { events: finnhub, source: "finnhub" };
+    } else {
+      // 3) Both unavailable — return the FF result (even if empty) gracefully.
+      result = { events: ffEvents, source: "forexfactory" };
+    }
   }
 
-  throw new Error("Unable to load live economic calendar");
+  // Only cache results that actually have data, so transient outages retry.
+  if (result.events.length > 0) {
+    cache.set("calendar", { result, cachedAt: Date.now() });
+  }
+  return result;
 }
 
 serve(async (req) => {
