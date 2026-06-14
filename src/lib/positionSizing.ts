@@ -19,6 +19,7 @@ export type InstrumentCategory =
   | "crypto"
   | "commodities"
   | "indices"
+  | "volatility"
   | "synthetic"
   | "stocks"
   | "futures";
@@ -66,6 +67,24 @@ const FX = (
     ...opts,
   };
 };
+
+const VOL = (
+  symbol: string,
+  name: string,
+  pipSize: number,
+  minLot: number,
+  lotStep?: number,
+): InstrumentSpec => ({
+  symbol,
+  name,
+  category: "volatility",
+  contractSize: 1,
+  pipSize,
+  quote: "USD",
+  minLot,
+  lotStep: lotStep ?? (minLot < 0.01 ? minLot : 0.01),
+  defaultSlMode: "price",
+});
 
 const SYN = (
   symbol: string,
@@ -169,19 +188,28 @@ export const INSTRUMENTS: InstrumentSpec[] = [
   { symbol: "NETH25", name: "Netherlands 25", category: "indices", contractSize: 1, pipSize: 1, quote: "EUR", minLot: 0.1, lotStep: 0.1, defaultSlMode: "price" },
   { symbol: "DXY", name: "US Dollar Index", category: "indices", contractSize: 1, pipSize: 0.01, quote: "USD", minLot: 1, lotStep: 1, defaultSlMode: "price" },
 
-  /* ---------- Deriv synthetics (contract size 1, USD — official specs) ---------- */
-  SYN("V10", "Volatility 10 Index", 0.001, 0.5),
-  SYN("V10(1s)", "Volatility 10 (1s) Index", 0.01, 0.5),
-  SYN("V25", "Volatility 25 Index", 0.001, 0.5),
-  SYN("V25(1s)", "Volatility 25 (1s) Index", 0.01, 0.005),
-  SYN("V50", "Volatility 50 Index", 0.0001, 4),
-  SYN("V50(1s)", "Volatility 50 (1s) Index", 0.01, 0.005),
-  SYN("V75", "Volatility 75 Index", 0.01, 0.001),
-  SYN("V75(1s)", "Volatility 75 (1s) Index", 0.01, 0.05),
-  SYN("V100", "Volatility 100 Index", 0.01, 0.5),
-  SYN("V100(1s)", "Volatility 100 (1s) Index", 0.01, 0.2),
-  SYN("V150(1s)", "Volatility 150 (1s) Index", 0.01, 0.1),
-  SYN("V250(1s)", "Volatility 250 (1s) Index", 0.01, 0.5),
+  /* ---------- Deriv volatility indices (MT5 — contract size 1, USD) ---------- */
+  // Standard (2s tick): lower vol uses 3-decimal prices; V50 uses 4-decimal; V75/V100 use 2-decimal.
+  VOL("V10", "Volatility 10 Index", 0.001, 0.5),
+  VOL("V25", "Volatility 25 Index", 0.001, 0.5),
+  VOL("V50", "Volatility 50 Index", 0.0001, 4),
+  VOL("V75", "Volatility 75 Index", 0.01, 0.001),
+  VOL("V100", "Volatility 100 Index", 0.01, 0.5),
+  // 1-second tick variants (2-decimal prices).
+  VOL("V10(1s)", "Volatility 10 (1s) Index", 0.01, 0.5),
+  VOL("V15(1s)", "Volatility 15 (1s) Index", 0.01, 0.2),
+  VOL("V25(1s)", "Volatility 25 (1s) Index", 0.01, 0.005),
+  VOL("V30(1s)", "Volatility 30 (1s) Index", 0.01, 0.2),
+  VOL("V50(1s)", "Volatility 50 (1s) Index", 0.01, 0.005),
+  VOL("V75(1s)", "Volatility 75 (1s) Index", 0.01, 0.05),
+  VOL("V90(1s)", "Volatility 90 (1s) Index", 0.01, 0.2),
+  VOL("V100(1s)", "Volatility 100 (1s) Index", 0.01, 0.2),
+  VOL("V150(1s)", "Volatility 150 (1s) Index", 0.01, 0.1),
+  VOL("V200(1s)", "Volatility 200 (1s) Index", 0.01, 0.02),
+  VOL("V250(1s)", "Volatility 250 (1s) Index", 0.01, 0.5),
+  VOL("V300(1s)", "Volatility 300 (1s) Index", 0.01, 1),
+
+  /* ---------- Other Deriv synthetics (Boom / Crash / Jump / Step) ---------- */
   SYN("BOOM300", "Boom 300 Index", 0.001, 1),
   SYN("BOOM500", "Boom 500 Index", 0.001, 0.2),
   SYN("BOOM1000", "Boom 1000 Index", 0.0001, 0.2),
@@ -246,6 +274,26 @@ const SYMBOL_ALIASES: Record<string, string> = {
   WTIUSD: "USOIL", XTIUSD: "USOIL", USOILSPOT: "USOIL", CRUDEOIL: "USOIL", WTICOUSD: "USOIL",
   XBRUSD: "UKOIL", BRENT: "UKOIL", BCOUSD: "UKOIL",
   NATGASUSD: "NATGAS", NGAS: "NATGAS", XNGUSD: "NATGAS",
+  // Deriv volatility (MT5 / TradingView / internal codes)
+  R10: "V10", R25: "V25", R50: "V50", R75: "V75", R100: "V100",
+  VOL10: "V10", VOL25: "V25", VOL50: "V50", VOL75: "V75", VOL100: "V100",
+  VIX10: "V10", VIX25: "V25", VIX50: "V50", VIX75: "V75", VIX100: "V100",
+  VOLATILITY10: "V10", VOLATILITY25: "V25", VOLATILITY50: "V50",
+  VOLATILITY75: "V75", VOLATILITY100: "V100",
+  VOLATILITY10INDEX: "V10", VOLATILITY25INDEX: "V25", VOLATILITY50INDEX: "V50",
+  VOLATILITY75INDEX: "V75", VOLATILITY100INDEX: "V100",
+  VOLATILITY101SINDEX: "V10(1s)", VOLATILITY151SINDEX: "V15(1s)",
+  VOLATILITY251SINDEX: "V25(1s)", VOLATILITY301SINDEX: "V30(1s)",
+  VOLATILITY501SINDEX: "V50(1s)", VOLATILITY751SINDEX: "V75(1s)",
+  VOLATILITY901SINDEX: "V90(1s)", VOLATILITY1001SINDEX: "V100(1s)",
+  VOLATILITY1501SINDEX: "V150(1s)", VOLATILITY2001SINDEX: "V200(1s)",
+  VOLATILITY2501SINDEX: "V250(1s)", VOLATILITY3001SINDEX: "V300(1s)",
+  V101S: "V10(1s)", V151S: "V15(1s)", V251S: "V25(1s)", V301S: "V30(1s)",
+  V501S: "V50(1s)", V751S: "V75(1s)", V901S: "V90(1s)", V1001S: "V100(1s)",
+  V1501S: "V150(1s)", V2001S: "V200(1s)", V2501S: "V250(1s)", V3001S: "V300(1s)",
+  "1HZ10V": "V10(1s)", "1HZ15V": "V15(1s)", "1HZ25V": "V25(1s)", "1HZ30V": "V30(1s)",
+  "1HZ50V": "V50(1s)", "1HZ75V": "V75(1s)", "1HZ90V": "V90(1s)", "1HZ100V": "V100(1s)",
+  "1HZ150V": "V150(1s)", "1HZ200V": "V200(1s)", "1HZ250V": "V250(1s)", "1HZ300V": "V300(1s)",
 };
 
 const normalize = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");

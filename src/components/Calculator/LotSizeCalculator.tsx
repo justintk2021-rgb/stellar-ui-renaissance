@@ -23,6 +23,7 @@ const CATEGORIES: { id: InstrumentCategory; label: string }[] = [
   { id: "crypto", label: "Crypto" },
   { id: "commodities", label: "Commodities" },
   { id: "indices", label: "Indices" },
+  { id: "volatility", label: "Volatility" },
   { id: "synthetic", label: "Synthetics" },
   { id: "stocks", label: "Stocks" },
   { id: "futures", label: "Futures" },
@@ -400,7 +401,7 @@ export function LotSizeCalculator({ compact = false, initialSymbol }: LotSizeCal
               {liveBadge}
             </div>
             <p className="text-xs text-muted-foreground">
-              Forex, crypto, commodities, indices, Deriv synthetics, stocks & futures
+              Forex, crypto, commodities, indices, Deriv volatility, synthetics, stocks & futures
             </p>
           </div>
         </div>
@@ -811,7 +812,8 @@ export function LotSizeCalculator({ compact = false, initialSymbol }: LotSizeCal
             <p className="text-xs text-muted-foreground leading-relaxed">
               Position Size = Risk Amount ÷ (Stop Loss in {calculations.pipLabel} × {pipName} value per lot).
               {pipName === 'pip' && ' Pip values for non-USD quote currencies are converted with live exchange rates.'}
-              {selectedInstrument?.category === 'synthetic' && ' For Deriv synthetics, P&L = lots × price movement (contract size 1), so entering the SL as a price distance is most accurate.'}
+              {selectedInstrument?.category === 'volatility' && ' For Deriv volatility indices, P&L = lots × price movement (contract size 1). Enter your stop as a price distance for the most accurate lot size.'}
+              {selectedInstrument?.category === 'synthetic' && ' For other Deriv synthetics (Boom/Crash/Jump), P&L = lots × price movement (contract size 1), so entering the SL as a price distance is most accurate.'}
               {' '}The result is rounded down to the broker volume step so your actual risk never exceeds the budget.
             </p>
           </div>
