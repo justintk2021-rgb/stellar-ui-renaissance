@@ -8,6 +8,7 @@ import { WinRatioCard } from "./WinRatioCard";
 import { RecentTrades } from "./RecentTrades";
 import { motion } from "framer-motion";
 import { useActiveBrokerConnectionId, useBrokerPositions, sumFloatingPl } from "@/hooks/useBrokerPositions";
+import { getTradeNetResult } from "@/lib/tradeFormat";
 
 interface StatsGridProps {
   trades: Trade[];
@@ -106,7 +107,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
 
   const stats = trades.reduce(
     (acc, trade) => {
-      const pl = trade.result || 0;
+      const pl = getTradeNetResult(trade);
       acc.net += pl;
       if (pl > 0) {
         acc.wins++;
@@ -125,7 +126,7 @@ export function StatsGrid({ trades }: StatsGridProps) {
   trades.forEach((trade) => {
     const date = trade.date;
     const current = tradingDays.get(date) || 0;
-    tradingDays.set(date, current + (trade.result || 0));
+    tradingDays.set(date, current + getTradeNetResult(trade));
   });
 
   const profitableDays = Array.from(tradingDays.values()).filter((pnl) => pnl > 0).length;
