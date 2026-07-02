@@ -6,8 +6,15 @@
 
 **THE EFFECT OF TEMPERATURE ON THE RATE OF CATALASE ACTIVITY IN POTATO TISSUE**
 
-Candidate Name: _______________________
-Candidate Number: _______________________
+Group Members:
+- Kevaughn Braham
+- Nigel Buckley
+- Shaheen Bhulai
+- Omario Palmer
+- Divondrae Matthews
+- Japhet McLean
+
+Candidate Numbers: _______________________
 Centre Number: _______________________
 Territory: _______________________
 Date of Submission: _______________________
