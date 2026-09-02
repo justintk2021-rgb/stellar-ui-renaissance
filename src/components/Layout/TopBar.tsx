@@ -4,6 +4,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { RankBadge } from "@/components/Dashboard/RankBadge";
 import { Greeting } from "@/components/Layout/Greeting";
 import { cn } from "@/lib/utils";
+import type { AppTheme } from "@/lib/theme";
 
 interface Trade {
   id: string;
@@ -16,8 +17,7 @@ interface Trade {
 interface TopBarProps {
   title: string;
   subtitle: string;
-  theme?: 'dark' | 'light';
-  onThemeChange?: (theme: 'dark' | 'light') => void;
+  onThemeChange?: (theme: AppTheme) => void;
   trades?: Trade[];
   showRank?: boolean;
   greetingName?: string | null;
@@ -26,7 +26,7 @@ interface TopBarProps {
   rightSlot?: ReactNode;
 }
 
-export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], showRank = false, greetingName, profileReady = true, showGreeting = false, rightSlot }: TopBarProps) {
+export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank = false, greetingName, profileReady = true, showGreeting = false, rightSlot }: TopBarProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 pb-3 sm:pb-4 mb-4 sm:mb-6">
       <div className="min-w-0">
@@ -42,10 +42,7 @@ export function TopBar({ title, subtitle, theme, onThemeChange, trades = [], sho
           <RankBadge trades={trades} />
         )}
         {onThemeChange && (
-          <ThemeToggle
-            checked={theme === 'dark'}
-            onCheckedChange={(checked) => onThemeChange(checked ? 'dark' : 'light')}
-          />
+          <ThemeToggle onThemeChange={onThemeChange} />
         )}
         <Badge variant="secondary" className="px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium text-muted-foreground hidden sm:inline-flex">
           ATP • Private

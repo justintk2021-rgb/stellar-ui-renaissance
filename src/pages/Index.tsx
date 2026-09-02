@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, lazy, Suspense, useMemo } fro
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trade, NotebookEntry } from "@/types/trade";
-import { useThemeTransition } from "@/hooks/useThemeTransition";
+import { useThemeChange } from "@/hooks/useThemeTransition";
 import { useTrades } from "@/hooks/useTrades";
 import { useTradingAccounts } from "@/hooks/useTradingAccounts";
 import { useNotebookEntries } from "@/hooks/useNotebookEntries";
@@ -97,7 +97,6 @@ const PREVIEW_USER = {
 
 const Index = () => {
   const navigate = useNavigate();
-  const { setThemeWithTransition } = useThemeTransition();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -415,6 +414,7 @@ const Index = () => {
     setNotebookFont,
   } = useUserSettings(user?.id);
   
+  const handleThemeChange = useThemeChange(setTheme);
   const { theme, accentColor, customColor, customGradient, sidebarCollapsed, notebookFont } = settings;
   
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
@@ -746,7 +746,7 @@ const Index = () => {
       />
 
       <div className={cn(
-        "relative z-10 min-h-screen flex flex-col gap-3 p-2 sm:p-3 pb-24 transition-all duration-300 w-full",
+        "relative z-10 min-h-screen flex flex-col gap-3 p-2 sm:p-3 pb-24 w-full",
         !isChartPage && "lg:p-5 lg:pb-5"
       )}>
         {/* Mobile Header */}
@@ -768,15 +768,12 @@ const Index = () => {
         {/* Theme switch for chart page - bottom center */}
         {isChartPage && (
           <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-10">
-            <ThemeToggle
-              checked={theme === 'dark'}
-              onCheckedChange={(checked) => setThemeWithTransition(checked ? 'dark' : 'light', setTheme)}
-            />
+            <ThemeToggle onThemeChange={handleThemeChange} />
           </div>
         )}
 
         <main className={cn(
-          "flex-1 transition-all duration-300 min-w-0",
+          "flex-1 transition-[margin-left] duration-300 min-w-0",
           !isChartPage && sidebarCollapsed && "lg:ml-24"
         )}>
           <div className={cn(
@@ -790,8 +787,7 @@ const Index = () => {
               <TopBar
                 title={title}
                 subtitle={subtitle}
-                theme={theme}
-                onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)}
+                onThemeChange={handleThemeChange}
                 trades={trades}
                 showRank={currentPage === 'dashboard'}
                 showGreeting={currentPage === 'dashboard'}
@@ -1094,7 +1090,7 @@ const Index = () => {
                   <Suspense fallback={<PageFallback />}>
                     <SettingsView 
                       theme={theme} 
-                      onThemeChange={(newTheme) => setThemeWithTransition(newTheme, setTheme)}
+                      onThemeChange={handleThemeChange}
                       accentColor={accentColor}
                       onAccentColorChange={setAccentColor}
                       userProfile={userProfile}

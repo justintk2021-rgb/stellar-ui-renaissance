@@ -208,7 +208,7 @@ export function DashboardStatsLayout({
           />
         </div>
 
-        {/* Right column — fills height, compact cards + map */}
+        {/* Right column — fills height, compact cards + win ratio */}
         <div className="md:col-span-2 lg:col-span-2 flex flex-col gap-2 min-h-0">
           {rightCards.map((card, i) => (
             <div key={card.label} className="flex-1 min-h-0">
@@ -216,9 +216,13 @@ export function DashboardStatsLayout({
             </div>
           ))}
           <div className="flex-[1.4] min-h-0">
-            <Suspense fallback={<WidgetFallback minHeight={120} />}>
-              <TradingIntelligenceMap trades={trades} compact />
-            </Suspense>
+            <SpotlightCard
+              index={2}
+              contentClassName="p-3 md:p-3.5 flex flex-col min-h-0 h-full"
+              hoverLift={false}
+            >
+              <WinRatioCard trades={trades} compact />
+            </SpotlightCard>
           </div>
         </div>
       </div>
@@ -256,20 +260,23 @@ export function DashboardStatsLayout({
         </DialogContent>
       </Dialog>
 
-      {/* Win ratio + Recent trades */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-5">
-        <SpotlightCard
-          index={1}
-          contentClassName="p-4 md:p-5 flex flex-col min-h-[260px] md:min-h-[280px]"
-          hoverLift={false}
+      {/* Intelligence map + Recent trades */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-5 items-stretch">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="min-h-[280px] lg:min-h-[300px] flex flex-col h-full"
         >
-          <WinRatioCard trades={trades} />
-        </SpotlightCard>
+          <Suspense fallback={<WidgetFallback minHeight={280} />}>
+            <TradingIntelligenceMap trades={trades} compact />
+          </Suspense>
+        </motion.div>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="lg:col-span-3 min-w-0"
+          className="lg:col-span-3 min-w-0 min-h-[280px] lg:min-h-[300px]"
         >
           <Suspense fallback={<WidgetFallback minHeight={280} />}>
             <RecentTrades trades={trades} brokerConnectionId={brokerConnectionId} />

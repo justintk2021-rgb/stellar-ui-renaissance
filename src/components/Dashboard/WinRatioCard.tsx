@@ -4,16 +4,24 @@ import { Info, Settings, Trash2, TrendingUp, TrendingDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCountUp } from "@/hooks/useCountUp";
 import { cn } from "@/lib/utils";
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isWithinInterval, subWeeks, subMonths, subYears } from "date-fns";
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, subYears } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { computeWinLossStats, filterTradesByCloseDateRange } from "@/lib/tradeFormat";
 
 interface WinRatioCardProps {
   trades: Trade[];
+  compact?: boolean;
 }
 
 type TimePeriod = "all" | "year" | "month" | "week" | "day";
 
-function AnimatedPercentage({ value }: { value: number }) {
+function AnimatedPercentage({
+  value,
+  compact = false,
+}: {
+  value: number;
+  compact?: boolean;
+}) {
   const { formattedValue } = useCountUp({
     end: value,
     duration: 1000,
@@ -22,10 +30,14 @@ function AnimatedPercentage({ value }: { value: number }) {
 
   const colorClass = value < 50 ? "text-destructive" : "text-primary";
 
-  return <span className={cn("text-4xl font-bold", colorClass)}>{formattedValue}%</span>;
+  return (
+    <span className={cn("font-bold", compact ? "text-2xl" : "text-4xl", colorClass)}>
+      {formattedValue}%
+    </span>
+  );
 }
 
-export function WinRatioCard({ trades }: WinRatioCardProps) {
+export function WinRatioCard({ trades, compact = false }: WinRatioCardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("month");
   const [animatedValue, setAnimatedValue] = useState(0);
 
@@ -37,16 +49,9 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
 
     // For "all", we don't filter by date
     if (selectedPeriod === "all") {
-      const calculateStats = (filteredTrades: Trade[]) => {
-        const wins = filteredTrades.filter((t) => t.result > 0).length;
-        const losses = filteredTrades.filter((t) => t.result < 0).length;
-        const total = filteredTrades.length;
-        const winRate = total > 0 ? (wins / total) * 100 : 0;
-        return { wins, losses, total, winRate };
-      };
       return {
-        currentStats: calculateStats(trades),
-        previousStats: { wins: 0, losses: 0, total: 0, winRate: 0 },
+        currentStats: computeWinLossStats(trades),
+        previousStats: { wins: 0, losses: 0, breakeven: 0, total: 0, winRate: 0 },
       };
     }
 
@@ -82,27 +87,12 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
         break;
     }
 
-    const filterByPeriod = (start: Date, end: Date) => {
-      return trades.filter((trade) => {
-        const tradeDate = parseISO(trade.date);
-        return isWithinInterval(tradeDate, { start, end });
-      });
-    };
-
-    const currentTrades = filterByPeriod(currentStart, currentEnd);
-    const previousTrades = filterByPeriod(previousStart, previousEnd);
-
-    const calculateStats = (filteredTrades: Trade[]) => {
-      const wins = filteredTrades.filter((t) => t.result > 0).length;
-      const losses = filteredTrades.filter((t) => t.result < 0).length;
-      const total = filteredTrades.length;
-      const winRate = total > 0 ? (wins / total) * 100 : 0;
-      return { wins, losses, total, winRate };
-    };
+    const currentTrades = filterTradesByCloseDateRange(trades, currentStart, currentEnd);
+    const previousTrades = filterTradesByCloseDateRange(trades, previousStart, previousEnd);
 
     return {
-      currentStats: calculateStats(currentTrades),
-      previousStats: calculateStats(previousTrades),
+      currentStats: computeWinLossStats(currentTrades),
+      previousStats: computeWinLossStats(previousTrades),
     };
   }, [trades, selectedPeriod]);
 
@@ -117,8 +107,8 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
   }, [currentStats.winRate]);
 
   // Circular progress values
-  const size = 180;
-  const strokeWidth = 14;
+  const size = compact ? 108 : 180;
+  const strokeWidth = compact ? 9 : 14;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.min(Math.max(animatedValue, 0), 100);
@@ -140,8 +130,8 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
       className="flex flex-col h-full"
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
+      <div className={cn("flex items-center justify-between", compact ? "mb-2" : "mb-4")}>
+        <h3 className={cn("font-semibold flex items-center gap-2", compact ? "text-xs" : "text-sm")}>
           Win Ratio
           <motion.div
             className="w-2 h-2 rounded-full bg-primary"
@@ -170,10 +160,15 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex items-center justify-center gap-8 mb-6 flex-1">
+      <div
+        className={cn(
+          "flex items-center justify-center flex-1",
+          compact ? "flex-col gap-3 mb-3" : "gap-8 mb-6",
+        )}
+      >
         {/* Circular Progress */}
         <motion.div 
-          className="relative" 
+          className="relative shrink-0" 
           style={{ width: size, height: size }}
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -207,41 +202,45 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
           
           {/* Center content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <AnimatedPercentage value={animatedValue} />
-            <span className="text-xs text-muted-foreground mt-1">win rate</span>
+            <AnimatedPercentage value={animatedValue} compact={compact} />
+            <span className={cn("text-muted-foreground mt-0.5", compact ? "text-[10px]" : "text-xs")}>
+              win rate
+            </span>
           </div>
           
         </motion.div>
 
         {/* Stats */}
-        <div className="flex flex-col gap-4">
+        <div className={cn(compact ? "flex w-full justify-center gap-5" : "flex flex-col gap-4")}>
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4 }}
+            className={compact ? "text-center" : undefined}
           >
-            <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+            <p className={cn("text-muted-foreground mb-0.5 flex items-center gap-1.5", compact ? "text-[10px] justify-center" : "text-xs")}>
               <TrendingUp className="w-3 h-3 text-primary" />
-              Winning trades
+              {compact ? "Wins" : "Winning trades"}
             </p>
-            <p className="text-2xl font-bold text-primary">{currentStats.wins}</p>
+            <p className={cn("font-bold text-primary", compact ? "text-lg" : "text-2xl")}>{currentStats.wins}</p>
           </motion.div>
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.5 }}
+            className={compact ? "text-center" : undefined}
           >
-            <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+            <p className={cn("text-muted-foreground mb-0.5 flex items-center gap-1.5", compact ? "text-[10px] justify-center" : "text-xs")}>
               <TrendingDown className="w-3 h-3 text-destructive" />
-              Losing trades
+              {compact ? "Losses" : "Losing trades"}
             </p>
-            <p className="text-2xl font-bold text-destructive">{currentStats.losses}</p>
+            <p className={cn("font-bold text-destructive", compact ? "text-lg" : "text-2xl")}>{currentStats.losses}</p>
           </motion.div>
         </div>
       </div>
 
       {/* Period Tabs */}
-      <div className="flex items-center gap-1 mb-4 p-1 bg-muted/20 rounded-lg">
+      <div className={cn("flex items-center gap-1 p-1 bg-muted/20 rounded-lg", compact ? "mb-2" : "mb-4")}>
         {periods.map((period, index) => (
           <motion.button
             key={period}
@@ -250,7 +249,8 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
             transition={{ delay: 0.1 * index }}
             onClick={() => setSelectedPeriod(period)}
             className={cn(
-              "flex-1 px-3 py-2 text-xs font-medium rounded-md transition-all duration-200 capitalize relative",
+              "flex-1 font-medium rounded-md transition-all duration-200 capitalize relative",
+              compact ? "px-1 py-1.5 text-[10px]" : "px-3 py-2 text-xs",
               selectedPeriod === period
                 ? "text-primary"
                 : "text-muted-foreground hover:text-foreground"
@@ -276,7 +276,7 @@ export function WinRatioCard({ trades }: WinRatioCardProps) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="text-xs text-muted-foreground text-center"
+            className={cn("text-muted-foreground text-center", compact ? "text-[10px] leading-snug" : "text-xs")}
           >
             Your win % is{" "}
             <span className={cn("font-semibold", isImproved ? "text-primary" : "text-destructive")}>

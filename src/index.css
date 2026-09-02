@@ -375,16 +375,15 @@
     color-scheme: dark;
   }
 
-  /* During a theme swap, disable every transition/animation on the page so
-     the swap is instant. The class is added before changing the theme class
-     and removed on the next frame in useThemeTransition. */
-  html.theme-switching,
-  html.theme-switching *,
-  html.theme-switching *::before,
-  html.theme-switching *::after {
-    transition: none !important;
-    animation-duration: 0s !important;
-    animation-delay: 0s !important;
+  /* Theme colors never animate — only motion/layout properties may transition. */
+  html.no-color-transition *,
+  html.no-color-transition *::before,
+  html.no-color-transition *::after {
+    transition-property:
+      transform, opacity, translate, scale, rotate, filter,
+      width, height, min-width, min-height, max-width, max-height,
+      margin, padding, top, left, right, bottom, gap, flex, order, z-index,
+      clip-path !important;
   }
 
   body {

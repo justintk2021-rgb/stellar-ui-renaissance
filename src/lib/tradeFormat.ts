@@ -1,3 +1,4 @@
+import { isWithinInterval } from "date-fns";
 import { Trade } from "@/types/trade";
 
 /**
@@ -159,6 +160,56 @@ export const buildDailyPnLMap = (
 /** Sum net trade P&L at full precision. Always sum first, round/truncate later. */
 export const sumPnL = (trades: Trade[]): number =>
   dedupeTradesForPnL(trades).reduce((acc, t) => acc + getTradeNetResult(t), 0);
+
+const LOCAL_DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+export type WinLossStats = {
+  wins: number;
+  losses: number;
+  breakeven: number;
+  total: number;
+  /** Win rate as a percentage 0–100 */
+  winRate: number;
+};
+
+/** Win/loss counts from deduped trades using broker-accurate net P&L. */
+export const computeWinLossStats = (trades: Trade[]): WinLossStats => {
+  const deduped = dedupeTradesForPnL(trades);
+  let wins = 0;
+  let losses = 0;
+  let breakeven = 0;
+
+  for (const trade of deduped) {
+    const pl = getTradeNetResult(trade);
+    if (pl > 0) wins++;
+    else if (pl < 0) losses++;
+    else breakeven++;
+  }
+
+  const total = deduped.length;
+  return {
+    wins,
+    losses,
+    breakeven,
+    total,
+    winRate: total > 0 ? (wins / total) * 100 : 0,
+  };
+};
+
+/**
+ * Filter deduped trades whose close local date (fallback: open date) falls
+ * within [start, end]. Uses local date keys to match the PnL calendar.
+ */
+export const filterTradesByCloseDateRange = (
+  trades: Trade[],
+  start: Date,
+  end: Date,
+): Trade[] =>
+  dedupeTradesForPnL(trades).filter((trade) => {
+    const key = getTradeCloseLocalDateKey(trade);
+    if (!key || !LOCAL_DATE_KEY.test(key)) return false;
+    return isWithinInterval(parseLocalDateKey(key), { start, end });
+  });
 
 /**
  * Per-trade P&L for UI when the day total was overridden (e.g. broker today gross).

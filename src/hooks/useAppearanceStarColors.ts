@@ -2,11 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { hslComponentsToHex } from "@/lib/colorUtils";
 
 export interface StarfieldColors {
-  /** Neutral star specks */
   starWhite: string;
-  /** Accent-tinted particles (primary) */
   accentPrimary: string;
-  /** Secondary glow (primary-glow / secondary) */
   accentGlow: string;
   isLight: boolean;
 }
@@ -38,7 +35,8 @@ function readStarfieldColors(): StarfieldColors {
 }
 
 /**
- * Keeps starfield (CSS + WebGL) in sync with theme, accent presets, and custom colors.
+ * Keeps starfield (CSS + WebGL) in sync with theme and accent colors.
+ * Listens only to `appearance-change` (debounced in theme.ts) — no MutationObserver.
  */
 export function useAppearanceStarColors(): StarfieldColors {
   const [colors, setColors] = useState<StarfieldColors>(() =>
@@ -57,20 +55,8 @@ export function useAppearanceStarColors(): StarfieldColors {
   }, []);
 
   useEffect(() => {
-    sync();
-    const root = document.documentElement;
-    const observer = new MutationObserver(sync);
-    observer.observe(root, {
-      attributes: true,
-      attributeFilter: ["class", "style"],
-    });
-    window.addEventListener("storage", sync);
     window.addEventListener("appearance-change", sync);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("appearance-change", sync);
-    };
+    return () => window.removeEventListener("appearance-change", sync);
   }, [sync]);
 
   return colors;

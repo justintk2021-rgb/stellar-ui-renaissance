@@ -24,6 +24,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import {
   getTradeLocalDateKey,
+  getTradeNetResult,
   parseLocalDateKey,
   formatPnL,
   sumPnL,
@@ -103,13 +104,19 @@ const groupTradesByDate = (trades: Trade[]) => {
 // Calculate metrics for a group of trades
 const calculateGroupMetrics = (trades: Trade[]) => {
   const totalTrades = trades.length;
-  const winners = trades.filter(t => (t.result || 0) > 0).length;
-  const losers = trades.filter(t => (t.result || 0) < 0).length;
+  const winners = trades.filter((t) => getTradeNetResult(t) > 0).length;
+  const losers = trades.filter((t) => getTradeNetResult(t) < 0).length;
   const winRate = totalTrades > 0 ? (winners / totalTrades) * 100 : 0;
   
   const grossPnL = sumPnL(trades);
-  const totalWins = trades.filter(t => (t.result || 0) > 0).reduce((sum, t) => sum + (t.result || 0), 0);
-  const totalLosses = Math.abs(trades.filter(t => (t.result || 0) < 0).reduce((sum, t) => sum + (t.result || 0), 0));
+  const totalWins = trades
+    .filter((t) => getTradeNetResult(t) > 0)
+    .reduce((sum, t) => sum + getTradeNetResult(t), 0);
+  const totalLosses = Math.abs(
+    trades
+      .filter((t) => getTradeNetResult(t) < 0)
+      .reduce((sum, t) => sum + getTradeNetResult(t), 0),
+  );
   const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? Infinity : 0;
   
   return {

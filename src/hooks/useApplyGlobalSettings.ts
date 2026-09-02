@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { setDocumentTheme, notifyAppearanceChange } from '@/lib/theme';
 
 const ACCENT_CLASSES = [
   'accent-emerald', 'accent-blue', 'accent-purple', 'accent-pink',
@@ -34,16 +35,26 @@ interface AppliedSettings {
   customGradient?: { from: string; to: string } | null;
 }
 
+let lastAppliedKey = '';
+
+function settingsKey(s: AppliedSettings): string {
+  return JSON.stringify({
+    theme: s.theme,
+    accentColor: s.accentColor,
+    customColor: s.customColor,
+    customGradient: s.customGradient,
+  });
+}
+
 export function applySettingsToDocument(s: AppliedSettings) {
+  const key = settingsKey(s);
+  if (key === lastAppliedKey) return;
+  lastAppliedKey = key;
+
   const root = document.documentElement;
   const theme = s.theme === 'light' ? 'light' : 'dark';
 
-  // Only swap the theme class if it actually changed — avoids re-triggering
-  // every CSS recompute on the page when realtime/cache echoes the same value.
-  if (!root.classList.contains(theme)) {
-    root.classList.remove('light', 'dark');
-    root.classList.add(theme);
-  }
+  setDocumentTheme(theme);
 
   const accent = s.accentColor || 'emerald';
   const targetAccentClass = `accent-${accent}`;
@@ -75,7 +86,7 @@ export function applySettingsToDocument(s: AppliedSettings) {
     root.style.setProperty('--sidebar-ring', hsl);
   }
 
-  root.dispatchEvent(new CustomEvent('appearance-change'));
+  notifyAppearanceChange();
 }
 
 const CACHE_KEY = 'atp_settings_cache';
