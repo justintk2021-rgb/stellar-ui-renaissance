@@ -151,7 +151,7 @@ export const buildEquityCurve = (trades: Trade[]): EquityPoint[] => {
   let cum = 0;
   const points: EquityPoint[] = [{ step: 0, cumulative: 0, ts: sorted[0]?.openTime || sorted[0]?.date || "" }];
   sorted.forEach((t, i) => {
-    cum += t.result || 0;
+    cum += getTradeNetResult(t);
     points.push({
       step: i + 1,
       cumulative: cum,
@@ -186,7 +186,7 @@ const groupBy = (trades: Trade[], keyFn: (t: Trade) => string | undefined) => {
 };
 
 const winRateOf = (ts: Trade[]) =>
-  ts.length ? ts.filter((t) => t.result > 0).length / ts.length : 0;
+  ts.length ? ts.filter((t) => getTradeNetResult(t) > 0).length / ts.length : 0;
 
 export const buildGroupBreakdown = (
   aTrades: Trade[],
@@ -229,7 +229,7 @@ export const buildDayOfWeekBuckets = (trades: Trade[]) => {
     if (isNaN(d.getTime())) return;
     const i = d.getDay();
     buckets[i].count += 1;
-    buckets[i].pnl += t.result || 0;
+    buckets[i].pnl += getTradeNetResult(t);
   });
   return buckets;
 };
@@ -248,7 +248,7 @@ export const buildSessionBuckets = (trades: Trade[]) => {
     const h = d.getHours();
     const i = h < 8 ? 0 : h < 13 ? 1 : h < 20 ? 2 : 3;
     buckets[i].count += 1;
-    buckets[i].pnl += t.result || 0;
+    buckets[i].pnl += getTradeNetResult(t);
   });
   return buckets;
 };
@@ -260,8 +260,8 @@ export const bestAndWorst = (trades: Trade[]): { best: Trade | null; worst: Trad
   let best = trades[0];
   let worst = trades[0];
   trades.forEach((t) => {
-    if (t.result > best.result) best = t;
-    if (t.result < worst.result) worst = t;
+    if (getTradeNetResult(t) > getTradeNetResult(best)) best = t;
+    if (getTradeNetResult(t) < getTradeNetResult(worst)) worst = t;
   });
   return { best, worst };
 };
@@ -564,10 +564,10 @@ export const buildCompareInsights = (
   // —— 8. Profit concentration / consistency ——
   const concentrationFor = (trades: Trade[], label: string) => {
     if (trades.length < 4) return null;
-    const winners = trades.filter((t) => t.result > 0).sort((a, b) => b.result - a.result);
+    const winners = trades.filter((t) => getTradeNetResult(t) > 0).sort((a, b) => getTradeNetResult(b) - getTradeNetResult(a));
     if (winners.length < 3) return null;
-    const top3 = winners.slice(0, 3).reduce((s, t) => s + t.result, 0);
-    const grossWin = winners.reduce((s, t) => s + t.result, 0);
+    const top3 = winners.slice(0, 3).reduce((s, t) => s + getTradeNetResult(t), 0);
+    const grossWin = winners.reduce((s, t) => s + getTradeNetResult(t), 0);
     if (grossWin <= 0) return null;
     const share = top3 / grossWin;
     if (share >= 0.65) return { label, share, count: winners.length };
