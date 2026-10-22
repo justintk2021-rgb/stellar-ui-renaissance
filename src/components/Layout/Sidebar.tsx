@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList, CalendarClock, ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList, CalendarClock, ChevronLeft, ChevronRight, Users, Landmark, GraduationCap } from "lucide-react";
 import bookLogo from "@/assets/book-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,6 +18,8 @@ const navItems = [
   { id: 'calendar', label: 'Economic Calendar', icon: CalendarClock },
   { id: 'playbook', label: 'Playbook', icon: ClipboardList },
   { id: 'notebook', label: 'Notebook', icon: NotebookPen },
+  { id: 'propfirm', label: 'Prop Firm', icon: Landmark },
+  { id: 'learning', label: 'Learning', icon: GraduationCap },
   { id: 'community', label: 'Community', icon: Users },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];

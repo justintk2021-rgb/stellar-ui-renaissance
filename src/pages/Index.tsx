@@ -42,6 +42,8 @@ const CustomChart = lazy(() => import("@/components/Chart/CustomChart").then(m =
 const PlaybookView = lazy(() => import("@/components/Playbook/PlaybookView").then(m => ({ default: m.PlaybookView })));
 const EconomicCalendarView = lazy(() => import("@/components/EconomicCalendar/EconomicCalendarView").then(m => ({ default: m.EconomicCalendarView })));
 const CommunityView = lazy(() => import("@/components/Community/CommunityView").then(m => ({ default: m.CommunityView })));
+const PropFirmView = lazy(() => import("@/components/PropFirm/PropFirmView").then(m => ({ default: m.PropFirmView })));
+const LearningView = lazy(() => import("@/components/Learning/LearningView").then(m => ({ default: m.LearningView })));
 
 // 3D animated background is ~600KB (three.js + drei). Lazy-load and only mount on the dashboard tab.
 const AnimatedBackground = lazy(() => import("@/components/Layout/AnimatedBackground").then(m => ({ default: m.AnimatedBackground })));
@@ -71,6 +73,8 @@ const pageInfo: Record<string, { title: string; subtitle: string }> = {
   calendar: { title: 'Economic Calendar', subtitle: 'Live economic news and events' },
   playbook: { title: 'Playbook', subtitle: 'Your trading checklists and rules' },
   notebook: { title: 'Notebook', subtitle: 'Your personal trading notes and journal' },
+  propfirm: { title: 'Prop Firm', subtitle: 'Challenge progress for the selected account' },
+  learning: { title: 'Learning', subtitle: 'Short lessons on risk, execution, and journaling' },
   community: { title: 'Community', subtitle: 'Chat with other traders' },
   settings: { title: 'Settings', subtitle: 'Customize your preferences' },
 };
@@ -710,7 +714,11 @@ const Index = () => {
     setCurrentPage('notebook');
   }, [notebookEntries, trades, saveNotebookEntry]);
 
-  const { title, subtitle } = pageInfo[currentPage];
+  const { title, subtitle } = pageInfo[currentPage] ?? pageInfo.dashboard;
+  const todayKey = formatLocalDateKey(new Date());
+  const brokerTodayPnL = selectedBrokerAccountId && brokerDayTotals.has(todayKey)
+    ? brokerDayTotals.get(todayKey)
+    : undefined;
 
   if (!authReady || !session) {
     return <LoadingScreen />;
@@ -1111,6 +1119,30 @@ const Index = () => {
                 <PageTransition key="chart">
                   <Suspense fallback={<PageFallback />}>
                     <CustomChart />
+                  </Suspense>
+                </PageTransition>
+              )}
+
+              {/* Prop Firm Page */}
+              {currentPage === 'propfirm' && (
+                <PageTransition key="propfirm">
+                  <Suspense fallback={<PageFallback />}>
+                    <PropFirmView
+                      trades={trades}
+                      accountLabel={accountProjection.accountLabel}
+                      startBalance={accountProjection.startBalance}
+                      currentBalance={accountProjection.currentBalance}
+                      todayPnL={brokerTodayPnL}
+                    />
+                  </Suspense>
+                </PageTransition>
+              )}
+
+              {/* Learning Page */}
+              {currentPage === 'learning' && (
+                <PageTransition key="learning">
+                  <Suspense fallback={<PageFallback />}>
+                    <LearningView />
                   </Suspense>
                 </PageTransition>
               )}

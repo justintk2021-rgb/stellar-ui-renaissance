@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList, CalendarClock, Users } from "lucide-react";
+import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList, CalendarClock, Users, Landmark, GraduationCap } from "lucide-react";
 
 interface MobileNavProps {
   currentPage: string;
@@ -14,13 +14,15 @@ const navItems = [
   { id: 'community', label: 'Chat', icon: Users },
   { id: 'playbook', label: 'Playbook', icon: ClipboardList },
   { id: 'notebook', label: 'Notes', icon: NotebookPen },
+  { id: 'propfirm', label: 'Prop Firm', icon: Landmark },
+  { id: 'learning', label: 'Learn', icon: GraduationCap },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
 export function MobileNav({ currentPage, onPageChange }: MobileNavProps) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden glass-strong border-t border-border/50 px-1 py-2 bg-card/95 backdrop-blur-xl safe-area-bottom">
-      <div className="flex justify-between items-center max-w-lg mx-auto">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden glass-strong border-t border-border/50 bg-card/95 backdrop-blur-xl safe-area-bottom">
+      <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide px-1 py-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
@@ -29,7 +31,7 @@ export function MobileNav({ currentPage, onPageChange }: MobileNavProps) {
               key={item.id}
               onClick={() => onPageChange(item.id)}
               className={cn(
-                "relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all duration-200 min-w-0 flex-1",
+                "relative flex shrink-0 flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg transition-all duration-200 min-w-[3.25rem]",
                 isActive
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
