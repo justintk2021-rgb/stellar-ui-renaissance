@@ -25,6 +25,9 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { dedupeTradesForPnL, getTradeNetResult, journalTradeStats } from "@/lib/tradeFormat";
+import { tradeRoiPercent } from "@/lib/tradePnl";
+import { useSelectedAccountBalance } from "@/hooks/useSelectedAccountBalance";
 
 interface Trade {
   id: string;
@@ -32,6 +35,11 @@ interface Trade {
   pair: string;
   result: number;
   checklist_id?: string;
+  swap?: number | null;
+  commission?: number | null;
+  importedFromBroker?: boolean | null;
+  brokerPositionId?: string | null;
+  lastBrokerSyncAt?: string | null;
 }
 
 interface ChecklistMetrics {
@@ -386,6 +394,7 @@ function NotesTab({
 
 // Executed Trades Tab Component with pagination and filtering
 function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
+  const { balance, ready } = useSelectedAccountBalance();
   const [currentPage, setCurrentPage] = useState(1);
   const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -397,9 +406,9 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
     
     // Apply result filter
     if (filter === "wins") {
-      result = result.filter(t => t.result > 0);
+      result = result.filter(t => getTradeNetResult(t) > 0);
     } else if (filter === "losses") {
-      result = result.filter(t => t.result < 0);
+      result = result.filter(t => getTradeNetResult(t) < 0);
     }
     
     // Apply search (by date or symbol)
@@ -433,8 +442,8 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
     setCurrentPage(1);
   }, [filter, searchQuery]);
 
-  const winCount = trades.filter(t => t.result > 0).length;
-  const lossCount = trades.filter(t => t.result < 0).length;
+  const winCount = trades.filter(t => getTradeNetResult(t) > 0).length;
+  const lossCount = trades.filter(t => getTradeNetResult(t) < 0).length;
 
   return (
     <motion.div
@@ -500,9 +509,8 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
         <div className="divide-y divide-border/20">
           <AnimatePresence mode="popLayout">
             {paginatedTrades.map((trade, index) => {
-              // Calculate a mock ROI based on result (you can adjust this based on actual account balance)
-              const mockAccountValue = 10000; // Placeholder - could be passed as prop
-              const roi = (trade.result / mockAccountValue) * 100;
+              const net = getTradeNetResult(trade);
+              const roi = tradeRoiPercent(net, balance);
               
               return (
                 <motion.div
@@ -517,15 +525,15 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
                   <div className="text-sm font-medium">{trade.pair}</div>
                   <div className={cn(
                     "text-sm font-mono font-semibold text-right",
-                    trade.result >= 0 ? "text-primary" : "text-destructive"
+                    net >= 0 ? "text-primary" : "text-destructive"
                   )}>
-                    ${Math.abs(trade.result).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${Math.abs(net).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div className={cn(
                     "text-sm font-mono text-right",
                     roi >= 0 ? "text-primary" : "text-destructive"
                   )}>
-                    {roi >= 0 ? '+' : ''}{roi.toFixed(2)}%
+                    {ready ? `${roi >= 0 ? "+" : ""}${roi.toFixed(2)}%` : "—"}
                   </div>
                 </motion.div>
               );
@@ -623,8 +631,8 @@ export function PlaybookDetailView({
   const [currentNotes, setCurrentNotes] = useState(checklist.notes || '');
 
   // Filter trades for this checklist
-  const checklistTrades = useMemo(() => 
-    trades.filter(t => t.checklist_id === checklist.id),
+  const checklistTrades = useMemo(() =>
+    dedupeTradesForPnL(trades.filter(t => t.checklist_id === checklist.id)),
     [trades, checklist.id]
   );
 
@@ -632,36 +640,27 @@ export function PlaybookDetailView({
   const extendedMetrics = useMemo(() => {
     if (!metrics || checklistTrades.length === 0) return null;
 
-    const winningTrades = checklistTrades.filter(t => t.result > 0);
-    const losingTrades = checklistTrades.filter(t => t.result < 0);
-    
-    const totalWinAmount = winningTrades.reduce((sum, t) => sum + t.result, 0);
-    const totalLossAmount = Math.abs(losingTrades.reduce((sum, t) => sum + t.result, 0));
-    
-    const avgWinner = winningTrades.length > 0 ? totalWinAmount / winningTrades.length : 0;
-    const avgLoser = losingTrades.length > 0 ? totalLossAmount / losingTrades.length : 0;
-    const largestProfit = winningTrades.length > 0 ? Math.max(...winningTrades.map(t => t.result)) : 0;
-    const largestLoss = losingTrades.length > 0 ? Math.min(...losingTrades.map(t => t.result)) : 0;
-    
-    const profitFactor = totalLossAmount > 0 ? totalWinAmount / totalLossAmount : 
-                         totalWinAmount > 0 ? Infinity : 0;
-    
-    // Expectancy: (Win% × Avg Win) - (Loss% × Avg Loss)
-    const winRate = metrics.winRate / 100;
-    const lossRate = 1 - winRate;
-    const expectancy = (winRate * avgWinner) - (lossRate * avgLoser);
-    
-    // R-Multiple (simplified: total PnL / avg loss as risk unit)
-    const rMultiple = avgLoser > 0 ? metrics.totalPnL / avgLoser : 0;
+    const stats = journalTradeStats(checklistTrades);
+    const nets = checklistTrades.map((t) => getTradeNetResult(t));
+    const winningNets = nets.filter((n) => n > 0);
+    const losingNets = nets.filter((n) => n < 0);
+    const largestProfit = winningNets.length > 0 ? Math.max(...winningNets) : 0;
+    const largestLoss = losingNets.length > 0 ? Math.min(...losingNets) : 0;
+    const rMultiple = stats.avgLoss > 0 ? stats.netPnL / stats.avgLoss : 0;
 
     return {
       ...metrics,
-      avgWinner,
-      avgLoser,
+      totalTrades: stats.total,
+      winningTrades: stats.wins,
+      losingTrades: stats.losses,
+      totalPnL: stats.netPnL,
+      winRate: stats.winRate,
+      avgWinner: stats.avgWin,
+      avgLoser: stats.avgLoss,
       largestProfit,
       largestLoss,
-      profitFactor,
-      expectancy,
+      profitFactor: stats.profitFactor,
+      expectancy: stats.expectancy,
       rMultiple,
       rulesFollowed: 100, // Placeholder - could be calculated from checklist completion
       missedTrades: 0, // Placeholder
@@ -678,7 +677,7 @@ export function PlaybookDetailView({
     
     let cumulative = 0;
     return sortedTrades.map((trade, index) => {
-      cumulative += trade.result;
+      cumulative += getTradeNetResult(trade);
       return {
         date: trade.date,
         value: cumulative,

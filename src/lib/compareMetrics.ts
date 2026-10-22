@@ -1,5 +1,11 @@
 import { Trade } from "@/types/trade";
-import { getTradeLocalDateKey, getTradeNetResult, sumPnL } from "@/lib/tradeFormat";
+import {
+  dedupeTradesForPnL,
+  getTradeLocalDateKey,
+  getTradeNetResult,
+  journalTradeStats,
+  sumPnL,
+} from "@/lib/tradeFormat";
 
 /**
  * Aggregated stats for a single comparison period.
@@ -24,34 +30,25 @@ export interface PeriodStats {
 }
 
 export const computePeriodStats = (trades: Trade[]): PeriodStats => {
-  const totalTrades = trades.length;
-  const wins = trades.filter((t) => getTradeNetResult(t) > 0).length;
-  const losses = trades.filter((t) => getTradeNetResult(t) < 0).length;
-  const breakeven = trades.filter((t) => getTradeNetResult(t) === 0).length;
-  const grossWin = trades
-    .filter((t) => getTradeNetResult(t) > 0)
-    .reduce((s, t) => s + getTradeNetResult(t), 0);
-  const grossLoss = trades
-    .filter((t) => getTradeNetResult(t) < 0)
-    .reduce((s, t) => s + getTradeNetResult(t), 0);
-  const netPnL = sumPnL(trades);
-  const winRate = totalTrades ? wins / totalTrades : 0;
-  const avgWin = wins ? grossWin / wins : 0;
-  const avgLoss = losses ? grossLoss / losses : 0;
-  const expectancy = totalTrades ? netPnL / totalTrades : 0;
-  const profitFactor =
-    grossLoss === 0
-      ? grossWin > 0
-        ? Infinity
-        : 0
-      : grossWin / Math.abs(grossLoss);
+  const rows = dedupeTradesForPnL(trades);
+  const stats = journalTradeStats(rows);
+  const totalTrades = stats.total;
+  const wins = stats.wins;
+  const losses = stats.losses;
+  const breakeven = stats.breakeven;
+  const netPnL = stats.netPnL;
+  const winRate = totalTrades ? stats.winRate / 100 : 0;
+  const avgWin = stats.avgWin;
+  const avgLoss = losses ? -stats.avgLoss : 0;
+  const expectancy = stats.expectancy;
+  const profitFactor = stats.profitFactor;
 
-  const dayKeys = new Set(trades.map(getTradeLocalDateKey).filter(Boolean));
+  const dayKeys = new Set(rows.map(getTradeLocalDateKey).filter(Boolean));
   const uniqueDays = dayKeys.size;
   const avgTradesPerDay = uniqueDays ? totalTrades / uniqueDays : 0;
 
   // Holding time
-  const withTimes = trades.filter((t) => t.openTime && t.closeTime);
+  const withTimes = rows.filter((t) => t.openTime && t.closeTime);
   const avgHoldingMinutes = withTimes.length
     ? withTimes.reduce((s, t) => {
         const open = new Date(t.openTime!).getTime();
@@ -60,8 +57,8 @@ export const computePeriodStats = (trades: Trade[]): PeriodStats => {
       }, 0) / withTimes.length
     : 0;
 
-  const longs = trades.filter((t) => t.direction === "Long").length;
-  const shorts = trades.filter((t) => t.direction === "Short").length;
+  const longs = rows.filter((t) => t.direction === "Long").length;
+  const shorts = rows.filter((t) => t.direction === "Short").length;
   const dirTotal = longs + shorts;
   const longRatio = dirTotal ? longs / dirTotal : 0;
   const shortRatio = dirTotal ? shorts / dirTotal : 0;
@@ -143,7 +140,7 @@ export interface EquityPoint {
 }
 
 export const buildEquityCurve = (trades: Trade[]): EquityPoint[] => {
-  const sorted = [...trades].sort((a, b) => {
+  const sorted = [...dedupeTradesForPnL(trades)].sort((a, b) => {
     const ta = a.openTime ? new Date(a.openTime).getTime() : new Date(a.date).getTime();
     const tb = b.openTime ? new Date(b.openTime).getTime() : new Date(b.date).getTime();
     return ta - tb;
@@ -151,7 +148,7 @@ export const buildEquityCurve = (trades: Trade[]): EquityPoint[] => {
   let cum = 0;
   const points: EquityPoint[] = [{ step: 0, cumulative: 0, ts: sorted[0]?.openTime || sorted[0]?.date || "" }];
   sorted.forEach((t, i) => {
-    cum += t.result || 0;
+    cum += getTradeNetResult(t);
     points.push({
       step: i + 1,
       cumulative: cum,
@@ -185,8 +182,10 @@ const groupBy = (trades: Trade[], keyFn: (t: Trade) => string | undefined) => {
   return map;
 };
 
-const winRateOf = (ts: Trade[]) =>
-  ts.length ? ts.filter((t) => t.result > 0).length / ts.length : 0;
+const winRateOf = (ts: Trade[]) => {
+  const rows = dedupeTradesForPnL(ts);
+  return rows.length ? rows.filter((t) => getTradeNetResult(t) > 0).length / rows.length : 0;
+};
 
 export const buildGroupBreakdown = (
   aTrades: Trade[],
@@ -198,8 +197,8 @@ export const buildGroupBreakdown = (
   const allKeys = new Set([...aMap.keys(), ...bMap.keys()]);
   const rows: GroupRow[] = [];
   allKeys.forEach((key) => {
-    const a = aMap.get(key) || [];
-    const b = bMap.get(key) || [];
+    const a = dedupeTradesForPnL(aMap.get(key) || []);
+    const b = dedupeTradesForPnL(bMap.get(key) || []);
     const aPnL = sumPnL(a);
     const bPnL = sumPnL(b);
     rows.push({
@@ -224,12 +223,12 @@ export const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export const buildDayOfWeekBuckets = (trades: Trade[]) => {
   const buckets = Array(7).fill(0).map((_, i) => ({ day: DAY_LABELS[i], count: 0, pnl: 0 }));
-  trades.forEach((t) => {
+  dedupeTradesForPnL(trades).forEach((t) => {
     const d = t.openTime ? new Date(t.openTime) : new Date(t.date);
     if (isNaN(d.getTime())) return;
     const i = d.getDay();
     buckets[i].count += 1;
-    buckets[i].pnl += t.result || 0;
+    buckets[i].pnl += getTradeNetResult(t);
   });
   return buckets;
 };
@@ -242,13 +241,13 @@ export const buildSessionBuckets = (trades: Trade[]) => {
     { label: "NY", count: 0, pnl: 0 },
     { label: "Late", count: 0, pnl: 0 },
   ];
-  trades.forEach((t) => {
+  dedupeTradesForPnL(trades).forEach((t) => {
     const d = t.openTime ? new Date(t.openTime) : new Date(t.date);
     if (isNaN(d.getTime())) return;
     const h = d.getHours();
     const i = h < 8 ? 0 : h < 13 ? 1 : h < 20 ? 2 : 3;
     buckets[i].count += 1;
-    buckets[i].pnl += t.result || 0;
+    buckets[i].pnl += getTradeNetResult(t);
   });
   return buckets;
 };
@@ -256,12 +255,14 @@ export const buildSessionBuckets = (trades: Trade[]) => {
 /* --------------------------- Best / worst trades --------------------------- */
 
 export const bestAndWorst = (trades: Trade[]): { best: Trade | null; worst: Trade | null } => {
-  if (!trades.length) return { best: null, worst: null };
-  let best = trades[0];
-  let worst = trades[0];
-  trades.forEach((t) => {
-    if (t.result > best.result) best = t;
-    if (t.result < worst.result) worst = t;
+  const rows = dedupeTradesForPnL(trades);
+  if (!rows.length) return { best: null, worst: null };
+  let best = rows[0];
+  let worst = rows[0];
+  rows.forEach((t) => {
+    const net = getTradeNetResult(t);
+    if (net > getTradeNetResult(best)) best = t;
+    if (net < getTradeNetResult(worst)) worst = t;
   });
   return { best, worst };
 };
@@ -563,11 +564,14 @@ export const buildCompareInsights = (
 
   // —— 8. Profit concentration / consistency ——
   const concentrationFor = (trades: Trade[], label: string) => {
-    if (trades.length < 4) return null;
-    const winners = trades.filter((t) => t.result > 0).sort((a, b) => b.result - a.result);
+    const rows = dedupeTradesForPnL(trades);
+    if (rows.length < 4) return null;
+    const winners = rows
+      .filter((t) => getTradeNetResult(t) > 0)
+      .sort((a, b) => getTradeNetResult(b) - getTradeNetResult(a));
     if (winners.length < 3) return null;
-    const top3 = winners.slice(0, 3).reduce((s, t) => s + t.result, 0);
-    const grossWin = winners.reduce((s, t) => s + t.result, 0);
+    const top3 = winners.slice(0, 3).reduce((s, t) => s + getTradeNetResult(t), 0);
+    const grossWin = winners.reduce((s, t) => s + getTradeNetResult(t), 0);
     if (grossWin <= 0) return null;
     const share = top3 / grossWin;
     if (share >= 0.65) return { label, share, count: winners.length };

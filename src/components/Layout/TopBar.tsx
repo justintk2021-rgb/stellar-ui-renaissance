@@ -5,14 +5,7 @@ import { RankBadge } from "@/components/Dashboard/RankBadge";
 import { Greeting } from "@/components/Layout/Greeting";
 import { cn } from "@/lib/utils";
 import type { AppTheme } from "@/lib/theme";
-
-interface Trade {
-  id: string;
-  date: string;
-  result: number;
-  checklist_id?: string | null;
-  checklist_state?: any;
-}
+import type { Trade } from "@/types/trade";
 
 interface TopBarProps {
   title: string;

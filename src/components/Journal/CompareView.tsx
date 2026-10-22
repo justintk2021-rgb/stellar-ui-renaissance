@@ -31,7 +31,9 @@ import {
   getTradeCloseLocalDateKey,
   getTradeLocalDateKey,
   getTradeNetResult,
+  dedupeTradesForPnL,
   formatPnL,
+  sumPnL,
 } from "@/lib/tradeFormat";
 import {
   computePeriodStats,
@@ -729,9 +731,15 @@ function buildSinglePeriodAssetRows(trades: Trade[]): AssetRow[] {
   });
   const rows: AssetRow[] = [];
   map.forEach((ts, asset) => {
-    const pnl = ts.reduce((s, t) => s + (t.result || 0), 0);
-    const wins = ts.filter((t) => t.result > 0).length;
-    rows.push({ asset, pnl, trades: ts.length, winRate: ts.length ? wins / ts.length : 0 });
+    const rowsForAsset = dedupeTradesForPnL(ts);
+    const pnl = sumPnL(rowsForAsset);
+    const wins = rowsForAsset.filter((t) => getTradeNetResult(t) > 0).length;
+    rows.push({
+      asset,
+      pnl,
+      trades: rowsForAsset.length,
+      winRate: rowsForAsset.length ? wins / rowsForAsset.length : 0,
+    });
   });
   rows.sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl));
   return rows;
@@ -886,7 +894,7 @@ const TradeHighlight: React.FC<{ trade: Trade | null; type: "best" | "worst" }> 
         <span className="text-sm font-medium truncate">{trade.pair}</span>
       </div>
       <span className={cn("text-sm font-mono tabular-nums font-semibold shrink-0", isBest ? "text-emerald-500" : "text-red-500")}>
-        {formatPnL(trade.result)}
+        {formatPnL(getTradeNetResult(trade))}
       </span>
     </div>
   );

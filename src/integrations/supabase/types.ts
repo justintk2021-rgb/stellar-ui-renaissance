@@ -75,6 +75,7 @@ export type Database = {
           broker_name: string
           connection_status: string | null
           created_at: string
+          day_gross_pnl: Json
           environment: string | null
           id: string
           last_connected_at: string | null
@@ -87,6 +88,10 @@ export type Database = {
           server: string
           sync_interval_seconds: number | null
           token_expiry: string | null
+          today_fees: number | null
+          today_gross_pnl: number | null
+          today_net_pnl: number | null
+          today_pnl_synced_at: string | null
           updated_at: string
           user_id: string
         }
@@ -100,6 +105,7 @@ export type Database = {
           broker_name: string
           connection_status?: string | null
           created_at?: string
+          day_gross_pnl?: Json
           environment?: string | null
           id?: string
           last_connected_at?: string | null
@@ -112,6 +118,10 @@ export type Database = {
           server: string
           sync_interval_seconds?: number | null
           token_expiry?: string | null
+          today_fees?: number | null
+          today_gross_pnl?: number | null
+          today_net_pnl?: number | null
+          today_pnl_synced_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -125,6 +135,7 @@ export type Database = {
           broker_name?: string
           connection_status?: string | null
           created_at?: string
+          day_gross_pnl?: Json
           environment?: string | null
           id?: string
           last_connected_at?: string | null
@@ -137,6 +148,10 @@ export type Database = {
           server?: string
           sync_interval_seconds?: number | null
           token_expiry?: string | null
+          today_fees?: number | null
+          today_gross_pnl?: number | null
+          today_net_pnl?: number | null
+          today_pnl_synced_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -939,6 +954,117 @@ export type Database = {
           sidebar_collapsed?: boolean
           theme?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chart_layouts: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          name: string
+          resolution: string
+          symbol: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          name: string
+          resolution?: string
+          symbol?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          name?: string
+          resolution?: string
+          symbol?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chart_drawings: {
+        Row: {
+          chart_id: string
+          id: string
+          layout_id: string
+          state: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chart_id: string
+          id?: string
+          layout_id: string
+          state?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chart_id?: string
+          id?: string
+          layout_id?: string
+          state?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chart_study_templates: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chart_drawing_templates: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          name: string
+          tool_name: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          name: string
+          tool_name: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          name?: string
+          tool_name?: string
           user_id?: string
         }
         Relationships: []

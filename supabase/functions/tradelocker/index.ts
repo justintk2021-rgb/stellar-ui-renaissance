@@ -108,7 +108,15 @@ function normalizeTokens(data: any): { accessToken: string; refreshToken?: strin
   return { accessToken: String(accessToken), refreshToken: refreshToken ? String(refreshToken) : undefined };
 }
 
-async function tlRefresh(refreshToken: string, environment: string) {
+type TlRefreshResult =
+  | { ok: true; accessToken: string; refreshToken?: string }
+  | { ok: false; permanent: boolean };
+
+function isPermanentRefreshStatus(status: number): boolean {
+  return status === 400 || status === 401 || status === 403;
+}
+
+async function tlRefresh(refreshToken: string, environment: string): Promise<TlRefreshResult> {
   const baseUrl = getBaseUrl(environment);
   try {
     const res = await fetch(`${baseUrl}/auth/jwt/refresh`, {
@@ -119,12 +127,14 @@ async function tlRefresh(refreshToken: string, environment: string) {
     if (!res.ok) {
       const text = await res.text();
       console.error('TL refresh failed:', res.status, text);
-      return null;
+      return { ok: false, permanent: isPermanentRefreshStatus(res.status) };
     }
-    return normalizeTokens(await res.json());
+    const tokens = normalizeTokens(await res.json());
+    if (!tokens) return { ok: false, permanent: true };
+    return { ok: true, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
   } catch (e) {
     console.error('TL refresh error:', e);
-    return null;
+    return { ok: false, permanent: false };
   }
 }
 
@@ -455,22 +465,51 @@ function tokenNeedsRefresh(conn: { token_expiry?: string | null; connection_stat
   return new Date(conn.token_expiry).getTime() - Date.now() < TOKEN_REFRESH_BUFFER_MS;
 }
 
+async function recoverRotatedToken(
+  supabase: any,
+  connectionId: string,
+  previousAccessToken?: string,
+): Promise<{ accessToken: string; refreshToken?: string } | null> {
+  const { data: latest } = await supabase
+    .from('broker_connections')
+    .select('metaapi_account_id, token_expiry')
+    .eq('id', connectionId)
+    .maybeSingle();
+  if (!latest?.token_expiry) return null;
+  if (new Date(latest.token_expiry).getTime() < Date.now() + 60_000) return null;
+
+  let parsed: { accessToken?: string; refreshToken?: string };
+  try {
+    parsed = JSON.parse(latest.metaapi_account_id || '{}');
+  } catch {
+    return null;
+  }
+  if (!parsed.accessToken || parsed.accessToken === previousAccessToken) return null;
+  return { accessToken: parsed.accessToken, refreshToken: parsed.refreshToken };
+}
+
 async function refreshConnectionTokens(
   supabase: any,
   conn: { id: string; environment?: string | null; metaapi_account_id?: string | null },
-): Promise<{ accessToken: string; refreshToken?: string } | null> {
+): Promise<
+  | { ok: true; accessToken: string; refreshToken?: string }
+  | { ok: false; permanent: boolean }
+> {
   let tokenData: { accessToken?: string; refreshToken?: string };
   try {
     tokenData = JSON.parse(conn.metaapi_account_id || '{}');
   } catch {
-    return null;
+    return { ok: false, permanent: true };
   }
 
-  if (!tokenData.refreshToken) return null;
+  if (!tokenData.refreshToken) return { ok: false, permanent: true };
 
   const environment = conn.environment || 'demo';
   const refreshResult = await tlRefresh(tokenData.refreshToken, environment);
-  if (!refreshResult) {
+  if (!refreshResult.ok) {
+    if (!refreshResult.permanent) return { ok: false, permanent: false };
+    const recovered = await recoverRotatedToken(supabase, conn.id, tokenData.accessToken);
+    if (recovered) return { ok: true, ...recovered };
     await supabase
       .from('broker_connections')
       .update({
@@ -479,7 +518,7 @@ async function refreshConnectionTokens(
         updated_at: new Date().toISOString(),
       })
       .eq('id', conn.id);
-    return null;
+    return { ok: false, permanent: true };
   }
 
   const newTokenData = {
@@ -498,7 +537,7 @@ async function refreshConnectionTokens(
     })
     .eq('id', conn.id);
 
-  return newTokenData;
+  return { ok: true, accessToken: newTokenData.accessToken, refreshToken: newTokenData.refreshToken };
 }
 
 async function getValidToken(supabase: any, connectionId: string): Promise<{ accessToken: string; environment: string; accountId: string; accNum: number } | null> {
@@ -525,7 +564,7 @@ async function getValidToken(supabase: any, connectionId: string): Promise<{ acc
 
   if (tokenNeedsRefresh(conn)) {
     const refreshed = await refreshConnectionTokens(supabase, conn);
-    if (!refreshed) return null;
+    if (!refreshed.ok) return null;
     return { accessToken: refreshed.accessToken, environment, accountId, accNum };
   }
 
@@ -773,8 +812,14 @@ serve(async (req) => {
       }
 
       const refreshed = await refreshConnectionTokens(supabase, conn);
-      if (!refreshed) {
-        return jsonResponse({ error: 'Session expired. Please reconnect.' }, 401);
+      if (!refreshed.ok) {
+        if (!refreshed.permanent) {
+          return jsonResponse({
+            error: 'TradeLocker is temporarily unreachable. Will retry.',
+            permanent: false,
+          }, 503);
+        }
+        return jsonResponse({ error: 'Session expired. Please reconnect.', permanent: true }, 401);
       }
 
       return jsonResponse({ success: true, message: 'Session refreshed' });
@@ -1331,7 +1376,7 @@ serve(async (req) => {
 
       // 5. Test token refresh
       const refreshResult = await tlRefresh(tokenData.refreshToken, conn.environment || 'demo');
-      if (refreshResult) {
+      if (refreshResult.ok) {
         results.push({ step: 'Token refresh', status: 'pass', detail: 'Token refreshed successfully' });
         // Save new tokens
         await supabase.from('broker_connections').update({
@@ -1342,7 +1387,13 @@ serve(async (req) => {
         }).eq('id', connectionId);
         tokenData = refreshResult;
       } else {
-        results.push({ step: 'Token refresh', status: 'fail', detail: 'Refresh failed - session expired, reconnect required' });
+        results.push({
+          step: 'Token refresh',
+          status: 'fail',
+          detail: refreshResult.permanent
+            ? 'Refresh failed - session expired, reconnect required'
+            : 'Refresh failed - TradeLocker was unreachable. Try again.',
+        });
         return jsonResponse({ results });
       }
 

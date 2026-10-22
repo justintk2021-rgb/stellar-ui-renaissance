@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Settings2, Check, X } from "lucide-react";
 import { truncateNum } from "@/lib/utils";
+import { dedupeTradesForPnL, getTradeNetResult } from "@/lib/tradeFormat";
 import {
   AreaChart,
   Area,
@@ -63,7 +64,7 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
   };
 
   const { chartData, currentBalance, change } = useMemo(() => {
-    const sortedTrades = [...trades].sort((a, b) => {
+    const sortedTrades = dedupeTradesForPnL(trades).sort((a, b) => {
       if (a.date === b.date) return parseInt(a.id) - parseInt(b.id);
       return a.date < b.date ? -1 : 1;
     });
@@ -72,7 +73,7 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
     const data = [{ name: "Start", value: startBalance, date: "" }];
     
     sortedTrades.forEach((trade, index) => {
-      equity += trade.result || 0;
+      equity += getTradeNetResult(trade);
       data.push({
         name: `Trade ${index + 1}`,
         value: equity,

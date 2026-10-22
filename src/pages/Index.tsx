@@ -21,13 +21,16 @@ import { YearMonthPicker, type MonthSelection } from "@/components/Journal/YearM
 import { AccountSelector } from "@/components/Dashboard/AccountSelector";
 import {
   buildDailyPnLMap,
+  dedupeTradesForPnL,
+  formatLocalDateKey,
   getClientDayBoundsISO,
   getTradeCloseLocalDateKey,
+  getTradeNetResult,
 } from "@/lib/tradeFormat";
 import { queryKeys } from "@/lib/queries/keys";
 import { fetchTradesList } from "@/lib/queries/trades";
 import { useBrokerTodayPnL } from "@/hooks/useBrokerTodayPnL";
-import { repairTradeLockerSessions } from "@/lib/repairBrokerSession";
+import { refreshTradeLockerConnection, repairTradeLockerSessions } from "@/lib/repairBrokerSession";
 
 const TradeTable = lazy(() => import("@/components/Journal/TradeTable").then(m => ({ default: m.TradeTable })));
 const CompareView = lazy(() => import("@/components/Journal/CompareView").then(m => ({ default: m.CompareView })));
@@ -221,9 +224,8 @@ const Index = () => {
         connections.map(async (conn) => {
           try {
             if (conn.connection_status === 'expired') {
-              const refreshRes = await invokeBroker({ action: 'refresh-session', connectionId: conn.id });
-              try { await refreshRes.text(); } catch {}
-              if (!refreshRes.ok) return;
+              const refreshed = await refreshTradeLockerConnection(conn.id);
+              if (refreshed !== 'ok') return;
             }
 
             let res = await invokeBroker({
@@ -235,9 +237,8 @@ const Index = () => {
             });
 
             if (res.status === 401) {
-              const refreshRes = await invokeBroker({ action: 'refresh-session', connectionId: conn.id });
-              try { await refreshRes.text(); } catch {}
-              if (refreshRes.ok) {
+              const refreshed = await refreshTradeLockerConnection(conn.id);
+              if (refreshed === 'ok') {
                 res = await invokeBroker({
                   action: 'sync',
                   connectionId: conn.id,
@@ -245,7 +246,7 @@ const Index = () => {
                   clientDayStart: dayBounds.start,
                   clientDayEnd: dayBounds.end,
                 });
-              } else {
+              } else if (refreshed === 'permanent') {
                 await supabase
                   .from('broker_connections')
                   .update({ connection_status: 'expired', last_error: 'Session expired — reconnect in Settings' })
@@ -443,13 +444,13 @@ const Index = () => {
   const showJournalWinLossFilter = !compareOpen;
 
   const journalBaseTrades = useMemo(() => {
-    if (!journalDateRange) return trades;
+    if (!journalDateRange) return dedupeTradesForPnL(trades);
     const startStr = formatLocalDateKey(journalDateRange.start);
     const endStr = formatLocalDateKey(journalDateRange.end);
-    return trades.filter((t) => {
+    return dedupeTradesForPnL(trades.filter((t) => {
       const d = getTradeCloseLocalDateKey(t);
       return d >= startStr && d <= endStr;
-    });
+    }));
   }, [trades, journalDateRange]);
 
   const journalViewData = useMemo(() => {
@@ -458,8 +459,8 @@ const Index = () => {
       activeFilter === 'all'
         ? journalBaseTrades
         : activeFilter === 'wins'
-          ? journalBaseTrades.filter((t) => t.result > 0)
-          : journalBaseTrades.filter((t) => t.result < 0);
+          ? journalBaseTrades.filter((t) => getTradeNetResult(t) > 0)
+          : journalBaseTrades.filter((t) => getTradeNetResult(t) < 0);
 
     const rangeFiltered = winLossFiltered;
 
@@ -909,8 +910,8 @@ const Index = () => {
                         filter === 'all'
                           ? journalBaseTrades.length
                           : filter === 'wins'
-                            ? journalBaseTrades.filter((t) => t.result > 0).length
-                            : journalBaseTrades.filter((t) => t.result < 0).length;
+                            ? journalBaseTrades.filter((t) => getTradeNetResult(t) > 0).length
+                            : journalBaseTrades.filter((t) => getTradeNetResult(t) < 0).length;
                       return (
                         <motion.button
                           key={filter}

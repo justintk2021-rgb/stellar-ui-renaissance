@@ -363,4 +363,4 @@ supabase secrets set KEY=value        # Set a cloud edge function secret
 
 - **Myfxbook / TradeLocker** broker integrations require valid API credentials from those respective services, set as Supabase edge function secrets.
 
-- Both `package-lock.json` (npm) and `bun.lock` (Bun) are present. Use whichever package manager you prefer — just stay consistent. `npm install` is safest if you're unsure.
+- This repo keeps a single `package-lock.json`. Vercel detects npm when that file is present and ignores Bun lockfiles, so `npm install` is the install path used in production.

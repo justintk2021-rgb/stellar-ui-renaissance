@@ -104,7 +104,6 @@ function BackgroundScene({
         factor={4.8}
         fade
         speed={0.2}
-        color={colors.accentGlow}
       />
       <Stars
         radius={80}
@@ -113,7 +112,6 @@ function BackgroundScene({
         factor={2.1}
         fade
         speed={0.15}
-        color={colors.starWhite}
       />
     </>
   );

@@ -102,7 +102,14 @@ export function useTradingAccounts(userId: string | undefined) {
   const updateAccount = useCallback(async (id: string, accountData: Partial<TradingAccount>) => {
     if (!userId) return false;
     try {
-      const updateData: Record<string, unknown> = {};
+      const updateData: {
+        name?: string;
+        broker?: string | null;
+        starting_balance?: number;
+        goal_balance?: number | null;
+        profit_target?: number | null;
+        currency?: string;
+      } = {};
       if (accountData.name !== undefined) updateData.name = accountData.name;
       if (accountData.broker !== undefined) updateData.broker = accountData.broker;
       if (accountData.starting_balance !== undefined) updateData.starting_balance = accountData.starting_balance;

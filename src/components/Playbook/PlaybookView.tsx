@@ -22,6 +22,25 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useChecklists, ChecklistItem, ChecklistSubItem, ConditionalSubItem, ChecklistType, PercentageType } from "@/hooks/useChecklists";
 import { supabase } from "@/integrations/supabase/client";
+import { journalTradeStats } from "@/lib/tradeFormat";
+
+const PLAYBOOK_TRADE_SELECT =
+  "id, date, pair, result, checklist_id, swap, commission, imported_from_broker, broker_position_id, last_broker_sync_at";
+
+function mapPlaybookTrade(row: Record<string, unknown>) {
+  return {
+    id: String(row.id),
+    date: String(row.date ?? ""),
+    pair: String(row.pair ?? ""),
+    result: Number(row.result) || 0,
+    checklist_id: (row.checklist_id as string | null) ?? undefined,
+    swap: row.swap != null ? Number(row.swap) : 0,
+    commission: row.commission != null ? Number(row.commission) : 0,
+    importedFromBroker: Boolean(row.imported_from_broker),
+    brokerPositionId: (row.broker_position_id as string | null) ?? null,
+    lastBrokerSyncAt: (row.last_broker_sync_at as string | null) ?? null,
+  };
+}
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 interface ChecklistMetrics {
@@ -83,11 +102,11 @@ export function PlaybookView() {
       
       const { data, error } = await supabase
         .from('trades')
-        .select('id, date, pair, result, checklist_id')
+        .select(PLAYBOOK_TRADE_SELECT)
         .not('checklist_id', 'is', null);
       
       if (!error && data) {
-        setAllTrades(data);
+        setAllTrades(data.map((row) => mapPlaybookTrade(row as Record<string, unknown>)));
       }
     };
     
@@ -103,41 +122,30 @@ export function PlaybookView() {
       try {
         const { data: trades, error } = await supabase
           .from('trades')
-          .select('checklist_id, result')
+          .select(PLAYBOOK_TRADE_SELECT)
           .not('checklist_id', 'is', null);
         
         if (error) throw error;
 
-        const metricsMap = new Map<string, { wins: number; losses: number; totalPnL: number }>();
-        
-        (trades || []).forEach((trade: any) => {
-          const checklistId = trade.checklist_id;
-          if (!checklistId) return;
-          
-          const existing = metricsMap.get(checklistId) || { wins: 0, losses: 0, totalPnL: 0 };
-          const result = Number(trade.result);
-          
-          if (result > 0) {
-            existing.wins++;
-          } else if (result < 0) {
-            existing.losses++;
-          }
-          existing.totalPnL += result;
-          
-          metricsMap.set(checklistId, existing);
+        const byChecklist = new Map<string, ReturnType<typeof mapPlaybookTrade>[]>();
+        (trades || []).forEach((row) => {
+          const trade = mapPlaybookTrade(row as Record<string, unknown>);
+          if (!trade.checklist_id) return;
+          const existing = byChecklist.get(trade.checklist_id) || [];
+          existing.push(trade);
+          byChecklist.set(trade.checklist_id, existing);
         });
 
         const metrics: ChecklistMetrics[] = checklists.map(checklist => {
-          const data = metricsMap.get(checklist.id) || { wins: 0, losses: 0, totalPnL: 0 };
-          const total = data.wins + data.losses;
+          const stats = journalTradeStats(byChecklist.get(checklist.id) || []);
           return {
             checklistId: checklist.id,
             checklistName: checklist.name,
-            totalTrades: total,
-            winningTrades: data.wins,
-            losingTrades: data.losses,
-            totalPnL: data.totalPnL,
-            winRate: total > 0 ? (data.wins / total) * 100 : 0,
+            totalTrades: stats.total,
+            winningTrades: stats.wins,
+            losingTrades: stats.losses,
+            totalPnL: stats.netPnL,
+            winRate: stats.winRate,
           };
         });
 

@@ -17,7 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getTradeCloseLocalDateKey, getTradeNetResult } from "@/lib/tradeFormat";
+import { dedupeTradesForPnL, getTradeCloseLocalDateKey, getTradeNetResult } from "@/lib/tradeFormat";
 import type { Trade } from "@/types/trade";
 
 interface RankBadgeProps {
@@ -35,7 +35,8 @@ const RANKS = [
   { name: "Legend", icon: Trophy, color: "from-rose-500 to-pink-500", minPoints: 2500, textColor: "text-rose-500", bgColor: "bg-rose-500/20" },
 ];
 
-function calculateConsistencyScore(trades: Trade[]) {
+function calculateConsistencyScore(inputTrades: Trade[]) {
+  const trades = dedupeTradesForPnL(inputTrades);
   if (trades.length === 0) {
     return {
       totalPoints: 0,
@@ -57,9 +58,9 @@ function calculateConsistencyScore(trades: Trade[]) {
   const checklistUsageRate = (tradesWithChecklist / trades.length) * 100;
   const checklistScore = Math.round(checklistUsageRate * 2);
 
-  const winningTrades = trades.filter(t => t.result > 0).length;
+  const winningTrades = trades.filter(t => getTradeNetResult(t) > 0).length;
   const winRate = (winningTrades / trades.length) * 100;
-  const totalPnL = trades.reduce((sum, t) => sum + t.result, 0);
+  const totalPnL = trades.reduce((sum, t) => sum + getTradeNetResult(t), 0);
   
   const winRatePoints = Math.min(Math.max((winRate - 30) * 5, 0), 150);
   const profitPoints = totalPnL > 0 ? Math.min(Math.log10(totalPnL + 1) * 20, 100) : 0;

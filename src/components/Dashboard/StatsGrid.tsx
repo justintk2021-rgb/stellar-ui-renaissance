@@ -8,6 +8,7 @@ import { WinRatioCard } from "./WinRatioCard";
 import { RecentTrades } from "./RecentTrades";
 import { motion } from "framer-motion";
 import { useActiveBrokerConnectionId, useBrokerPositions, sumFloatingPl } from "@/hooks/useBrokerPositions";
+import { journalTradeStats } from "@/lib/tradeFormat";
 
 interface StatsGridProps {
   trades: Trade[];
@@ -104,55 +105,24 @@ export function StatsGrid({ trades }: StatsGridProps) {
     floatingPl: sumFloatingPl(brokerPositions),
   }), [brokerPositions]);
 
-  const stats = trades.reduce(
-    (acc, trade) => {
-      const pl = trade.result || 0;
-      acc.net += pl;
-      if (pl > 0) {
-        acc.wins++;
-        acc.totalWinAmount += pl;
-      } else if (pl < 0) {
-        acc.losses++;
-        acc.totalLossAmount += Math.abs(pl);
-      }
-      return acc;
-    },
-    { wins: 0, losses: 0, net: 0, totalWinAmount: 0, totalLossAmount: 0 }
-  );
-
-  // Calculate day-based stats
-  const tradingDays = new Map<string, number>();
-  trades.forEach((trade) => {
-    const date = trade.date;
-    const current = tradingDays.get(date) || 0;
-    tradingDays.set(date, current + (trade.result || 0));
-  });
-
-  const profitableDays = Array.from(tradingDays.values()).filter((pnl) => pnl > 0).length;
-  const losingDays = Array.from(tradingDays.values()).filter((pnl) => pnl < 0).length;
-  const totalDays = tradingDays.size;
-  const dayWinRate = totalDays > 0 ? (profitableDays / totalDays) * 100 : 0;
-
-  const winRate = trades.length > 0 ? (stats.wins / trades.length) * 100 : 0;
-  const avgWin = stats.wins > 0 ? stats.totalWinAmount / stats.wins : 0;
-  const avgLoss = stats.losses > 0 ? stats.totalLossAmount / stats.losses : 0;
-  
-  // Profit Factor = Total Wins / Total Losses
-  const profitFactor = stats.totalLossAmount > 0 ? stats.totalWinAmount / stats.totalLossAmount : stats.totalWinAmount > 0 ? Infinity : 0;
+  const stats = journalTradeStats(trades);
+  const avgWin = stats.avgWin;
+  const avgLoss = stats.avgLoss;
+  const profitFactor = stats.profitFactor;
 
   const statCards = [
     {
       label: "Total Net P&L",
-      value: stats.net,
+      value: stats.netPnL,
       prefix: "$",
       decimals: 2,
       tooltip: "Total profit and loss across all trades",
       icon: DollarSign,
-      isPositive: stats.net >= 0,
+      isPositive: stats.netPnL >= 0,
       showTrend: true,
-      colorClass: stats.net >= 0 ? "text-primary" : "text-destructive",
-      bgClass: stats.net >= 0 ? "bg-primary/10" : "bg-destructive/10",
-      extra: `${trades.length} trades total`,
+      colorClass: stats.netPnL >= 0 ? "text-primary" : "text-destructive",
+      bgClass: stats.netPnL >= 0 ? "bg-primary/10" : "bg-destructive/10",
+      extra: `${stats.total} trades total`,
     },
     {
       label: "Open Trades",
