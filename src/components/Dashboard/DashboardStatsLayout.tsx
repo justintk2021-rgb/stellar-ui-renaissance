@@ -21,11 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useBrokerPositions, sumFloatingPl } from "@/hooks/useBrokerPositions";
-import {
-  buildDailyPnLMap,
-  dedupeTradesForPnL,
-  getTradeNetResult,
-} from "@/lib/tradeFormat";
+import { buildDailyPnLMap, journalTradeStats } from "@/lib/tradeFormat";
 
 // Lazy-load heavy widgets so the dashboard top section paints first.
 const RecentTrades = lazy(() =>
@@ -75,27 +71,7 @@ export function DashboardStatsLayout({
     [brokerConnectionId, brokerPositions],
   );
 
-  const pnlTrades = useMemo(() => dedupeTradesForPnL(trades), [trades]);
-
-  const stats = useMemo(
-    () =>
-      pnlTrades.reduce(
-        (acc, trade) => {
-          const pl = getTradeNetResult(trade);
-          acc.net += pl;
-          if (pl > 0) {
-            acc.wins++;
-            acc.totalWinAmount += pl;
-          } else if (pl < 0) {
-            acc.losses++;
-            acc.totalLossAmount += Math.abs(pl);
-          }
-          return acc;
-        },
-        { wins: 0, losses: 0, net: 0, totalWinAmount: 0, totalLossAmount: 0 },
-      ),
-    [pnlTrades],
-  );
+  const stats = useMemo(() => journalTradeStats(trades), [trades]);
 
   // Sparkline series from daily P&L (last 30 trading days).
   const series = useMemo(() => {
@@ -114,26 +90,21 @@ export function DashboardStatsLayout({
     };
   }, [trades, brokerDayTotals]);
 
-  const avgWin = stats.wins > 0 ? stats.totalWinAmount / stats.wins : 0;
-  const avgLoss = stats.losses > 0 ? stats.totalLossAmount / stats.losses : 0;
-  const profitFactor =
-    stats.totalLossAmount > 0
-      ? stats.totalWinAmount / stats.totalLossAmount
-      : stats.totalWinAmount > 0
-      ? Infinity
-      : 0;
+  const avgWin = stats.avgWin;
+  const avgLoss = stats.avgLoss;
+  const profitFactor = stats.profitFactor;
 
   const leftCards = [
     {
       label: "Total Net P&L",
-      value: stats.net,
+      value: stats.netPnL,
       prefix: "$",
       decimals: 2,
       tooltip: "Total profit and loss across all trades. Click to view your equity curve.",
       icon: DollarSign,
-      isPositive: stats.net >= 0,
+      isPositive: stats.netPnL >= 0,
       showTrend: true,
-      extra: `${pnlTrades.length} trades total`,
+      extra: `${stats.total} trades total`,
       sparkData: series.equity,
       onClick: () => setEquityOpen(true),
     },

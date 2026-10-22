@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { Trade } from '@/types/trade';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queries/keys';
@@ -59,8 +60,8 @@ export function useTrades(userId: string | undefined, accountId: string | null =
           notebook: tradeData.notebook || null,
           chart_image: tradeData.chartImage || null,
           checklist_id: tradeData.checklistId || null,
-          checklist_state: tradeData.checklistState as unknown || null,
-        } as Record<string, unknown>)
+          checklist_state: (tradeData.checklistState ?? null) as unknown as Json,
+        })
         .select()
         .single();
       if (error) throw error;
@@ -72,7 +73,18 @@ export function useTrades(userId: string | undefined, accountId: string | null =
 
   const updateTradeMutation = useMutation({
     mutationFn: async ({ id, tradeData }: { id: string; tradeData: Partial<Trade> }) => {
-      const updateData: Record<string, unknown> = {};
+      const updateData: {
+        date?: string;
+        pair?: string;
+        direction?: string;
+        result?: number;
+        session?: string | null;
+        notes?: string | null;
+        notebook?: string | null;
+        chart_image?: string | null;
+        checklist_id?: string | null;
+        checklist_state?: Json | null;
+      } = {};
       if (tradeData.date !== undefined) updateData.date = tradeData.date;
       if (tradeData.pair !== undefined) updateData.pair = tradeData.pair;
       if (tradeData.direction !== undefined) updateData.direction = tradeData.direction;
@@ -82,7 +94,7 @@ export function useTrades(userId: string | undefined, accountId: string | null =
       if (tradeData.notebook !== undefined) updateData.notebook = tradeData.notebook || null;
       if (tradeData.chartImage !== undefined) updateData.chart_image = tradeData.chartImage || null;
       if (tradeData.checklistId !== undefined) updateData.checklist_id = tradeData.checklistId || null;
-      if (tradeData.checklistState !== undefined) updateData.checklist_state = tradeData.checklistState || null;
+      if (tradeData.checklistState !== undefined) updateData.checklist_state = (tradeData.checklistState || null) as unknown as Json;
 
       const { error } = await supabase
         .from('trades')

@@ -63,7 +63,7 @@ export function BrokerManagement({
     loading, accountsLoading, syncing,
     connect, selectAccount, sync, disconnect, reconnect, refreshSession,
     placeOrder, closePosition, modifyPosition, cancelOrder, modifyOrder,
-    updateSyncSettings, runDiagnostic, fetchSyncLogs,
+    updateSyncSettings, runDiagnostic, fetchSyncLogs, fetchAccounts,
   } = useTradeLocker();
 
   const [diagnosticResults, setDiagnosticResults] = useState<DiagnosticResult[] | null>(null);
@@ -544,7 +544,7 @@ export function BrokerManagement({
                 ) : (
                   <div className="text-center space-y-3 py-4">
                     <p className="text-sm text-muted-foreground">No accounts loaded yet.</p>
-                    <Button variant="outline" onClick={() => fetchConnection()}>
+                    <Button variant="outline" onClick={() => { void fetchAccounts(); }}>
                       Reload accounts
                     </Button>
                   </div>
@@ -585,7 +585,7 @@ export function BrokerManagement({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={sync} disabled={syncing}>
+                <Button size="sm" variant="outline" onClick={() => { void sync(); }} disabled={syncing}>
                   {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
                   Sync
                 </Button>

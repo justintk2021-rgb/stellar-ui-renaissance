@@ -15,6 +15,7 @@
  * satisfies IExternalSaveLoadAdapter without importing it.
  */
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 
 /* ----- Structural types (mirror Charting Library shapes) ----- */
 
@@ -141,7 +142,7 @@ export function createChartStorageAdapter(userId: string) {
           state: {
             sources: mapToRecord(state.sources),
             groups: mapToRecord(state.groups),
-          },
+          } as unknown as Json,
         },
         { onConflict: "user_id,layout_id,chart_id" },
       );

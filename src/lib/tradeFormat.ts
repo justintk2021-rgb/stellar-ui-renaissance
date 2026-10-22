@@ -1,5 +1,25 @@
 import { isWithinInterval } from "date-fns";
 import { Trade } from "@/types/trade";
+import {
+  aggregateTradeStats,
+  dedupeTradesForPnL,
+  netTradeResult,
+  type PnlTrade,
+} from "@/lib/tradePnl";
+
+export {
+  accountBalanceForRoi,
+  aggregateTradeStats,
+  dedupeTradesForPnL,
+  FALLBACK_ACCOUNT_BALANCE,
+  netTradeResult,
+  tradeFees,
+  tradeOutcome,
+  tradeRoiPercent,
+  type PnlTrade,
+  type TradeAggregate,
+  type TradeOutcome,
+} from "@/lib/tradePnl";
 
 /**
  * Shared helpers used by the Dashboard PnL Calendar, Journal Trade Log, and
@@ -71,40 +91,13 @@ export function setBrokerPlByPositionCache(map: Map<string, number> | null): voi
   brokerPlByPositionCache = map;
 }
 
-/** P&L for a synced broker trade (per-position history, else journal result). */
-export const getTradeNetResult = (trade: Trade): number => {
-  const posId = trade.brokerPositionId;
-  if (
-    trade.importedFromBroker &&
-    posId &&
-    brokerPlByPositionCache?.has(posId)
-  ) {
-    return brokerPlByPositionCache.get(posId)!;
-  }
-  return trade.result || 0;
-};
+/** P&L for one trade, including the live broker-position cache when it is loaded. */
+export const getTradeNetResult = (trade: PnlTrade): number =>
+  netTradeResult(trade, { brokerPlByPosition: brokerPlByPositionCache });
 
-/** Drop duplicate broker journal rows (same position synced more than once). */
-export const dedupeTradesForPnL = (trades: Trade[]): Trade[] => {
-  const manual: Trade[] = [];
-  const byPosition = new Map<string, Trade>();
-
-  for (const trade of trades) {
-    const posId = trade.brokerPositionId;
-    if (!trade.importedFromBroker || !posId) {
-      manual.push(trade);
-      continue;
-    }
-    const prev = byPosition.get(posId);
-    const prevAt = prev?.lastBrokerSyncAt || "";
-    const nextAt = trade.lastBrokerSyncAt || "";
-    if (!prev || nextAt >= prevAt) {
-      byPosition.set(posId, trade);
-    }
-  }
-
-  return [...manual, ...byPosition.values()];
-};
+/** Deduped net P&L, win rate, and profit factor using the broker cache. */
+export const journalTradeStats = (trades: readonly PnlTrade[]) =>
+  aggregateTradeStats(trades, { brokerPlByPosition: brokerPlByPositionCache });
 
 export type BrokerTodayPnL = {
   net: number;
@@ -158,8 +151,8 @@ export const buildDailyPnLMap = (
 };
 
 /** Sum net trade P&L at full precision. Always sum first, round/truncate later. */
-export const sumPnL = (trades: Trade[]): number =>
-  dedupeTradesForPnL(trades).reduce((acc, t) => acc + getTradeNetResult(t), 0);
+export const sumPnL = (trades: readonly PnlTrade[]): number =>
+  journalTradeStats(trades).netPnL;
 
 const LOCAL_DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -173,26 +166,14 @@ export type WinLossStats = {
 };
 
 /** Win/loss counts from deduped trades using broker-accurate net P&L. */
-export const computeWinLossStats = (trades: Trade[]): WinLossStats => {
-  const deduped = dedupeTradesForPnL(trades);
-  let wins = 0;
-  let losses = 0;
-  let breakeven = 0;
-
-  for (const trade of deduped) {
-    const pl = getTradeNetResult(trade);
-    if (pl > 0) wins++;
-    else if (pl < 0) losses++;
-    else breakeven++;
-  }
-
-  const total = deduped.length;
+export const computeWinLossStats = (trades: readonly PnlTrade[]): WinLossStats => {
+  const stats = journalTradeStats(trades);
   return {
-    wins,
-    losses,
-    breakeven,
-    total,
-    winRate: total > 0 ? (wins / total) * 100 : 0,
+    wins: stats.wins,
+    losses: stats.losses,
+    breakeven: stats.breakeven,
+    total: stats.total,
+    winRate: stats.winRate,
   };
 };
 

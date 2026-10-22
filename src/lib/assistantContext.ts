@@ -1,7 +1,7 @@
 import { Trade } from "@/types/trade";
 import type { TradingAccount } from "@/hooks/useTradingAccounts";
 import { computePeriodStats } from "@/lib/compareMetrics";
-import { getTradeLocalDateKey } from "@/lib/tradeFormat";
+import { dedupeTradesForPnL, getTradeLocalDateKey, getTradeNetResult } from "@/lib/tradeFormat";
 
 export interface AssistantUserContext {
   user: {
@@ -76,7 +76,7 @@ function dayOfWeekPnL(trades: Trade[]): { best?: string; worst?: string } {
     const d = t.openTime ? new Date(t.openTime) : new Date(t.date);
     if (isNaN(d.getTime())) return;
     const dow = d.getDay();
-    buckets.set(dow, (buckets.get(dow) || 0) + (t.result || 0));
+    buckets.set(dow, (buckets.get(dow) || 0) + getTradeNetResult(t));
   });
   if (!buckets.size) return {};
   let bestDow = 0;
@@ -112,15 +112,16 @@ export function buildAssistantContext(input: BuildContextInput): AssistantUserCo
 
   let trading: AssistantUserContext["trading"] = null;
 
-  if (trades.length > 0) {
-    const stats = computePeriodStats(trades);
-    const monthTrades = tradesThisMonth(trades);
+  const rows = dedupeTradesForPnL(trades);
+  if (rows.length > 0) {
+    const stats = computePeriodStats(rows);
+    const monthTrades = tradesThisMonth(rows);
     const monthStats = monthTrades.length ? computePeriodStats(monthTrades) : null;
-    const { best, worst } = dayOfWeekPnL(trades);
+    const { best, worst } = dayOfWeekPnL(rows);
 
     const pairCounts: Record<string, number> = {};
     const sessionCounts: Record<string, number> = {};
-    trades.forEach((t) => {
+    rows.forEach((t) => {
       pairCounts[t.pair] = (pairCounts[t.pair] || 0) + 1;
       if (t.session) sessionCounts[t.session] = (sessionCounts[t.session] || 0) + 1;
     });
@@ -137,10 +138,13 @@ export function buildAssistantContext(input: BuildContextInput): AssistantUserCo
       .map(([s]) => s)
       .join(", ") || "None";
 
-    const recentTrades = [...trades]
+    const recentTrades = [...rows]
       .sort((a, b) => getTradeLocalDateKey(b).localeCompare(getTradeLocalDateKey(a)))
       .slice(0, 8)
-      .map((t) => `${t.date}: ${t.pair} ${t.direction} $${t.result > 0 ? "+" : ""}${t.result.toFixed(2)}`)
+      .map((t) => {
+        const net = getTradeNetResult(t);
+        return `${t.date}: ${t.pair} ${t.direction} $${net > 0 ? "+" : ""}${net.toFixed(2)}`;
+      })
       .join("; ");
 
     trading = {

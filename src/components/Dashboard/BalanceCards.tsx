@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { AccountProjectionCard } from "./AccountProjectionCard";
 import type { ProjectionMetrics } from "@/lib/accountProjection";
+import { dedupeTradesForPnL, getTradeNetResult } from "@/lib/tradeFormat";
 import {
   AreaChart,
   Area,
@@ -185,7 +186,7 @@ export function BalanceCards({
   };
 
   const { currentBalance, balanceChange, balancePercent, profit, fees, highestBalance, sparklineData } = useMemo(() => {
-    const sortedTrades = [...trades].sort((a, b) => {
+    const sortedTrades = dedupeTradesForPnL(trades).sort((a, b) => {
       if (a.date === b.date) return parseInt(a.id) - parseInt(b.id);
       return a.date < b.date ? -1 : 1;
     });
@@ -196,7 +197,7 @@ export function BalanceCards({
     let totalFees = 0;
 
     sortedTrades.forEach((trade) => {
-      const result = trade.result || 0;
+      const result = getTradeNetResult(trade);
       totalNetPnL += result;
       if (result > 0) {
         totalProfit += result;
@@ -216,7 +217,7 @@ export function BalanceCards({
     const equityPoints: number[] = [effectiveStart];
     
     sortedTrades.forEach((trade) => {
-      equity += trade.result || 0;
+      equity += getTradeNetResult(trade);
       highest = Math.max(highest, equity);
       equityPoints.push(equity);
     });

@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queries/keys';
 import { readTradeLockerConnectionId, writeTradeLockerConnectionId } from '@/lib/brokerStorage';
 import { getClientDayBoundsISO } from '@/lib/tradeFormat';
-import { repairTradeLockerSessions } from '@/lib/repairBrokerSession';
+import { refreshTradeLockerConnection, repairTradeLockerSessions } from '@/lib/repairBrokerSession';
 import type { BrokerPosition } from '@/types/broker';
 
 export type { BrokerPosition };
@@ -125,8 +125,8 @@ async function invokeTradeLocker(action: string, body: Record<string, unknown> =
       isSessionError(message)
     ) {
       try {
-        await invokeTradeLockerOnce('refresh-session', { connectionId });
-        return await invokeTradeLockerOnce(action, body);
+        const refreshed = await refreshTradeLockerConnection(connectionId);
+        if (refreshed === 'ok') return await invokeTradeLockerOnce(action, body);
       } catch {
         // Fall through to original error.
       }
@@ -457,7 +457,8 @@ export function useTradeLocker() {
     const connId = connectionId || connection?.id;
     if (!connId) return false;
     try {
-      await invokeTradeLocker('refresh-session', { connectionId: connId });
+      const outcome = await refreshTradeLockerConnection(connId);
+      if (outcome !== 'ok') return false;
       await refetchConnections();
       return true;
     } catch {
@@ -607,6 +608,7 @@ export function useTradeLocker() {
     modifyOrder,
     updateSyncSettings,
     fetchConnection: fetchConnections,
+    fetchAccounts,
     runDiagnostic,
     fetchSyncLogs,
   };

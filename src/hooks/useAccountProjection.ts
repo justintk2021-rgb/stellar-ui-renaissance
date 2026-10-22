@@ -188,7 +188,7 @@ export function useAccountProjection({
       }
       const { error } = await supabase
         .from('broker_accounts')
-        .update({ goal_balance: value } as Record<string, unknown>)
+        .update({ goal_balance: value })
         .eq('id', brokerProjection.id);
       if (error) {
         writeLocalBrokerProjection(brokerAccountExternalId, { goal_balance: value });
@@ -214,7 +214,7 @@ export function useAccountProjection({
       }
       const { error } = await supabase
         .from('broker_accounts')
-        .update({ profit_target: value } as Record<string, unknown>)
+        .update({ profit_target: value })
         .eq('id', brokerProjection.id);
       if (error) {
         writeLocalBrokerProjection(brokerAccountExternalId, { profit_target: value });

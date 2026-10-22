@@ -23,11 +23,12 @@ import {
 } from "@/components/ui/select";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  dedupeTradesForPnL,
   getTradeLocalDateKey,
   getTradeNetResult,
+  journalTradeStats,
   parseLocalDateKey,
   formatPnL,
-  sumPnL,
 } from "@/lib/tradeFormat";
 import { TradeScreenshot } from "./TradeScreenshot";
 
@@ -91,7 +92,7 @@ const getTradeNote = (entries: NotebookEntry[], tradeId: string): NotebookEntry 
 // log matches the dashboard PnL calendar and journal mini calendar exactly.
 const groupTradesByDate = (trades: Trade[]) => {
   const groups: Record<string, Trade[]> = {};
-  trades.forEach(trade => {
+  dedupeTradesForPnL(trades).forEach(trade => {
     const date = getTradeLocalDateKey(trade) || 'Unknown';
     if (!groups[date]) {
       groups[date] = [];
@@ -103,29 +104,14 @@ const groupTradesByDate = (trades: Trade[]) => {
 
 // Calculate metrics for a group of trades
 const calculateGroupMetrics = (trades: Trade[]) => {
-  const totalTrades = trades.length;
-  const winners = trades.filter((t) => getTradeNetResult(t) > 0).length;
-  const losers = trades.filter((t) => getTradeNetResult(t) < 0).length;
-  const winRate = totalTrades > 0 ? (winners / totalTrades) * 100 : 0;
-  
-  const grossPnL = sumPnL(trades);
-  const totalWins = trades
-    .filter((t) => getTradeNetResult(t) > 0)
-    .reduce((sum, t) => sum + getTradeNetResult(t), 0);
-  const totalLosses = Math.abs(
-    trades
-      .filter((t) => getTradeNetResult(t) < 0)
-      .reduce((sum, t) => sum + getTradeNetResult(t), 0),
-  );
-  const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? Infinity : 0;
-  
+  const stats = journalTradeStats(trades);
   return {
-    totalTrades,
-    winners,
-    losers,
-    winRate,
-    grossPnL,
-    profitFactor,
+    totalTrades: stats.total,
+    winners: stats.wins,
+    losers: stats.losses,
+    winRate: stats.winRate,
+    grossPnL: stats.netPnL,
+    profitFactor: stats.profitFactor,
   };
 };
 
@@ -245,7 +231,7 @@ function AnimatedLineChart({ trades, isExpanded }: { trades: Trade[]; isExpanded
   // Build cumulative P&L array starting from 0 (chronological order)
   const cumulative = [0, ...sortedTrades.reduce<number[]>((acc, trade, i) => {
     const prev = i > 0 ? acc[i - 1] : 0;
-    acc.push(prev + (trade.result || 0));
+    acc.push(prev + getTradeNetResult(trade));
     return acc;
   }, [])];
   
@@ -542,7 +528,7 @@ function TradeRowGroup({ date, trades, notebookEntries, checklists, userId, onEd
             {/* Individual Trades */}
             <div className="divide-y divide-border/10">
               {trades.map((trade, tradeIndex) => {
-                const pl = trade.result || 0;
+                const pl = getTradeNetResult(trade);
                 const tradeIsProfit = pl >= 0;
                 const checklist = trade.checklistId 
                   ? checklists.find(c => c.id === trade.checklistId)
@@ -1101,7 +1087,7 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], user
                 </DialogHeader>
                 <div className="flex-1 overflow-y-auto mt-4 space-y-2">
                   {dayTrades.map((trade, i) => {
-                    const pl = trade.result || 0;
+                    const pl = getTradeNetResult(trade);
                     const isProfit = pl >= 0;
                     const hasNote = !!getTradeNote(notebookEntries, trade.id) || !!trade.notes;
                     return (

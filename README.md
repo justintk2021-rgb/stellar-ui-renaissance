@@ -1,73 +1,89 @@
-# Welcome to your Lovable project
+# NSYNC Journal
 
-## Project info
+Personal trading journal for forex, crypto, and stocks. It is a Vite + React 18 + TypeScript app (originally scaffolded with Lovable) backed by Supabase and deployed on Vercel.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Live site: https://stellar-ui-renaissance.vercel.app
 
-## How can I edit this code?
+## Stack
 
-There are several ways of editing your application.
+- React 18, TypeScript, Vite 5
+- Tailwind CSS and shadcn/ui
+- TanStack Query, React Router (`/dashboard` hosts the signed-in app)
+- Supabase Auth, Postgres, Realtime, and Edge Functions
+- TradeLocker sync and a local MetaTrader 5 bridge
 
-**Use Lovable**
+## Setup
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Requirements: Node.js 20+ and npm.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+git clone <your-repo-url>
+cd stellar-ui-renaissance
+npm install
+cp .env.example .env
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The dev server runs at http://localhost:8080.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Production installs use **npm** and `package-lock.json`. Vercel selects npm when that lockfile is present. Do not add a second lockfile.
 
-**Use GitHub Codespaces**
+## Environment variables
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Copy `.env.example` to `.env`. Vite only exposes variables prefixed with `VITE_`.
 
-## What technologies are used for this project?
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `VITE_SUPABASE_URL` | Yes | Project URL, `https://<project-ref>.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase anon / publishable key |
+| `VITE_SUPABASE_PROJECT_ID` | No | Project ref, kept for tooling |
 
-This project is built with:
+Find them in the Supabase dashboard under **Project Settings → API**. Set the same `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` values in the Vercel project for Production and Preview.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+The app stays up without these, but auth and data calls will fail until they are set.
 
-## How can I deploy this project?
+## Scripts
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```sh
+npm run dev        # Vite dev server
+npm run build      # Production build to dist/
+npm run preview    # Preview the production build
+npm run typecheck  # tsc --noEmit
+npm run test       # Unit tests (vitest)
+npm run lint       # ESLint
+```
 
-## Can I connect a custom domain to my Lovable project?
+## Supabase
 
-Yes, you can!
+Schema lives in `supabase/migrations`. Generated database types are in `src/integrations/supabase/types.ts`.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Edge functions in `supabase/functions`:
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+| Function | Role |
+| --- | --- |
+| `tradelocker` | TradeLocker auth, session refresh, account sync, and journal import |
+| `mt5-bridge` | Pairs the local MT5 bridge and stores imported history |
+| `myfxbook` | Myfxbook account import |
+| `trading-assistant` | Journal assistant (OpenAI, `OPENAI_API_KEY`) |
+| `voice-to-text` / `text-to-voice` | Speech features (OpenAI) |
+| `economic-calendar` | Economic calendar proxy |
+| `chart-datafeed` | Chart data proxy |
+
+Serve them locally with the Supabase CLI (`supabase functions serve`) after `supabase start`. Deploy with `supabase functions deploy`. Frontend deploys on Vercel do **not** deploy these functions.
+
+Function secrets (set in the Supabase dashboard or with `supabase secrets set`):
+
+- `OPENAI_API_KEY` for the assistant and voice functions
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are injected by Supabase
+
+## MetaTrader 5 bridge
+
+The Windows bridge in `bridges/mt5` runs beside a local MetaTrader 5 terminal. It logs in with credentials saved in the app, then posts account and history snapshots to the `mt5-bridge` edge function. It imports data only; it does not place trades.
+
+See `bridges/mt5/README.md` for `setup.ps1`, `run.ps1`, and the bridge `.env` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `MT5_BRIDGE_KEY`).
+
+## Trade P&L
+
+Net P&L and win rate come from `src/lib/tradePnl.ts`. UI code should call `getTradeNetResult` / `journalTradeStats` in `src/lib/tradeFormat.ts` (those include the broker position cache) instead of summing `trade.result` directly.
+
+Imported TradeLocker and MT5 rows use the broker's realized P&L and do not add swap/commission a second time. Manual rows add non-zero swap and commission once. Duplicate imports that share a broker position id count once.

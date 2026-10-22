@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
-import { getTradeCloseLocalDateKey, getTradeNetResult } from "@/lib/tradeFormat";
+import { dedupeTradesForPnL, getTradeCloseLocalDateKey, getTradeNetResult } from "@/lib/tradeFormat";
 import type { Trade } from "@/types/trade";
 
 interface RankCardProps {
@@ -24,7 +24,8 @@ const RANKS = [
   { name: "Legend", icon: Trophy, color: "from-rose-500 to-pink-500", minPoints: 2500, textColor: "text-rose-500" },
 ];
 
-function calculateConsistencyScore(trades: Trade[]) {
+function calculateConsistencyScore(inputTrades: Trade[]) {
+  const trades = dedupeTradesForPnL(inputTrades);
   if (trades.length === 0) {
     return {
       totalPoints: 0,

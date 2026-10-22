@@ -4,6 +4,7 @@ import { Trade, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { useTradeDetail } from "@/hooks/useTrades";
 import { cn } from "@/lib/utils";
+import { getTradeNetResult, journalTradeStats } from "@/lib/tradeFormat";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -785,7 +786,15 @@ export function NotebookView({
   };
 
   // Note card colors based on folder marker color (if set), otherwise fall back to a rotating palette
-  const getNoteCardColor = (category: string, index: number) => {
+  const getNoteCardColor = (category: string, index: number): {
+    bg: string;
+    bgDark: string;
+    border: string;
+    borderDark: string;
+    accent: string;
+    text?: string;
+    textDark?: string;
+  } => {
     const fallback = [
       { bg: 'hsl(210, 100%, 95%)', bgDark: 'hsl(210, 50%, 15%)', border: 'hsl(210, 80%, 85%)', borderDark: 'hsl(210, 40%, 25%)', accent: 'hsl(210, 80%, 55%)' },
       { bg: 'hsl(142, 70%, 92%)', bgDark: 'hsl(142, 40%, 12%)', border: 'hsl(142, 60%, 80%)', borderDark: 'hsl(142, 30%, 22%)', accent: 'hsl(142, 70%, 45%)' },
@@ -1095,6 +1104,7 @@ export function NotebookView({
 
   // Find linked trade for entry
   const linkedTrade = selectedEntry?.tradeId ? trades.find((t) => t.id === selectedEntry.tradeId) : null;
+  const linkedNet = linkedTrade ? getTradeNetResult(linkedTrade) : 0;
   const { data: linkedTradeDetail } = useTradeDetail(userId, selectedEntry?.tradeId ?? null);
   const linkedTradeChart = linkedTradeDetail?.chartImage;
   const linkedTradeChecklistState = linkedTradeDetail?.checklistState ?? linkedTrade?.checklistState;
@@ -1104,12 +1114,13 @@ export function NotebookView({
     ? checklists.find(c => c.id === linkedTrade.checklistId) 
     : null;
   // Calculate overall trade stats
+  const tradeStats = journalTradeStats(trades);
   const overallStats = {
-    totalTrades: trades.length,
-    wins: trades.filter(t => t.result > 0).length,
-    losses: trades.filter(t => t.result < 0).length,
-    netPnL: trades.reduce((sum, t) => sum + t.result, 0),
-    winRate: trades.length > 0 ? (trades.filter(t => t.result > 0).length / trades.length) * 100 : 0,
+    totalTrades: tradeStats.total,
+    wins: tradeStats.wins,
+    losses: tradeStats.losses,
+    netPnL: tradeStats.netPnL,
+    winRate: tradeStats.winRate,
   };
 
   // Get font family from NOTEBOOK_FONTS array
@@ -2706,27 +2717,27 @@ export function NotebookView({
         {linkedTrade && !isSelectedEntryInTrash && (
           <div className={cn(
             "w-44 flex-shrink-0 glass rounded-xl border border-border/40 p-3 h-fit",
-            linkedTrade.result >= 0 
+            linkedNet >= 0 
               ? "bg-primary/5" 
               : "bg-destructive/5"
           )}>
             <div className="flex items-center gap-2 mb-3">
               <div className={cn(
                 "w-8 h-8 rounded-lg flex items-center justify-center",
-                linkedTrade.result >= 0 ? "bg-primary/20" : "bg-destructive/20"
+                linkedNet >= 0 ? "bg-primary/20" : "bg-destructive/20"
               )}>
                 <TrendingUp className={cn(
                   "w-4 h-4",
-                  linkedTrade.result >= 0 ? "text-primary" : "text-destructive"
+                  linkedNet >= 0 ? "text-primary" : "text-destructive"
                 )} />
               </div>
               <div>
                 <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Result</div>
                 <div className={cn(
                   "text-lg font-bold font-mono leading-tight",
-                  linkedTrade.result >= 0 ? "text-primary" : "text-destructive"
+                  linkedNet >= 0 ? "text-primary" : "text-destructive"
                 )}>
-                  {linkedTrade.result >= 0 ? "+" : ""}${linkedTrade.result.toFixed(0)}
+                  {linkedNet >= 0 ? "+" : ""}${linkedNet.toFixed(0)}
                 </div>
               </div>
             </div>

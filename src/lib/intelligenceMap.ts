@@ -1,5 +1,5 @@
 import { Trade } from "@/types/trade";
-import { getTradeLocalDateKey } from "@/lib/tradeFormat";
+import { dedupeTradesForPnL, getTradeLocalDateKey, getTradeNetResult } from "@/lib/tradeFormat";
 
 export type NodeType = "trade" | "setup" | "behavior" | "weekday" | "direction";
 export type NodeSentiment = "positive" | "negative" | "neutral";
@@ -150,7 +150,11 @@ function tradeDayOfWeek(t: Trade): number {
   return isNaN(d.getTime()) ? 0 : d.getDay();
 }
 
-export function buildIntelligenceGraph(trades: Trade[]): IntelligenceGraph {
+export function buildIntelligenceGraph(inputTrades: Trade[]): IntelligenceGraph {
+  const trades = dedupeTradesForPnL(inputTrades).map((trade) => ({
+    ...trade,
+    result: getTradeNetResult(trade),
+  }));
   const nodes: MapNode[] = [];
   const edges: MapEdge[] = [];
   const insights: IntelligenceInsight[] = [];
@@ -497,10 +501,11 @@ export function buildIntelligenceGraph(trades: Trade[]): IntelligenceGraph {
     { label: "Momentum Down", sentiment: "negative", visible: momentum === "declining", detail: `Recent slump: ${recentWinRate.toFixed(0)}% WR · $${recentPnl.toFixed(0)} P&L`, priority: 91 },
     { label: "Over-Concentrated", sentiment: "negative", visible: sample >= 15 && concentration >= 55, detail: `${concentration.toFixed(0)}% of trades in ${pairs[0]?.[0] ?? "one pair"}`, priority: 78 },
     { label: "Small Sample", sentiment: "neutral", visible: sample > 0 && sample < 10, detail: `${sample} trades — patterns still forming`, priority: 70 },
-  ].filter((b) => b.visible);
+  ];
+  const visibleBehaviors = behaviorDefs.filter((b) => b.visible);
 
-  behaviorDefs.sort((a, b) => b.priority - a.priority);
-  const topBehaviors = behaviorDefs.slice(0, 8);
+  visibleBehaviors.sort((a, b) => b.priority - a.priority);
+  const topBehaviors = visibleBehaviors.slice(0, 8);
   summary.positiveSignals = topBehaviors.filter((b) => b.sentiment === "positive").length;
   summary.negativeSignals = topBehaviors.filter((b) => b.sentiment === "negative").length;
 

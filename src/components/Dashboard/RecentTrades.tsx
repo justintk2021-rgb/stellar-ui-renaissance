@@ -11,6 +11,7 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useBrokerPositions } from "@/hooks/useBrokerPositions";
 import { subscribeBrokerOrdersRealtime } from "@/lib/queries/broker";
+import { dedupeTradesForPnL, getTradeNetResult } from "@/lib/tradeFormat";
 
 interface RecentTradesProps {
   trades: Trade[];
@@ -105,7 +106,7 @@ export function RecentTrades({ trades, brokerConnectionId = null }: RecentTrades
   }, [brokerConnectionId]);
 
   const recentTrades = useMemo(() =>
-    [...trades]
+    dedupeTradesForPnL(trades)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10),
     [trades]
@@ -160,8 +161,9 @@ export function RecentTrades({ trades, brokerConnectionId = null }: RecentTrades
                   </thead>
                   <tbody>
                     {recentTrades.map((trade, index) => {
-                      const isProfit = trade.result > 0;
-                      const isLoss = trade.result < 0;
+                      const net = getTradeNetResult(trade);
+                      const isProfit = net > 0;
+                      const isLoss = net < 0;
                       return (
                         <motion.tr
                           key={trade.id}
@@ -215,7 +217,7 @@ export function RecentTrades({ trades, brokerConnectionId = null }: RecentTrades
                               "text-xs font-mono font-semibold",
                               isProfit ? "text-primary" : isLoss ? "text-destructive" : "text-muted-foreground"
                             )}>
-                              {isProfit ? '+' : ''}{truncateNum(trade.result)}
+                              {isProfit ? '+' : ''}{truncateNum(net)}
                             </span>
                           </td>
                           <td className="py-3 text-center pr-2">
