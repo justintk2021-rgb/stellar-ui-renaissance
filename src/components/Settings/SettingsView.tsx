@@ -462,7 +462,7 @@ export function SettingsView({
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-6"
+      className="space-y-6 max-w-2xl"
     >
       <motion.div variants={itemVariants}>
         <h2 className="text-2xl font-bold text-foreground flex items-center gap-3">
@@ -621,7 +621,7 @@ export function SettingsView({
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-8"
+      className="space-y-8 max-w-2xl"
     >
       <motion.div variants={itemVariants}>
         <h2 className="text-2xl font-bold text-foreground flex items-center gap-3">
@@ -1269,7 +1269,7 @@ export function SettingsView({
   };
 
   return (
-    <div className="flex gap-8 max-w-5xl mx-auto">
+    <div className="flex gap-8 w-full">
       {/* Sidebar Navigation */}
       <motion.div
         initial={{ opacity: 0, x: -30 }}
@@ -1372,7 +1372,7 @@ export function SettingsView({
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 25, delay: 0.1 }}
-        className="flex-1 max-w-2xl"
+        className="flex-1 min-w-0"
       >
         <div className="relative rounded-2xl overflow-hidden">
           {/* Glass background with animated gradient */}

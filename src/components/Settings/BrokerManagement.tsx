@@ -234,7 +234,7 @@ export function BrokerManagement({
   };
 
   const renderConnectForm = () => (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 w-full">
       <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -251,7 +251,7 @@ export function BrokerManagement({
         </CardHeader>
         <CardContent>
           <form
-            className="space-y-4"
+            className="space-y-4 max-w-xl"
             onSubmit={(e) => {
               e.preventDefault();
               handleConnect();
@@ -410,7 +410,7 @@ export function BrokerManagement({
               <Plus className="w-4 h-4 mr-1" /> Connect another
             </Button>
           </div>
-          <div className="max-w-2xl mx-auto">
+          <div className="w-full">
             <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle>Select Trading Account</CardTitle>
@@ -436,7 +436,7 @@ export function BrokerManagement({
 
     if (connection.active_account_id) {
       return (
-        <div className="max-w-xl mx-auto space-y-4">
+        <div className="w-full max-w-xl space-y-4">
           {!isConnectMode && (
             <div className="flex justify-end">
               <Button variant="outline" size="sm" onClick={() => setShowConnectForm(true)}>
@@ -474,7 +474,7 @@ export function BrokerManagement({
     }
 
     return (
-      <div className="max-w-xl mx-auto">
+      <div className="w-full max-w-xl">
         <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
           <CardContent className="py-8 text-center space-y-4">
             <AlertCircle className="w-10 h-10 text-amber-400 mx-auto" />
@@ -523,7 +523,7 @@ export function BrokerManagement({
       return (
         <div className="space-y-6">
           {renderConnectionSwitcher()}
-          <div className="max-w-2xl mx-auto">
+          <div className="w-full">
             <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle>Select Trading Account</CardTitle>
