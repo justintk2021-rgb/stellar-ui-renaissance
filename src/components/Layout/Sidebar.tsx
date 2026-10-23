@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, NotebookPen, Settings, BarChart3, ClipboardList, CalendarClock, ChevronLeft, ChevronRight, Users, Landmark, GraduationCap } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import bookLogo from "@/assets/book-logo.png";
 import { supabase } from "@/integrations/supabase/client";
+import { appNavItems } from "@/components/Layout/appNav";
 
 interface SidebarProps {
   currentPage: string;
@@ -10,19 +11,6 @@ interface SidebarProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
-
-const navItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'journal', label: 'Journal', icon: BookOpen },
-  { id: 'chart', label: 'Chart', icon: BarChart3 },
-  { id: 'calendar', label: 'Economic Calendar', icon: CalendarClock },
-  { id: 'playbook', label: 'Playbook', icon: ClipboardList },
-  { id: 'notebook', label: 'Notebook', icon: NotebookPen },
-  { id: 'propfirm', label: 'Prop Firm', icon: Landmark },
-  { id: 'learning', label: 'Learning', icon: GraduationCap },
-  { id: 'community', label: 'Community', icon: Users },
-  { id: 'settings', label: 'Settings', icon: Settings },
-];
 
 export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggleCollapse }: SidebarProps) {
   const [userName, setUserName] = useState<string>("NSYNC JOURNAL");
@@ -172,20 +160,23 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 flex flex-col gap-2 overflow-y-auto">
+            <nav className="flex-1 flex flex-col gap-1 overflow-y-auto min-h-0">
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2 px-3">
                 Navigation
               </span>
-              {navItems.map((item) => {
+              {appNavItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentPage === item.id;
 
                 return (
                   <button
                     key={item.id}
-                    onClick={() => onPageChange(item.id)}
+                    onClick={() => {
+                      onPageChange(item.id);
+                      closeSidebar();
+                    }}
                     className={cn(
-                      "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 group",
+                      "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 group",
                       isActive
                         ? "bg-gradient-to-r from-primary/20 to-secondary/10 border border-primary/50 text-foreground shadow-glow-sm"
                         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"

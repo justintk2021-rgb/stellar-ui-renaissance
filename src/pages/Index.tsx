@@ -9,7 +9,6 @@ import { useNotebookEntries } from "@/hooks/useNotebookEntries";
 import { useUserSettings, AccentColor } from "@/hooks/useUserSettings";
 import { useChecklists } from "@/hooks/useChecklists";
 import { Sidebar } from "@/components/Layout/Sidebar";
-import { MobileNav } from "@/components/Layout/MobileNav";
 import { TopBar } from "@/components/Layout/TopBar";
 import { BalanceCards } from "@/components/Dashboard/BalanceCards";
 import { useAccountProjection } from "@/hooks/useAccountProjection";
@@ -755,8 +754,8 @@ const Index = () => {
       />
 
       <div className={cn(
-        "relative z-10 min-h-screen flex flex-col gap-3 p-2 sm:p-3 pb-24 w-full",
-        !isChartPage && "lg:p-5 lg:pb-5"
+        "relative z-10 min-h-screen flex flex-col gap-3 p-2 sm:p-3 w-full",
+        !isChartPage && "lg:p-5"
       )}>
         {/* Mobile Header */}
         {!isChartPage && (
@@ -1159,11 +1158,6 @@ const Index = () => {
             </div>
           </div>
         </main>
-
-        {/* Mobile Navigation - hidden on chart page */}
-        {!isChartPage && (
-          <MobileNav currentPage={currentPage} onPageChange={handlePageChange} />
-        )}
 
       </div>
     </>
