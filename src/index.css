@@ -1191,3 +1191,38 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   clip-path: var(--magicui-theme-vt-clip-from);
 }
 
+/* Projection dropdown — grows from the Target icon and collapses back into it. */
+.projection-popover {
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+
+.projection-popover[data-state="open"] {
+  animation: projection-extend-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+}
+
+.projection-popover[data-state="closed"] {
+  animation: projection-extend-out 0.2s ease-in both !important;
+}
+
+@keyframes projection-extend-in {
+  from {
+    opacity: 0;
+    transform: scale(0.28);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes projection-extend-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.28);
+  }
+}
+
