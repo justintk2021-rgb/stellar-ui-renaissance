@@ -20,6 +20,8 @@ export interface AnimatedBeamProps {
   startYOffset?: number;
   endXOffset?: number;
   endYOffset?: number;
+  /** Freeze the traveling gradient when off-screen or the tab is hidden. */
+  paused?: boolean;
 }
 
 /** Magic UI animated beam: a traveling gradient along a curve between two elements. */
@@ -41,6 +43,7 @@ export function AnimatedBeam({
   startYOffset = 0,
   endXOffset = 0,
   endYOffset = 0,
+  paused = false,
 }: AnimatedBeamProps) {
   const id = useId();
   const [pathD, setPathD] = useState("");
@@ -87,7 +90,7 @@ export function AnimatedBeam({
       width={svgDimensions.width}
       height={svgDimensions.height}
       xmlns="http://www.w3.org/2000/svg"
-      className={cn("pointer-events-none absolute left-0 top-0 transform-gpu stroke-2", className)}
+      className={cn("pointer-events-none absolute left-0 top-0 transform-gpu contain-paint stroke-2", className)}
       viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}
     >
       <path
@@ -120,7 +123,7 @@ export function AnimatedBeam({
             delay,
             duration,
             ease: [0.16, 1, 0.3, 1],
-            repeat: Infinity,
+            repeat: paused ? 0 : Infinity,
             repeatDelay: 0,
           }}
         >
@@ -145,6 +148,7 @@ interface AnimatedPathBeamProps {
   duration?: number;
   delay?: number;
   reverse?: boolean;
+  paused?: boolean;
 }
 
 /** Same traveling-gradient beam, drawn on an existing SVG path. */
@@ -159,6 +163,7 @@ export function AnimatedPathBeam({
   duration = 3,
   delay = 0,
   reverse = false,
+  paused = false,
 }: AnimatedPathBeamProps) {
   const gradientCoordinates = reverse
     ? { x1: ["90%", "-10%"], x2: ["100%", "0%"], y1: ["0%", "0%"], y2: ["0%", "0%"] }
@@ -197,7 +202,7 @@ export function AnimatedPathBeam({
             delay,
             duration,
             ease: [0.16, 1, 0.3, 1],
-            repeat: Infinity,
+            repeat: paused ? 0 : Infinity,
             repeatDelay: 0,
           }}
         >
