@@ -360,6 +360,7 @@
 
   html {
     color-scheme: light dark;
+    view-transition-name: root;
   }
 
   html.light {
@@ -1172,5 +1173,21 @@ input[type="number"]::-webkit-outer-spin-button {
 .tab-hidden .notebook-fab::after,
 .tab-hidden .animate-pulse-glow::after {
   animation-play-state: paused;
+}
+
+/* Magic UI theme toggler — View Transitions clip-path reveal */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-group(root) {
+  animation-duration: var(--magicui-theme-toggle-vt-duration, 520ms);
+  animation-timing-function: ease-in-out;
+}
+
+html[data-magicui-theme-vt="active"]::view-transition-new(root) {
+  clip-path: var(--magicui-theme-vt-clip-from);
 }
 
