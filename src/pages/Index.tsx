@@ -11,6 +11,7 @@ import { useChecklists } from "@/hooks/useChecklists";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { TopBar } from "@/components/Layout/TopBar";
 import { BalanceCards } from "@/components/Dashboard/BalanceCards";
+import { NotificationsMenu } from "@/components/Dashboard/NotificationsCard";
 import { useAccountProjection } from "@/hooks/useAccountProjection";
 import { DashboardStatsLayout } from "@/components/Dashboard/DashboardStatsLayout";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
@@ -827,6 +828,14 @@ const Index = () => {
                       )}
                     </AnimatePresence>
                   </div>
+                ) : undefined}
+                notificationsSlot={currentPage !== 'dashboard' ? (
+                  <NotificationsMenu
+                    trades={trades}
+                    notebookEntries={notebookEntries}
+                    isLoading={tradesLoading}
+                    onOpenJournal={handleOpenJournal}
+                  />
                 ) : undefined}
               />
             )}
