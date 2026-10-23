@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, memo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useBrokerPositions } from "@/hooks/useBrokerPositions";
 import { subscribeBrokerOrdersRealtime } from "@/lib/queries/broker";
@@ -57,7 +57,7 @@ const rowVariants = {
   },
 };
 
-export function RecentTrades({ trades, brokerConnectionId = null }: RecentTradesProps) {
+export const RecentTrades = memo(function RecentTrades({ trades, brokerConnectionId = null }: RecentTradesProps) {
   const { positions: brokerPositions } = useBrokerPositions(brokerConnectionId);
   const [orders, setOrders] = useState<PendingOrder[]>([]);
 
@@ -369,7 +369,7 @@ export function RecentTrades({ trades, brokerConnectionId = null }: RecentTrades
       </Tabs>
     </motion.div>
   );
-}
+});
 
 function EmptyState({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle: string }) {
   return (

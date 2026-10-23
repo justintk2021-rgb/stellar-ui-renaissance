@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { Calculator, DollarSign, Percent, TrendingDown, BarChart3, RefreshCw, Search, Wifi, WifiOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -81,6 +82,7 @@ export function LotSizeCalculator({ compact = false, initialSymbol }: LotSizeCal
   const [slModeOverride, setSlModeOverride] = useState<'pips' | 'price' | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<string>(initialSpec?.symbol ?? "EUR/USD");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const deferredSearch = useDebouncedValue(searchQuery, 160);
   const [activeCategory, setActiveCategory] = useState<InstrumentCategory>(initialSpec?.category ?? "forex");
 
   // Custom instrument settings
@@ -101,12 +103,12 @@ export function LotSizeCalculator({ compact = false, initialSymbol }: LotSizeCal
   const filteredInstruments = useMemo(() => {
     return INSTRUMENTS.filter((i) => {
       const matchesCategory = i.category === activeCategory;
-      const matchesSearch = searchQuery === "" ||
-        i.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        i.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = deferredSearch === "" ||
+        i.symbol.toLowerCase().includes(deferredSearch.toLowerCase()) ||
+        i.name.toLowerCase().includes(deferredSearch.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, deferredSearch]);
 
   /** Live reference price for the selected instrument (when derivable). */
   const livePrice = useMemo(() => {

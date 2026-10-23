@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ArrowLeft, Share2, TrendingUp, TrendingDown, Target, Award, 
@@ -398,6 +399,7 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const deferredSearch = useDebouncedValue(searchQuery, 160);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
 
   // Filter and sort trades
@@ -412,8 +414,8 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
     }
     
     // Apply search (by date or symbol)
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (deferredSearch) {
+      const query = deferredSearch.toLowerCase();
       result = result.filter(t => 
         t.date.toLowerCase().includes(query) ||
         t.pair.toLowerCase().includes(query)
@@ -428,7 +430,7 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
     });
     
     return result;
-  }, [trades, filter, searchQuery, sortOrder]);
+  }, [trades, filter, deferredSearch, sortOrder]);
 
   // Pagination
   const totalPages = Math.ceil(filteredTrades.length / TRADES_PER_PAGE);
@@ -440,7 +442,7 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
   // Reset page when filter changes
   useMemo(() => {
     setCurrentPage(1);
-  }, [filter, searchQuery]);
+  }, [filter, deferredSearch]);
 
   const winCount = trades.filter(t => getTradeNetResult(t) > 0).length;
   const lossCount = trades.filter(t => getTradeNetResult(t) < 0).length;

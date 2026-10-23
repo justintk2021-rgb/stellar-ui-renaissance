@@ -1,6 +1,7 @@
 import { type RefObject, useEffect, useId, useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { usePrefersReducedMotion } from "@/hooks/useAnimationGate";
 
 export interface AnimatedBeamProps {
   className?: string;
@@ -145,6 +146,7 @@ interface AnimatedPathBeamProps {
   duration?: number;
   delay?: number;
   reverse?: boolean;
+  paused?: boolean;
 }
 
 /** Same traveling-gradient beam, drawn on an existing SVG path. */
@@ -159,7 +161,10 @@ export function AnimatedPathBeam({
   duration = 3,
   delay = 0,
   reverse = false,
+  paused = false,
 }: AnimatedPathBeamProps) {
+  const reduced = usePrefersReducedMotion();
+  const freeze = paused || reduced;
   const gradientCoordinates = reverse
     ? { x1: ["90%", "-10%"], x2: ["100%", "0%"], y1: ["0%", "0%"], y2: ["0%", "0%"] }
     : { x1: ["10%", "110%"], x2: ["0%", "100%"], y1: ["0%", "0%"], y2: ["0%", "0%"] };
@@ -182,30 +187,39 @@ export function AnimatedPathBeam({
         strokeLinecap="round"
       />
       <defs>
-        <motion.linearGradient
-          className="transform-gpu"
-          id={id}
-          gradientUnits="userSpaceOnUse"
-          initial={{ x1: "0%", x2: "0%", y1: "0%", y2: "0%" }}
-          animate={{
-            x1: gradientCoordinates.x1,
-            x2: gradientCoordinates.x2,
-            y1: gradientCoordinates.y1,
-            y2: gradientCoordinates.y2,
-          }}
-          transition={{
-            delay,
-            duration,
-            ease: [0.16, 1, 0.3, 1],
-            repeat: Infinity,
-            repeatDelay: 0,
-          }}
-        >
-          <stop stopColor={gradientStartColor} stopOpacity="0" />
-          <stop stopColor={gradientStartColor} />
-          <stop offset="32.5%" stopColor={gradientStopColor} />
-          <stop offset="100%" stopColor={gradientStopColor} stopOpacity="0" />
-        </motion.linearGradient>
+        {freeze ? (
+          <linearGradient id={id} gradientUnits="userSpaceOnUse" x1="10%" x2="100%" y1="0%" y2="0%">
+            <stop stopColor={gradientStartColor} stopOpacity="0" />
+            <stop stopColor={gradientStartColor} />
+            <stop offset="32.5%" stopColor={gradientStopColor} />
+            <stop offset="100%" stopColor={gradientStopColor} stopOpacity="0" />
+          </linearGradient>
+        ) : (
+          <motion.linearGradient
+            className="transform-gpu"
+            id={id}
+            gradientUnits="userSpaceOnUse"
+            initial={{ x1: "0%", x2: "0%", y1: "0%", y2: "0%" }}
+            animate={{
+              x1: gradientCoordinates.x1,
+              x2: gradientCoordinates.x2,
+              y1: gradientCoordinates.y1,
+              y2: gradientCoordinates.y2,
+            }}
+            transition={{
+              delay,
+              duration,
+              ease: [0.16, 1, 0.3, 1],
+              repeat: Infinity,
+              repeatDelay: 0,
+            }}
+          >
+            <stop stopColor={gradientStartColor} stopOpacity="0" />
+            <stop stopColor={gradientStartColor} />
+            <stop offset="32.5%" stopColor={gradientStopColor} />
+            <stop offset="100%" stopColor={gradientStopColor} stopOpacity="0" />
+          </motion.linearGradient>
+        )}
       </defs>
     </g>
   );

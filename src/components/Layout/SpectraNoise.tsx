@@ -133,7 +133,7 @@ export function SpectraNoise({
       alpha: false,
       antialias: false,
       preserveDrawingBuffer: false,
-      powerPreference: "high-performance",
+      powerPreference: "low-power",
     });
     if (!gl) return;
 
@@ -161,7 +161,10 @@ export function SpectraNoise({
 
     let raf = 0;
     let tabVisible = !document.hidden;
+    let onScreen = true;
     let timeValue = 0;
+    let lastFrame = 0;
+    const minFrameMs = 1000 / 30;
 
     const resize = () => {
       const dpr = getEffectiveDpr(resolutionScale);
@@ -198,15 +201,18 @@ export function SpectraNoise({
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     };
 
-    const tick = () => {
+    const tick = (now: number) => {
       raf = 0;
-      if (!tabVisible || pausedRef.current) return;
-      drawFrame();
+      if (!tabVisible || !onScreen || pausedRef.current) return;
+      if (now - lastFrame >= minFrameMs) {
+        lastFrame = now;
+        drawFrame();
+      }
       raf = requestAnimationFrame(tick);
     };
 
     const startLoop = () => {
-      if (raf !== 0 || !tabVisible || pausedRef.current) return;
+      if (raf !== 0 || !tabVisible || !onScreen || pausedRef.current) return;
       raf = requestAnimationFrame(tick);
     };
 
@@ -217,12 +223,23 @@ export function SpectraNoise({
       }
     };
 
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        onScreen = entry.isIntersecting && entry.intersectionRatio > 0;
+        if (onScreen && tabVisible && !pausedRef.current) startLoop();
+        else stopLoop();
+      },
+      { threshold: 0.01 },
+    );
+    io.observe(canvas);
+
     startLoop();
     loopControlRef.current = { start: startLoop, stop: stopLoop };
 
     return () => {
       stopLoop();
       loopControlRef.current = null;
+      io.disconnect();
       window.removeEventListener("resize", resize);
       document.removeEventListener("visibilitychange", onVisibility);
       gl.deleteProgram(program);
@@ -243,7 +260,7 @@ export function SpectraNoise({
         fixed ? "fixed" : "absolute",
         className,
       )}
-      style={{ contain: "strict", willChange: "transform" }}
+      style={{ contain: "strict" }}
       aria-hidden
     >
       <canvas ref={canvasRef} className="w-full h-full block" />
