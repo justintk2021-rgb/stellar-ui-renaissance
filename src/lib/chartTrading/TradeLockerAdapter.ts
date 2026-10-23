@@ -1,5 +1,13 @@
 import { invokeTradeLockerMarket } from "./marketClient";
-import { applyQuoteToCandle, ChartMarketError, defaultHistoryRange } from "./tradeLockerMap";
+import {
+  applyQuoteToCandle,
+  ChartMarketError,
+  defaultHistoryRange,
+  mapBrokerHistory,
+  mapBrokerOrders,
+  mapBrokerPositions,
+  mapRawInstruments,
+} from "./tradeLockerMap";
 import type {
   BrokerAdapter,
   Candle,
@@ -37,11 +45,14 @@ export class TradeLockerAdapter implements BrokerAdapter {
 
   async getInstruments(): Promise<ChartInstrument[]> {
     if (this.instrumentsLoaded) return this.instruments;
-    const data = await invokeTradeLockerMarket<{ instruments: ChartInstrument[] }>({
+    const data = await invokeTradeLockerMarket<{ instruments: unknown[] }>({
       action: "instruments",
       ...this.scope(),
     });
-    this.instruments = data.instruments || [];
+    const raw = data.instruments || [];
+    this.instruments = raw[0] && typeof raw[0] === "object" && "infoRouteId" in (raw[0] as object)
+      ? (raw as ChartInstrument[])
+      : mapRawInstruments(raw);
     this.instrumentsLoaded = true;
     return this.instruments;
   }
@@ -165,30 +176,27 @@ export class TradeLockerAdapter implements BrokerAdapter {
   }
 
   async getPositions(): Promise<Position[]> {
-    const data = await invokeTradeLockerMarket<{ positions: Position[] }>({
+    const data = await invokeTradeLockerMarket<{ positions: unknown[] }>({
       action: "positions",
       ...this.scope(),
     });
-    return (data.positions || []).map((p) => ({
-      ...p,
-      openedAt: p.openedAt > 1e12 ? p.openedAt : p.openedAt * 1000,
-    }));
+    return mapBrokerPositions(data.positions || []) as Position[];
   }
 
   async getOrders(): Promise<PendingOrder[]> {
-    const data = await invokeTradeLockerMarket<{ orders: PendingOrder[] }>({
+    const data = await invokeTradeLockerMarket<{ orders: unknown[] }>({
       action: "orders",
       ...this.scope(),
     });
-    return data.orders || [];
+    return mapBrokerOrders(data.orders || []) as PendingOrder[];
   }
 
   async getHistory(): Promise<HistoryTrade[]> {
-    const data = await invokeTradeLockerMarket<{ history: HistoryTrade[] }>({
+    const data = await invokeTradeLockerMarket<{ history: unknown[] }>({
       action: "history",
       ...this.scope(),
     });
-    return data.history || [];
+    return mapBrokerHistory(data.history || []) as HistoryTrade[];
   }
 
   async closePosition(): Promise<HistoryTrade | null> {

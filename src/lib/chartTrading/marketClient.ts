@@ -10,8 +10,8 @@ export interface MarketRequest {
   [key: string]: unknown;
 }
 
-async function invokeOnce(body: MarketRequest) {
-  const { data, error } = await supabase.functions.invoke("tradelocker-market", { body });
+async function invokeNamed(name: "tradelocker" | "tradelocker-market", body: MarketRequest) {
+  const { data, error } = await supabase.functions.invoke(name, { body });
   if (data?.error) {
     throw classifyMarketError(
       typeof data.status === "number" ? data.status : 0,
@@ -31,6 +31,16 @@ async function invokeOnce(body: MarketRequest) {
     throw classifyMarketError(status, payload);
   }
   return data;
+}
+
+async function invokeOnce(body: MarketRequest) {
+  try {
+    return await invokeNamed("tradelocker", body);
+  } catch (error) {
+    const missing = error instanceof ChartMarketError && error.code === "unavailable";
+    if (!missing) throw error;
+    return await invokeNamed("tradelocker-market", body);
+  }
 }
 
 export async function invokeTradeLockerMarket<T = Record<string, unknown>>(body: MarketRequest): Promise<T> {

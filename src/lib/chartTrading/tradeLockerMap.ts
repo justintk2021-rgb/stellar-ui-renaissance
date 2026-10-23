@@ -41,6 +41,12 @@ export function classifyMarketError(status: number, body: unknown): ChartMarketE
   if (status === 401 || status === 403 || /expired|reconnect|invalid session|unauthorized|refresh token/.test(lower)) {
     return new ChartMarketError("expired", "Session expired. Reconnect TradeLocker in Settings.");
   }
+  if (/failed to send a request to the edge function|unknown action/.test(lower)) {
+    return new ChartMarketError(
+      "unavailable",
+      "Chart market data is not deployed yet. Deploy the latest tradelocker function: supabase functions deploy tradelocker",
+    );
+  }
   if (status === 429 || /rate limit|too many requests|throttle/.test(lower)) {
     return new ChartMarketError("rate_limit", "TradeLocker rate limit reached. Retrying shortly.");
   }
@@ -175,6 +181,104 @@ export function inferPrecision(symbol: string): number {
 
 export function inferMinMove(precision: number): number {
   return Number((10 ** -precision).toFixed(precision));
+}
+
+export function mapRawInstruments(raw: unknown[]): ChartInstrumentLike[] {
+  return (raw || []).map((item) => {
+    const inst = (item || {}) as Record<string, unknown>;
+    const symbol = String(inst.name || inst.symbol || inst.tradableInstrumentId || "");
+    const routes = Array.isArray(inst.routes) ? inst.routes as Array<{ id?: number; type?: string }> : [];
+    const info = routes.find((route) => String(route.type).toUpperCase() === "INFO") || routes[0];
+    const trade = routes.find((route) => String(route.type).toUpperCase() === "TRADE") || routes[0];
+    const precision = inferPrecision(symbol);
+    return {
+      symbol,
+      name: String(inst.name || symbol),
+      type: String(inst.type || ""),
+      tradableInstrumentId: Number(inst.tradableInstrumentId),
+      infoRouteId: Number(info?.id),
+      tradeRouteId: Number(trade?.id),
+      precision,
+      minMove: inferMinMove(precision),
+    };
+  }).filter((inst) => inst.symbol && Number.isFinite(inst.tradableInstrumentId) && Number.isFinite(inst.infoRouteId));
+}
+
+export interface ChartInstrumentLike {
+  symbol: string;
+  name: string;
+  type?: string;
+  tradableInstrumentId?: number;
+  infoRouteId?: number;
+  tradeRouteId?: number;
+  precision: number;
+  minMove: number;
+}
+
+export function mapBrokerPositions(raw: unknown[]): Array<{
+  id: string;
+  symbol: string;
+  side: "buy" | "sell";
+  lots: number;
+  entryPrice: number;
+  stopLoss: number | null;
+  takeProfit: number | null;
+  currentPrice: number;
+  pnl: number;
+  openedAt: number;
+}> {
+  return (raw || []).map((item) => {
+    const row = (item || {}) as Record<string, unknown>;
+    const side = String(row.side || row.type || "buy").toLowerCase();
+    const opened = row.openedAt ?? row.open_time ?? row.openTime;
+    return {
+      id: String(row.id ?? row.position_id ?? row.positionId ?? ""),
+      symbol: String(row.symbol || ""),
+      side: side.includes("sell") || side.includes("short") ? "sell" as const : "buy" as const,
+      lots: Number(row.lots ?? row.volume ?? row.size ?? row.qty) || 0,
+      entryPrice: Number(row.entryPrice ?? row.open_price ?? row.avgPrice) || 0,
+      stopLoss: Number.isFinite(Number(row.stopLoss ?? row.stop_loss)) ? Number(row.stopLoss ?? row.stop_loss) : null,
+      takeProfit: Number.isFinite(Number(row.takeProfit ?? row.take_profit)) ? Number(row.takeProfit ?? row.take_profit) : null,
+      currentPrice: Number(row.currentPrice ?? row.current_price ?? row.entryPrice ?? row.open_price) || 0,
+      pnl: Number(row.pnl ?? row.floating_pl ?? row.unrealizedPl) || 0,
+      openedAt: opened ? new Date(opened as string | number).getTime() || Number(opened) || Date.now() : Date.now(),
+    };
+  }).filter((row) => row.id);
+}
+
+export function mapBrokerOrders(raw: unknown[]) {
+  return (raw || []).map((item) => {
+    const row = (item || {}) as Record<string, unknown>;
+    const type = String(row.type ?? row.order_type ?? "limit").toLowerCase();
+    return {
+      id: String(row.id ?? row.broker_order_id ?? ""),
+      symbol: String(row.symbol || ""),
+      side: String(row.side || "buy").toLowerCase() === "sell" ? "sell" as const : "buy" as const,
+      type: type.includes("stop") ? "stop" as const : "limit" as const,
+      lots: Number(row.lots ?? row.size ?? row.qty) || 0,
+      entryPrice: Number(row.entryPrice ?? row.entry_price ?? row.price) || 0,
+      stopLoss: Number.isFinite(Number(row.stopLoss ?? row.stop_loss)) ? Number(row.stopLoss ?? row.stop_loss) : null,
+      takeProfit: Number.isFinite(Number(row.takeProfit ?? row.take_profit)) ? Number(row.takeProfit ?? row.take_profit) : null,
+      createdAt: row.createdAt ?? row.created_broker_at ? new Date(String(row.createdAt ?? row.created_broker_at)).getTime() : Date.now(),
+    };
+  }).filter((row) => row.id);
+}
+
+export function mapBrokerHistory(raw: unknown[]) {
+  return (raw || []).map((item) => {
+    const row = (item || {}) as Record<string, unknown>;
+    return {
+      id: String(row.id ?? ""),
+      symbol: String(row.symbol || ""),
+      side: String(row.side || "buy").toLowerCase() === "sell" ? "sell" as const : "buy" as const,
+      lots: Number(row.lots ?? row.size) || 0,
+      entryPrice: Number(row.entryPrice ?? row.entry_price) || 0,
+      exitPrice: Number(row.exitPrice ?? row.exit_price) || 0,
+      pnl: Number(row.pnl ?? row.realized_pl) || 0,
+      openedAt: row.openedAt ?? row.opened_at ? new Date(String(row.openedAt ?? row.opened_at)).getTime() : Date.now(),
+      closedAt: row.closedAt ?? row.closed_at ? new Date(String(row.closedAt ?? row.closed_at)).getTime() : Date.now(),
+    };
+  }).filter((row) => row.id);
 }
 
 export function marketErrorMessage(error: unknown): { code: MarketErrorCode; message: string } {

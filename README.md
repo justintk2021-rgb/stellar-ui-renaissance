@@ -61,8 +61,8 @@ Edge functions in `supabase/functions`:
 
 | Function | Role |
 | --- | --- |
-| `tradelocker` | TradeLocker auth, session refresh, account sync, and journal import |
-| `tradelocker-market` | Chart-page proxy for TradeLocker instruments, candles, quotes, and live positions |
+| `tradelocker` | TradeLocker auth, session refresh, account sync, journal import, and Chart candles/quotes |
+| `tradelocker-market` | Optional Chart-only proxy (the Chart page uses `tradelocker` first) |
 | `mt5-bridge` | Pairs the local MT5 bridge and stores imported history |
 | `myfxbook` | Myfxbook account import |
 | `trading-assistant` | Journal assistant (OpenAI, `OPENAI_API_KEY`) |

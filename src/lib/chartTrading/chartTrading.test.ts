@@ -9,6 +9,7 @@ import {
   applyQuoteToCandle,
   classifyMarketError,
   mapHistoryBars,
+  mapRawInstruments,
 } from "./tradeLockerMap";
 import { positionPnl, type ChartBrokerAccount } from "./types";
 
@@ -100,6 +101,26 @@ describe("TradeLocker market mapping", () => {
     expect(classifyMarketError(401, { error: "expired" }).code).toBe("expired");
     expect(classifyMarketError(429, "too many requests").code).toBe("rate_limit");
     expect(classifyMarketError(409, { code: "market_closed", error: "Market is closed" }).code).toBe("market_closed");
+  });
+
+  it("maps TradeLocker instrument routes and missing-function errors", () => {
+    const instruments = mapRawInstruments([
+      {
+        name: "EURUSD",
+        tradableInstrumentId: 42,
+        type: "FOREX",
+        routes: [
+          { id: 11, type: "INFO" },
+          { id: 12, type: "TRADE" },
+        ],
+      },
+    ]);
+    expect(instruments[0]).toMatchObject({
+      symbol: "EURUSD",
+      tradableInstrumentId: 42,
+      infoRouteId: 11,
+    });
+    expect(classifyMarketError(0, "Failed to send a request to the Edge Function").code).toBe("unavailable");
   });
 });
 
