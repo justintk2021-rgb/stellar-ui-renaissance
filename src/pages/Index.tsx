@@ -64,6 +64,31 @@ const PageFallback = () => (
   </div>
 );
 
+function notebookPlainText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+\n/g, "\n")
+    .trim();
+}
+
+function plainTextToNotebookHtml(text: string): string {
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  if (!escaped.trim()) return "";
+  return escaped
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br/>")}</p>`)
+    .join("");
+}
+
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
   journal: { title: 'Journal', subtitle: 'Log and manage your trades' },
@@ -708,28 +733,36 @@ const Index = () => {
     await deleteNotebookEntry(id);
   }, [deleteNotebookEntry]);
 
-  const handleSelectForNotebook = useCallback(async (id: string) => {
-    // If no note exists for this trade yet, create a blank one so the user can write
+  const handleSelectForNotebook = useCallback(async (id: string, quickNotes?: string) => {
+    const trade = trades.find(t => t.id === id);
     const existing = notebookEntries.find(e => e.tradeId === id && !e.isDeleted);
-    if (!existing) {
-      const trade = trades.find(t => t.id === id);
-      if (trade) {
-        const newEntry: NotebookEntry = {
-          id: crypto.randomUUID(),
-          title: `${trade.pair} - ${trade.direction} Trade`,
-          content: '',
-          category: 'trade-notes',
-          date: trade.date,
-          tradeId: trade.id,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        await saveNotebookEntry(newEntry);
-      }
+    const seed = (quickNotes ?? trade?.notes ?? "").trim();
+    const html = plainTextToNotebookHtml(seed);
+    const now = new Date().toISOString();
+
+    if (!existing && trade) {
+      const newEntry: NotebookEntry = {
+        id: crypto.randomUUID(),
+        title: `${trade.pair} - ${trade.direction} Trade`,
+        content: html,
+        category: 'trade-notes',
+        date: trade.date,
+        tradeId: trade.id,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await saveNotebookEntry(newEntry);
+    } else if (existing && seed && !notebookPlainText(existing.content).trim()) {
+      await saveNotebookEntry({ ...existing, content: html, updatedAt: now });
     }
+
+    if (seed) {
+      await updateTrade(id, { notes: seed });
+    }
+
     setSelectedTradeId(id);
     setCurrentPage('notebook');
-  }, [notebookEntries, trades, saveNotebookEntry]);
+  }, [notebookEntries, trades, saveNotebookEntry, updateTrade]);
 
   const { title, subtitle } = pageInfo[currentPage] ?? pageInfo.dashboard;
   const todayKey = formatLocalDateKey(new Date());
@@ -1006,6 +1039,7 @@ const Index = () => {
                               }}
                               onDelete={handleDeleteTrade}
                               onSelectForNotebook={handleSelectForNotebook}
+                              onOpenPlaybook={() => setCurrentPage('playbook')}
                               onUpdateTrade={async (id, updates) => {
                                 await updateTrade(id, updates);
                               }}

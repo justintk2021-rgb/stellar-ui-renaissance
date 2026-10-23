@@ -4,7 +4,7 @@ import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, ClipboardCheck, ArrowLeft, Clock, LogIn, LogOut, Timer, Check, History } from "lucide-react";
+import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, ClipboardCheck, ArrowLeft, Clock, LogIn, LogOut, Timer, Check, History, BookMarked } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -51,7 +51,8 @@ interface TradeTableProps {
   userId?: string;
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
-  onSelectForNotebook: (id: string) => void;
+  onSelectForNotebook: (id: string, quickNotes?: string) => void;
+  onOpenPlaybook?: () => void;
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void | Promise<void>;
   onClearAll?: () => void;
   focusTradeId?: string | null;
@@ -429,7 +430,7 @@ function TradeEntry({ trade, checklists, userId, onEdit, onDelete, onViewNotes, 
   );
 }
 
-export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onUpdateTrade, focusTradeId, openNotesOnFocus = false, onFocusHandled }: TradeTableProps) {
+export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onOpenPlaybook, onUpdateTrade, focusTradeId, openNotesOnFocus = false, onFocusHandled }: TradeTableProps) {
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [dayTrades, setDayTrades] = useState<Trade[] | null>(null);
@@ -495,10 +496,17 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
     };
   }, [expandedTradeId]);
 
+  const seedQuickNotes = (trade: Trade) => {
+    if (trade.notes?.trim()) return trade.notes;
+    const entry = getTradeNote(notebookEntries, trade.id);
+    if (entry) return extractPlainText(entry.content);
+    return "";
+  };
+
   const handleViewNotes = (trade: Trade) => {
     setDayTrades(null);
     setSelectedTrade(trade);
-    setNotesDraft(trade.notes ?? "");
+    setNotesDraft(seedQuickNotes(trade));
     setNotesView('note');
     setNotesModalOpen(true);
   };
@@ -521,7 +529,7 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
     if (openNotesOnFocus) {
       setDayTrades(null);
       setSelectedTrade(trade);
-      setNotesDraft(trade.notes ?? "");
+      setNotesDraft(seedQuickNotes(trade));
       setNotesView("note");
       setNotesModalOpen(true);
     } else {
@@ -536,8 +544,10 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
   }, [focusTradeId, filteredTrades, historyPeriod, historySymbol, openNotesOnFocus, onFocusHandled, rowVirtualizer]);
 
   useEffect(() => {
-    if (selectedTrade) setNotesDraft(selectedTrade.notes ?? "");
-  }, [selectedTrade]);
+    if (selectedTrade) setNotesDraft(seedQuickNotes(selectedTrade));
+    // Seed when a different trade is opened, not on every notes keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTrade?.id]);
 
   const handleSelectTradeFromList = (trade: Trade) => {
     setSelectedTrade(trade);
@@ -881,7 +891,7 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                             variant="default"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onSelectForNotebook(trade.id);
+                              onSelectForNotebook(trade.id, trade.notes);
                               handleCloseModal();
                             }}
                             className="gap-1.5 h-8"
@@ -944,39 +954,63 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                       />
                     </div>
                   )}
-                  {selectedTradeNote ? (
-                    <>
-                      <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 flex-shrink-0 bg-muted/30">
-                        <h4 className="text-base font-semibold text-foreground truncate pr-3">{selectedTradeNote.title}</h4>
-                        <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                          {new Date(selectedTradeNote.updatedAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
-                        {extractPlainText(selectedTradeNote.content).trim().length > 0 ? (
-                          <div 
-                            className="prose prose-sm dark:prose-invert max-w-none break-words"
-                            dangerouslySetInnerHTML={{ __html: selectedTradeNote.content }}
-                          />
-                        ) : (
-                          <p className="text-sm text-muted-foreground italic">This note is empty. Click "Edit in Notebook" to add content.</p>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
+                  <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar space-y-4">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Quick notes</p>
                       <Textarea
                         value={notesDraft}
                         onChange={(e) => setNotesDraft(e.target.value)}
                         placeholder="Add notes for this trade…"
                         className="min-h-[160px] resize-none bg-background/40"
-                        aria-label="Trade notes"
+                        aria-label="Quick notes"
                       />
+                      {selectedTradeNote && (
+                        <p className="text-[11px] text-muted-foreground mt-2">
+                          A notebook page exists for this trade. Edit here or open it in the Notebook.
+                        </p>
+                      )}
                     </div>
-                  )}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <BookMarked className="w-3 h-3" />
+                        Playbook
+                      </p>
+                      <Select
+                        value={selectedTrade.checklistId || "none"}
+                        onValueChange={(value) => {
+                          const next = value === "none" ? "" : value;
+                          setSelectedTrade({ ...selectedTrade, checklistId: next || undefined });
+                          onUpdateTrade?.(selectedTrade.id, { checklistId: next || undefined });
+                        }}
+                        disabled={!onUpdateTrade || checklists.length === 0}
+                      >
+                        <SelectTrigger className="bg-background/40 border-border/50">
+                          <SelectValue placeholder={checklists.length === 0 ? "No playbooks yet" : "Select playbook…"} />
+                        </SelectTrigger>
+                        <SelectContent className="z-[200]">
+                          <SelectItem value="none">No playbook</SelectItem>
+                          {checklists.map((checklist) => (
+                            <SelectItem key={checklist.id} value={checklist.id}>
+                              {checklist.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleCloseModal();
+                          onOpenPlaybook?.();
+                        }}
+                        className="mt-2 text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
+                      >
+                        {checklists.length === 0 ? "Create a playbook" : "Open playbook page"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border/40 flex-shrink-0">
-                  {!selectedTradeNote && onUpdateTrade && (
+                  {onUpdateTrade && (
                     <Button
                       variant="default"
                       disabled={savingNotes}
@@ -998,18 +1032,20 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                   )}
                   <Button
                     variant={selectedTradeNote ? "outline" : "ghost"}
-                    onClick={() => {
-                      if (selectedTrade) {
-                        onSelectForNotebook(selectedTrade.id);
-                        handleCloseModal();
+                    onClick={async () => {
+                      if (!selectedTrade) return;
+                      if (onUpdateTrade) {
+                        await onUpdateTrade(selectedTrade.id, { notes: notesDraft });
                       }
+                      onSelectForNotebook(selectedTrade.id, notesDraft);
+                      handleCloseModal();
                     }}
                     className="gap-2"
                   >
                     <Pencil className="w-4 h-4" />
                     {selectedTradeNote ? 'Edit in Notebook' : 'Create Note'}
                   </Button>
-                  <Button variant={selectedTradeNote ? "default" : "outline"} onClick={handleCloseModal}>
+                  <Button variant="outline" onClick={handleCloseModal}>
                     Close
                   </Button>
                 </div>
