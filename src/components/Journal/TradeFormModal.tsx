@@ -133,7 +133,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, userId, onSubmit
     notes: '',
     checklistId: '',
   });
-  const [chartImage, setChartImage] = useState<string | undefined>(undefined);
+  const [chartImage, setChartImage] = useState<string | null | undefined>(undefined);
   const [checklistState, setChecklistState] = useState<ChecklistItemState[] | undefined>(undefined);
   const [showChecklistPopup, setShowChecklistPopup] = useState(false);
   const [pendingChecklistId, setPendingChecklistId] = useState<string | null>(null);
@@ -207,7 +207,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, userId, onSubmit
       result: parseFloat(formData.result) || 0,
       session: formData.session,
       notes: formData.notes,
-      chartImage: chartImage,
+      chartImage: chartImage ?? null,
       checklistId: formData.checklistId || undefined,
       checklistState: checklistState,
     });
@@ -459,7 +459,7 @@ export function TradeFormModal({ isOpen, onClose, editingTrade, userId, onSubmit
                         variant="destructive"
                         size="icon"
                         className="absolute top-2 right-2 h-7 w-7"
-                        onClick={() => setChartImage(undefined)}
+                        onClick={() => setChartImage(null)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>

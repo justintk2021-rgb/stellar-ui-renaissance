@@ -1109,6 +1109,9 @@ const Index = () => {
                       notebookEntries={notebookEntries}
                       onSaveEntry={handleSaveEntry}
                       onDeleteEntry={handleDeleteEntry}
+                      onUpdateTrade={async (id, updates) => {
+                        await updateTrade(id, updates);
+                      }}
                       notebookFont={notebookFont}
                       onFontChange={setNotebookFont}
                     />

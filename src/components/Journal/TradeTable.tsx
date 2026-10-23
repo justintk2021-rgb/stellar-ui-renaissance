@@ -880,7 +880,17 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                         <div className="flex items-center gap-2 shrink-0">
                           {userId && (
                             <div className="w-14 hidden sm:block" onClick={(e) => e.stopPropagation()}>
-                              <TradeScreenshot tradeId={trade.id} userId={userId} compact />
+                              <TradeScreenshot
+                                tradeId={trade.id}
+                                userId={userId}
+                                compact
+                                editable={!!onUpdateTrade}
+                                onUpdate={
+                                  onUpdateTrade
+                                    ? (chartImage) => onUpdateTrade(trade.id, { chartImage })
+                                    : undefined
+                                }
+                              />
                             </div>
                           )}
                         {hasNote ? (

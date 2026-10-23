@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type MouseEvent } from "react";
 import { ImagePlus, Trash2, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTradeDetail } from "@/hooks/useTrades";
@@ -18,7 +18,7 @@ interface TradeScreenshotProps {
   chartImage?: string;
   compact?: boolean;
   editable?: boolean;
-  onUpdate?: (chartImage: string | undefined) => void | Promise<void>;
+  onUpdate?: (chartImage: string | null) => void | Promise<void>;
   className?: string;
 }
 
@@ -52,9 +52,11 @@ export function TradeScreenshot({
     e.target.value = "";
   };
 
-  const handleRemove = async () => {
+  const handleRemove = async (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (!onUpdate) return;
-    await onUpdate(undefined);
+    await onUpdate(null);
     toast.success("Screenshot removed");
   };
 
@@ -109,7 +111,8 @@ export function TradeScreenshot({
             type="button"
             variant="destructive"
             size="icon"
-            className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label="Delete screenshot"
+            className="absolute top-1.5 right-1.5 h-7 w-7 z-20 shadow-md"
             onClick={handleRemove}
           >
             <Trash2 className="h-3.5 w-3.5" />

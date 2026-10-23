@@ -103,7 +103,12 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         .eq('user_id', userId!);
       if (error) throw error;
     },
-    onSuccess: (_, { id }) => {
+    onSuccess: (_, { id, tradeData }) => {
+      if (tradeData.chartImage === null || tradeData.chartImage === "") {
+        queryClient.setQueryData<Trade | null>(queryKeys.trades.detail(id), (old) =>
+          old ? { ...old, chartImage: undefined } : old,
+        );
+      }
       invalidate();
       queryClient.invalidateQueries({ queryKey: queryKeys.trades.detail(id) });
     },
