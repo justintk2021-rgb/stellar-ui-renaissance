@@ -81,6 +81,17 @@ export interface HistoryTrade {
   closedAt: number;
 }
 
+export interface ChartInstrument {
+  symbol: string;
+  name: string;
+  type?: string;
+  tradableInstrumentId?: number;
+  infoRouteId?: number;
+  tradeRouteId?: number;
+  precision: number;
+  minMove: number;
+}
+
 export interface ChartBrokerAccount {
   id: string;
   label: string;
@@ -88,6 +99,9 @@ export interface ChartBrokerAccount {
   environment: AccountEnvironment;
   accountNumber: string;
   brokerName: string;
+  connectionId?: string | null;
+  accountId?: string | null;
+  accNum?: number | null;
 }
 
 export interface PlaceOrderResult {
@@ -98,7 +112,11 @@ export interface PlaceOrderResult {
 export interface BrokerAdapter {
   id: string;
   account: ChartBrokerAccount;
+  readonly supportsTrading: boolean;
+  readonly supportsMarketData: boolean;
+  getInstruments(): Promise<ChartInstrument[]>;
   getCandles(symbol: string, timeframe: ChartTimeframe, count?: number): Promise<Candle[]>;
+  loadMoreCandles(symbol: string, timeframe: ChartTimeframe, beforeTime: number, count?: number): Promise<Candle[]>;
   subscribePrice(symbol: string, onTick: (tick: PriceTick) => void): () => void;
   placeOrder(order: PlaceOrderRequest): Promise<PlaceOrderResult>;
   getPositions(): Promise<Position[]>;
@@ -207,7 +225,26 @@ export function isChartSymbol(value: string): value is ChartSymbol {
 }
 
 export function getSymbolSpec(symbol: string): SymbolSpec {
-  return isChartSymbol(symbol) ? SYMBOL_SPECS[symbol] : SYMBOL_SPECS.EURUSD;
+  if (isChartSymbol(symbol)) return SYMBOL_SPECS[symbol];
+  const precision = symbol.toUpperCase().includes("JPY")
+    ? 3
+    : symbol.toUpperCase().includes("XAU") || symbol.toUpperCase().includes("XAG")
+      ? 2
+      : /^[A-Z]{6}$/.test(symbol.toUpperCase())
+        ? 5
+        : 2;
+  const minMove = Number((10 ** -precision).toFixed(precision));
+  return {
+    symbol: "EURUSD",
+    label: symbol,
+    precision,
+    minMove,
+    pipSize: minMove * 10,
+    contractSize: 1,
+    basePrice: 0,
+    volatility: minMove,
+    spread: minMove,
+  };
 }
 
 export function positionPnl(side: OrderSide, entry: number, current: number, lots: number, symbol: string): number {

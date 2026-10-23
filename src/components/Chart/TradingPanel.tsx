@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { formatMoney, formatPrice, riskPreview, type ChartSymbol, type OrderSide, type OrderType } from "@/lib/chartTrading/types";
+import { formatMoney, formatPrice, riskPreview, type OrderSide, type OrderType } from "@/lib/chartTrading/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,7 @@ export interface TradeTicket {
 }
 
 interface TradingPanelProps {
-  symbol: ChartSymbol;
+  symbol: string;
   lastPrice: number | null;
   ticket: TradeTicket;
   onChange: (patch: Partial<TradeTicket>) => void;
@@ -128,13 +128,15 @@ export function TradingPanel({ symbol, lastPrice, ticket, onChange, onSubmit }: 
 
       <Button
         type="button"
+        disabled
+        title="Live trading coming soon"
         onClick={onSubmit}
         className={cn(
           "mt-auto h-11 w-full text-sm font-bold uppercase tracking-wide",
           buy ? "bg-emerald-500 text-white hover:bg-emerald-500/90" : "bg-red-500 text-white hover:bg-red-500/90",
         )}
       >
-        {buy ? "Buy" : "Sell"} {symbol}
+        Live trading coming soon
       </Button>
     </div>
   );

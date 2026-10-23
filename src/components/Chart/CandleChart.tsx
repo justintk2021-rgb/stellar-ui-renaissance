@@ -39,10 +39,11 @@ export interface CandleChartProps {
   showEma50: boolean;
   showRsi: boolean;
   draggingId: string | null;
+  onNeedMoreHistory?: () => void;
 }
 
 export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function CandleChart(
-  { candles, symbol, positions, showEma20, showEma50, showRsi, draggingId },
+  { candles, symbol, positions, showEma20, showEma50, showRsi, draggingId, onNeedMoreHistory },
   ref,
 ) {
   const theme = useDocumentTheme();
@@ -265,6 +266,20 @@ export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function Candl
       }
     }
   }, [positions, symbol, theme, draggingId]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    const series = candleSeriesRef.current;
+    if (!chart || !series || !onNeedMoreHistory) return;
+    const handler = () => {
+      const range = chart.timeScale().getVisibleLogicalRange();
+      if (!range) return;
+      const info = series.barsInLogicalRange(range);
+      if (info && info.barsBefore < 20) onNeedMoreHistory();
+    };
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
+    return () => chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
+  }, [onNeedMoreHistory, candles.length]);
 
   return <div ref={hostRef} className="absolute inset-0" />;
 });

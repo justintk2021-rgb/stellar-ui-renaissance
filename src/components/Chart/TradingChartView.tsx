@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChartCandlestick } from "lucide-react";
 import { useDocumentTheme } from "@/hooks/useDocumentTheme";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -10,16 +9,16 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { createBrokerAdapter } from "@/lib/chartTrading/BrokerAdapter";
+import { adapterAvailable, createBrokerAdapter } from "@/lib/chartTrading/BrokerAdapter";
 import { loadChartAccounts } from "@/lib/chartTrading/accounts";
+import { marketErrorMessage } from "@/lib/chartTrading/tradeLockerMap";
 import {
-  formatMoney,
   formatPrice,
   getSymbolSpec,
   type BrokerAdapter,
   type Candle,
   type ChartBrokerAccount,
-  type ChartSymbol,
+  type ChartInstrument,
   type ChartTimeframe,
   type HistoryTrade,
   type PendingOrder,
@@ -33,9 +32,9 @@ import { DrawingOverlay } from "./DrawingOverlay";
 import { TradingPanel, type TradeTicket } from "./TradingPanel";
 import type { ChartDrawing, DrawingTool } from "./drawings";
 
-function defaultTicket(symbol: ChartSymbol, last: number | null): TradeTicket {
+function defaultTicket(symbol: string, last: number | null): TradeTicket {
   const spec = getSymbolSpec(symbol);
-  const mark = last ?? spec.basePrice;
+  const mark = last ?? spec.basePrice ?? 0;
   return {
     side: "buy",
     type: "market",
@@ -46,23 +45,32 @@ function defaultTicket(symbol: ChartSymbol, last: number | null): TradeTicket {
   };
 }
 
+function pickDefaultSymbol(instruments: ChartInstrument[], preferred?: string | null) {
+  if (preferred && instruments.some((item) => item.symbol === preferred)) return preferred;
+  return instruments.find((item) => item.symbol === "EURUSD")?.symbol
+    ?? instruments.find((item) => item.symbol === "XAUUSD")?.symbol
+    ?? instruments[0]?.symbol
+    ?? "";
+}
+
 export function TradingChartView() {
   const isMobile = useIsMobile();
   const theme = useDocumentTheme();
   const adaptersRef = useRef(new Map<string, BrokerAdapter>());
   const chartApiRef = useRef<ChartApi | null>(null);
+  const loadingMoreRef = useRef(false);
   const [, setApiVersion] = useState(0);
 
   const [accounts, setAccounts] = useState<ChartBrokerAccount[]>([]);
   const [accountId, setAccountId] = useState<string | null>(null);
-  const [symbol, setSymbol] = useState<ChartSymbol>("EURUSD");
+  const [instruments, setInstruments] = useState<ChartInstrument[]>([]);
+  const [symbol, setSymbol] = useState("");
   const [timeframe, setTimeframe] = useState<ChartTimeframe>("15m");
   const [candles, setCandles] = useState<Candle[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [orders, setOrders] = useState<PendingOrder[]>([]);
   const [history, setHistory] = useState<HistoryTrade[]>([]);
   const [ticket, setTicket] = useState<TradeTicket>(() => defaultTicket("EURUSD", null));
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [tool, setTool] = useState<DrawingTool>("cursor");
   const [drawings, setDrawings] = useState<ChartDrawing[]>([]);
@@ -70,6 +78,8 @@ export function TradingChartView() {
   const [showEma50, setShowEma50] = useState(false);
   const [showRsi, setShowRsi] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const account = useMemo(
     () => accounts.find((item) => item.id === accountId) ?? accounts[0] ?? null,
@@ -77,6 +87,7 @@ export function TradingChartView() {
   );
 
   const lastPrice = candles[candles.length - 1]?.close ?? null;
+  const marketReady = adapterAvailable(account);
 
   const getAdapter = useCallback((item: ChartBrokerAccount) => {
     let adapter = adaptersRef.current.get(item.id);
@@ -88,23 +99,45 @@ export function TradingChartView() {
   }, []);
 
   const refreshBook = useCallback(async (adapter: BrokerAdapter) => {
-    const [nextPositions, nextOrders, nextHistory] = await Promise.all([
-      adapter.getPositions(),
-      adapter.getOrders(),
-      adapter.getHistory(),
-    ]);
-    setPositions(nextPositions);
-    setOrders(nextOrders);
-    setHistory(nextHistory);
+    if (!adapter.supportsMarketData) {
+      setPositions([]);
+      setOrders([]);
+      setHistory([]);
+      return;
+    }
+    try {
+      const [nextPositions, nextOrders, nextHistory] = await Promise.all([
+        adapter.getPositions(),
+        adapter.getOrders(),
+        adapter.getHistory(),
+      ]);
+      setPositions(nextPositions);
+      setOrders(nextOrders);
+      setHistory(nextHistory);
+    } catch (error) {
+      const parsed = marketErrorMessage(error);
+      setStatusMessage(parsed.message);
+    }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    loadChartAccounts().then((next) => {
-      if (cancelled) return;
-      setAccounts(next);
-      setAccountId((current) => current ?? next[0]?.id ?? null);
-    });
+    loadChartAccounts()
+      .then((next) => {
+        if (cancelled) return;
+        setAccounts(next);
+        setAccountId((current) => current ?? next[0]?.id ?? null);
+        if (!next.length) {
+          setStatusMessage("No connected broker accounts. Connect one in Settings.");
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStatusMessage("Could not load connected accounts.");
+          setLoading(false);
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -121,37 +154,87 @@ export function TradingChartView() {
     if (!account) return;
     const adapter = getAdapter(account);
     let cancelled = false;
+    setInstruments([]);
+    setCandles([]);
+    setPositions([]);
+    setOrders([]);
+    setHistory([]);
+    setLoading(true);
+
+    if (!adapter.supportsMarketData) {
+      setStatusMessage("Chart data not available for this broker yet");
+      setLoading(false);
+      return;
+    }
+
+    adapter.getInstruments().then((nextInstruments) => {
+      if (cancelled) return;
+      setInstruments(nextInstruments);
+      setSymbol((current) => pickDefaultSymbol(nextInstruments, current));
+      if (!nextInstruments.length) {
+        setStatusMessage("No tradable instruments on this account.");
+        setLoading(false);
+      }
+    }).catch((error) => {
+      if (!cancelled) {
+        setStatusMessage(marketErrorMessage(error).message);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [account, getAdapter]);
+
+  useEffect(() => {
+    if (!account || !symbol || !marketReady) return;
+    const adapter = getAdapter(account);
+    if (!adapter.supportsMarketData) return;
+    let cancelled = false;
     let unsub = () => undefined;
+    setLoading(true);
+
+    const bookTimer = setInterval(() => {
+      refreshBook(adapter);
+    }, 10_000);
 
     adapter.getCandles(symbol, timeframe).then((series) => {
       if (cancelled) return;
       setCandles(series);
-      const close = series[series.length - 1]?.close ?? null;
       setTicket((prev) => ({
-        ...defaultTicket(symbol, close),
+        ...defaultTicket(symbol, series[series.length - 1]?.close ?? null),
         side: prev.side,
         type: prev.type,
         lots: prev.lots,
       }));
+      setStatusMessage(null);
       unsub = adapter.subscribePrice(symbol, (tick) => {
         setCandles((current) => {
-          if (!current.length) return current;
+          if (!current.length) return [tick.candle];
           const next = current.slice();
-          next[next.length - 1] = tick.candle;
+          const last = next[next.length - 1];
+          if (last.time === tick.candle.time) next[next.length - 1] = tick.candle;
+          else if (tick.candle.time > last.time) next.push(tick.candle);
           return next;
         });
-        adapter.getPositions().then((nextPositions) => {
-          if (!cancelled) setPositions(nextPositions);
-        });
       });
+      return refreshBook(adapter);
+    }).catch((error) => {
+      if (cancelled) return;
+      const parsed = marketErrorMessage(error);
+      setStatusMessage(parsed.message);
+      if (parsed.code !== "market_closed") setCandles([]);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
     });
-    refreshBook(adapter);
 
     return () => {
       cancelled = true;
       unsub();
+      clearInterval(bookTimer);
     };
-  }, [account, symbol, timeframe, getAdapter, refreshBook]);
+  }, [account, symbol, timeframe, getAdapter, refreshBook, marketReady]);
 
   const bindChartApi = useCallback((api: ChartApi | null) => {
     chartApiRef.current = api;
@@ -160,41 +243,36 @@ export function TradingChartView() {
 
   const handleAccountChange = (id: string) => {
     setAccountId(id);
-    setDrawings([]);
+    setSymbol("");
+    setStatusMessage(null);
   };
+
+  const handleNeedMore = useCallback(() => {
+    if (!account || !symbol || loadingMoreRef.current || !candles.length) return;
+    const adapter = getAdapter(account);
+    if (!adapter.supportsMarketData) return;
+    loadingMoreRef.current = true;
+    adapter.loadMoreCandles(symbol, timeframe, candles[0].time).then((older) => {
+      if (older.length) {
+        setCandles((current) => {
+          const unique = new Map<number, Candle>();
+          for (const bar of [...older, ...current]) unique.set(bar.time, bar);
+          return [...unique.values()].sort((a, b) => a.time - b.time);
+        });
+      }
+    }).catch((error) => {
+      const parsed = marketErrorMessage(error);
+      if (parsed.code !== "market_closed") setStatusMessage(parsed.message);
+    }).finally(() => {
+      loadingMoreRef.current = false;
+    });
+  }, [account, symbol, timeframe, candles, getAdapter]);
 
   const handleTicketChange = (patch: Partial<TradeTicket>) => {
     setTicket((prev) => ({ ...prev, ...patch }));
   };
 
-  const handleConfirmTrade = async () => {
-    if (!account) return;
-    const adapter = getAdapter(account);
-    const sl = ticket.stopLoss === "" ? null : Number(ticket.stopLoss);
-    const tp = ticket.takeProfit === "" ? null : Number(ticket.takeProfit);
-    await adapter.placeOrder({
-      symbol,
-      side: ticket.side,
-      type: ticket.type,
-      lots: ticket.lots,
-      entryPrice: ticket.type === "market" ? undefined : Number(ticket.entryPrice),
-      stopLoss: sl,
-      takeProfit: tp,
-    });
-    await refreshBook(adapter);
-    setConfirmOpen(false);
-    setSheetOpen(false);
-  };
-
-  const handleClosePosition = async (id: string) => {
-    if (!account) return;
-    const adapter = getAdapter(account);
-    await adapter.closePosition(id);
-    await refreshBook(adapter);
-  };
-
-  const handleDragLevel = async (positionId: string, kind: "sl" | "tp", price: number) => {
-    if (!account) return;
+  const handleDragLevel = (positionId: string, kind: "sl" | "tp", price: number) => {
     const rounded = formatPrice(price, symbol);
     const numeric = Number(rounded);
     setPositions((current) =>
@@ -209,35 +287,15 @@ export function TradingChartView() {
       stopLoss: kind === "sl" ? rounded : prev.stopLoss,
       takeProfit: kind === "tp" ? rounded : prev.takeProfit,
     }));
-    await getAdapter(account).updatePosition(positionId, {
-      stopLoss: kind === "sl" ? numeric : undefined,
-      takeProfit: kind === "tp" ? numeric : undefined,
-    });
   };
-
-  const confirmCopy = useMemo(() => {
-    const entry = ticket.type === "market" ? lastPrice : Number(ticket.entryPrice);
-    const sl = ticket.stopLoss === "" ? null : Number(ticket.stopLoss);
-    const tp = ticket.takeProfit === "" ? null : Number(ticket.takeProfit);
-    const risk = sl != null && entry != null
-      ? Math.abs(entry - sl) * ticket.lots * getSymbolSpec(symbol).contractSize
-      : null;
-    return [
-      `${ticket.side.toUpperCase()} ${ticket.lots} ${symbol} ${ticket.type}`,
-      `Entry ${entry == null ? "—" : formatPrice(entry, symbol)}`,
-      `SL ${sl == null ? "—" : formatPrice(sl, symbol)}`,
-      `TP ${tp == null ? "—" : formatPrice(tp, symbol)}`,
-      `Risk ${risk == null ? "—" : formatMoney(risk)}`,
-    ].join(" · ");
-  }, [ticket, lastPrice, symbol]);
 
   const panel = (
     <TradingPanel
-      symbol={symbol}
+      symbol={symbol || "—"}
       lastPrice={lastPrice}
       ticket={ticket}
       onChange={handleTicketChange}
-      onSubmit={() => setConfirmOpen(true)}
+      onSubmit={() => undefined}
     />
   );
 
@@ -247,13 +305,18 @@ export function TradingChartView() {
         accounts={accounts}
         account={account}
         onAccountChange={handleAccountChange}
+        instruments={instruments}
         symbol={symbol}
         onSymbolChange={(next) => {
           setSymbol(next);
           setDrawings([]);
+          setStatusMessage(null);
         }}
         timeframe={timeframe}
-        onTimeframeChange={setTimeframe}
+        onTimeframeChange={(tf) => {
+          setTimeframe(tf);
+          setDrawings([]);
+        }}
         showEma20={showEma20}
         showEma50={showEma50}
         showRsi={showRsi}
@@ -262,6 +325,12 @@ export function TradingChartView() {
         onToggleRsi={setShowRsi}
         lastPrice={lastPrice}
       />
+
+      {statusMessage && (
+        <div className="liquid-glass rounded-xl px-3 py-2 text-xs font-medium text-amber-500">
+          {statusMessage}
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 lg:flex-row">
         <ChartToolbar tool={tool} onToolChange={setTool} onDeleteAll={() => setDrawings([])} />
@@ -277,6 +346,7 @@ export function TradingChartView() {
             showEma50={showEma50}
             showRsi={showRsi}
             draggingId={draggingId}
+            onNeedMoreHistory={handleNeedMore}
           />
           <DrawingOverlay
             chartApi={chartApiRef.current}
@@ -288,6 +358,11 @@ export function TradingChartView() {
             onDragLevel={handleDragLevel}
             onDragStart={setDraggingId}
           />
+          {loading && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/30 text-xs text-muted-foreground">
+              Loading chart…
+            </div>
+          )}
         </div>
 
         {!isMobile && <div className="w-[17.5rem] shrink-0">{panel}</div>}
@@ -297,7 +372,7 @@ export function TradingChartView() {
         positions={positions}
         orders={orders}
         history={history}
-        onClose={handleClosePosition}
+        onClose={() => undefined}
       />
 
       {isMobile && (
@@ -319,15 +394,6 @@ export function TradingChartView() {
           {panel}
         </SheetContent>
       </Sheet>
-
-      <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title={ticket.type === "market" ? "Confirm market order" : "Confirm pending order"}
-        description={confirmCopy}
-        confirmLabel={ticket.side === "buy" ? "Buy" : "Sell"}
-        onConfirm={handleConfirmTrade}
-      />
     </div>
   );
 }
