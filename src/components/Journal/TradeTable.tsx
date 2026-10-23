@@ -4,9 +4,10 @@ import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, ClipboardCheck, ArrowLeft, Clock, LogIn, LogOut, Timer, Check, History } from "lucide-react";
+import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, ClipboardCheck, ArrowLeft, Clock, LogIn, LogOut, Timer, Check, History, BookMarked } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -50,9 +51,13 @@ interface TradeTableProps {
   userId?: string;
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
-  onSelectForNotebook: (id: string) => void;
+  onSelectForNotebook: (id: string, quickNotes?: string) => void | Promise<void>;
+  onOpenPlaybook?: () => void;
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void | Promise<void>;
   onClearAll?: () => void;
+  focusTradeId?: string | null;
+  openNotesOnFocus?: boolean;
+  onFocusHandled?: () => void;
 }
 
 // Helper to extract plain text from HTML
@@ -425,12 +430,14 @@ function TradeEntry({ trade, checklists, userId, onEdit, onDelete, onViewNotes, 
   );
 }
 
-export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onUpdateTrade }: TradeTableProps) {
+export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onOpenPlaybook, onUpdateTrade, focusTradeId, openNotesOnFocus = false, onFocusHandled }: TradeTableProps) {
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [dayTrades, setDayTrades] = useState<Trade[] | null>(null);
   const [notesView, setNotesView] = useState<'list' | 'note'>('list');
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
   const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriod>("all");
   const [historySymbol, setHistorySymbol] = useState<string>("__all__");
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -489,12 +496,58 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
     };
   }, [expandedTradeId]);
 
+  const seedQuickNotes = (trade: Trade) => {
+    if (trade.notes?.trim()) return trade.notes;
+    const entry = getTradeNote(notebookEntries, trade.id);
+    if (entry) return extractPlainText(entry.content);
+    return "";
+  };
+
   const handleViewNotes = (trade: Trade) => {
     setDayTrades(null);
     setSelectedTrade(trade);
+    setNotesDraft(seedQuickNotes(trade));
     setNotesView('note');
     setNotesModalOpen(true);
   };
+
+  useEffect(() => {
+    if (!focusTradeId) return;
+    if (historyPeriod !== "all" || historySymbol !== "__all__") {
+      setHistoryPeriod("all");
+      setHistorySymbol("__all__");
+      return;
+    }
+    const index = filteredTrades.findIndex((t) => t.id === focusTradeId);
+    if (index < 0) {
+      onFocusHandled?.();
+      return;
+    }
+    const trade = filteredTrades[index];
+    rowVirtualizer.scrollToIndex(index, { align: "center" });
+    setExpandedTradeId(trade.id);
+    if (openNotesOnFocus) {
+      setDayTrades(null);
+      setSelectedTrade(trade);
+      setNotesDraft(seedQuickNotes(trade));
+      setNotesView("note");
+      setNotesModalOpen(true);
+    } else {
+      requestAnimationFrame(() => {
+        document.getElementById(`trade-row-${trade.id}`)?.scrollIntoView({
+          block: "center",
+          behavior: "smooth",
+        });
+      });
+    }
+    onFocusHandled?.();
+  }, [focusTradeId, filteredTrades, historyPeriod, historySymbol, openNotesOnFocus, onFocusHandled, rowVirtualizer]);
+
+  useEffect(() => {
+    if (selectedTrade) setNotesDraft(seedQuickNotes(selectedTrade));
+    // Seed when a different trade is opened, not on every notes keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTrade?.id]);
 
   const handleSelectTradeFromList = (trade: Trade) => {
     setSelectedTrade(trade);
@@ -707,6 +760,8 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                   return (
                     <div
                       key={trade.id}
+                      id={`trade-row-${trade.id}`}
+                      data-trade-id={trade.id}
                       style={{
                         position: 'absolute',
                         top: 0,
@@ -825,7 +880,17 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                         <div className="flex items-center gap-2 shrink-0">
                           {userId && (
                             <div className="w-14 hidden sm:block" onClick={(e) => e.stopPropagation()}>
-                              <TradeScreenshot tradeId={trade.id} userId={userId} compact />
+                              <TradeScreenshot
+                                tradeId={trade.id}
+                                userId={userId}
+                                compact
+                                editable={!!onUpdateTrade}
+                                onUpdate={
+                                  onUpdateTrade
+                                    ? (chartImage) => onUpdateTrade(trade.id, { chartImage })
+                                    : undefined
+                                }
+                              />
                             </div>
                           )}
                         {hasNote ? (
@@ -836,7 +901,7 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                             variant="default"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onSelectForNotebook(trade.id);
+                              onSelectForNotebook(trade.id, trade.notes);
                               handleCloseModal();
                             }}
                             className="gap-1.5 h-8"
@@ -899,54 +964,95 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                       />
                     </div>
                   )}
-                  {selectedTradeNote ? (
-                    <>
-                      <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 flex-shrink-0 bg-muted/30">
-                        <h4 className="text-base font-semibold text-foreground truncate pr-3">{selectedTradeNote.title}</h4>
-                        <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                          {new Date(selectedTradeNote.updatedAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
-                        {extractPlainText(selectedTradeNote.content).trim().length > 0 ? (
-                          <div 
-                            className="prose prose-sm dark:prose-invert max-w-none break-words"
-                            dangerouslySetInnerHTML={{ __html: selectedTradeNote.content }}
-                          />
-                        ) : (
-                          <p className="text-sm text-muted-foreground italic">This note is empty. Click "Edit in Notebook" to add content.</p>
-                        )}
-                      </div>
-                    </>
-                  ) : selectedTrade.notes ? (
-                    <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
-                      <p className="text-sm text-foreground whitespace-pre-wrap break-words">{selectedTrade.notes}</p>
+                  <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar space-y-4">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Quick notes</p>
+                      <Textarea
+                        value={notesDraft}
+                        onChange={(e) => setNotesDraft(e.target.value)}
+                        placeholder="Add notes for this trade…"
+                        className="min-h-[160px] resize-none bg-background/40"
+                        aria-label="Quick notes"
+                      />
+                      {selectedTradeNote && (
+                        <p className="text-[11px] text-muted-foreground mt-2">
+                          A notebook page exists for this trade. Edit here or open it in the Notebook.
+                        </p>
+                      )}
                     </div>
-                  ) : (
-                    <div className="flex-1 flex items-center justify-center px-5 py-8">
-                      <div className="text-center">
-                        <FileText className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-                        <p className="text-sm text-muted-foreground italic">No note for this trade yet.</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">Click "Create Note" below to add one.</p>
-                      </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <BookMarked className="w-3 h-3" />
+                        Playbook
+                      </p>
+                      <Select
+                        value={selectedTrade.checklistId || "none"}
+                        onValueChange={(value) => {
+                          const next = value === "none" ? "" : value;
+                          setSelectedTrade({ ...selectedTrade, checklistId: next || undefined });
+                          onUpdateTrade?.(selectedTrade.id, { checklistId: next || undefined });
+                        }}
+                        disabled={!onUpdateTrade || checklists.length === 0}
+                      >
+                        <SelectTrigger className="bg-background/40 border-border/50">
+                          <SelectValue placeholder={checklists.length === 0 ? "No playbooks yet" : "Select playbook…"} />
+                        </SelectTrigger>
+                        <SelectContent className="z-[200]">
+                          <SelectItem value="none">No playbook</SelectItem>
+                          {checklists.map((checklist) => (
+                            <SelectItem key={checklist.id} value={checklist.id}>
+                              {checklist.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleCloseModal();
+                          onOpenPlaybook?.();
+                        }}
+                        className="mt-2 text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
+                      >
+                        {checklists.length === 0 ? "Create a playbook" : "Open playbook page"}
+                      </button>
                     </div>
-                  )}
+                  </div>
                 </div>
                 <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border/40 flex-shrink-0">
+                  {onUpdateTrade && (
+                    <Button
+                      variant="default"
+                      disabled={savingNotes}
+                      onClick={async () => {
+                        if (!selectedTrade) return;
+                        setSavingNotes(true);
+                        try {
+                          await onUpdateTrade(selectedTrade.id, { notes: notesDraft });
+                          handleCloseModal();
+                        } finally {
+                          setSavingNotes(false);
+                        }
+                      }}
+                      className="gap-2"
+                    >
+                      <Check className="w-4 h-4" />
+                      {savingNotes ? "Saving…" : "Save notes"}
+                    </Button>
+                  )}
                   <Button
-                    variant={selectedTradeNote ? "outline" : "default"}
-                    onClick={() => {
-                      if (selectedTrade) {
-                        onSelectForNotebook(selectedTrade.id);
-                        handleCloseModal();
-                      }
+                    variant={selectedTradeNote ? "outline" : "ghost"}
+                    onClick={async () => {
+                      if (!selectedTrade) return;
+                      await onSelectForNotebook(selectedTrade.id, notesDraft);
+                      handleCloseModal();
                     }}
                     className="gap-2"
                   >
                     <Pencil className="w-4 h-4" />
                     {selectedTradeNote ? 'Edit in Notebook' : 'Create Note'}
                   </Button>
-                  <Button variant={selectedTradeNote ? "default" : "outline"} onClick={handleCloseModal}>
+                  <Button variant="outline" onClick={handleCloseModal}>
                     Close
                   </Button>
                 </div>

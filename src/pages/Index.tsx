@@ -11,6 +11,7 @@ import { useChecklists } from "@/hooks/useChecklists";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { TopBar } from "@/components/Layout/TopBar";
 import { BalanceCards } from "@/components/Dashboard/BalanceCards";
+import { NotificationsMenu } from "@/components/Dashboard/NotificationsCard";
 import { useAccountProjection } from "@/hooks/useAccountProjection";
 import { DashboardStatsLayout } from "@/components/Dashboard/DashboardStatsLayout";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
@@ -26,6 +27,13 @@ import {
   getTradeCloseLocalDateKey,
   getTradeNetResult,
 } from "@/lib/tradeFormat";
+import { isUnjournaledTrade, type JournalFilter } from "@/lib/notifications";
+import {
+  notebookPlainText,
+  plainTextToNotebookHtml,
+  shouldWriteQuickNotesToNotebook,
+} from "@/lib/notebookSync";
+import type { OpenJournalTarget } from "@/components/Dashboard/NotificationsCard";
 import { queryKeys } from "@/lib/queries/keys";
 import { fetchTradesList } from "@/lib/queries/trades";
 import { useBrokerTodayPnL } from "@/hooks/useBrokerTodayPnL";
@@ -420,8 +428,10 @@ const Index = () => {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
-  const [journalFilter, setJournalFilter] = useState<'all' | 'wins' | 'losses'>('all');
+  const [journalFilter, setJournalFilter] = useState<JournalFilter>('all');
   const [journalDateRange, setJournalDateRange] = useState<{ start: Date; end: Date } | null>(null);
+  const [journalFocusTradeId, setJournalFocusTradeId] = useState<string | null>(null);
+  const [journalOpenNotes, setJournalOpenNotes] = useState(false);
 
   // Compare view state — hydrated from URL so the view is shareable.
   const [compareOpen, setCompareOpen] = useState(false);
@@ -459,7 +469,9 @@ const Index = () => {
         ? journalBaseTrades
         : activeFilter === 'wins'
           ? journalBaseTrades.filter((t) => getTradeNetResult(t) > 0)
-          : journalBaseTrades.filter((t) => getTradeNetResult(t) < 0);
+          : activeFilter === 'losses'
+            ? journalBaseTrades.filter((t) => getTradeNetResult(t) < 0)
+            : journalBaseTrades.filter((t) => isUnjournaledTrade(t, notebookEntries));
 
     const rangeFiltered = winLossFiltered;
 
@@ -475,7 +487,7 @@ const Index = () => {
       rangeFiltered,
       dayPnLs: Array.from(pnlMap.entries()).map(([date, pnl]) => ({ date, pnl })),
     };
-  }, [journalBaseTrades, journalFilter, showJournalWinLossFilter, brokerDayTotals, selectedBrokerAccountId]);
+  }, [journalBaseTrades, journalFilter, showJournalWinLossFilter, brokerDayTotals, selectedBrokerAccountId, notebookEntries]);
 
   const { data: allUserTrades = [] } = useQuery({
     queryKey: queryKeys.trades.list(user?.id ?? '', null, null),
@@ -500,6 +512,20 @@ const Index = () => {
     closeCompareView();
     setCurrentPage(page);
   }, [closeCompareView]);
+
+  const handleOpenJournal = useCallback((target: OpenJournalTarget) => {
+    closeCompareView();
+    setJournalFilter(target.filter ?? 'unjournaled');
+    setJournalDateRange(null);
+    setJournalFocusTradeId(target.tradeId ?? null);
+    setJournalOpenNotes(Boolean(target.openNotes && target.tradeId));
+    setCurrentPage('journal');
+  }, [closeCompareView]);
+
+  const handleJournalFocusHandled = useCallback(() => {
+    setJournalFocusTradeId(null);
+    setJournalOpenNotes(false);
+  }, []);
 
   useEffect(() => {
     if (currentPage !== 'journal' && compareOpen) {
@@ -681,34 +707,49 @@ const Index = () => {
 
   const handleSaveEntry = useCallback(async (entry: NotebookEntry) => {
     await saveNotebookEntry(entry);
-  }, [saveNotebookEntry]);
+    if (entry.tradeId) {
+      await updateTrade(entry.tradeId, { notes: notebookPlainText(entry.content) });
+    }
+  }, [saveNotebookEntry, updateTrade]);
 
   const handleDeleteEntry = useCallback(async (id: string) => {
     await deleteNotebookEntry(id);
   }, [deleteNotebookEntry]);
 
-  const handleSelectForNotebook = useCallback(async (id: string) => {
-    // If no note exists for this trade yet, create a blank one so the user can write
-    const existing = notebookEntries.find(e => e.tradeId === id && !e.isDeleted);
-    if (!existing) {
-      const trade = trades.find(t => t.id === id);
-      if (trade) {
-        const newEntry: NotebookEntry = {
-          id: crypto.randomUUID(),
-          title: `${trade.pair} - ${trade.direction} Trade`,
-          content: '',
-          category: 'trade-notes',
-          date: trade.date,
-          tradeId: trade.id,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        await saveNotebookEntry(newEntry);
-      }
+  const upsertNotebookFromQuickNotes = useCallback(async (id: string, quickNotes?: string) => {
+    const trade = trades.find((t) => t.id === id);
+    const existing = notebookEntries.find((e) => e.tradeId === id && !e.isDeleted);
+    const seed = (quickNotes ?? trade?.notes ?? "").trim();
+    if (!shouldWriteQuickNotesToNotebook(seed, existing?.content) && existing) {
+      if (seed) await updateTrade(id, { notes: seed });
+      return existing;
     }
+
+    const html = plainTextToNotebookHtml(seed);
+    const now = new Date().toISOString();
+    const entry: NotebookEntry = existing
+      ? { ...existing, content: html || existing.content, updatedAt: now }
+      : {
+          id: crypto.randomUUID(),
+          title: trade ? `${trade.pair} - ${trade.direction} Trade` : "Trade note",
+          content: html,
+          category: "trade-notes",
+          date: trade?.date || now.slice(0, 10),
+          tradeId: id,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+    await saveNotebookEntry(entry);
+    if (seed) await updateTrade(id, { notes: seed });
+    return entry;
+  }, [notebookEntries, trades, saveNotebookEntry, updateTrade]);
+
+  const handleSelectForNotebook = useCallback(async (id: string, quickNotes?: string) => {
+    await upsertNotebookFromQuickNotes(id, quickNotes);
     setSelectedTradeId(id);
     setCurrentPage('notebook');
-  }, [notebookEntries, trades, saveNotebookEntry]);
+  }, [upsertNotebookFromQuickNotes]);
 
   const { title, subtitle } = pageInfo[currentPage] ?? pageInfo.dashboard;
   const todayKey = formatLocalDateKey(new Date());
@@ -808,6 +849,14 @@ const Index = () => {
                     </AnimatePresence>
                   </div>
                 ) : undefined}
+                notificationsSlot={currentPage !== 'dashboard' ? (
+                  <NotificationsMenu
+                    trades={trades}
+                    notebookEntries={notebookEntries}
+                    isLoading={tradesLoading}
+                    onOpenJournal={handleOpenJournal}
+                  />
+                ) : undefined}
               />
             )}
 
@@ -824,6 +873,9 @@ const Index = () => {
                       brokerFloatingPl={brokerFloatingPl}
                       brokerHasOpenPositions={brokerHasOpenPositions}
                       onSetBalance={handleSetBalance}
+                      tradesLoading={tradesLoading}
+                      notebookEntries={notebookEntries}
+                      onOpenJournal={handleOpenJournal}
                       projection={{
                         accountLabel: accountProjection.accountLabel,
                         accountSubtitle: accountProjection.accountSubtitle,
@@ -890,15 +942,18 @@ const Index = () => {
                   
                   {/* Filter Tabs — hidden during compare only */}
                   {showJournalWinLossFilter && (
-                  <motion.div variants={staggerItem} className="flex items-center gap-1 p-1 rounded-xl bg-muted/40 border border-border/30 w-fit">
-                    {(['all', 'wins', 'losses'] as const).map((filter) => {
+                  <motion.div variants={staggerItem} className="flex items-center gap-1 p-1 rounded-xl bg-muted/40 border border-border/30 w-fit flex-wrap">
+                    {(['all', 'wins', 'losses', 'unjournaled'] as const).map((filter) => {
                       const isActive = journalFilter === filter;
                       const count =
                         filter === 'all'
                           ? journalBaseTrades.length
                           : filter === 'wins'
                             ? journalBaseTrades.filter((t) => getTradeNetResult(t) > 0).length
-                            : journalBaseTrades.filter((t) => getTradeNetResult(t) < 0).length;
+                            : filter === 'losses'
+                              ? journalBaseTrades.filter((t) => getTradeNetResult(t) < 0).length
+                              : journalBaseTrades.filter((t) => isUnjournaledTrade(t, notebookEntries)).length;
+                      const label = filter === 'unjournaled' ? 'Not Journaled' : filter;
                       return (
                         <motion.button
                           key={filter}
@@ -922,7 +977,7 @@ const Index = () => {
                               transition={{ type: "spring", stiffness: 350, damping: 30 }}
                             />
                           )}
-                          <span className="relative z-10 capitalize">{filter}</span>
+                          <span className="relative z-10 capitalize">{label}</span>
                           <span className={cn(
                             "relative z-10 text-[10px] px-1.5 py-0.5 rounded-full font-mono",
                             isActive ? "bg-white/20" : "bg-muted/60"
@@ -971,10 +1026,17 @@ const Index = () => {
                               }}
                               onDelete={handleDeleteTrade}
                               onSelectForNotebook={handleSelectForNotebook}
+                              onOpenPlaybook={() => setCurrentPage('playbook')}
                               onUpdateTrade={async (id, updates) => {
                                 await updateTrade(id, updates);
+                                if (typeof updates.notes === "string") {
+                                  await upsertNotebookFromQuickNotes(id, updates.notes);
+                                }
                               }}
                               onClearAll={handleClearAll}
+                              focusTradeId={journalFocusTradeId}
+                              openNotesOnFocus={journalOpenNotes}
+                              onFocusHandled={handleJournalFocusHandled}
                             />
                             </Suspense>
                           </div>
@@ -1047,6 +1109,9 @@ const Index = () => {
                       notebookEntries={notebookEntries}
                       onSaveEntry={handleSaveEntry}
                       onDeleteEntry={handleDeleteEntry}
+                      onUpdateTrade={async (id, updates) => {
+                        await updateTrade(id, updates);
+                      }}
                       notebookFont={notebookFont}
                       onFontChange={setNotebookFont}
                     />

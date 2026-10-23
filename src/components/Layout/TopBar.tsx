@@ -1,5 +1,4 @@
 import { ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { RankBadge } from "@/components/Dashboard/RankBadge";
 import { Greeting } from "@/components/Layout/Greeting";
@@ -17,9 +16,10 @@ interface TopBarProps {
   profileReady?: boolean;
   showGreeting?: boolean;
   rightSlot?: ReactNode;
+  notificationsSlot?: ReactNode;
 }
 
-export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank = false, greetingName, profileReady = true, showGreeting = false, rightSlot }: TopBarProps) {
+export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank = false, greetingName, profileReady = true, showGreeting = false, rightSlot, notificationsSlot }: TopBarProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 pb-3 sm:pb-4 mb-4 sm:mb-6">
       <div className="min-w-0">
@@ -37,9 +37,7 @@ export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank =
         {onThemeChange && (
           <ThemeToggle onThemeChange={onThemeChange} />
         )}
-        <Badge variant="secondary" className="px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium text-muted-foreground hidden sm:inline-flex">
-          ATP • Private
-        </Badge>
+        {notificationsSlot}
       </div>
     </div>
   );

@@ -102,6 +102,7 @@ export function useNotebookEntries(userId: string | undefined) {
         const { error } = await supabase
           .from('notebook_entries')
           .insert({
+            id: entry.id,
             user_id: userId,
             title: entry.title,
             content: entry.content,
@@ -116,6 +117,15 @@ export function useNotebookEntries(userId: string | undefined) {
         if (error) throw error;
       }
 
+      queryClient.setQueryData<NotebookEntry[]>(queryKey, (prev = []) => {
+        const idx = prev.findIndex((e) => e.id === entry.id || (!!entry.tradeId && e.tradeId === entry.tradeId && !e.isDeleted));
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = { ...prev[idx], ...entry };
+          return next;
+        }
+        return [entry, ...prev];
+      });
       invalidate();
       return true;
     } catch (error) {

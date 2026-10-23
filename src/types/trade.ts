@@ -34,7 +34,7 @@ export interface Trade {
   session?: string;
   notes?: string;
   notebook?: string;
-  chartImage?: string;
+  chartImage?: string | null;
   accountId?: string;
   checklistId?: string;
   checklistState?: ChecklistItemState[];

@@ -4,6 +4,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { useTradeDetail } from "@/hooks/useTrades";
+import { TradeScreenshot } from "@/components/Journal/TradeScreenshot";
 import { cn } from "@/lib/utils";
 import { getTradeNetResult, journalTradeStats } from "@/lib/tradeFormat";
 import { Badge } from "@/components/ui/badge";
@@ -108,6 +109,7 @@ interface NotebookViewProps {
   notebookEntries: NotebookEntry[];
   onSaveEntry: (entry: NotebookEntry) => void;
   onDeleteEntry: (id: string) => void;
+  onUpdateTrade?: (id: string, updates: Partial<Trade>) => void | Promise<void>;
   notebookFont?: string;
   onFontChange?: (font: string) => void;
 }
@@ -200,6 +202,7 @@ export function NotebookView({
   notebookEntries,
   onSaveEntry,
   onDeleteEntry,
+  onUpdateTrade,
   notebookFont = 'inter',
   onFontChange,
 }: NotebookViewProps) {
@@ -404,25 +407,27 @@ export function NotebookView({
     getItemKey: (index) => visibleEntries[index]?.id ?? index,
   });
 
-  // Load entry content into editor — ONLY when switching to a different entry
-  // (not on every save). This prevents cursor reset and scroll-to-top while typing.
+  // Load entry content into editor when switching notes or when Journal
+  // pushes new quick-notes content into this trade-linked page.
   useEffect(() => {
     if (editorRef.current && selectedEntry) {
-      // Only replace innerHTML if it differs (i.e. switched note), not on auto-save updates
-      if (editorRef.current.innerHTML !== (selectedEntry.content || "")) {
-        editorRef.current.innerHTML = selectedEntry.content || "";
+      const incoming = selectedEntry.content || "";
+      if (editorRef.current.innerHTML !== incoming) {
+        const editorIsFocused = document.activeElement === editorRef.current;
+        if (!editorIsFocused || !editorRef.current.innerHTML.trim()) {
+          editorRef.current.innerHTML = incoming;
+        }
       }
     } else if (editorRef.current && isCreatingNew) {
       editorRef.current.innerHTML = "";
     }
     updateEditorStats(editorRef.current);
     setLastSavedAt(null);
-    // Auto-focus the editor so the user can start typing immediately.
     if (editorRef.current && !selectedEntry?.isDeleted && !isLocked && (selectedEntry || isCreatingNew)) {
       requestAnimationFrame(() => focusEditorAtEnd(editorRef.current));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEntry?.id, isCreatingNew]);
+  }, [selectedEntry?.id, selectedEntry?.content, selectedTradeId, isCreatingNew]);
 
   // Sync content when entering fullscreen
   useEffect(() => {
@@ -1109,7 +1114,6 @@ export function NotebookView({
   const linkedTrade = selectedEntry?.tradeId ? trades.find((t) => t.id === selectedEntry.tradeId) : null;
   const linkedNet = linkedTrade ? getTradeNetResult(linkedTrade) : 0;
   const { data: linkedTradeDetail } = useTradeDetail(userId, selectedEntry?.tradeId ?? null);
-  const linkedTradeChart = linkedTradeDetail?.chartImage;
   const linkedTradeChecklistState = linkedTradeDetail?.checklistState ?? linkedTrade?.checklistState;
   
   // Find the checklist used for the linked trade
@@ -2841,16 +2845,18 @@ export function NotebookView({
               </div>
             )}
 
-            {/* Trade Chart Image */}
-            {linkedTradeChart && (
+            {selectedEntry?.tradeId && (
               <div className="mt-3 pt-3 border-t border-border/30">
                 <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-2">Chart</div>
-                <img
-                  src={linkedTradeChart}
-                  alt="Trade chart"
-                  loading="lazy"
-                  className="w-full rounded-lg border border-border/30 cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => setImagePreview(linkedTradeChart!)}
+                <TradeScreenshot
+                  tradeId={selectedEntry.tradeId}
+                  userId={userId}
+                  editable={!!onUpdateTrade}
+                  onUpdate={
+                    onUpdateTrade
+                      ? (chartImage) => onUpdateTrade(selectedEntry.tradeId!, { chartImage })
+                      : undefined
+                  }
                 />
               </div>
             )}

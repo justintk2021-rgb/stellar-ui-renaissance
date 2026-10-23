@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from "react";
-import { Trade } from "@/types/trade";
+import { NotebookEntry, Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Check, X, TrendingUp, Wallet, Trophy, Activity, Target } from "lucide-react";
@@ -7,6 +7,7 @@ import { useCountUp } from "@/hooks/useCountUp";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { AccountProjectionCard } from "./AccountProjectionCard";
+import { NotificationsCard, type OpenJournalTarget } from "./NotificationsCard";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { ProjectionMetrics } from "@/lib/accountProjection";
 import { dedupeTradesForPnL, getTradeNetResult } from "@/lib/tradeFormat";
@@ -24,6 +25,9 @@ interface BalanceCardsProps {
   brokerFloatingPl?: number;
   brokerHasOpenPositions?: boolean;
   onSetBalance: (balance: number) => void;
+  tradesLoading?: boolean;
+  notebookEntries?: NotebookEntry[];
+  onOpenJournal?: (target: OpenJournalTarget) => void;
   projection: {
     accountLabel: string;
     accountSubtitle: string;
@@ -144,6 +148,9 @@ export function BalanceCards({
   brokerFloatingPl = 0,
   brokerHasOpenPositions = false,
   onSetBalance,
+  tradesLoading = false,
+  notebookEntries,
+  onOpenJournal,
   projection,
 }: BalanceCardsProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -505,8 +512,21 @@ export function BalanceCards({
         );
       })()}
 
-      {/* Reserved for a future card — keep the old Projection slot empty. */}
-      <div className="hidden md:block min-h-[1px]" aria-hidden />
+      <motion.div
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        whileHover="hover"
+        custom={2}
+        className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
+      >
+        <NotificationsCard
+          trades={trades}
+          notebookEntries={notebookEntries}
+          isLoading={tradesLoading}
+          onOpenJournal={onOpenJournal}
+        />
+      </motion.div>
     </div>
   );
 }
