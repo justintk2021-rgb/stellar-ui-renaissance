@@ -70,6 +70,7 @@ function MapCanvas({
   nodes,
   edges,
   height,
+  fill = false,
   compact,
   activeId,
   onSelect,
@@ -80,6 +81,7 @@ function MapCanvas({
   nodes: MapNode[];
   edges: MapEdge[];
   height: number;
+  fill?: boolean;
   compact?: boolean;
   activeId: string | null;
   onSelect: (id: string | null) => void;
@@ -95,12 +97,13 @@ function MapCanvas({
     if (!containerRef.current) return;
     const ro = new ResizeObserver((entries) => {
       for (const e of entries) {
-        setSize({ w: e.contentRect.width, h: height });
+        const nextH = fill && e.contentRect.height > 0 ? e.contentRect.height : height;
+        setSize({ w: e.contentRect.width, h: nextH });
       }
     });
     ro.observe(containerRef.current);
     return () => ro.disconnect();
-  }, [height]);
+  }, [fill, height]);
 
   const nodeById = useMemo(() => Object.fromEntries(nodes.map((n) => [n.id, n])), [nodes]);
   const toX = (p: number) => (p / 100) * size.w;
@@ -109,8 +112,8 @@ function MapCanvas({
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden"
-      style={{ height }}
+      className={cn("relative w-full overflow-hidden", fill && "h-full")}
+      style={fill ? undefined : { height }}
       onClick={() => interactive && onSelect(null)}
     >
       <div
@@ -388,12 +391,12 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
           </button>
         </div>
 
-        <div onClick={(e) => e.stopPropagation()}>
+        <div className={cn(compact && "flex-1 min-h-0")} onClick={(e) => e.stopPropagation()}>
           {expanded ? (
             <div
               className={cn(
                 "flex flex-col items-center justify-center bg-muted/10 text-muted-foreground",
-                compact ? "h-[200px]" : "h-[420px]",
+                compact ? "h-full min-h-[200px]" : "h-[420px]",
               )}
             >
               <Maximize2 className="w-5 h-5 mb-2 opacity-40" />
@@ -404,6 +407,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
               nodes={filtered.nodes}
               edges={filtered.edges}
               height={compact ? 200 : 420}
+              fill={compact}
               compact={compact}
               activeId={compactActiveId}
               onSelect={() => {}}
