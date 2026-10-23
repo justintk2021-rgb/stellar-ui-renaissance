@@ -2,11 +2,12 @@ import { useMemo, useState, useRef, useEffect } from "react";
 import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, X, TrendingUp, Wallet, Trophy, Activity } from "lucide-react";
+import { Check, X, TrendingUp, Wallet, Trophy, Activity, Target } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { AccountProjectionCard } from "./AccountProjectionCard";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { ProjectionMetrics } from "@/lib/accountProjection";
 import { dedupeTradesForPnL, getTradeNetResult } from "@/lib/tradeFormat";
 import {
@@ -147,6 +148,7 @@ export function BalanceCards({
 }: BalanceCardsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(startBalance.toString());
+  const [projectionOpen, setProjectionOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -413,7 +415,37 @@ export function BalanceCards({
                     )}
                   </div>
                 </div>
-                <Sparkline data={sparklineData} isPositive={equityPositive} />
+                <div className="flex items-center gap-2">
+                  <Popover open={projectionOpen} onOpenChange={setProjectionOpen} modal={false}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={projectionOpen ? "Close projection" : "Open projection"}
+                        aria-expanded={projectionOpen}
+                        className={cn(
+                          "h-8 w-8 rounded-full border border-border/40 bg-foreground/[0.04]",
+                          "flex items-center justify-center text-muted-foreground",
+                          "hover:text-primary hover:border-primary/30 hover:bg-primary/10",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                          "transition-colors",
+                          projectionOpen && "text-primary border-primary/30 bg-primary/10",
+                        )}
+                      >
+                        <Target className="w-4 h-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="end"
+                      side="bottom"
+                      sideOffset={10}
+                      collisionPadding={16}
+                      className="w-[min(24rem,calc(100vw-2rem))] p-4 liquid-glass projection-popover shadow-none data-[state=open]:animate-none data-[state=closed]:animate-none"
+                    >
+                      <AccountProjectionCard {...projection} embedded />
+                    </PopoverContent>
+                  </Popover>
+                  <Sparkline data={sparklineData} isPositive={equityPositive} />
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -473,9 +505,8 @@ export function BalanceCards({
         );
       })()}
 
-
-      {/* Account Projection */}
-      <AccountProjectionCard {...projection} />
+      {/* Reserved for a future card — keep the old Projection slot empty. */}
+      <div className="hidden md:block min-h-[1px]" aria-hidden />
     </div>
   );
 }

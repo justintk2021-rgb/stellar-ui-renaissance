@@ -27,6 +27,8 @@ interface AccountProjectionCardProps {
   metrics: ProjectionMetrics;
   onSetGoalBalance: (value: number) => Promise<boolean>;
   onSetProfitTarget: (value: number) => Promise<boolean>;
+  /** Skip the standalone card chrome when this sits inside a dialog. */
+  embedded?: boolean;
 }
 
 function Money({ value, className }: { value: number; className?: string }) {
@@ -95,6 +97,7 @@ export function AccountProjectionCard({
   metrics,
   onSetGoalBalance,
   onSetProfitTarget,
+  embedded = false,
 }: AccountProjectionCardProps) {
   const [tab, setTab] = useState<'goal' | 'profit'>('goal');
   const [editing, setEditing] = useState(false);
@@ -142,12 +145,19 @@ export function AccountProjectionCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: embedded ? 8 : 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ type: 'spring', stiffness: 280, damping: 26, delay: 0.15 }}
-      className="relative rounded-2xl p-3 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl h-auto self-start"
+      transition={{ type: 'spring', stiffness: 280, damping: 26, delay: embedded ? 0 : 0.15 }}
+      className={cn(
+        "relative overflow-hidden",
+        embedded
+          ? "p-0"
+          : "rounded-2xl p-3 bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl h-auto self-start",
+      )}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+      {!embedded && (
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+      )}
 
       <div className="relative flex flex-col gap-2">
         {/* Header */}
