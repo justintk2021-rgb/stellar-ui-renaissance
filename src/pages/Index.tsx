@@ -924,7 +924,7 @@ const Index = () => {
                             : filter === 'losses'
                               ? journalBaseTrades.filter((t) => getTradeNetResult(t) < 0).length
                               : journalBaseTrades.filter((t) => isUnjournaledTrade(t, notebookEntries)).length;
-                      const label = filter === 'unjournaled' ? 'No notes' : filter;
+                      const label = filter === 'unjournaled' ? 'Not Journaled' : filter;
                       return (
                         <motion.button
                           key={filter}
