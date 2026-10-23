@@ -203,18 +203,18 @@ export const DashboardStatsLayout = memo(function DashboardStatsLayout({
         <DialogContent
           className={
             "sm:max-w-3xl overflow-hidden rounded-3xl p-6 md:p-7 " +
-            "border border-border/50 bg-card/80 backdrop-blur-md " +
+            "border border-border/50 bg-card/70 backdrop-blur-2xl " +
             "shadow-[0_24px_80px_-16px_hsl(var(--foreground)/0.18),0_0_60px_-20px_hsl(var(--primary)/0.35)]"
           }
         >
           {/* Ambient glow accents */}
           <div
             aria-hidden
-            className="pointer-events-none absolute -top-16 -right-16 w-40 h-40 rounded-full bg-primary/18 blur-xl"
+            className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full bg-primary/20 blur-3xl"
           />
           <div
             aria-hidden
-            className="pointer-events-none absolute -bottom-16 -left-16 w-44 h-44 rounded-full bg-primary/10 blur-xl"
+            className="pointer-events-none absolute -bottom-28 -left-28 w-80 h-80 rounded-full bg-primary/10 blur-3xl"
           />
           <div
             aria-hidden

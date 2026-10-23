@@ -57,7 +57,7 @@
     --shadow-card: 0 20px 50px hsl(222 47% 4% / 0.8);
     --shadow-button: 0 10px 30px hsl(158 64% 52% / 0.3);
 
-    --glass-blur: 10px;
+    --glass-blur: 20px;
     --glass-border: hsl(217 32% 25% / 0.5);
 
     /* Sidebar */
@@ -137,7 +137,7 @@
     --shadow-card: 0 20px 50px hsl(222 47% 11% / 0.1);
     --shadow-button: 0 10px 30px hsl(158 64% 42% / 0.2);
 
-    --glass-blur: 10px;
+    --glass-blur: 20px;
     --glass-border: hsl(214 32% 80% / 0.5);
 
     /* Sidebar */
@@ -192,7 +192,7 @@
     --shadow-glow: 0 0 40px hsl(158 64% 52% / 0.25);
     --shadow-card: 0 20px 50px hsl(0 0% 0% / 0.5);
     --shadow-button: 0 10px 30px hsl(158 64% 52% / 0.3);
-    --glass-blur: 10px;
+    --glass-blur: 20px;
     --glass-border: hsl(0 0% 15% / 0.5);
     --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.2);
     --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.2);
@@ -421,13 +421,13 @@
     display: none;
   }
 
-  /* Glass morphism — lighter blur, slightly stronger fill so the look holds */
+  /* Glass morphism */
   .glass {
-    @apply backdrop-blur-md bg-card/85 border border-border/50;
+    @apply backdrop-blur-xl bg-card/80 border border-border/50;
   }
 
   .glass-strong {
-    @apply backdrop-blur-md bg-card/90 border border-border/60;
+    @apply backdrop-blur-xl bg-card/90 border border-border/60;
   }
 
   /* Floating popovers, dialogs, dropdown panels.
@@ -438,11 +438,11 @@
   }
 
   .glass-popup {
-    @apply backdrop-blur-md bg-card/80 border border-border/40 shadow-2xl shadow-black/15;
+    @apply backdrop-blur-2xl bg-card/70 border border-border/40 shadow-2xl shadow-black/15;
   }
 
   .glass-popup-panel {
-    @apply backdrop-blur-md bg-card/55 border border-white/[0.08] shadow-lg shadow-black/20;
+    @apply backdrop-blur-xl bg-card/45 border border-white/[0.08] shadow-lg shadow-black/20;
   }
 
   /* P&L calendar — days with no trades */
@@ -540,13 +540,18 @@
     mask-composite: exclude;
   }
 
-  /* Hover scale — transform only */
+  /* Hover scale */
   .hover-lift {
-    @apply transition-transform duration-300 ease-out;
+    @apply transition-all duration-300 ease-out;
   }
 
   .hover-lift:hover {
     @apply -translate-y-1;
+    box-shadow: 0 20px 40px hsl(var(--foreground) / 0.1);
+  }
+
+  .light .hover-lift:hover {
+    box-shadow: 0 20px 40px hsl(var(--foreground) / 0.08);
   }
 
   /* Stat card gradient backgrounds */
@@ -631,12 +636,10 @@
 
 @keyframes pulse-glow {
   0%, 100% {
-    opacity: 0.82;
-    transform: scale(1);
+    box-shadow: 0 0 20px hsl(158 64% 52% / 0.3);
   }
   50% {
-    opacity: 1;
-    transform: scale(1.015);
+    box-shadow: 0 0 40px hsl(158 64% 52% / 0.5);
   }
 }
 
@@ -690,11 +693,13 @@
 @keyframes entries-panel-in {
   from {
     opacity: 0;
-    transform: translateX(-16px);
+    transform: translateX(-20px);
+    width: 0;
   }
   to {
     opacity: 1;
     transform: translateX(0);
+    width: 18rem;
   }
 }
 
@@ -702,10 +707,12 @@
   from {
     opacity: 1;
     transform: translateX(0);
+    width: 18rem;
   }
   to {
     opacity: 0;
-    transform: translateX(-16px);
+    transform: translateX(-20px);
+    width: 0;
   }
 }
 
@@ -738,7 +745,7 @@
   clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 9px 50%);
   filter: drop-shadow(-3px 3px 8px hsl(var(--foreground) / 0.25));
   cursor: pointer;
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
   border: none;
   outline: none;
   animation: bookmark-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
@@ -790,6 +797,8 @@
 
 .bookmark-tab:hover {
   transform: translateX(-100%) translateX(-6px);
+  filter: drop-shadow(-5px 4px 12px hsl(var(--foreground) / 0.3))
+    drop-shadow(0 0 10px var(--bm-color-a));
 }
 
 .bookmark-tab:active {
@@ -816,7 +825,7 @@
   --note-accent: hsl(var(--primary));
   position: relative;
   isolation: isolate;
-  transition: border-color 0.35s ease, transform 0.3s ease;
+  transition: box-shadow 0.35s ease, border-color 0.35s ease;
 }
 
 .note-card:hover {
@@ -869,7 +878,7 @@
   box-shadow:
     0 4px 16px hsl(var(--primary) / 0.4),
     0 0 0 0 hsl(var(--primary) / 0.4);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
 }
 
 .notebook-fab:hover {
@@ -907,9 +916,9 @@
 
 /* Frosted panel for notebook sidebars */
 .notebook-panel {
-  background: hsl(var(--card) / 0.78);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: hsl(var(--card) / 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid hsl(var(--border) / 0.4);
   box-shadow:
     0 16px 40px -16px hsl(var(--foreground) / 0.15),
@@ -1149,15 +1158,6 @@ input[type="number"]::-webkit-outer-spin-button {
   .app-starfield::before,
   .app-starfield::after {
     animation: none;
-  }
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
 }
 

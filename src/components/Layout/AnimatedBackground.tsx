@@ -1,31 +1,10 @@
 import { useRef, useMemo, Suspense, useEffect, useState } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
 import * as THREE from "three";
 import { useAppearanceStarColors } from "@/hooks/useAppearanceStarColors";
-import { useAnimationGate } from "@/hooks/useAnimationGate";
 
-function FrameLimiter({ active, fps = 30 }: { active: boolean; fps?: number }) {
-  const invalidate = useThree((s) => s.invalidate);
-  useEffect(() => {
-    if (!active) return;
-    invalidate();
-    let raf = 0;
-    let last = 0;
-    const interval = 1000 / fps;
-    const tick = (t: number) => {
-      raf = requestAnimationFrame(tick);
-      if (t - last >= interval) {
-        last = t;
-        invalidate();
-      }
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [active, fps, invalidate]);
-  return null;
-}
-
+// Floating Particles — tinted with accent appearance
 function Particles({
   count,
   accentPrimary,
@@ -98,20 +77,18 @@ function Particles({
   );
 }
 
+// Background Scene
 function BackgroundScene({
   particleCount,
   starCount,
   colors,
-  active,
 }: {
   particleCount: number;
   starCount: number;
   colors: ReturnType<typeof useAppearanceStarColors>;
-  active: boolean;
 }) {
   return (
     <>
-      <FrameLimiter active={active} fps={30} />
       <ambientLight intensity={colors.isLight ? 0.35 : 0.2} />
       <Particles
         count={particleCount}
@@ -142,32 +119,38 @@ function BackgroundScene({
 
 export function AnimatedBackground() {
   const appearanceColors = useAppearanceStarColors();
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const { active, reduced } = useAnimationGate(wrapperRef);
-  const [isSmall, setIsSmall] = useState(
+  // Pause rendering when tab is hidden, and reduce work on small screens / reduced motion
+  const [isActive, setIsActive] = useState(true);
+  const reduced = useMemo(
+    () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+    []
+  );
+  const isSmall = useMemo(
     () => typeof window !== "undefined" && window.innerWidth < 768,
+    []
   );
 
   useEffect(() => {
-    const onResize = () => setIsSmall(window.innerWidth < 768);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    const onVis = () => setIsActive(!document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
-  const particleCount = isSmall ? 28 : 48;
-  const starCount = isSmall ? 400 : 900;
+  const particleCount = isSmall ? 60 : 100;
+  const starCount = isSmall ? 800 : 2000;
 
   return (
     <>
+      {/* CSS stars — always visible in margins and while WebGL loads */}
       <div className="app-starfield" aria-hidden>
         <div className="app-starfield-glow" aria-hidden />
       </div>
       {!reduced && (
-        <div ref={wrapperRef} className="fixed inset-0 z-0 pointer-events-none">
+        <div className="fixed inset-0 z-0 pointer-events-none">
           <Canvas
             camera={{ position: [0, 0, 10], fov: 45 }}
-            dpr={[1, 1.25]}
-            frameloop="demand"
+            dpr={[1, 1.5]}
+            frameloop={isActive ? "always" : "never"}
             gl={{ antialias: false, powerPreference: "low-power", alpha: true }}
             style={{ background: "transparent" }}
           >
@@ -176,7 +159,6 @@ export function AnimatedBackground() {
                 particleCount={particleCount}
                 starCount={starCount}
                 colors={appearanceColors}
-                active={active}
               />
             </Suspense>
           </Canvas>
@@ -185,3 +167,4 @@ export function AnimatedBackground() {
     </>
   );
 }
+

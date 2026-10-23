@@ -37,7 +37,6 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { AnimatedPathBeam } from "@/components/ui/animated-beam";
-import { useAnimationGate } from "@/hooks/useAnimationGate";
 
 interface TradingIntelligenceMapProps {
   trades: Trade[];
@@ -92,7 +91,6 @@ function MapCanvas({
   interactive?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { active: beamsActive } = useAnimationGate(containerRef);
   const [size, setSize] = useState({ w: 800, h: height });
   const gradPrefix = compact ? "im-c" : "im-e";
 
@@ -175,7 +173,6 @@ function MapCanvas({
               duration={8 + (i % 5) * 1.2}
               delay={(i % 7) * 0.4}
               reverse={i % 2 === 1}
-              paused={!beamsActive}
             />
           );
         })}
@@ -354,7 +351,7 @@ export const TradingIntelligenceMap = memo(function TradingIntelligenceMap({ tra
     <>
       <div
         className={cn(
-          "group relative rounded-2xl bg-gradient-to-br from-card/60 via-card/40 to-card/20 backdrop-blur-md border border-border/40 shadow-xl overflow-hidden",
+          "group relative rounded-2xl bg-gradient-to-br from-card/60 via-card/40 to-card/20 backdrop-blur-xl border border-border/40 shadow-xl overflow-hidden",
           compact ? "flex flex-col h-full min-h-0 cursor-pointer" : "",
           expanded && "opacity-60",
         )}
@@ -363,8 +360,8 @@ export const TradingIntelligenceMap = memo(function TradingIntelligenceMap({ tra
         tabIndex={compact && !expanded ? 0 : undefined}
         onKeyDown={compact && !expanded ? (e) => { if (e.key === "Enter" || e.key === " ") openExpanded(); } : undefined}
       >
-        <div className="pointer-events-none absolute -top-16 -left-16 w-40 h-40 rounded-full bg-primary/12 blur-xl opacity-50" />
-        <div className="pointer-events-none absolute -bottom-16 -right-16 w-40 h-40 rounded-full bg-violet-500/10 blur-xl opacity-50" />
+        <div className="pointer-events-none absolute -top-20 -left-20 w-64 h-64 rounded-full bg-primary/10 blur-3xl opacity-60" />
+        <div className="pointer-events-none absolute -bottom-20 -right-20 w-64 h-64 rounded-full bg-violet-500/5 blur-3xl opacity-60" />
 
         <div className={cn("relative flex items-center justify-between", compact ? "px-3 pt-3 pb-2" : "px-5 pt-5 pb-3")}>
           <div className="flex items-center gap-2.5 min-w-0">

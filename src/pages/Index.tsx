@@ -779,7 +779,7 @@ const Index = () => {
         )}
 
         <main className={cn(
-          "flex-1 min-w-0",
+          "flex-1 transition-[margin-left] duration-300 min-w-0",
           !sidebarCollapsed && "lg:ml-72 lg:w-[calc(100%-18rem)]"
         )}>
           <div className="glass-strong min-h-screen p-3 sm:p-4 lg:p-6">

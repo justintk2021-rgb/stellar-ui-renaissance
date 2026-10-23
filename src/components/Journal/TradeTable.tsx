@@ -308,10 +308,11 @@ function TradeEntry({ trade, checklists, userId, onEdit, onDelete, onViewNotes, 
       <AnimatePresence>
         {isExpanded && (
           <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden"
           >
             <div className="px-5 pb-4 pl-14 bg-card/20 border-t border-border/10">
               {trade.importedFromBroker && (trade.openTime || trade.closeTime) && (
