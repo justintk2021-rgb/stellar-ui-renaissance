@@ -447,13 +447,13 @@ const Index = () => {
   const showJournalWinLossFilter = !compareOpen;
 
   const journalBaseTrades = useMemo(() => {
-    if (!journalDateRange) return dedupeTradesForPnL(trades);
+    if (!journalDateRange) return trades;
     const startStr = formatLocalDateKey(journalDateRange.start);
     const endStr = formatLocalDateKey(journalDateRange.end);
-    return dedupeTradesForPnL(trades.filter((t) => {
+    return trades.filter((t) => {
       const d = getTradeCloseLocalDateKey(t);
       return d >= startStr && d <= endStr;
-    }));
+    });
   }, [trades, journalDateRange]);
 
   const journalViewData = useMemo(() => {
@@ -469,8 +469,9 @@ const Index = () => {
 
     // Broker day totals only apply when that broker account is selected —
     // otherwise days from other accounts would bleed into this calendar.
+    // Calendar totals stay position-deduped so re-sync rows do not inflate P&L.
     const pnlMap = buildDailyPnLMap(
-      rangeFiltered,
+      dedupeTradesForPnL(rangeFiltered),
       selectedBrokerAccountId ? brokerDayTotals : null,
     );
 
