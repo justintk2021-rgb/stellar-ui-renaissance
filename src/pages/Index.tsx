@@ -28,6 +28,11 @@ import {
   getTradeNetResult,
 } from "@/lib/tradeFormat";
 import { isUnjournaledTrade, type JournalFilter } from "@/lib/notifications";
+import {
+  notebookPlainText,
+  plainTextToNotebookHtml,
+  shouldWriteQuickNotesToNotebook,
+} from "@/lib/notebookSync";
 import type { OpenJournalTarget } from "@/components/Dashboard/NotificationsCard";
 import { queryKeys } from "@/lib/queries/keys";
 import { fetchTradesList } from "@/lib/queries/trades";
@@ -63,31 +68,6 @@ const PageFallback = () => (
     <RefreshCw className="h-5 w-5 text-muted-foreground/60 animate-spin" />
   </div>
 );
-
-function notebookPlainText(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/\s+\n/g, "\n")
-    .trim();
-}
-
-function plainTextToNotebookHtml(text: string): string {
-  const escaped = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  if (!escaped.trim()) return "";
-  return escaped
-    .split(/\n{2,}/)
-    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br/>")}</p>`)
-    .join("");
-}
 
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
@@ -727,42 +707,49 @@ const Index = () => {
 
   const handleSaveEntry = useCallback(async (entry: NotebookEntry) => {
     await saveNotebookEntry(entry);
-  }, [saveNotebookEntry]);
+    if (entry.tradeId) {
+      await updateTrade(entry.tradeId, { notes: notebookPlainText(entry.content) });
+    }
+  }, [saveNotebookEntry, updateTrade]);
 
   const handleDeleteEntry = useCallback(async (id: string) => {
     await deleteNotebookEntry(id);
   }, [deleteNotebookEntry]);
 
-  const handleSelectForNotebook = useCallback(async (id: string, quickNotes?: string) => {
-    const trade = trades.find(t => t.id === id);
-    const existing = notebookEntries.find(e => e.tradeId === id && !e.isDeleted);
+  const upsertNotebookFromQuickNotes = useCallback(async (id: string, quickNotes?: string) => {
+    const trade = trades.find((t) => t.id === id);
+    const existing = notebookEntries.find((e) => e.tradeId === id && !e.isDeleted);
     const seed = (quickNotes ?? trade?.notes ?? "").trim();
+    if (!shouldWriteQuickNotesToNotebook(seed, existing?.content) && existing) {
+      if (seed) await updateTrade(id, { notes: seed });
+      return existing;
+    }
+
     const html = plainTextToNotebookHtml(seed);
     const now = new Date().toISOString();
+    const entry: NotebookEntry = existing
+      ? { ...existing, content: html || existing.content, updatedAt: now }
+      : {
+          id: crypto.randomUUID(),
+          title: trade ? `${trade.pair} - ${trade.direction} Trade` : "Trade note",
+          content: html,
+          category: "trade-notes",
+          date: trade?.date || now.slice(0, 10),
+          tradeId: id,
+          createdAt: now,
+          updatedAt: now,
+        };
 
-    if (!existing && trade) {
-      const newEntry: NotebookEntry = {
-        id: crypto.randomUUID(),
-        title: `${trade.pair} - ${trade.direction} Trade`,
-        content: html,
-        category: 'trade-notes',
-        date: trade.date,
-        tradeId: trade.id,
-        createdAt: now,
-        updatedAt: now,
-      };
-      await saveNotebookEntry(newEntry);
-    } else if (existing && seed && !notebookPlainText(existing.content).trim()) {
-      await saveNotebookEntry({ ...existing, content: html, updatedAt: now });
-    }
+    await saveNotebookEntry(entry);
+    if (seed) await updateTrade(id, { notes: seed });
+    return entry;
+  }, [notebookEntries, trades, saveNotebookEntry, updateTrade]);
 
-    if (seed) {
-      await updateTrade(id, { notes: seed });
-    }
-
+  const handleSelectForNotebook = useCallback(async (id: string, quickNotes?: string) => {
+    await upsertNotebookFromQuickNotes(id, quickNotes);
     setSelectedTradeId(id);
     setCurrentPage('notebook');
-  }, [notebookEntries, trades, saveNotebookEntry, updateTrade]);
+  }, [upsertNotebookFromQuickNotes]);
 
   const { title, subtitle } = pageInfo[currentPage] ?? pageInfo.dashboard;
   const todayKey = formatLocalDateKey(new Date());
@@ -1042,6 +1029,9 @@ const Index = () => {
                               onOpenPlaybook={() => setCurrentPage('playbook')}
                               onUpdateTrade={async (id, updates) => {
                                 await updateTrade(id, updates);
+                                if (typeof updates.notes === "string") {
+                                  await upsertNotebookFromQuickNotes(id, updates.notes);
+                                }
                               }}
                               onClearAll={handleClearAll}
                               focusTradeId={journalFocusTradeId}

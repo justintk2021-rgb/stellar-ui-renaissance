@@ -51,7 +51,7 @@ interface TradeTableProps {
   userId?: string;
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
-  onSelectForNotebook: (id: string, quickNotes?: string) => void;
+  onSelectForNotebook: (id: string, quickNotes?: string) => void | Promise<void>;
   onOpenPlaybook?: () => void;
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void | Promise<void>;
   onClearAll?: () => void;
@@ -1034,10 +1034,7 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                     variant={selectedTradeNote ? "outline" : "ghost"}
                     onClick={async () => {
                       if (!selectedTrade) return;
-                      if (onUpdateTrade) {
-                        await onUpdateTrade(selectedTrade.id, { notes: notesDraft });
-                      }
-                      onSelectForNotebook(selectedTrade.id, notesDraft);
+                      await onSelectForNotebook(selectedTrade.id, notesDraft);
                       handleCloseModal();
                     }}
                     className="gap-2"

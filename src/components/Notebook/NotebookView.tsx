@@ -404,25 +404,27 @@ export function NotebookView({
     getItemKey: (index) => visibleEntries[index]?.id ?? index,
   });
 
-  // Load entry content into editor — ONLY when switching to a different entry
-  // (not on every save). This prevents cursor reset and scroll-to-top while typing.
+  // Load entry content into editor when switching notes or when Journal
+  // pushes new quick-notes content into this trade-linked page.
   useEffect(() => {
     if (editorRef.current && selectedEntry) {
-      // Only replace innerHTML if it differs (i.e. switched note), not on auto-save updates
-      if (editorRef.current.innerHTML !== (selectedEntry.content || "")) {
-        editorRef.current.innerHTML = selectedEntry.content || "";
+      const incoming = selectedEntry.content || "";
+      if (editorRef.current.innerHTML !== incoming) {
+        const editorIsFocused = document.activeElement === editorRef.current;
+        if (!editorIsFocused || !editorRef.current.innerHTML.trim()) {
+          editorRef.current.innerHTML = incoming;
+        }
       }
     } else if (editorRef.current && isCreatingNew) {
       editorRef.current.innerHTML = "";
     }
     updateEditorStats(editorRef.current);
     setLastSavedAt(null);
-    // Auto-focus the editor so the user can start typing immediately.
     if (editorRef.current && !selectedEntry?.isDeleted && !isLocked && (selectedEntry || isCreatingNew)) {
       requestAnimationFrame(() => focusEditorAtEnd(editorRef.current));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEntry?.id, isCreatingNew]);
+  }, [selectedEntry?.id, selectedEntry?.content, selectedTradeId, isCreatingNew]);
 
   // Sync content when entering fullscreen
   useEffect(() => {
