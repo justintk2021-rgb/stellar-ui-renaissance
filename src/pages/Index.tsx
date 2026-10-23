@@ -26,6 +26,8 @@ import {
   getTradeCloseLocalDateKey,
   getTradeNetResult,
 } from "@/lib/tradeFormat";
+import { isUnjournaledTrade, type JournalFilter } from "@/lib/notifications";
+import type { OpenJournalTarget } from "@/components/Dashboard/NotificationsCard";
 import { queryKeys } from "@/lib/queries/keys";
 import { fetchTradesList } from "@/lib/queries/trades";
 import { useBrokerTodayPnL } from "@/hooks/useBrokerTodayPnL";
@@ -420,8 +422,10 @@ const Index = () => {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
-  const [journalFilter, setJournalFilter] = useState<'all' | 'wins' | 'losses'>('all');
+  const [journalFilter, setJournalFilter] = useState<JournalFilter>('all');
   const [journalDateRange, setJournalDateRange] = useState<{ start: Date; end: Date } | null>(null);
+  const [journalFocusTradeId, setJournalFocusTradeId] = useState<string | null>(null);
+  const [journalOpenNotes, setJournalOpenNotes] = useState(false);
 
   // Compare view state — hydrated from URL so the view is shareable.
   const [compareOpen, setCompareOpen] = useState(false);
@@ -459,7 +463,9 @@ const Index = () => {
         ? journalBaseTrades
         : activeFilter === 'wins'
           ? journalBaseTrades.filter((t) => getTradeNetResult(t) > 0)
-          : journalBaseTrades.filter((t) => getTradeNetResult(t) < 0);
+          : activeFilter === 'losses'
+            ? journalBaseTrades.filter((t) => getTradeNetResult(t) < 0)
+            : journalBaseTrades.filter(isUnjournaledTrade);
 
     const rangeFiltered = winLossFiltered;
 
@@ -500,6 +506,20 @@ const Index = () => {
     closeCompareView();
     setCurrentPage(page);
   }, [closeCompareView]);
+
+  const handleOpenJournal = useCallback((target: OpenJournalTarget) => {
+    closeCompareView();
+    setJournalFilter(target.filter ?? 'unjournaled');
+    setJournalDateRange(null);
+    setJournalFocusTradeId(target.tradeId ?? null);
+    setJournalOpenNotes(Boolean(target.openNotes && target.tradeId));
+    setCurrentPage('journal');
+  }, [closeCompareView]);
+
+  const handleJournalFocusHandled = useCallback(() => {
+    setJournalFocusTradeId(null);
+    setJournalOpenNotes(false);
+  }, []);
 
   useEffect(() => {
     if (currentPage !== 'journal' && compareOpen) {
@@ -824,6 +844,8 @@ const Index = () => {
                       brokerFloatingPl={brokerFloatingPl}
                       brokerHasOpenPositions={brokerHasOpenPositions}
                       onSetBalance={handleSetBalance}
+                      tradesLoading={tradesLoading}
+                      onOpenJournal={handleOpenJournal}
                       projection={{
                         accountLabel: accountProjection.accountLabel,
                         accountSubtitle: accountProjection.accountSubtitle,
@@ -890,15 +912,18 @@ const Index = () => {
                   
                   {/* Filter Tabs — hidden during compare only */}
                   {showJournalWinLossFilter && (
-                  <motion.div variants={staggerItem} className="flex items-center gap-1 p-1 rounded-xl bg-muted/40 border border-border/30 w-fit">
-                    {(['all', 'wins', 'losses'] as const).map((filter) => {
+                  <motion.div variants={staggerItem} className="flex items-center gap-1 p-1 rounded-xl bg-muted/40 border border-border/30 w-fit flex-wrap">
+                    {(['all', 'wins', 'losses', 'unjournaled'] as const).map((filter) => {
                       const isActive = journalFilter === filter;
                       const count =
                         filter === 'all'
                           ? journalBaseTrades.length
                           : filter === 'wins'
                             ? journalBaseTrades.filter((t) => getTradeNetResult(t) > 0).length
-                            : journalBaseTrades.filter((t) => getTradeNetResult(t) < 0).length;
+                            : filter === 'losses'
+                              ? journalBaseTrades.filter((t) => getTradeNetResult(t) < 0).length
+                              : journalBaseTrades.filter(isUnjournaledTrade).length;
+                      const label = filter === 'unjournaled' ? 'No notes' : filter;
                       return (
                         <motion.button
                           key={filter}
@@ -922,7 +947,7 @@ const Index = () => {
                               transition={{ type: "spring", stiffness: 350, damping: 30 }}
                             />
                           )}
-                          <span className="relative z-10 capitalize">{filter}</span>
+                          <span className="relative z-10 capitalize">{label}</span>
                           <span className={cn(
                             "relative z-10 text-[10px] px-1.5 py-0.5 rounded-full font-mono",
                             isActive ? "bg-white/20" : "bg-muted/60"
@@ -975,6 +1000,9 @@ const Index = () => {
                                 await updateTrade(id, updates);
                               }}
                               onClearAll={handleClearAll}
+                              focusTradeId={journalFocusTradeId}
+                              openNotesOnFocus={journalOpenNotes}
+                              onFocusHandled={handleJournalFocusHandled}
                             />
                             </Suspense>
                           </div>

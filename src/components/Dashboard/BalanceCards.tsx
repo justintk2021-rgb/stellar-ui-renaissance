@@ -7,6 +7,7 @@ import { useCountUp } from "@/hooks/useCountUp";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { AccountProjectionCard } from "./AccountProjectionCard";
+import { NotificationsCard, type OpenJournalTarget } from "./NotificationsCard";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { ProjectionMetrics } from "@/lib/accountProjection";
 import { dedupeTradesForPnL, getTradeNetResult } from "@/lib/tradeFormat";
@@ -24,6 +25,8 @@ interface BalanceCardsProps {
   brokerFloatingPl?: number;
   brokerHasOpenPositions?: boolean;
   onSetBalance: (balance: number) => void;
+  tradesLoading?: boolean;
+  onOpenJournal?: (target: OpenJournalTarget) => void;
   projection: {
     accountLabel: string;
     accountSubtitle: string;
@@ -144,6 +147,8 @@ export function BalanceCards({
   brokerFloatingPl = 0,
   brokerHasOpenPositions = false,
   onSetBalance,
+  tradesLoading = false,
+  onOpenJournal,
   projection,
 }: BalanceCardsProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -505,8 +510,20 @@ export function BalanceCards({
         );
       })()}
 
-      {/* Reserved for a future card — keep the old Projection slot empty. */}
-      <div className="hidden md:block min-h-[1px]" aria-hidden />
+      <motion.div
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        whileHover="hover"
+        custom={2}
+        className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
+      >
+        <NotificationsCard
+          trades={trades}
+          isLoading={tradesLoading}
+          onOpenJournal={onOpenJournal}
+        />
+      </motion.div>
     </div>
   );
 }

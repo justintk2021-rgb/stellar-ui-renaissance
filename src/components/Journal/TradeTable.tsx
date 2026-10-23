@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, ClipboardCheck, ArrowLeft, Clock, LogIn, LogOut, Timer, Check, History } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -53,6 +54,9 @@ interface TradeTableProps {
   onSelectForNotebook: (id: string) => void;
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void | Promise<void>;
   onClearAll?: () => void;
+  focusTradeId?: string | null;
+  openNotesOnFocus?: boolean;
+  onFocusHandled?: () => void;
 }
 
 // Helper to extract plain text from HTML
@@ -425,12 +429,14 @@ function TradeEntry({ trade, checklists, userId, onEdit, onDelete, onViewNotes, 
   );
 }
 
-export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onUpdateTrade }: TradeTableProps) {
+export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onUpdateTrade, focusTradeId, openNotesOnFocus = false, onFocusHandled }: TradeTableProps) {
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [dayTrades, setDayTrades] = useState<Trade[] | null>(null);
   const [notesView, setNotesView] = useState<'list' | 'note'>('list');
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
   const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriod>("all");
   const [historySymbol, setHistorySymbol] = useState<string>("__all__");
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -492,9 +498,46 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
   const handleViewNotes = (trade: Trade) => {
     setDayTrades(null);
     setSelectedTrade(trade);
+    setNotesDraft(trade.notes ?? "");
     setNotesView('note');
     setNotesModalOpen(true);
   };
+
+  useEffect(() => {
+    if (!focusTradeId) return;
+    if (historyPeriod !== "all" || historySymbol !== "__all__") {
+      setHistoryPeriod("all");
+      setHistorySymbol("__all__");
+      return;
+    }
+    const index = filteredTrades.findIndex((t) => t.id === focusTradeId);
+    if (index < 0) {
+      onFocusHandled?.();
+      return;
+    }
+    const trade = filteredTrades[index];
+    rowVirtualizer.scrollToIndex(index, { align: "center" });
+    setExpandedTradeId(trade.id);
+    if (openNotesOnFocus) {
+      setDayTrades(null);
+      setSelectedTrade(trade);
+      setNotesDraft(trade.notes ?? "");
+      setNotesView("note");
+      setNotesModalOpen(true);
+    } else {
+      requestAnimationFrame(() => {
+        document.getElementById(`trade-row-${trade.id}`)?.scrollIntoView({
+          block: "center",
+          behavior: "smooth",
+        });
+      });
+    }
+    onFocusHandled?.();
+  }, [focusTradeId, filteredTrades, historyPeriod, historySymbol, openNotesOnFocus, onFocusHandled, rowVirtualizer]);
+
+  useEffect(() => {
+    if (selectedTrade) setNotesDraft(selectedTrade.notes ?? "");
+  }, [selectedTrade]);
 
   const handleSelectTradeFromList = (trade: Trade) => {
     setSelectedTrade(trade);
@@ -707,6 +750,8 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                   return (
                     <div
                       key={trade.id}
+                      id={`trade-row-${trade.id}`}
+                      data-trade-id={trade.id}
                       style={{
                         position: 'absolute',
                         top: 0,
@@ -918,23 +963,41 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                         )}
                       </div>
                     </>
-                  ) : selectedTrade.notes ? (
-                    <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
-                      <p className="text-sm text-foreground whitespace-pre-wrap break-words">{selectedTrade.notes}</p>
-                    </div>
                   ) : (
-                    <div className="flex-1 flex items-center justify-center px-5 py-8">
-                      <div className="text-center">
-                        <FileText className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-                        <p className="text-sm text-muted-foreground italic">No note for this trade yet.</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">Click "Create Note" below to add one.</p>
-                      </div>
+                    <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar">
+                      <Textarea
+                        value={notesDraft}
+                        onChange={(e) => setNotesDraft(e.target.value)}
+                        placeholder="Add notes for this trade…"
+                        className="min-h-[160px] resize-none bg-background/40"
+                        aria-label="Trade notes"
+                      />
                     </div>
                   )}
                 </div>
                 <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border/40 flex-shrink-0">
+                  {!selectedTradeNote && onUpdateTrade && (
+                    <Button
+                      variant="default"
+                      disabled={savingNotes}
+                      onClick={async () => {
+                        if (!selectedTrade) return;
+                        setSavingNotes(true);
+                        try {
+                          await onUpdateTrade(selectedTrade.id, { notes: notesDraft });
+                          handleCloseModal();
+                        } finally {
+                          setSavingNotes(false);
+                        }
+                      }}
+                      className="gap-2"
+                    >
+                      <Check className="w-4 h-4" />
+                      {savingNotes ? "Saving…" : "Save notes"}
+                    </Button>
+                  )}
                   <Button
-                    variant={selectedTradeNote ? "outline" : "default"}
+                    variant={selectedTradeNote ? "outline" : "ghost"}
                     onClick={() => {
                       if (selectedTrade) {
                         onSelectForNotebook(selectedTrade.id);
