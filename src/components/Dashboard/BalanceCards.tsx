@@ -2,11 +2,17 @@ import { useMemo, useState, useRef, useEffect } from "react";
 import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, X, TrendingUp, Wallet, Trophy, Activity } from "lucide-react";
+import { Check, X, TrendingUp, Wallet, Trophy, Activity, Target } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { AccountProjectionCard } from "./AccountProjectionCard";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { ProjectionMetrics } from "@/lib/accountProjection";
 import { dedupeTradesForPnL, getTradeNetResult } from "@/lib/tradeFormat";
 import {
@@ -147,6 +153,7 @@ export function BalanceCards({
 }: BalanceCardsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(startBalance.toString());
+  const [projectionOpen, setProjectionOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -240,7 +247,7 @@ export function BalanceCards({
   const isPositive = balanceChange >= 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
       {/* Balance Card */}
       <motion.div
         variants={cardVariants}
@@ -413,7 +420,26 @@ export function BalanceCards({
                     )}
                   </div>
                 </div>
-                <Sparkline data={sparklineData} isPositive={equityPositive} />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="Open projection"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setProjectionOpen(true);
+                    }}
+                    className={cn(
+                      "h-8 w-8 rounded-full border border-border/40 bg-foreground/[0.04]",
+                      "flex items-center justify-center text-muted-foreground",
+                      "hover:text-primary hover:border-primary/30 hover:bg-primary/10",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                      "transition-colors",
+                    )}
+                  >
+                    <Target className="w-4 h-4" />
+                  </button>
+                  <Sparkline data={sparklineData} isPositive={equityPositive} />
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -473,9 +499,14 @@ export function BalanceCards({
         );
       })()}
 
-
-      {/* Account Projection */}
-      <AccountProjectionCard {...projection} />
+      <Dialog open={projectionOpen} onOpenChange={setProjectionOpen}>
+        <DialogContent className="sm:max-w-lg overflow-hidden rounded-3xl p-6 md:p-7 liquid-glass">
+          <DialogHeader>
+            <DialogTitle className="sr-only">Projection</DialogTitle>
+          </DialogHeader>
+          <AccountProjectionCard {...projection} embedded />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
