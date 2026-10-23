@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { AnimatedPathBeam } from "@/components/ui/animated-beam";
+import { useAnimationGate } from "@/hooks/useAnimationGate";
 
 interface TradingIntelligenceMapProps {
   trades: Trade[];
@@ -91,6 +92,7 @@ function MapCanvas({
   interactive?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { active: beamsActive } = useAnimationGate(containerRef);
   const [size, setSize] = useState({ w: 800, h: height });
   const gradPrefix = compact ? "im-c" : "im-e";
 
@@ -113,7 +115,7 @@ function MapCanvas({
   return (
     <div
       ref={containerRef}
-      className={cn("relative w-full overflow-hidden", fill && "h-full")}
+      className={cn("relative w-full overflow-hidden gpu-layer", fill && "h-full")}
       style={fill ? undefined : { height }}
       onClick={() => interactive && onSelect(null)}
     >
@@ -124,7 +126,7 @@ function MapCanvas({
           backgroundSize: "28px 28px",
         }}
       />
-      <svg width={size.w} height={size.h} className="absolute inset-0">
+      <svg width={size.w} height={size.h} className="absolute inset-0 transform-gpu">
         <defs>
           {(["positive", "negative", "neutral"] as const).map((s) => (
             <radialGradient key={s} id={`${gradPrefix}-grad-${s}`} cx="50%" cy="50%" r="50%">
@@ -173,6 +175,7 @@ function MapCanvas({
               duration={8 + (i % 5) * 1.2}
               delay={(i % 7) * 0.4}
               reverse={i % 2 === 1}
+              paused={!beamsActive}
             />
           );
         })}

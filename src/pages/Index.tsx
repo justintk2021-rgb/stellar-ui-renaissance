@@ -44,16 +44,12 @@ const CommunityView = lazy(() => import("@/components/Community/CommunityView").
 const PropFirmView = lazy(() => import("@/components/PropFirm/PropFirmView").then(m => ({ default: m.PropFirmView })));
 const LearningView = lazy(() => import("@/components/Learning/LearningView").then(m => ({ default: m.LearningView })));
 
-// 3D animated background is ~600KB (three.js + drei). Lazy-load and only mount on the dashboard tab.
-const AnimatedBackground = lazy(() => import("@/components/Layout/AnimatedBackground").then(m => ({ default: m.AnimatedBackground })));
-
 import { Helmet } from "react-helmet";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
 import { LoadingScreen } from "@/components/Layout/LoadingScreen";
 import { AnimatePresence, motion } from "framer-motion";
@@ -736,15 +732,6 @@ const Index = () => {
 
       {/* Boot overlay — app mounts and loads underneath, then this fades out */}
       <AnimatePresence>{!bootComplete && <LoadingScreen />}</AnimatePresence>
-
-      {/* Star background — visible in side margins and behind glass panels */}
-      <ErrorBoundary
-        fallback={<div className="app-starfield fixed inset-0 z-0 pointer-events-none" aria-hidden />}
-      >
-        <Suspense fallback={<div className="app-starfield" aria-hidden />}>
-          <AnimatedBackground />
-        </Suspense>
-      </ErrorBoundary>
 
       {/* Global Sidebar - works for all pages */}
       <Sidebar 

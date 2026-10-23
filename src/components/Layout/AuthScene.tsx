@@ -1,4 +1,4 @@
-import { useRef, useMemo, Suspense } from "react";
+import { useRef, useMemo, Suspense, useEffect, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Float, MeshDistortMaterial, Sphere, Stars } from "@react-three/drei";
 import * as THREE from "three";
@@ -76,12 +76,22 @@ function Scene() {
 const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches;
 
 export function AuthScene() {
+  const [tabVisible, setTabVisible] = useState(() =>
+    typeof document === "undefined" ? true : !document.hidden,
+  );
+
+  useEffect(() => {
+    const onVis = () => setTabVisible(!document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
   return (
     <Canvas
       camera={{ position: [0, 0, 6], fov: 50 }}
       dpr={isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5)}
       gl={{ powerPreference: isMobile ? "low-power" : "high-performance", antialias: false }}
-      frameloop="always"
+      frameloop={tabVisible ? "always" : "never"}
     >
       <Suspense fallback={null}>
         <Scene />

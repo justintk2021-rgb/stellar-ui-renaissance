@@ -68,12 +68,15 @@ export function SpotlightCard({
         "group/spot relative h-full w-full rounded-2xl",
         // Gradient border via padded gradient wrapper
         "bg-gradient-to-br from-border/60 via-border/20 to-border/60 p-px",
-        "transition-shadow duration-300",
-        "hover:shadow-[0_0_30px_-8px_hsl(var(--primary)/0.35)]",
         onClick && "cursor-pointer select-none",
         className,
       )}
     >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300 group-hover/spot:opacity-100"
+        style={{ boxShadow: "0 0 30px -8px hsl(var(--primary) / 0.35)" }}
+      />
       <div className="relative h-full w-full overflow-hidden rounded-[calc(1rem-1px)] bg-card/60 backdrop-blur-xl">
         {/* Mouse-tracking spotlight */}
         <div
