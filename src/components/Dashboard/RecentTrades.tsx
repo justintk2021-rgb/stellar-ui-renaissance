@@ -117,7 +117,7 @@ export function RecentTrades({ trades, brokerConnectionId = null }: RecentTrades
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.3, type: "spring" as const, stiffness: 200 }}
-      className="relative rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl flex flex-col min-h-[340px]"
+      className="relative rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl flex flex-col min-h-[340px] h-full"
     >
       <Tabs defaultValue="recent" className="flex flex-col flex-1">
         <div className="flex items-center justify-between mb-4">

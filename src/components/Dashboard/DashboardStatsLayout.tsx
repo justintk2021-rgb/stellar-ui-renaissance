@@ -237,7 +237,7 @@ export function DashboardStatsLayout({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="min-h-[280px] lg:min-h-[300px] flex flex-col h-full"
+          className="min-h-[280px] lg:min-h-[520px] flex flex-col h-full"
         >
           <Suspense fallback={<WidgetFallback minHeight={280} />}>
             <TradingIntelligenceMap trades={trades} compact />
@@ -247,7 +247,7 @@ export function DashboardStatsLayout({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="lg:col-span-3 min-w-0 min-h-[280px] lg:min-h-[300px]"
+          className="lg:col-span-3 min-w-0 min-h-[280px] lg:min-h-[520px] h-full"
         >
           <Suspense fallback={<WidgetFallback minHeight={280} />}>
             <RecentTrades trades={trades} brokerConnectionId={brokerConnectionId} />

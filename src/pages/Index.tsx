@@ -753,10 +753,7 @@ const Index = () => {
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
-      <div className={cn(
-        "relative z-10 min-h-screen flex flex-col gap-3 p-2 sm:p-3 w-full",
-        !isChartPage && "lg:p-5"
-      )}>
+      <div className="relative z-10 min-h-screen flex flex-col w-full pb-20 lg:pb-0">
         {/* Mobile Header */}
         {!isChartPage && (
           <div className="lg:hidden glass-strong rounded-2xl p-3 sm:p-4 flex items-center gap-3">
@@ -782,15 +779,10 @@ const Index = () => {
 
         <main className={cn(
           "flex-1 transition-[margin-left] duration-300 min-w-0",
-          !isChartPage && sidebarCollapsed && "lg:ml-24"
+          !sidebarCollapsed && "lg:ml-72 lg:w-[calc(100%-18rem)]"
         )}>
-          <div className={cn(
-            "glass-strong rounded-2xl min-h-[calc(100vh-120px)]",
-            isChartPage ? "p-3 sm:p-4 lg:min-h-[calc(100vh-100px)]" : "p-3 sm:p-4 lg:p-6 lg:min-h-[calc(100vh-60px)]"
-          )}>
-            <div className={cn(
-              !isChartPage && "w-full px-0 sm:px-2 lg:px-8 xl:px-12 2xl:px-16"
-            )}>
+          <div className="glass-strong min-h-screen p-3 sm:p-4 lg:p-6">
+            <div className="w-full">
             {!isChartPage && (
               <TopBar
                 title={title}

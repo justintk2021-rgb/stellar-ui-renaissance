@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import bookLogo from "@/assets/book-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { appNavItems } from "@/components/Layout/appNav";
@@ -12,12 +12,20 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
 }
 
+function isDesktopViewport() {
+  return typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+}
+
 export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggleCollapse }: SidebarProps) {
   const [userName, setUserName] = useState<string>("NSYNC JOURNAL");
   const [isHovering, setIsHovering] = useState(false);
-  const [isPinned, setIsPinned] = useState(false);
+  const [isPinned, setIsPinned] = useState(!isCollapsed);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setIsPinned(!isCollapsed);
+  }, [isCollapsed]);
 
   // Fetch user name once; re-fetch only when the user actually changes
   useEffect(() => {
@@ -87,9 +95,10 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
     }
   };
 
-  // Close when clicking outside the pinned panel
+  // Click-outside closes the drawer on mobile only. Pinned desktop stays open.
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (isDesktopViewport()) return;
       if (
         isPinned &&
         sidebarRef.current &&
@@ -107,40 +116,28 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
 
   return (
     <>
-      {/* Arrow toggle — collapsed by default on load; user opens manually */}
-      <button
-        ref={arrowRef}
-        onClick={handleArrowClick}
-        onMouseEnter={handleArrowHover}
-        aria-label="Open navigation"
-        className={cn(
-          "fixed left-0 top-1/2 -translate-y-1/2 w-7 h-20 bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-glow-sm transition-all duration-200 hover:w-9 hover:bg-primary/90 z-50",
-          showSidebar && "opacity-0 pointer-events-none"
-        )}
-      >
-        <ChevronRight className="w-5 h-5" />
-      </button>
-
-      {/* Sidebar panel */}
+      {/* Sidebar panel — one bookmark tab peeks when closed and rides the edge when open */}
       <aside 
         ref={sidebarRef}
         className={cn(
-          "fixed left-0 top-0 h-full z-50 transition-transform duration-300 ease-in-out",
+          "fixed left-0 top-0 h-full z-50 overflow-visible transition-transform duration-300 ease-in-out",
           showSidebar ? "translate-x-0" : "-translate-x-full"
         )}
         onMouseLeave={handleSidebarLeave}
       >
-        <div className="h-full p-4">
-          <div className="glass-strong rounded-2xl p-5 flex flex-col gap-6 shadow-card h-full w-64 lg:w-72 relative">
-            {/* Collapse Toggle Button - same arrow style */}
-            {onToggleCollapse && (
-              <button
-                onClick={handleArrowClick}
-                className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-16 bg-primary/90 hover:bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-lg transition-all duration-200 hover:w-8 z-10"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-            )}
+        <button
+          ref={arrowRef}
+          type="button"
+          onClick={handleArrowClick}
+          onMouseEnter={handleArrowHover}
+          aria-label={isPinned ? "Unpin navigation" : "Open navigation"}
+          aria-expanded={showSidebar}
+          className="absolute left-full top-1/2 z-10 flex h-11 w-6 -translate-y-1/2 items-center justify-center rounded-r-md border border-primary/25 bg-primary/10 text-primary backdrop-blur-md transition-colors hover:bg-primary/20"
+        >
+          <Bookmark className="h-3.5 w-3.5" strokeWidth={1.15} />
+        </button>
+        <div className="h-full p-4 lg:p-0">
+          <div className="glass-strong rounded-2xl lg:rounded-none p-5 flex flex-col gap-6 shadow-card h-full w-64 lg:w-72 relative">
 
             {/* Logo */}
             <div className="flex items-center gap-3">
@@ -173,7 +170,7 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
                     key={item.id}
                     onClick={() => {
                       onPageChange(item.id);
-                      closeSidebar();
+                      if (!isPinned || !isDesktopViewport()) closeSidebar();
                     }}
                     className={cn(
                       "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 group",
