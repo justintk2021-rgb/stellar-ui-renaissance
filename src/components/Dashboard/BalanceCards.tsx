@@ -247,7 +247,7 @@ export function BalanceCards({
   const isPositive = balanceChange >= 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
       {/* Balance Card */}
       <motion.div
         variants={cardVariants}
@@ -498,6 +498,9 @@ export function BalanceCards({
           </motion.div>
         );
       })()}
+
+      {/* Reserved for a future card — keep the old Projection slot empty. */}
+      <div className="hidden md:block min-h-[1px]" aria-hidden />
 
       <Dialog open={projectionOpen} onOpenChange={setProjectionOpen}>
         <DialogContent className="sm:max-w-lg overflow-hidden rounded-3xl p-6 md:p-7 liquid-glass">
