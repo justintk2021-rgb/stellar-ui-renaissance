@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { AnimatedPathBeam } from "@/components/ui/animated-beam";
 
 interface TradingIntelligenceMapProps {
   trades: Trade[];
@@ -160,14 +161,18 @@ function MapCanvas({
           const cy1 = my + (dx / len) * curveAmt;
           const path = `M ${x1} ${y1} Q ${cx1} ${cy1} ${x2} ${y2}`;
           return (
-            <path
+            <AnimatedPathBeam
               key={`edge-${i}`}
+              id={`${gradPrefix}-beam-${i}`}
               d={path}
-              fill="none"
-              stroke={stroke}
-              strokeOpacity={isConnected ? 0.75 : isDimmed ? 0.06 : 0.18}
-              strokeWidth={isConnected ? 2 : 1}
-              strokeLinecap="round"
+              pathColor={stroke}
+              pathWidth={isConnected ? 2 : 1.25}
+              pathOpacity={isConnected ? 0.45 : isDimmed ? 0.06 : 0.18}
+              gradientStartColor={stroke}
+              gradientStopColor="hsl(var(--primary))"
+              duration={2.8 + (i % 5) * 0.35}
+              delay={(i % 7) * 0.18}
+              reverse={i % 2 === 1}
             />
           );
         })}
@@ -347,7 +352,7 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
       <div
         className={cn(
           "group relative rounded-2xl bg-gradient-to-br from-card/60 via-card/40 to-card/20 backdrop-blur-xl border border-border/40 shadow-xl overflow-hidden",
-          compact ? "flex flex-col flex-1 min-h-0 cursor-pointer" : "",
+          compact ? "flex flex-col h-full min-h-0 cursor-pointer" : "",
           expanded && "opacity-60",
         )}
         onClick={compact && !expanded ? openExpanded : undefined}
