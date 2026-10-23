@@ -81,7 +81,7 @@ export function MyfxbookPanel({
   // Not connected — show login form
   if (!connection || connection.connection_status !== "connected") {
     return (
-      <div className="max-w-xl mx-auto">
+      <div className="w-full">
         <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -95,7 +95,7 @@ export function MyfxbookPanel({
               equity, and performance into your dashboard. Your password is
               stored encrypted and only used to refresh the session.
             </p>
-            <form onSubmit={handleConnect} className="space-y-4">
+            <form onSubmit={handleConnect} className="space-y-4 max-w-xl">
               <div className="space-y-2">
                 <Label htmlFor="mfx-email">Email</Label>
                 <Input
@@ -156,7 +156,7 @@ export function MyfxbookPanel({
 
   if (isConnectMode) {
     return (
-      <div className="max-w-xl mx-auto space-y-4">
+      <div className="w-full space-y-4">
         <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -205,7 +205,7 @@ export function MyfxbookPanel({
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-6 w-full">
       <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-3">

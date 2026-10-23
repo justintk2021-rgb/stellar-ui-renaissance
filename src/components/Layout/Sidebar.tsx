@@ -12,12 +12,20 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
 }
 
+function isDesktopViewport() {
+  return typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+}
+
 export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggleCollapse }: SidebarProps) {
   const [userName, setUserName] = useState<string>("NSYNC JOURNAL");
   const [isHovering, setIsHovering] = useState(false);
-  const [isPinned, setIsPinned] = useState(false);
+  const [isPinned, setIsPinned] = useState(!isCollapsed);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setIsPinned(!isCollapsed);
+  }, [isCollapsed]);
 
   // Fetch user name once; re-fetch only when the user actually changes
   useEffect(() => {
@@ -87,9 +95,10 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
     }
   };
 
-  // Close when clicking outside the pinned panel
+  // Click-outside closes the drawer on mobile only. Pinned desktop stays open.
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (isDesktopViewport()) return;
       if (
         isPinned &&
         sidebarRef.current &&
@@ -130,8 +139,8 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
         )}
         onMouseLeave={handleSidebarLeave}
       >
-        <div className="h-full p-4">
-          <div className="glass-strong rounded-2xl p-5 flex flex-col gap-6 shadow-card h-full w-64 lg:w-72 relative">
+        <div className="h-full p-4 lg:p-0">
+          <div className="glass-strong rounded-2xl lg:rounded-none p-5 flex flex-col gap-6 shadow-card h-full w-64 lg:w-72 relative">
             {/* Collapse Toggle Button - same arrow style */}
             {onToggleCollapse && (
               <button
@@ -173,7 +182,7 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
                     key={item.id}
                     onClick={() => {
                       onPageChange(item.id);
-                      closeSidebar();
+                      if (!isPinned || !isDesktopViewport()) closeSidebar();
                     }}
                     className={cn(
                       "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 group",

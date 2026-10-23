@@ -105,7 +105,7 @@ export function MetaTraderManagement() {
 
   if (showEmptyState) {
     return (
-      <div className="max-w-3xl mx-auto space-y-4">
+      <div className="w-full space-y-4">
         {connections.length > 0 && (
           <div className="flex justify-end">
             <Button variant="ghost" size="sm" onClick={() => setShowCreateForm(false)}>
