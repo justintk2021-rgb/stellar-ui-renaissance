@@ -132,7 +132,7 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
           onMouseEnter={handleArrowHover}
           aria-label={isPinned ? "Unpin navigation" : "Open navigation"}
           aria-expanded={showSidebar}
-          className="absolute left-full top-1/2 z-10 flex h-11 w-6 -translate-y-1/2 items-center justify-center rounded-r-md border border-white/15 bg-background/25 text-foreground/55 backdrop-blur-md transition-colors hover:bg-background/40 hover:text-foreground/80"
+          className="absolute left-full top-1/2 z-10 flex h-11 w-6 -translate-y-1/2 items-center justify-center rounded-r-md border border-primary/25 bg-primary/10 text-primary backdrop-blur-md transition-colors hover:bg-primary/20"
         >
           <Bookmark className="h-3.5 w-3.5" strokeWidth={1.15} />
         </button>
