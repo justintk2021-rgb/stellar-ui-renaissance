@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Bell, Check, ChevronRight } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, Check, ChevronRight } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { NotebookEntry, Trade } from "@/types/trade";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -134,7 +134,9 @@ export function NotificationsCard({
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
             <Check className="w-5 h-5 text-primary" />
           </div>
-          <p className="text-sm font-medium text-foreground">All trades journaled</p>
+          <p className="text-sm font-medium text-foreground tracking-normal">
+            All trades journaled
+          </p>
         </div>
       ) : (
         <>
@@ -170,38 +172,55 @@ export function NotificationsCard({
                     "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
                   )}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex items-center gap-2">
-                      <span className="text-sm font-semibold truncate">
-                        {payload?.pair ?? item.title}
-                      </span>
-                      {payload?.direction && (
-                        <span
-                          className={cn(
-                            "text-[10px] font-medium px-1.5 py-0.5 rounded-md",
-                            payload.direction === "Long"
-                              ? "text-primary bg-primary/10"
-                              : "text-destructive bg-destructive/10",
-                          )}
-                        >
-                          {payload.direction}
-                        </span>
+                  <div className="flex items-start gap-2.5">
+                    <div
+                      className={cn(
+                        "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                        win ? "bg-primary/15" : "bg-destructive/15",
+                      )}
+                      aria-label={win ? "Win" : "Loss"}
+                    >
+                      {win ? (
+                        <ArrowUp className="w-3.5 h-3.5 text-primary" strokeWidth={2.5} />
+                      ) : (
+                        <ArrowDown className="w-3.5 h-3.5 text-destructive" strokeWidth={2.5} />
                       )}
                     </div>
-                    <span
-                      className={cn(
-                        "text-xs font-mono font-semibold tabular-nums shrink-0",
-                        win ? "text-primary" : "text-destructive",
-                      )}
-                    >
-                      {formatPnL(pnl)}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-muted-foreground">
-                      {formatNotificationTime(item.timestamp)}
-                    </span>
-                    <span className="text-[11px] text-primary/80">{item.message}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex items-center gap-2">
+                          <span className="text-sm font-semibold truncate">
+                            {payload?.pair ?? item.title}
+                          </span>
+                          {payload?.direction && (
+                            <span
+                              className={cn(
+                                "text-[10px] font-medium px-1.5 py-0.5 rounded-md",
+                                payload.direction === "Long"
+                                  ? "text-primary bg-primary/10"
+                                  : "text-destructive bg-destructive/10",
+                              )}
+                            >
+                              {payload.direction}
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className={cn(
+                            "text-xs font-mono font-semibold tabular-nums shrink-0",
+                            win ? "text-primary" : "text-destructive",
+                          )}
+                        >
+                          {formatPnL(pnl)}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-muted-foreground">
+                          {formatNotificationTime(item.timestamp)}
+                        </span>
+                        <span className="text-[11px] text-primary/80">{item.message}</span>
+                      </div>
+                    </div>
                   </div>
                 </motion.button>
               );
