@@ -39,7 +39,15 @@ export function ChartBottomPanel({ positions, orders, history, onClose }: ChartB
               p.stopLoss == null ? "—" : formatPrice(p.stopLoss, p.symbol),
               p.takeProfit == null ? "—" : formatPrice(p.takeProfit, p.symbol),
               <PnL key={p.id} value={p.pnl} />,
-              <Button key={`${p.id}-x`} size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => onClose(p.id)}>
+              <Button
+                key={`${p.id}-x`}
+                size="sm"
+                variant="ghost"
+                disabled
+                title="Live trading coming soon"
+                className="h-7 px-2 text-xs"
+                onClick={() => onClose(p.id)}
+              >
                 Close
               </Button>,
             ])}

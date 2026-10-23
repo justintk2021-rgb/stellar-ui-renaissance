@@ -12,6 +12,9 @@ verify_jwt = true
 [functions.tradelocker]
 verify_jwt = true
 
+[functions.tradelocker-market]
+verify_jwt = true
+
 [functions.mt5-bridge]
 verify_jwt = false
 

@@ -1,16 +1,14 @@
 import type { BrokerAdapter, ChartBrokerAccount } from "./types";
-import { MockAdapter } from "./MockAdapter";
+import { TradeLockerAdapter } from "./TradeLockerAdapter";
+import { UnavailableAdapter } from "./UnavailableAdapter";
 
-/**
- * Factory used by the Chart page. TradeLocker and MT5 adapters can replace
- * the mock implementation later without changing the UI.
- */
 export function createBrokerAdapter(account: ChartBrokerAccount): BrokerAdapter {
-  switch (account.platform) {
-    case "tradelocker":
-    case "mt5":
-    case "mock":
-    default:
-      return new MockAdapter(account);
+  if (account.platform === "tradelocker" && account.connectionId) {
+    return new TradeLockerAdapter(account);
   }
+  return new UnavailableAdapter(account);
+}
+
+export function adapterAvailable(account: ChartBrokerAccount | null): boolean {
+  return Boolean(account?.platform === "tradelocker" && account.connectionId);
 }

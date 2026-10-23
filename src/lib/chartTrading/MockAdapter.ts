@@ -27,6 +27,8 @@ function seedOffset(id: string, index: number): number {
 export class MockAdapter implements BrokerAdapter {
   readonly id: string;
   readonly account: ChartBrokerAccount;
+  readonly supportsTrading = true;
+  readonly supportsMarketData = true;
 
   private candles = new Map<string, Candle[]>();
   private positions: Position[] = [];
@@ -41,6 +43,17 @@ export class MockAdapter implements BrokerAdapter {
     this.id = account.id;
     this.account = account;
     this.seedDemoBook();
+  }
+
+  async getInstruments() {
+    return [
+      { symbol: "EURUSD", name: "EUR/USD", precision: 5, minMove: 0.00001 },
+      { symbol: "XAUUSD", name: "XAU/USD", precision: 2, minMove: 0.01 },
+    ];
+  }
+
+  async loadMoreCandles(): Promise<Candle[]> {
+    return [];
   }
 
   async getCandles(symbol: string, timeframe: ChartTimeframe, count = 280): Promise<Candle[]> {

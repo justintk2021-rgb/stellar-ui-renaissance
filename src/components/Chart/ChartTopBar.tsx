@@ -12,12 +12,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
-  CHART_SYMBOLS,
   CHART_TIMEFRAMES,
-  SYMBOL_SPECS,
   platformLabel,
   type ChartBrokerAccount,
-  type ChartSymbol,
+  type ChartInstrument,
   type ChartTimeframe,
 } from "@/lib/chartTrading/types";
 
@@ -25,8 +23,9 @@ interface ChartTopBarProps {
   accounts: ChartBrokerAccount[];
   account: ChartBrokerAccount | null;
   onAccountChange: (id: string) => void;
-  symbol: ChartSymbol;
-  onSymbolChange: (symbol: ChartSymbol) => void;
+  instruments: ChartInstrument[];
+  symbol: string;
+  onSymbolChange: (symbol: string) => void;
   timeframe: ChartTimeframe;
   onTimeframeChange: (tf: ChartTimeframe) => void;
   showEma20: boolean;
@@ -42,6 +41,7 @@ export function ChartTopBar({
   accounts,
   account,
   onAccountChange,
+  instruments,
   symbol,
   onSymbolChange,
   timeframe,
@@ -54,6 +54,9 @@ export function ChartTopBar({
   onToggleRsi,
   lastPrice,
 }: ChartTopBarProps) {
+  const current = instruments.find((item) => item.symbol === symbol);
+  const precision = current?.precision ?? 5;
+
   return (
     <div className="liquid-glass flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2">
       <DropdownMenu>
@@ -74,6 +77,9 @@ export function ChartTopBar({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="liquid-glass min-w-[18rem]">
           <DropdownMenuLabel>Connected accounts</DropdownMenuLabel>
+          {accounts.length === 0 && (
+            <DropdownMenuItem disabled>No connected broker accounts</DropdownMenuItem>
+          )}
           {accounts.map((item) => (
             <DropdownMenuItem
               key={item.id}
@@ -95,21 +101,24 @@ export function ChartTopBar({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="h-9 rounded-xl px-2.5 hover:bg-foreground/5">
-            <span className="font-semibold tracking-wide">{SYMBOL_SPECS[symbol].label}</span>
+            <span className="font-semibold tracking-wide">{current?.name || symbol || "Symbol"}</span>
             {lastPrice != null && (
               <span className="ml-1 font-mono text-xs text-muted-foreground">
-                {lastPrice.toFixed(SYMBOL_SPECS[symbol].precision)}
+                {lastPrice.toFixed(precision)}
               </span>
             )}
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="liquid-glass">
+        <DropdownMenuContent align="start" className="liquid-glass max-h-80 overflow-y-auto">
           <DropdownMenuLabel>Symbol</DropdownMenuLabel>
-          {CHART_SYMBOLS.map((item) => (
-            <DropdownMenuItem key={item} onClick={() => onSymbolChange(item)}>
-              <span className="font-medium">{SYMBOL_SPECS[item].label}</span>
-              <span className="ml-auto text-xs text-muted-foreground">{item}</span>
+          {instruments.length === 0 && (
+            <DropdownMenuItem disabled>No instruments</DropdownMenuItem>
+          )}
+          {instruments.map((item) => (
+            <DropdownMenuItem key={item.symbol} onClick={() => onSymbolChange(item.symbol)}>
+              <span className="font-medium">{item.name}</span>
+              <span className="ml-auto text-xs text-muted-foreground">{item.symbol}</span>
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

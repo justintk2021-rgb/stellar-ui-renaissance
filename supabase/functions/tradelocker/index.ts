@@ -540,7 +540,11 @@ async function refreshConnectionTokens(
   return { ok: true, accessToken: newTokenData.accessToken, refreshToken: newTokenData.refreshToken };
 }
 
-async function getValidToken(supabase: any, connectionId: string): Promise<{ accessToken: string; environment: string; accountId: string; accNum: number } | null> {
+async function getValidToken(
+  supabase: any,
+  connectionId: string,
+  overrides?: { accountId?: string | null; accNum?: number | null },
+): Promise<{ accessToken: string; environment: string; accountId: string; accNum: number } | null> {
   const { data: conn } = await supabase
     .from('broker_connections')
     .select('*')
@@ -557,8 +561,8 @@ async function getValidToken(supabase: any, connectionId: string): Promise<{ acc
   }
 
   const environment = conn.environment || 'demo';
-  const accountId = conn.active_account_id;
-  const accNum = conn.active_acc_num;
+  const accountId = overrides?.accountId || conn.active_account_id;
+  const accNum = overrides?.accNum ?? conn.active_acc_num;
 
   if (!tokenData.accessToken || !accountId || !accNum) return null;
 
@@ -1586,12 +1590,95 @@ serve(async (req) => {
 
     // ====================== GET INSTRUMENTS ======================
     if (action === 'instruments') {
-      const { connectionId } = body;
-      const tokenInfo = await getValidToken(supabase, connectionId);
+      const { connectionId, accountId, accNum } = body;
+      const tokenInfo = await getValidToken(supabase, connectionId, { accountId, accNum });
       if (!tokenInfo) return jsonResponse({ error: 'Invalid session' }, 401);
 
       const instruments = await tlGetInstruments(tokenInfo.accessToken, tokenInfo.accountId, tokenInfo.accNum, tokenInfo.environment);
       return jsonResponse({ instruments });
+    }
+
+    // ====================== CHART CANDLES ======================
+    if (action === 'candles') {
+      const { connectionId, accountId, accNum, timeframe, tradableInstrumentId, routeId, fromMs, toMs } = body;
+      const tokenInfo = await getValidToken(supabase, connectionId, { accountId, accNum });
+      if (!tokenInfo) return jsonResponse({ error: 'Invalid session. Please reconnect.', code: 'expired' }, 401);
+
+      const resolution = ({ '1m': '1m', '5m': '5m', '15m': '15m', '1H': '1H', '4H': '4H', '1D': '1D' } as Record<string, string>)[String(timeframe || '15m')];
+      if (!resolution) return jsonResponse({ error: 'Unsupported timeframe', code: 'unknown' }, 400);
+      if (!tradableInstrumentId || !routeId) return jsonResponse({ error: 'Missing instrument route', code: 'unknown' }, 400);
+
+      const stepSec = ({ '1m': 60, '5m': 300, '15m': 900, '1H': 3600, '4H': 14400, '1D': 86400 } as Record<string, number>)[resolution] || 900;
+      const to = Number(toMs) || Date.now();
+      const from = Number(fromMs) || to - stepSec * 300 * 1000;
+      const params = new URLSearchParams({
+        routeId: String(routeId),
+        tradableInstrumentId: String(tradableInstrumentId),
+        from: String(Math.floor(from)),
+        to: String(Math.floor(to)),
+        resolution,
+      });
+      const res = await fetch(`${getBaseUrl(tokenInfo.environment)}/trade/history?${params}`, {
+        headers: { Authorization: `Bearer ${tokenInfo.accessToken}`, accNum: String(tokenInfo.accNum) },
+      });
+      const text = await res.text();
+      let parsed: any = text;
+      try { parsed = text ? JSON.parse(text) : null; } catch { /* keep text */ }
+      if (!res.ok) {
+        const lower = String(text).toLowerCase();
+        const code = res.status === 429 || lower.includes('rate limit') ? 'rate_limit' : res.status === 401 ? 'expired' : 'unknown';
+        return jsonResponse({ error: parsed?.message || parsed?.error || text || 'TradeLocker history failed', code }, res.status === 429 ? 429 : 400);
+      }
+      if (parsed?.s === 'no_data') {
+        return jsonResponse({ candles: [], code: 'market_closed', message: 'No TradeLocker bars in this range. The market may be closed.' });
+      }
+      const bars = parsed?.d?.barDetails || [];
+      const unique = new Map<number, any>();
+      for (const bar of bars) {
+        const rawTime = Number(bar.t ?? bar.time);
+        if (!Number.isFinite(rawTime)) continue;
+        const seconds = rawTime > 1e12 ? Math.floor(rawTime / 1000) : Math.floor(rawTime);
+        const time = Math.floor(seconds / stepSec) * stepSec;
+        const open = Number(bar.o ?? bar.open);
+        const high = Number(bar.h ?? bar.high);
+        const low = Number(bar.l ?? bar.low);
+        const close = Number(bar.c ?? bar.close);
+        if (![open, high, low, close].every(Number.isFinite)) continue;
+        unique.set(time, { time, open, high, low, close, volume: Number(bar.v ?? bar.volume) || 0 });
+      }
+      return jsonResponse({ candles: [...unique.values()].sort((a, b) => a.time - b.time) });
+    }
+
+    // ====================== CHART QUOTE ======================
+    if (action === 'quote') {
+      const { connectionId, accountId, accNum, tradableInstrumentId, routeId } = body;
+      const tokenInfo = await getValidToken(supabase, connectionId, { accountId, accNum });
+      if (!tokenInfo) return jsonResponse({ error: 'Invalid session. Please reconnect.', code: 'expired' }, 401);
+      if (!tradableInstrumentId || !routeId) return jsonResponse({ error: 'Missing instrument route', code: 'unknown' }, 400);
+
+      const params = new URLSearchParams({
+        routeId: String(routeId),
+        tradableInstrumentId: String(tradableInstrumentId),
+      });
+      const res = await fetch(`${getBaseUrl(tokenInfo.environment)}/trade/quotes?${params}`, {
+        headers: { Authorization: `Bearer ${tokenInfo.accessToken}`, accNum: String(tokenInfo.accNum) },
+      });
+      const text = await res.text();
+      let parsed: any = text;
+      try { parsed = text ? JSON.parse(text) : null; } catch { /* keep text */ }
+      if (!res.ok) {
+        const lower = String(text).toLowerCase();
+        const code = res.status === 429 || lower.includes('rate limit') ? 'rate_limit' : res.status === 401 ? 'expired' : 'unknown';
+        return jsonResponse({ error: parsed?.message || parsed?.error || text || 'TradeLocker quote failed', code }, res.status === 429 ? 429 : 400);
+      }
+      const quote = parsed?.d || {};
+      const bid = Number(quote.bp);
+      const ask = Number(quote.ap);
+      const last = Number.isFinite(ask) && Number.isFinite(bid) ? (ask + bid) / 2 : (Number.isFinite(ask) ? ask : bid);
+      if (!Number.isFinite(last)) {
+        return jsonResponse({ error: 'Market is closed for this symbol.', code: 'market_closed' }, 409);
+      }
+      return jsonResponse({ quote: { bid: Number.isFinite(bid) ? bid : null, ask: Number.isFinite(ask) ? ask : null, last, time: Math.floor(Date.now() / 1000) } });
     }
 
     // ====================== DISCONNECT ======================
