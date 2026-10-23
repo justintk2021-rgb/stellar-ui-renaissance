@@ -27,33 +27,14 @@ import {
   getTradeNetResult,
   parseLocalDateKey,
   formatPnL,
+  sumPnL,
 } from "@/lib/tradeFormat";
+import {
+  PERIOD_OPTIONS,
+  tradeMatchesHistoryPeriod,
+  type HistoryPeriod,
+} from "@/lib/tradeHistoryPeriod";
 import { TradeScreenshot } from "./TradeScreenshot";
-
-type HistoryPeriod = "all" | "week" | "month" | "3months" | "6months" | "year";
-
-const PERIOD_OPTIONS: { value: HistoryPeriod; label: string }[] = [
-  { value: "all", label: "All time" },
-  { value: "week", label: "Last week" },
-  { value: "month", label: "Last month" },
-  { value: "3months", label: "Last 3 months" },
-  { value: "6months", label: "Last 6 months" },
-  { value: "year", label: "Last year" },
-];
-
-function getPeriodCutoff(period: HistoryPeriod): Date | null {
-  if (period === "all") return null;
-  const now = new Date();
-  const d = new Date(now);
-  switch (period) {
-    case "week": d.setDate(d.getDate() - 7); break;
-    case "month": d.setMonth(d.getMonth() - 1); break;
-    case "3months": d.setMonth(d.getMonth() - 3); break;
-    case "6months": d.setMonth(d.getMonth() - 6); break;
-    case "year": d.setFullYear(d.getFullYear() - 1); break;
-  }
-  return d;
-}
 
 interface Checklist {
   id: string;
@@ -462,22 +443,18 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], user
   }, [trades]);
 
   const filteredTrades = useMemo(() => {
-    const cutoff = getPeriodCutoff(historyPeriod);
-    const visible = trades.filter(t => {
+    const now = new Date();
+    const visible = trades.filter((t) => {
       if (historySymbol !== "__all__" && t.pair !== historySymbol) return false;
-      if (cutoff) {
-        const key = getTradeLocalDateKey(t);
-        if (!key || key === "Unknown") return false;
-        const td = parseLocalDateKey(key);
-        if (isNaN(td.getTime()) || td < cutoff) return false;
-      }
-      return true;
+      return tradeMatchesHistoryPeriod(t, historyPeriod, now);
     });
     return sortTradesNewestFirst(visible);
   }, [trades, historyPeriod, historySymbol]);
 
+  const historyPnL = useMemo(() => sumPnL(filteredTrades), [filteredTrades]);
+
   const isFilterActive = historyPeriod !== "all" || historySymbol !== "__all__";
-  const activePeriodLabel = PERIOD_OPTIONS.find(p => p.value === historyPeriod)?.label ?? "All time";
+  const activePeriodLabel = PERIOD_OPTIONS.find(p => p.value === historyPeriod)?.label ?? "All";
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -557,6 +534,17 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], user
             <p className="text-xs text-muted-foreground mt-1">Every trade is listed separately. Click a row for details.</p>
           </div>
           <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end leading-tight pr-0.5">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Current P&L</span>
+              <span
+                className={cn(
+                  "text-sm font-bold font-mono tabular-nums",
+                  historyPnL >= 0 ? "text-primary" : "text-destructive"
+                )}
+              >
+                {formatPnL(historyPnL)}
+              </span>
+            </div>
             <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
               <PopoverTrigger asChild>
                 <motion.button
@@ -603,7 +591,7 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], user
                   </div>
 
                   {/* Symbol filter */}
-                  <div className="px-4 py-3 border-b border-border/40">
+                  <div className="px-4 py-3 border-b border-border/40 space-y-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm text-foreground">Symbol</span>
                       <Select value={historySymbol} onValueChange={setHistorySymbol}>
@@ -624,6 +612,17 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], user
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-foreground">Current P&L</span>
+                      <span
+                        className={cn(
+                          "text-sm font-bold font-mono tabular-nums",
+                          historyPnL >= 0 ? "text-primary" : "text-destructive"
+                        )}
+                      >
+                        {formatPnL(historyPnL)}
+                      </span>
                     </div>
                   </div>
 
