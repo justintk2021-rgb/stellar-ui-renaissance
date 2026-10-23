@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import bookLogo from "@/assets/book-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { appNavItems } from "@/components/Layout/appNav";
@@ -116,40 +116,28 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
 
   return (
     <>
-      {/* Arrow toggle — collapsed by default on load; user opens manually */}
-      <button
-        ref={arrowRef}
-        onClick={handleArrowClick}
-        onMouseEnter={handleArrowHover}
-        aria-label="Open navigation"
-        className={cn(
-          "fixed left-0 top-1/2 -translate-y-1/2 w-7 h-20 bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-glow-sm transition-all duration-200 hover:w-9 hover:bg-primary/90 z-50",
-          showSidebar && "opacity-0 pointer-events-none"
-        )}
-      >
-        <ChevronRight className="w-5 h-5" />
-      </button>
-
-      {/* Sidebar panel */}
+      {/* Sidebar panel — one bookmark tab peeks when closed and rides the edge when open */}
       <aside 
         ref={sidebarRef}
         className={cn(
-          "fixed left-0 top-0 h-full z-50 transition-transform duration-300 ease-in-out",
+          "fixed left-0 top-0 h-full z-50 overflow-visible transition-transform duration-300 ease-in-out",
           showSidebar ? "translate-x-0" : "-translate-x-full"
         )}
         onMouseLeave={handleSidebarLeave}
       >
+        <button
+          ref={arrowRef}
+          type="button"
+          onClick={handleArrowClick}
+          onMouseEnter={handleArrowHover}
+          aria-label={isPinned ? "Unpin navigation" : "Open navigation"}
+          aria-expanded={showSidebar}
+          className="absolute left-full top-1/2 z-10 flex h-11 w-6 -translate-y-1/2 items-center justify-center rounded-r-md border border-white/15 bg-background/25 text-foreground/55 backdrop-blur-md transition-colors hover:bg-background/40 hover:text-foreground/80"
+        >
+          <Bookmark className="h-3.5 w-3.5" strokeWidth={1.15} />
+        </button>
         <div className="h-full p-4 lg:p-0">
           <div className="glass-strong rounded-2xl lg:rounded-none p-5 flex flex-col gap-6 shadow-card h-full w-64 lg:w-72 relative">
-            {/* Collapse Toggle Button - same arrow style */}
-            {onToggleCollapse && (
-              <button
-                onClick={handleArrowClick}
-                className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-16 bg-primary/90 hover:bg-primary text-primary-foreground flex items-center justify-center rounded-r-lg shadow-lg transition-all duration-200 hover:w-8 z-10"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-            )}
 
             {/* Logo */}
             <div className="flex items-center gap-3">
