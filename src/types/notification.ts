@@ -19,6 +19,7 @@ export interface UnjournaledTradePayload {
   pair: string;
   direction: "Long" | "Short";
   pnl: number;
+  journaled?: boolean;
 }
 
 export interface NotificationSource<T = unknown> {

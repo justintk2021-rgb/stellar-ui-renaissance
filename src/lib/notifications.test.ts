@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Trade } from "@/types/trade";
+import type { NotebookEntry } from "@/types/trade";
 import {
+  addReadNotificationId,
   buildUnjournaledNotifications,
+  isNotificationVisible,
   isUnjournaledTrade,
   mergeNotificationSources,
   parseNotificationLink,
+  tradeHasJournalNotes,
   tradeHasNotes,
   tradeNotificationTimestamp,
   unreadNotificationCount,
@@ -33,6 +37,38 @@ describe("isUnjournaledTrade", () => {
   it("treats notes with content as journaled", () => {
     expect(tradeHasNotes(trade({ id: "e", notes: "Setup was clean" }))).toBe(true);
     expect(isUnjournaledTrade(trade({ id: "e", notes: "Setup was clean" }))).toBe(false);
+  });
+
+  it("treats a notebook entry with real content as journaled", () => {
+    const entries: NotebookEntry[] = [
+      {
+        id: "n1",
+        title: "EURUSD - Long Trade",
+        content: "<p>Took the London breakout</p>",
+        category: "trade-notes",
+        date: "2026-06-01",
+        tradeId: "nb",
+        createdAt: "2026-06-01T00:00:00.000Z",
+        updatedAt: "2026-06-01T00:00:00.000Z",
+      },
+    ];
+    expect(tradeHasJournalNotes(trade({ id: "nb" }), entries)).toBe(true);
+    expect(isUnjournaledTrade(trade({ id: "nb" }), entries)).toBe(false);
+    expect(tradeHasJournalNotes(trade({ id: "empty" }), [{ ...entries[0], tradeId: "empty", content: "<p>  </p>" }])).toBe(false);
+  });
+});
+
+describe("isNotificationVisible", () => {
+  it("keeps journaled trades until they are read, then drops them", () => {
+    expect(isNotificationVisible({ hasNotesField: false, hasJournalNotes: true, read: false })).toBe(true);
+    expect(isNotificationVisible({ hasNotesField: false, hasJournalNotes: true, read: true })).toBe(false);
+  });
+
+  it("keeps trades with zero notes after they are read, until they are journaled", () => {
+    expect(isNotificationVisible({ hasNotesField: false, hasJournalNotes: false, read: false })).toBe(true);
+    expect(isNotificationVisible({ hasNotesField: false, hasJournalNotes: false, read: true })).toBe(true);
+    expect(isNotificationVisible({ hasNotesField: true, hasJournalNotes: true, read: false })).toBe(false);
+    expect(isNotificationVisible({ hasNotesField: true, hasJournalNotes: true, read: true })).toBe(false);
   });
 });
 
@@ -73,8 +109,42 @@ describe("buildUnjournaledNotifications", () => {
       pair: "XAUUSD",
       direction: "Long",
       pnl: 40,
+      journaled: false,
     });
     expect(payloads["unjournaled_trade:old"]?.direction).toBe("Short");
+    expect(payloads["unjournaled_trade:new"]?.journaled).toBe(false);
+  });
+
+  it("keeps notebook-journaled trades until hover-read, then removes them", () => {
+    const rows = [
+      trade({ id: "journaled-nb", pair: "USDJPY" }),
+      trade({ id: "needs-notes", pair: "EURUSD" }),
+    ];
+    const entries: NotebookEntry[] = [
+      {
+        id: "n1",
+        title: "USDJPY",
+        content: "<p>Already wrote this up</p>",
+        category: "trade-notes",
+        date: "2026-06-01",
+        tradeId: "journaled-nb",
+        createdAt: "2026-06-01T00:00:00.000Z",
+        updatedAt: "2026-06-01T00:00:00.000Z",
+      },
+    ];
+
+    const unread = buildUnjournaledNotifications(rows, { notebookEntries: entries });
+    expect(unread.notifications.map((n) => n.id)).toEqual([
+      "unjournaled_trade:journaled-nb",
+      "unjournaled_trade:needs-notes",
+    ]);
+    expect(unread.payloads["unjournaled_trade:journaled-nb"]?.journaled).toBe(true);
+
+    const afterHover = buildUnjournaledNotifications(rows, {
+      notebookEntries: entries,
+      readIds: new Set(addReadNotificationId([], "journaled-nb")),
+    });
+    expect(afterHover.notifications.map((n) => n.id)).toEqual(["unjournaled_trade:needs-notes"]);
   });
 
   it("dedupes broker re-syncs the same way as the journal", () => {

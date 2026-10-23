@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from "react";
-import { Trade } from "@/types/trade";
+import { NotebookEntry, Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Check, X, TrendingUp, Wallet, Trophy, Activity, Target } from "lucide-react";
@@ -26,6 +26,7 @@ interface BalanceCardsProps {
   brokerHasOpenPositions?: boolean;
   onSetBalance: (balance: number) => void;
   tradesLoading?: boolean;
+  notebookEntries?: NotebookEntry[];
   onOpenJournal?: (target: OpenJournalTarget) => void;
   projection: {
     accountLabel: string;
@@ -148,6 +149,7 @@ export function BalanceCards({
   brokerHasOpenPositions = false,
   onSetBalance,
   tradesLoading = false,
+  notebookEntries,
   onOpenJournal,
   projection,
 }: BalanceCardsProps) {
@@ -520,6 +522,7 @@ export function BalanceCards({
       >
         <NotificationsCard
           trades={trades}
+          notebookEntries={notebookEntries}
           isLoading={tradesLoading}
           onOpenJournal={onOpenJournal}
         />

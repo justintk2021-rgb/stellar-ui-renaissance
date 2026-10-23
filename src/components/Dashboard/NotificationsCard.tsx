@@ -1,6 +1,7 @@
+import { useEffect, useRef } from "react";
 import { Bell, Check, ChevronRight } from "lucide-react";
-import { motion } from "framer-motion";
-import { Trade } from "@/types/trade";
+import { AnimatePresence, motion } from "framer-motion";
+import { NotebookEntry, Trade } from "@/types/trade";
 import { useNotifications } from "@/hooks/useNotifications";
 import {
   parseNotificationLink,
@@ -23,6 +24,7 @@ export interface OpenJournalTarget {
 
 interface NotificationsCardProps {
   trades: Trade[];
+  notebookEntries?: NotebookEntry[];
   isLoading?: boolean;
   onOpenJournal?: (target: OpenJournalTarget) => void;
 }
@@ -47,13 +49,42 @@ function formatNotificationTime(timestamp: string): string {
 
 export function NotificationsCard({
   trades,
+  notebookEntries,
   isLoading = false,
   onOpenJournal,
 }: NotificationsCardProps) {
-  const { notifications, unjournaledCount, payloads, isLoading: loading } = useNotifications({
+  const { notifications, payloads, isLoading: loading, markRead } = useNotifications({
     trades,
+    notebookEntries,
     isLoading,
   });
+  const readTimers = useRef(new Map<string, number>());
+
+  useEffect(() => {
+    const timers = readTimers.current;
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      timers.clear();
+    };
+  }, []);
+
+  const scheduleRead = (tradeId?: string) => {
+    if (!tradeId || readTimers.current.has(tradeId)) return;
+    const timer = window.setTimeout(() => {
+      markRead(tradeId);
+      readTimers.current.delete(tradeId);
+    }, 280);
+    readTimers.current.set(tradeId, timer);
+  };
+
+  const cancelRead = (tradeId?: string) => {
+    if (!tradeId) return;
+    const timer = readTimers.current.get(tradeId);
+    if (timer) {
+      window.clearTimeout(timer);
+      readTimers.current.delete(tradeId);
+    }
+  };
 
   const openJournal = (target: OpenJournalTarget) => {
     onOpenJournal?.(target);
@@ -87,12 +118,12 @@ export function NotificationsCard({
           className={cn(
             "min-w-6 h-6 px-1.5 rounded-full text-[11px] font-semibold font-mono tabular-nums",
             "flex items-center justify-center",
-            unjournaledCount > 0
+            notifications.length > 0
               ? "bg-primary/15 text-primary"
               : "bg-muted/60 text-muted-foreground",
           )}
         >
-          {loading ? "—" : unjournaledCount}
+          {loading ? "—" : notifications.length}
         </span>
       </div>
 
@@ -108,15 +139,31 @@ export function NotificationsCard({
       ) : (
         <>
           <div className="max-h-[7.5rem] overflow-y-auto custom-scrollbar -mx-1 px-1 space-y-1.5">
+            <AnimatePresence initial={false}>
             {notifications.map((item) => {
               const payload = payloads[item.id];
               const pnl = payload?.pnl ?? 0;
               const win = pnl >= 0;
+              const tradeId = payload?.tradeId;
               return (
-                <button
+                <motion.button
                   key={item.id}
                   type="button"
-                  onClick={() => handleRowClick(item.link, payload)}
+                  layout
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: item.read && !payload?.journaled ? 0.72 : 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  onPointerEnter={() => scheduleRead(tradeId)}
+                  onPointerLeave={() => cancelRead(tradeId)}
+                  onFocus={() => scheduleRead(tradeId)}
+                  onBlur={() => cancelRead(tradeId)}
+                  onClick={() => {
+                    if (tradeId) {
+                      cancelRead(tradeId);
+                      markRead(tradeId);
+                    }
+                    handleRowClick(item.link, payload);
+                  }}
                   className={cn(
                     "w-full text-left rounded-xl px-3 py-2",
                     "bg-foreground/[0.03] hover:bg-primary/10 border border-transparent hover:border-primary/20",
@@ -156,9 +203,10 @@ export function NotificationsCard({
                     </span>
                     <span className="text-[11px] text-primary/80">{item.message}</span>
                   </div>
-                </button>
+                </motion.button>
               );
             })}
+            </AnimatePresence>
           </div>
           <button
             type="button"

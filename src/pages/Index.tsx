@@ -465,7 +465,7 @@ const Index = () => {
           ? journalBaseTrades.filter((t) => getTradeNetResult(t) > 0)
           : activeFilter === 'losses'
             ? journalBaseTrades.filter((t) => getTradeNetResult(t) < 0)
-            : journalBaseTrades.filter(isUnjournaledTrade);
+            : journalBaseTrades.filter((t) => isUnjournaledTrade(t, notebookEntries));
 
     const rangeFiltered = winLossFiltered;
 
@@ -481,7 +481,7 @@ const Index = () => {
       rangeFiltered,
       dayPnLs: Array.from(pnlMap.entries()).map(([date, pnl]) => ({ date, pnl })),
     };
-  }, [journalBaseTrades, journalFilter, showJournalWinLossFilter, brokerDayTotals, selectedBrokerAccountId]);
+  }, [journalBaseTrades, journalFilter, showJournalWinLossFilter, brokerDayTotals, selectedBrokerAccountId, notebookEntries]);
 
   const { data: allUserTrades = [] } = useQuery({
     queryKey: queryKeys.trades.list(user?.id ?? '', null, null),
@@ -845,6 +845,7 @@ const Index = () => {
                       brokerHasOpenPositions={brokerHasOpenPositions}
                       onSetBalance={handleSetBalance}
                       tradesLoading={tradesLoading}
+                      notebookEntries={notebookEntries}
                       onOpenJournal={handleOpenJournal}
                       projection={{
                         accountLabel: accountProjection.accountLabel,
@@ -922,7 +923,7 @@ const Index = () => {
                             ? journalBaseTrades.filter((t) => getTradeNetResult(t) > 0).length
                             : filter === 'losses'
                               ? journalBaseTrades.filter((t) => getTradeNetResult(t) < 0).length
-                              : journalBaseTrades.filter(isUnjournaledTrade).length;
+                              : journalBaseTrades.filter((t) => isUnjournaledTrade(t, notebookEntries)).length;
                       const label = filter === 'unjournaled' ? 'No notes' : filter;
                       return (
                         <motion.button
