@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect } from "react";
+import { memo, useMemo, useState, useRef, useEffect } from "react";
 import { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ interface EquityChartProps {
   onSetBalance: (balance: number) => void;
 }
 
-export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartProps) {
+export const EquityChart = memo(function EquityChart({ trades, startBalance, onSetBalance }: EquityChartProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(startBalance.toString());
   const inputRef = useRef<HTMLInputElement>(null);
@@ -259,4 +259,4 @@ export function EquityChart({ trades, startBalance, onSetBalance }: EquityChartP
       </div>
     </div>
   );
-}
+});

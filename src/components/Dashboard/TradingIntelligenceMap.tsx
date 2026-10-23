@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { memo, useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { Trade } from "@/types/trade";
 import {
   Brain,
@@ -310,7 +310,7 @@ function LayerToggles({ layers, onChange }: { layers: LayerFilter; onChange: (l:
   );
 }
 
-export function TradingIntelligenceMap({ trades, compact = false }: TradingIntelligenceMapProps) {
+export const TradingIntelligenceMap = memo(function TradingIntelligenceMap({ trades, compact = false }: TradingIntelligenceMapProps) {
   const graph = useMemo(() => buildIntelligenceGraph(trades), [trades]);
   const [expanded, setExpanded] = useState(false);
   const [viewMode, setViewMode] = useState<IntelligenceViewMode>("network");
@@ -546,4 +546,4 @@ export function TradingIntelligenceMap({ trades, compact = false }: TradingIntel
       </Dialog>
     </>
   );
-}
+});

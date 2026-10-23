@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Trade, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
@@ -211,6 +212,7 @@ export function NotebookView({
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const deferredSearch = useDebouncedValue(searchQuery, 160);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [isSmallText, setIsSmallText] = useState(false);
   const [isFullWidth, setIsFullWidth] = useState(false);
@@ -223,6 +225,7 @@ export function NotebookView({
   const [isAddFolderDialogOpen, setIsAddFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [folderSearchQuery, setFolderSearchQuery] = useState("");
+  const deferredFolderSearch = useDebouncedValue(folderSearchQuery, 160);
   const [customFolders, setCustomFolders] = useState<Array<{ id: string; label: string; color?: string }>>(() => {
     const saved = localStorage.getItem('notebook-custom-folders');
     console.log('Loading custom folders:', saved);
@@ -326,10 +329,10 @@ export function NotebookView({
     }
     if (entry.isDeleted) return false;
     const matchesCategory = selectedCategory === "all" || entry.category === selectedCategory;
-    const matchesSearch = entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      entry.content.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = entry.title.toLowerCase().includes(deferredSearch.toLowerCase()) ||
+      entry.content.toLowerCase().includes(deferredSearch.toLowerCase());
     return matchesCategory && matchesSearch;
-  }), [notebookEntries, selectedCategory, searchQuery]);
+  }), [notebookEntries, selectedCategory, deferredSearch]);
 
   const trashCount = useMemo(
     () => notebookEntries.filter(e => e.isDeleted).length,
@@ -354,15 +357,15 @@ export function NotebookView({
     .filter(e => {
       if (e.isDeleted) return false;
       if (selectedCategory !== "all" && e.category !== selectedCategory) return false;
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
+      if (deferredSearch) {
+        const query = deferredSearch.toLowerCase();
         return e.title.toLowerCase().includes(query) ||
           e.content.toLowerCase().includes(query);
       }
       return true;
     })
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
-  [notebookEntries, selectedCategory, searchQuery]);
+  [notebookEntries, selectedCategory, deferredSearch]);
 
   type SidebarRow =
     | { type: 'header'; date: string }
@@ -1486,7 +1489,7 @@ export function NotebookView({
               {/* Categories */}
               <ScrollArea className="flex-1 overflow-hidden">
                 <div className="p-2 space-y-0.5">
-                  {CATEGORIES.filter(c => c.id !== "trash" && c.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).map((cat) => {
+                  {CATEGORIES.filter(c => c.id !== "trash" && c.label.toLowerCase().includes(deferredFolderSearch.toLowerCase())).map((cat) => {
                     const Icon = cat.icon;
                     const count = cat.id === "all" 
                       ? notebookEntries.filter(e => !e.isDeleted).length 
@@ -1567,12 +1570,12 @@ export function NotebookView({
                   })}
 
                   {/* Custom Folders */}
-                  {customFolders.filter(f => f.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).length > 0 && (
+                  {customFolders.filter(f => f.label.toLowerCase().includes(deferredFolderSearch.toLowerCase())).length > 0 && (
                     <>
                       <div className="text-[9px] uppercase tracking-wider text-muted-foreground px-2 pt-3 pb-1">
                         Custom
                       </div>
-                      {customFolders.filter(f => f.label.toLowerCase().includes(folderSearchQuery.toLowerCase())).map((folder) => {
+                      {customFolders.filter(f => f.label.toLowerCase().includes(deferredFolderSearch.toLowerCase())).map((folder) => {
                         const count = notebookEntries.filter((e) => e.category === folder.id && !e.isDeleted).length;
                         const markerColor = getFolderMarkerColor(folder.id);
                         

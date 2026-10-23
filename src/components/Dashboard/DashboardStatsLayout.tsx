@@ -1,4 +1,4 @@
-import { useMemo, useState, lazy, Suspense } from "react";
+import { memo, useMemo, useState, lazy, Suspense } from "react";
 import { Trade } from "@/types/trade";
 import {
   TrendingUp,
@@ -50,7 +50,7 @@ interface DashboardStatsLayoutProps {
   onAddTrade: (trade: Omit<Trade, "id">) => void;
 }
 
-export function DashboardStatsLayout({
+export const DashboardStatsLayout = memo(function DashboardStatsLayout({
   trades,
   userId,
   brokerDayTotals = null,
@@ -256,4 +256,4 @@ export function DashboardStatsLayout({
       </div>
     </div>
   );
-}
+});
