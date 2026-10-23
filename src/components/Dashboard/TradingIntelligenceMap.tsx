@@ -170,8 +170,8 @@ function MapCanvas({
               pathOpacity={isConnected ? 0.45 : isDimmed ? 0.06 : 0.18}
               gradientStartColor={stroke}
               gradientStopColor="hsl(var(--primary))"
-              duration={2.8 + (i % 5) * 0.35}
-              delay={(i % 7) * 0.18}
+              duration={8 + (i % 5) * 1.2}
+              delay={(i % 7) * 0.4}
               reverse={i % 2 === 1}
             />
           );
