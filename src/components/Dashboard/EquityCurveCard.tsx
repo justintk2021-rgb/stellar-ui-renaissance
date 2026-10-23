@@ -55,33 +55,31 @@ function StatChip({
   icon: Icon,
   label,
   value,
-  positive,
+  tone,
   delay,
 }: {
   icon: typeof TrendingUp;
   label: string;
   value: string;
-  positive: boolean;
+  tone: "up" | "down" | "neutral";
   delay: number;
 }) {
+  const valueClass =
+    tone === "up" ? "text-primary" : tone === "down" ? "text-destructive" : "text-foreground";
+  const iconClass =
+    tone === "up" ? "text-primary/70" : tone === "down" ? "text-destructive/70" : "text-muted-foreground";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/60 backdrop-blur px-3 py-2"
+      className="flex items-center gap-2 rounded-full border border-border/40 bg-foreground/[0.04] px-3 py-1.5"
     >
-      <div
-        className={cn(
-          "w-6 h-6 rounded-md flex items-center justify-center shrink-0",
-          positive ? "bg-primary/15" : "bg-destructive/15",
-        )}
-      >
-        <Icon className={cn("w-3.5 h-3.5", positive ? "text-primary" : "text-destructive")} />
-      </div>
+      <Icon className={cn("w-3.5 h-3.5 shrink-0", iconClass)} />
       <div className="min-w-0">
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground leading-none mb-1">{label}</p>
-        <p className={cn("text-xs font-bold font-mono leading-none", positive ? "text-primary" : "text-destructive")}>
+        <p className={cn("text-xs font-bold font-mono leading-none", valueClass)}>
           {value}
         </p>
       </div>
@@ -143,25 +141,25 @@ export function EquityCurveCard({ trades, brokerDayTotals = null, className }: E
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-base font-semibold flex items-center gap-2.5">
-          <span className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center">
-            <LineChartIcon className="w-4 h-4 text-primary" />
+          <span className="w-8 h-8 rounded-full border border-border/50 bg-foreground/[0.04] flex items-center justify-center">
+            <LineChartIcon className="w-4 h-4 text-muted-foreground" />
           </span>
           Equity Curve
         </h3>
-        <div className="flex items-center gap-0.5 p-1 rounded-xl border border-border/40 bg-card/60 backdrop-blur">
+        <div className="flex items-center gap-0.5 p-1 rounded-full border border-border/40 bg-foreground/[0.03]">
           {RANGES.map((r) => (
             <button
               key={r.id}
               onClick={() => setRange(r.id)}
               className={cn(
-                "relative px-3 py-1.5 text-[11px] font-semibold rounded-lg transition-colors",
-                range === r.id ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                "relative px-3 py-1.5 text-[11px] font-semibold rounded-full transition-colors",
+                range === r.id ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
               {range === r.id && (
                 <motion.span
                   layoutId="equityRange"
-                  className="absolute inset-0 rounded-lg bg-primary/15 border border-primary/25"
+                  className="absolute inset-0 rounded-full bg-foreground/[0.06] border border-border/40"
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
               )}
@@ -180,7 +178,6 @@ export function EquityCurveCard({ trades, brokerDayTotals = null, className }: E
               "text-3xl font-bold font-mono tracking-tight",
               positive ? "text-primary" : "text-destructive",
             )}
-            style={{ textShadow: `0 0 24px ${positive ? "hsl(var(--primary) / 0.45)" : "hsl(var(--destructive) / 0.45)"}` }}
           >
             {formatPnL(summary?.last ?? 0)}
           </p>
@@ -191,22 +188,28 @@ export function EquityCurveCard({ trades, brokerDayTotals = null, className }: E
               icon={summary.change >= 0 ? TrendingUp : TrendingDown}
               label="Range"
               value={formatPnL(summary.change)}
-              positive={summary.change >= 0}
+              tone={summary.change >= 0 ? "up" : "down"}
               delay={0.15}
             />
-            <StatChip icon={TrendingUp} label="Best day" value={formatPnL(summary.bestDay)} positive delay={0.22} />
+            <StatChip
+              icon={TrendingUp}
+              label="Best day"
+              value={formatPnL(summary.bestDay)}
+              tone={summary.bestDay >= 0 ? "up" : "down"}
+              delay={0.22}
+            />
             <StatChip
               icon={TrendingDown}
               label="Worst day"
               value={formatPnL(summary.worstDay)}
-              positive={summary.worstDay >= 0}
+              tone={summary.worstDay >= 0 ? "up" : "down"}
               delay={0.29}
             />
             <StatChip
               icon={CalendarDays}
               label="Trading days"
               value={`${summary.days}`}
-              positive
+              tone="neutral"
               delay={0.36}
             />
           </div>
@@ -214,16 +217,13 @@ export function EquityCurveCard({ trades, brokerDayTotals = null, className }: E
       </div>
 
       {/* Chart */}
-      <div
-        className="flex-1 min-h-[200px] rounded-2xl border border-border/40 bg-card/40 p-2"
-        style={{ filter: `drop-shadow(0 4px 16px ${positive ? "hsl(var(--primary) / 0.18)" : "hsl(var(--destructive) / 0.18)"})` }}
-      >
+      <div className="flex-1 min-h-[200px] rounded-2xl border border-border/30 bg-foreground/[0.03] p-2">
         {data.length > 1 ? (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 12, right: 12, bottom: 4, left: 12 }}>
               <defs>
                 <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={stroke} stopOpacity={0.35} />
+                  <stop offset="0%" stopColor={stroke} stopOpacity={0.1} />
                   <stop offset="100%" stopColor={stroke} stopOpacity={0} />
                 </linearGradient>
               </defs>
@@ -249,7 +249,7 @@ export function EquityCurveCard({ trades, brokerDayTotals = null, className }: E
                 type="monotone"
                 dataKey="equity"
                 stroke={stroke}
-                strokeWidth={2.5}
+                strokeWidth={2}
                 fill="url(#equityFill)"
                 animationDuration={1200}
                 animationEasing="ease-out"

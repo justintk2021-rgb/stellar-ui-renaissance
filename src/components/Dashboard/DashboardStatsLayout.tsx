@@ -200,26 +200,7 @@ export const DashboardStatsLayout = memo(function DashboardStatsLayout({
 
       {/* Equity curve popup — opens from the Total Net P&L card */}
       <Dialog open={equityOpen} onOpenChange={setEquityOpen}>
-        <DialogContent
-          className={
-            "sm:max-w-3xl overflow-hidden rounded-3xl p-6 md:p-7 " +
-            "border border-border/50 bg-card/70 backdrop-blur-2xl " +
-            "shadow-[0_24px_80px_-16px_hsl(var(--foreground)/0.18),0_0_60px_-20px_hsl(var(--primary)/0.35)]"
-          }
-        >
-          {/* Ambient glow accents */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full bg-primary/20 blur-3xl"
-          />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -bottom-28 -left-28 w-80 h-80 rounded-full bg-primary/10 blur-3xl"
-          />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent"
-          />
+        <DialogContent className="sm:max-w-3xl overflow-hidden rounded-3xl p-6 md:p-7 liquid-glass">
           <DialogHeader>
             <DialogTitle className="sr-only">Equity Curve</DialogTitle>
           </DialogHeader>
