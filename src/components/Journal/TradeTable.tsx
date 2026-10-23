@@ -535,7 +535,7 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], user
           </div>
           <div className="flex items-center gap-3">
             <div className="flex flex-col items-end leading-tight pr-0.5">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Current P&L</span>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Total P&L</span>
               <span
                 className={cn(
                   "text-sm font-bold font-mono tabular-nums",
@@ -614,7 +614,7 @@ export function TradeTable({ trades, notebookEntries = [], checklists = [], user
                       </Select>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm text-foreground">Current P&L</span>
+                      <span className="text-sm text-foreground">Total P&L</span>
                       <span
                         className={cn(
                           "text-sm font-bold font-mono tabular-nums",
