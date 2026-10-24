@@ -1,11 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Calculator, ChartCandlestick } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChartCandlestick } from "lucide-react";
 import { useDocumentTheme } from "@/hooks/useDocumentTheme";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -35,12 +34,6 @@ import { ChartBottomPanel } from "./ChartBottomPanel";
 import { ChartTopBar } from "./ChartTopBar";
 import { TradingViewAdvancedChart } from "./TradingViewAdvancedChart";
 import { TradingPanel, type TradeTicket } from "./TradingPanel";
-
-const LotSizeCalculator = lazy(() =>
-  import("@/components/Calculator/LotSizeCalculator").then((m) => ({
-    default: m.LotSizeCalculator,
-  })),
-);
 
 function defaultTicket(symbol: string, last: number | null): TradeTicket {
   const spec = getSymbolSpec(symbol);
@@ -79,7 +72,6 @@ export function TradingChartView() {
   const [history, setHistory] = useState<HistoryTrade[]>([]);
   const [ticket, setTicket] = useState<TradeTicket>(() => defaultTicket("EURUSD", null));
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const account = useMemo(
@@ -240,7 +232,6 @@ export function TradingChartView() {
         timeframe={timeframe}
         onTimeframeChange={setTimeframe}
         lastPrice={lastPrice}
-        onOpenCalculator={() => setCalculatorOpen(true)}
       />
 
       {statusMessage && (
@@ -287,33 +278,6 @@ export function TradingChartView() {
             <SheetTitle>Place order</SheetTitle>
           </SheetHeader>
           {panel}
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={calculatorOpen} onOpenChange={setCalculatorOpen}>
-        <SheetContent side="right" className="liquid-glass w-full overflow-y-auto sm:max-w-md">
-          <SheetHeader className="mb-4">
-            <SheetTitle className="flex items-center gap-2">
-              <Calculator className="h-5 w-5 text-primary" />
-              Pip calculator
-            </SheetTitle>
-            <SheetDescription>
-              Size your position before placing the trade. Live rates included.
-            </SheetDescription>
-          </SheetHeader>
-          {calculatorOpen && (
-            <Suspense
-              fallback={
-                <div className="space-y-3">
-                  {Array.from({ length: 4 }, (_, i) => (
-                    <div key={i} className="h-16 animate-pulse rounded-lg bg-muted/40" />
-                  ))}
-                </div>
-              }
-            >
-              <LotSizeCalculator compact initialSymbol={tvSymbol} />
-            </Suspense>
-          )}
         </SheetContent>
       </Sheet>
     </div>

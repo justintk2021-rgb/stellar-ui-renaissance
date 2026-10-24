@@ -1,3 +1,4 @@
+import { lazy, Suspense, useState } from "react";
 import { Calculator, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
   CHART_TIMEFRAMES,
@@ -16,6 +18,12 @@ import {
   type ChartInstrument,
   type ChartTimeframe,
 } from "@/lib/chartTrading/types";
+
+const LotSizeCalculator = lazy(() =>
+  import("@/components/Calculator/LotSizeCalculator").then((m) => ({
+    default: m.LotSizeCalculator,
+  })),
+);
 
 interface ChartTopBarProps {
   accounts: ChartBrokerAccount[];
@@ -27,7 +35,6 @@ interface ChartTopBarProps {
   timeframe: ChartTimeframe;
   onTimeframeChange: (tf: ChartTimeframe) => void;
   lastPrice: number | null;
-  onOpenCalculator: () => void;
 }
 
 export function ChartTopBar({
@@ -40,8 +47,8 @@ export function ChartTopBar({
   timeframe,
   onTimeframeChange,
   lastPrice,
-  onOpenCalculator,
 }: ChartTopBarProps) {
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
   const current = instruments.find((item) => item.symbol === symbol);
   const precision = current?.precision ?? 5;
 
@@ -130,17 +137,51 @@ export function ChartTopBar({
         ))}
       </div>
 
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        title="Pip calculator"
-        aria-label="Pip calculator"
-        onClick={onOpenCalculator}
-        className="ml-auto h-9 w-9 rounded-xl hover:bg-foreground/5"
-      >
-        <Calculator className="h-4 w-4" />
-      </Button>
+      <Popover open={calculatorOpen} onOpenChange={setCalculatorOpen} modal={false}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            title="Pip calculator"
+            aria-label={calculatorOpen ? "Close pip calculator" : "Open pip calculator"}
+            aria-expanded={calculatorOpen}
+            className={cn(
+              "ml-auto h-8 w-8 rounded-full border border-border/40 bg-foreground/[0.04]",
+              "flex items-center justify-center text-muted-foreground",
+              "hover:text-primary hover:border-primary/30 hover:bg-primary/10",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+              "transition-colors",
+              calculatorOpen && "text-primary border-primary/30 bg-primary/10",
+            )}
+          >
+            <Calculator className="h-4 w-4" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="end"
+          side="bottom"
+          sideOffset={10}
+          collisionPadding={16}
+          className="w-[min(24rem,calc(100vw-2rem))] max-h-[min(40rem,calc(100dvh-5rem))] overflow-y-auto p-4 liquid-glass projection-popover shadow-none data-[state=open]:animate-none data-[state=closed]:animate-none"
+        >
+          <div className="mb-3 flex items-center gap-2">
+            <Calculator className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-muted-foreground">Pip calculator</span>
+          </div>
+          {calculatorOpen && (
+            <Suspense
+              fallback={
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }, (_, i) => (
+                    <div key={i} className="h-16 animate-pulse rounded-lg bg-muted/40" />
+                  ))}
+                </div>
+              }
+            >
+              <LotSizeCalculator compact initialSymbol={symbol} />
+            </Suspense>
+          )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
