@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { Calculator, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,7 @@ interface ChartTopBarProps {
   timeframe: ChartTimeframe;
   onTimeframeChange: (tf: ChartTimeframe) => void;
   lastPrice: number | null;
+  onOpenCalculator: () => void;
 }
 
 export function ChartTopBar({
@@ -39,6 +40,7 @@ export function ChartTopBar({
   timeframe,
   onTimeframeChange,
   lastPrice,
+  onOpenCalculator,
 }: ChartTopBarProps) {
   const current = instruments.find((item) => item.symbol === symbol);
   const precision = current?.precision ?? 5;
@@ -127,6 +129,18 @@ export function ChartTopBar({
           </button>
         ))}
       </div>
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        title="Pip calculator"
+        aria-label="Pip calculator"
+        onClick={onOpenCalculator}
+        className="ml-auto h-9 w-9 rounded-xl hover:bg-foreground/5"
+      >
+        <Calculator className="h-4 w-4" />
+      </Button>
     </div>
   );
 }
