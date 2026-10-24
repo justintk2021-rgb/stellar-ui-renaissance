@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { motion } from "framer-motion";
+import { motion } from "@/lib/motion";
 import { 
   Trophy, TrendingUp, Target, CheckCircle2, 
   Flame, Star, Crown, Shield, Zap, Award
@@ -138,7 +138,7 @@ export function RankCard({ trades }: RankCardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.1 }}
-      className="glass rounded-2xl p-5 border border-border/30"
+      className="glass perf-contain rounded-2xl p-5 border border-border/30"
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-5">

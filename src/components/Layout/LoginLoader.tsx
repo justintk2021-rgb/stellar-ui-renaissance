@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion } from "@/lib/motion";
 import { useEffect, useRef, useState } from "react";
 
 interface LoginLoaderProps {

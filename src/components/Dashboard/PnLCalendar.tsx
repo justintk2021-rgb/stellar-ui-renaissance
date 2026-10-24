@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 import {
   formatPnL as sharedFormatPnL,
   getTradeLocalDateKey,
@@ -416,7 +416,7 @@ export function PnLCalendar({
 
   return (
     <>
-      <div className="glass rounded-2xl border border-border/40 shadow-card overflow-hidden">
+      <div className="glass perf-contain rounded-2xl border border-border/40 shadow-card overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border/30">
           <div className="flex items-center gap-3">

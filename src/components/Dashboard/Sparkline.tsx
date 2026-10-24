@@ -1,5 +1,5 @@
 import { useId, useMemo } from "react";
-import { motion } from "framer-motion";
+import { motion } from "@/lib/motion";
 
 interface SparklineProps {
   data: number[];

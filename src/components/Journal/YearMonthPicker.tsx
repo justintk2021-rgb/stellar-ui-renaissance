@@ -10,7 +10,7 @@ import {
   isSameMonth,
   isSameDay,
 } from "date-fns";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 export interface MonthSelection {

@@ -113,7 +113,7 @@ export const EquityChart = memo(function EquityChart({ trades, startBalance, onS
   };
 
   return (
-    <div className="glass rounded-2xl p-5 border border-border/40 shadow-card">
+    <div className="glass perf-contain rounded-2xl p-5 border border-border/40 shadow-card">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
         <div>
           <h3 className="text-base font-semibold">Account Growth</h3>

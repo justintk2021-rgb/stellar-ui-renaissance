@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Bell, Check, ChevronRight } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { NotebookEntry, Trade } from "@/types/trade";
 import { useNotifications } from "@/hooks/useNotifications";
 import {

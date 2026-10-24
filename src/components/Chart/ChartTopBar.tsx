@@ -53,7 +53,7 @@ export function ChartTopBar({
   const precision = current?.precision ?? 5;
 
   return (
-    <div className="liquid-glass flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2">
+    <div className="perf-contain liquid-glass flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

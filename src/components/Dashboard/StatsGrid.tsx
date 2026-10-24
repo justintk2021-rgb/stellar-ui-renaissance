@@ -6,7 +6,7 @@ import { useCountUp } from "@/hooks/useCountUp";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WinRatioCard } from "./WinRatioCard";
 import { RecentTrades } from "./RecentTrades";
-import { motion } from "framer-motion";
+import { motion } from "@/lib/motion";
 import { useActiveBrokerConnectionId, useBrokerPositions, sumFloatingPl } from "@/hooks/useBrokerPositions";
 import { journalTradeStats } from "@/lib/tradeFormat";
 

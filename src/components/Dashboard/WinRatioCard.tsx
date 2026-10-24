@@ -1,7 +1,7 @@
 import { Trade } from "@/types/trade";
 import { useState, useEffect, useMemo } from "react";
 import { Info, Settings, Trash2, TrendingUp, TrendingDown } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 import { useCountUp } from "@/hooks/useCountUp";
 import { cn } from "@/lib/utils";
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, subYears } from "date-fns";

@@ -6,7 +6,7 @@ import { Trade } from "@/types/trade";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { AssistantUserContext } from "@/lib/assistantContext";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 interface Message {
@@ -231,7 +231,7 @@ export const TradingAssistant = ({ trades, userContext, onAddTrade }: TradingAss
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 420, damping: 32 }}
-            className="fixed bottom-40 lg:bottom-24 right-6 z-50 w-[calc(100vw-48px)] max-w-md h-[min(560px,calc(100vh-8rem))] glass-strong rounded-2xl flex flex-col overflow-hidden shadow-2xl border border-border/50"
+            className="perf-contain fixed bottom-40 lg:bottom-24 right-6 z-50 w-[calc(100vw-48px)] max-w-md h-[min(560px,calc(100vh-8rem))] glass-strong rounded-2xl flex flex-col overflow-hidden shadow-2xl border border-border/50"
           >
             <div className="p-4 border-b border-border/50 bg-gradient-to-r from-primary/10 to-violet-500/10">
               <div className="flex items-center justify-between gap-2">

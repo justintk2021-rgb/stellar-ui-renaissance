@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 import { 
   Trophy, TrendingUp, Target, CheckCircle2, 
   Flame, Star, Crown, Shield, Zap, Award

@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion } from "@/lib/motion";
 
 /**
  * Full-screen boot loader shown after login while the dashboard loads

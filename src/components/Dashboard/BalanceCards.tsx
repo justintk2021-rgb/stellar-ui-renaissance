@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Check, X, TrendingUp, Wallet, Trophy, Activity, Target } from "lucide-react";
 import { useCountUp } from "@/hooks/useCountUp";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { AccountProjectionCard } from "./AccountProjectionCard";
 import { NotificationsCard, type OpenJournalTarget } from "./NotificationsCard";

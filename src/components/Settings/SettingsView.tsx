@@ -11,7 +11,7 @@ import { CSVImport } from "./CSVImport";
 import { CustomAccentColorPicker } from "./CustomAccentColorPicker";
 import { useTrades } from "@/hooks/useTrades";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string {

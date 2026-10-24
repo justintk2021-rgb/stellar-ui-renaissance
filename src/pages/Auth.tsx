@@ -30,8 +30,8 @@ function GoogleIcon({ className }: { className?: string }) {
 }
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
-import { motion, AnimatePresence } from "framer-motion";
-import logo from "@/assets/logo-3d.png";
+import { motion, AnimatePresence } from "@/lib/motion";
+import logo from "@/assets/logo-3d.webp";
 import { LoginLoader } from "@/components/Layout/LoginLoader";
 
 const AuthScene = lazy(() =>
@@ -326,7 +326,7 @@ export function AuthPage() {
                 whileHover={{ scale: 1.1, rotate: 5 }}
                 className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-glow"
               >
-                <img src={logo} alt="NSYNC" loading="lazy" className="w-12 h-12 rounded-xl" />
+                <img src={logo} alt="NSYNC" width={48} height={48} loading="lazy" decoding="async" className="w-12 h-12 rounded-xl" />
               </motion.div>
 
               <motion.h1

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 import { 
   ArrowLeft, Share2, TrendingUp, TrendingDown, Target, Award, 
   AlertCircle, DollarSign, BarChart3, Percent, Activity, Scale,

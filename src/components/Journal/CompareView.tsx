@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Trade } from "@/types/trade";
 import type { TradingAccount } from "@/hooks/useTradingAccounts";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 import {
   X,
   Sparkles,

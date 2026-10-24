@@ -60,7 +60,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
 import { LoadingScreen } from "@/components/Layout/LoadingScreen";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { RefreshCw } from "lucide-react";
 
 const PageFallback = () => (
@@ -989,7 +989,7 @@ const Index = () => {
                   )}
 
                   {/* Main Content with Calendar Sidebar */}
-                  <motion.div variants={staggerItem} className={cn(compareOpen ? "block w-full" : "flex gap-6")}>
+                  <motion.div variants={staggerItem} className={cn("below-fold", compareOpen ? "block w-full" : "flex gap-6")}>
                     {compareOpen ? (
                       <Suspense fallback={<div className="rounded-2xl bg-card/30 border border-border/30 animate-pulse min-h-[400px]" />}>
                         <CompareView
