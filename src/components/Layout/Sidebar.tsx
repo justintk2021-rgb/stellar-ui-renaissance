@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Bookmark } from "lucide-react";
-import bookLogo from "@/assets/book-logo.png";
+import bookLogo from "@/assets/book-logo.webp";
 import { supabase } from "@/integrations/supabase/client";
 import { appNavItems } from "@/components/Layout/appNav";
 
@@ -137,15 +137,18 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
           <Bookmark className="h-3.5 w-3.5" strokeWidth={1.15} />
         </button>
         <div className="h-full p-4 lg:p-0">
-          <div className="glass-strong rounded-2xl lg:rounded-none p-5 flex flex-col gap-6 shadow-card h-full w-64 lg:w-72 relative">
+          <div className="glass-strong perf-contain rounded-2xl lg:rounded-none p-5 flex flex-col gap-6 shadow-card h-full w-64 lg:w-72 relative">
 
             {/* Logo */}
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0">
                 <img 
                   src={bookLogo} 
-                  alt="NSYNC Journal Logo" 
+                  alt="NSYNC Journal Logo"
+                  width={48}
+                  height={48}
                   loading="lazy"
+                  decoding="async"
                   className="w-12 h-12 object-contain"
                   style={{ filter: 'drop-shadow(0 0 8px hsl(var(--primary) / 0.5))' }}
                 />

@@ -4,8 +4,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { LazyMotion, domAnimation } from "@/lib/motion";
 import { useApplyGlobalSettings } from "./hooks/useApplyGlobalSettings";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { FpsMeter } from "./components/dev/FpsMeter";
 import { isSupabaseConfigured } from "./integrations/supabase/client";
 
 // Lazy-load route pages so visitors only download the JS they actually need.
@@ -63,10 +65,12 @@ const App = () => {
 
   return (
   <QueryClientProvider client={queryClient}>
+    <LazyMotion features={domAnimation}>
     <TooltipProvider>
       <GlobalSettingsApplier />
       <Toaster />
       <Sonner />
+      {import.meta.env.DEV && <FpsMeter />}
       <BrowserRouter>
         <ErrorBoundary>
           <Suspense fallback={<RouteFallback />}>
@@ -83,6 +87,7 @@ const App = () => {
         </ErrorBoundary>
       </BrowserRouter>
     </TooltipProvider>
+    </LazyMotion>
   </QueryClientProvider>
   );
 };

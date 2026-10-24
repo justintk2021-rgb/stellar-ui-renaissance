@@ -10,7 +10,7 @@ import { Plus, X, ImagePlus, Trash2, ClipboardList, Award, GitBranch, ListChecks
 import { useChecklists } from "@/hooks/useChecklists";
 import { useTradeDetail } from "@/hooks/useTrades";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 import { ChecklistPopup } from "./ChecklistPopup";
 import { Badge } from "@/components/ui/badge";
 import { compressTradeImage } from "@/lib/tradeImage";

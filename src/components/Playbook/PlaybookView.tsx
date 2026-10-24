@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { motion, AnimatePresence, Reorder } from "framer-motion";
+import { motion, AnimatePresence, Reorder } from "@/lib/motion";
 import { PlaybookDetailView } from "./PlaybookDetailView";
 import { Plus, Trash2, Check, Edit2, X, ClipboardList, ChevronDown, Loader2, Percent, TrendingUp, TrendingDown, BarChart3, GripVertical, ChevronRight, GitBranch, ListChecks, Lock, Unlock, MoreHorizontal, LayoutGrid, List, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";

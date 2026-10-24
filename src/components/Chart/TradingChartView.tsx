@@ -221,7 +221,7 @@ export function TradingChartView() {
   );
 
   return (
-    <div className="flex h-[calc(100dvh-1.5rem)] min-h-[36rem] flex-col gap-2 sm:h-[calc(100dvh-2rem)] lg:h-[calc(100dvh-3rem)]">
+    <div className="perf-contain flex h-[calc(100dvh-1.5rem)] min-h-[36rem] flex-col gap-2 sm:h-[calc(100dvh-2rem)] lg:h-[calc(100dvh-3rem)]">
       <ChartTopBar
         accounts={accounts}
         account={account}
@@ -241,7 +241,7 @@ export function TradingChartView() {
       )}
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 lg:flex-row">
-        <div className="relative min-h-[20rem] min-w-0 w-full flex-1 overflow-hidden rounded-2xl border border-foreground/10 bg-background/40">
+        <div className="perf-contain relative min-h-[20rem] min-w-0 w-full flex-1 overflow-hidden rounded-2xl border border-foreground/10 bg-background/40">
           <TradingViewAdvancedChart
             key={`${theme}-${tvSymbol}-${tvInterval}-${timezone}`}
             symbol={tvSymbol}

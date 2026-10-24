@@ -14,7 +14,7 @@ import {
   subMonths,
   isWithinInterval,
 } from "date-fns";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { IOSDatePicker } from "./IOSDatePicker";

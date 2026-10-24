@@ -7,7 +7,7 @@ import {
   Scale,
   Activity,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion } from "@/lib/motion";
 import { StatCardPro } from "./StatCardPro";
 import { SpotlightCard } from "./SpotlightCard";
 import { EquityCurveCard } from "./EquityCurveCard";
@@ -213,7 +213,7 @@ export const DashboardStatsLayout = memo(function DashboardStatsLayout({
       </Dialog>
 
       {/* Intelligence map + Recent trades */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-5 items-stretch">
+      <div className="below-fold grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-5 items-stretch">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

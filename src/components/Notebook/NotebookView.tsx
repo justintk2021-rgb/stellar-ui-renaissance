@@ -98,7 +98,7 @@ import {
   AlignRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 
 interface NotebookViewProps {
   trades: Trade[];
@@ -1163,7 +1163,7 @@ export function NotebookView({
             ease: [0.25, 0.46, 0.45, 0.94],
             scale: { type: "spring", stiffness: 300, damping: 25 }
           }}
-          className="w-full max-w-4xl h-[90vh] glass-strong rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+          className="perf-contain w-full max-w-4xl h-[90vh] glass-strong rounded-3xl shadow-2xl flex flex-col overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}

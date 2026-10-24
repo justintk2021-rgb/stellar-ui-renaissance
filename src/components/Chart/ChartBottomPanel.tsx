@@ -13,7 +13,7 @@ interface ChartBottomPanelProps {
 
 export function ChartBottomPanel({ positions, orders, history, onClose }: ChartBottomPanelProps) {
   return (
-    <div className="liquid-glass min-h-[9.5rem] rounded-2xl px-3 py-2">
+    <div className="perf-contain liquid-glass min-h-[9.5rem] rounded-2xl px-3 py-2">
       <Tabs defaultValue="positions" className="w-full">
         <TabsList className="h-8 bg-foreground/5">
           <TabsTrigger value="positions" className="h-7 text-xs">

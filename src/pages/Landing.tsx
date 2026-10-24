@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, useScroll, useTransform, type Variants } from "framer-motion";
+import { motion, useMotionValue, useScroll, useTransform, type Variants } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,9 +19,9 @@ import {
   Check,
   Quote,
 } from "lucide-react";
-import logo from "@/assets/logo-3d.png";
-import dashboardShot from "@/assets/landing-screenshots/dashboard.png";
-import settingsBrokersShot from "@/assets/landing-screenshots/settings-brokers.png";
+import logo from "@/assets/logo-3d.webp";
+import dashboardShot from "@/assets/landing-screenshots/dashboard.webp";
+import settingsBrokersShot from "@/assets/landing-screenshots/settings-brokers.webp";
 import { cn } from "@/lib/utils";
 
 const easeOut = [0.25, 0.46, 0.45, 0.94] as const;
@@ -191,6 +191,9 @@ function ProductScreenshot({
   style?: React.CSSProperties;
 }) {
   const [reduceMotion, setReduceMotion] = useState(false);
+  const hover = useMotionValue(0);
+  const hoverY = useTransform(hover, [0, 1], [0, -6]);
+  const hoverScale = useTransform(hover, [0, 1], [1, 1.03]);
   useEffect(() => {
     setReduceMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   }, []);
@@ -203,7 +206,7 @@ function ProductScreenshot({
   return (
     <motion.div
       className={cn(
-        "group relative rounded-2xl border border-border/70 bg-muted/40 p-1.5 shadow-lg ring-1 ring-black/5",
+        "group perf-contain relative rounded-2xl border border-border/70 bg-muted/40 p-1.5 shadow-lg ring-1 ring-black/5",
         size === "hero" ? "max-w-4xl mx-auto" : "max-w-md md:max-w-none md:ml-auto",
       )}
       style={style}
@@ -212,8 +215,10 @@ function ProductScreenshot({
         ? { animate: { opacity: 1, x: 0, y: 0, scale: 1 } }
         : { whileInView: { opacity: 1, x: 0, y: 0, scale: 1 }, viewport: { once: true, margin: "-80px" } })}
       transition={{ duration: 0.85, ease: easeOut }}
-      whileHover={reduceMotion ? undefined : { y: -8, scale: 1.02 }}
+      onHoverStart={() => hover.set(reduceMotion ? 0 : 1)}
+      onHoverEnd={() => hover.set(0)}
     >
+      <motion.div style={{ y: hoverY, scale: hoverScale }}>
       <motion.div
         animate={reduceMotion ? undefined : { y: [0, -10, 0] }}
         transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
@@ -227,6 +232,8 @@ function ProductScreenshot({
           <motion.img
             src={src}
             alt={alt}
+            width={size === "hero" ? 2608 : 2608}
+            height={size === "hero" ? 3690 : 1728}
             className="w-full h-full object-cover object-top block"
             loading="lazy"
             decoding="async"
@@ -235,6 +242,7 @@ function ProductScreenshot({
             transition={{ duration: 1.2, ease: easeOut }}
           />
         </div>
+      </motion.div>
       </motion.div>
       <div
         className="pointer-events-none absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-60"
@@ -246,31 +254,101 @@ function ProductScreenshot({
 
 function FeatureVisual({ icon: Icon, reverse }: { icon: React.ElementType; reverse?: boolean }) {
   const [reduceMotion, setReduceMotion] = useState(false);
+  const hover = useMotionValue(0);
+  const hoverY = useTransform(hover, [0, 1], [0, -6]);
+  const hoverScale = useTransform(hover, [0, 1], [1, 1.03]);
   useEffect(() => {
     setReduceMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   }, []);
 
   return (
     <motion.div
-      className="relative rounded-2xl border border-border/60 bg-gradient-to-br from-muted/60 to-card p-10 min-h-[220px] md:min-h-[260px] flex items-center justify-center max-w-md md:max-w-none md:ml-auto overflow-hidden"
+      className="perf-contain relative rounded-2xl border border-border/60 bg-gradient-to-br from-muted/60 to-card p-10 min-h-[220px] md:min-h-[260px] flex items-center justify-center max-w-md md:max-w-none md:ml-auto overflow-hidden"
       variants={reverse ? fadeInLeft : fadeInRight}
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, margin: "-60px" }}
-      whileHover={reduceMotion ? undefined : { scale: 1.03, y: -6 }}
       transition={{ type: "spring", stiffness: 260, damping: 22 }}
+      onHoverStart={() => hover.set(reduceMotion ? 0 : 1)}
+      onHoverEnd={() => hover.set(0)}
     >
       <motion.div
         className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(var(--primary)/0.08),transparent_70%)]"
         animate={reduceMotion ? undefined : { opacity: [0.4, 0.8, 0.4] }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
       />
-      <motion.div
-        className="relative w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shadow-glow-sm"
-        animate={reduceMotion ? undefined : { rotate: [0, 4, -4, 0], scale: [1, 1.05, 1] }}
-        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+      <motion.div style={{ y: hoverY, scale: hoverScale }} className="relative">
+        <motion.div
+          className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shadow-glow-sm"
+          animate={reduceMotion ? undefined : { rotate: [0, 4, -4, 0], scale: [1, 1.05, 1] }}
+          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <Icon className="w-10 h-10 text-primary" strokeWidth={1.25} />
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function FeatureCard({
+  card,
+}: {
+  card: (typeof featureCards)[number];
+}) {
+  const hover = useMotionValue(0);
+  const y = useTransform(hover, [0, 1], [0, -8]);
+  const scale = useTransform(hover, [0, 1], [1, 1.02]);
+
+  return (
+    <motion.div
+      variants={staggerChild}
+      onHoverStart={() => hover.set(1)}
+      onHoverEnd={() => hover.set(0)}
+      className="perf-contain rounded-2xl border border-border/70 bg-card p-6 shadow-sm hover:shadow-lg hover:border-primary/25 transition-colors duration-300"
+    >
+      <motion.div style={{ y, scale }}>
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+          <card.icon className="w-5 h-5 text-primary" />
+        </div>
+        <h3 className="text-lg font-semibold mb-2">{card.title}</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed mb-5">{card.description}</p>
+        <div className="flex flex-wrap gap-2">
+          {card.metrics.map((m) => (
+            <span
+              key={m}
+              className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-muted text-muted-foreground border border-border/60"
+            >
+              {m}
+            </span>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function StepCard({ item }: { item: (typeof steps)[number] }) {
+  const hover = useMotionValue(0);
+  const y = useTransform(hover, [0, 1], [0, -6]);
+
+  return (
+    <motion.div
+      variants={staggerChild}
+      onHoverStart={() => hover.set(1)}
+      onHoverEnd={() => hover.set(0)}
+      className="perf-contain text-center p-6 rounded-2xl border border-border/60 bg-card"
+    >
+      <motion.div style={{ y }}>
+      <motion.span
+        className="inline-flex w-10 h-10 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold mb-4"
+        whileInView={{ scale: [0.5, 1.15, 1] }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5 }}
       >
-        <Icon className="w-10 h-10 text-primary" strokeWidth={1.25} />
+        {item.step}
+      </motion.span>
+      <h3 className="font-semibold mb-2">{item.title}</h3>
+      <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
       </motion.div>
     </motion.div>
   );
@@ -309,7 +387,7 @@ export default function Landing() {
       >
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
           <Link to="/" className="flex items-center gap-2.5">
-            <img src={logo} alt="NSYNC" className="w-8 h-8 rounded-lg" loading="lazy" />
+            <img src={logo} alt="NSYNC" width={32} height={32} className="h-8 w-8 rounded-lg" loading="eager" />
             <span className="font-semibold text-[15px] tracking-tight">NSYNC Journal</span>
           </Link>
 
@@ -441,7 +519,7 @@ export default function Landing() {
       </section>
 
       {/* Intro band */}
-      <section className="py-16 md:py-20 px-4 sm:px-6 border-y border-border/50 bg-muted/30">
+      <section className="below-fold py-16 md:py-20 px-4 sm:px-6 border-y border-border/50 bg-muted/30">
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -460,8 +538,8 @@ export default function Landing() {
       </section>
 
       {/* Alternating spotlight sections */}
-      <div id="benefits">
-        {spotlightSections.map((section, i) => (
+      <div id="benefits" className="below-fold">
+        {spotlightSections.map((section) => (
           <section key={section.title} className="py-20 md:py-28 px-4 sm:px-6">
             <div
               className={`max-w-6xl mx-auto grid md:grid-cols-2 gap-12 md:gap-16 items-center ${
@@ -494,7 +572,7 @@ export default function Landing() {
       </div>
 
       {/* Feature grid */}
-      <section id="features" className="py-20 md:py-28 px-4 sm:px-6 bg-muted/20">
+      <section id="features" className="below-fold py-20 md:py-28 px-4 sm:px-6 bg-muted/20">
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial="hidden"
@@ -519,40 +597,14 @@ export default function Landing() {
             viewport={{ once: true, margin: "-60px" }}
           >
             {featureCards.map((card) => (
-              <motion.div
-                key={card.title}
-                variants={staggerChild}
-                whileHover={{ y: -8, scale: 1.02 }}
-                transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                className="rounded-2xl border border-border/70 bg-card p-6 shadow-sm hover:shadow-lg hover:border-primary/25 transition-colors duration-300"
-              >
-                <motion.div
-                  className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-4"
-                  whileHover={{ rotate: 8, scale: 1.1 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                >
-                  <card.icon className="w-5 h-5 text-primary" />
-                </motion.div>
-                <h3 className="text-lg font-semibold mb-2">{card.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-5">{card.description}</p>
-                <div className="flex flex-wrap gap-2">
-                  {card.metrics.map((m) => (
-                    <span
-                      key={m}
-                      className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-muted text-muted-foreground border border-border/60"
-                    >
-                      {m}
-                    </span>
-                  ))}
-                </div>
-              </motion.div>
+              <FeatureCard key={card.title} card={card} />
             ))}
           </motion.div>
         </div>
       </section>
 
       {/* Steps */}
-      <section className="py-20 md:py-28 px-4 sm:px-6 border-t border-border/50">
+      <section className="below-fold py-20 md:py-28 px-4 sm:px-6 border-t border-border/50">
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial="hidden"
@@ -577,23 +629,7 @@ export default function Landing() {
             viewport={{ once: true, margin: "-40px" }}
           >
             {steps.map((item) => (
-              <motion.div
-                key={item.step}
-                variants={staggerChild}
-                whileHover={{ y: -6 }}
-                className="text-center p-6 rounded-2xl border border-border/60 bg-card"
-              >
-                <motion.span
-                  className="inline-flex w-10 h-10 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold mb-4"
-                  whileInView={{ scale: [0.5, 1.15, 1] }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5 }}
-                >
-                  {item.step}
-                </motion.span>
-                <h3 className="font-semibold mb-2">{item.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
-              </motion.div>
+              <StepCard key={item.step} item={item} />
             ))}
           </motion.div>
 
@@ -614,7 +650,7 @@ export default function Landing() {
       </section>
 
       {/* Integrations */}
-      <section id="integrations" className="py-20 md:py-28 px-4 sm:px-6 bg-muted/30">
+      <section id="integrations" className="below-fold py-20 md:py-28 px-4 sm:px-6 bg-muted/30">
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
           <motion.div
             initial="hidden"
@@ -658,7 +694,7 @@ export default function Landing() {
       </section>
 
       {/* Testimonial */}
-      <section className="py-20 px-4 sm:px-6">
+      <section className="below-fold py-20 px-4 sm:px-6">
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -685,7 +721,7 @@ export default function Landing() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 md:py-28 px-4 sm:px-6">
+      <section className="below-fold py-20 md:py-28 px-4 sm:px-6">
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -711,11 +747,11 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border/60 py-12 px-4 sm:px-6 bg-muted/20">
+      <footer className="below-fold border-t border-border/60 py-12 px-4 sm:px-6 bg-muted/20">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10 mb-10">
             <div className="flex items-center gap-2.5">
-              <img src={logo} alt="NSYNC" className="w-8 h-8 rounded-lg" loading="lazy" />
+              <img src={logo} alt="NSYNC" width={32} height={32} className="h-8 w-8 rounded-lg" loading="lazy" />
               <span className="font-semibold">NSYNC Journal</span>
             </div>
             <div className="flex flex-wrap gap-x-10 gap-y-4 text-sm text-muted-foreground">

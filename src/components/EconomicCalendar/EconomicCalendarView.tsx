@@ -20,7 +20,7 @@ import {
   FilterX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Sparkline } from "@/components/Dashboard/Sparkline";
 import {

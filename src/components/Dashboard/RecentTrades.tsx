@@ -1,5 +1,5 @@
 import { Trade } from "@/types/trade";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "@/lib/motion";
 import { format, parseISO } from "date-fns";
 import { Filter, TrendingUp, TrendingDown, Activity, CircleDot, ClipboardList } from "lucide-react";
 import { cn, truncateNum } from "@/lib/utils";

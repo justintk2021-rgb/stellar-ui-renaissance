@@ -30,7 +30,7 @@ export function TradingPanel({ symbol, lastPrice, ticket, onChange, onSubmit }: 
   const buy = ticket.side === "buy";
 
   return (
-    <div className="liquid-glass flex h-full flex-col gap-3 rounded-2xl p-3">
+    <div className="perf-contain liquid-glass flex h-full flex-col gap-3 rounded-2xl p-3">
       <div className="grid grid-cols-2 gap-1 rounded-xl bg-foreground/5 p-1">
         {(["buy", "sell"] as const).map((side) => (
           <button
