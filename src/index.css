@@ -1226,3 +1226,29 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   }
 }
 
+.tv-advanced-chart,
+.tv-advanced-chart .tradingview-widget-container,
+.tv-advanced-chart iframe {
+  height: 100%;
+  width: 100%;
+}
+
+.tv-advanced-chart .tradingview-widget-container__widget {
+  height: calc(100% - 32px);
+  width: 100%;
+}
+
+.tv-advanced-chart .tradingview-widget-copyright {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+
+.tv-advanced-chart .tradingview-widget-copyright a,
+.tv-advanced-chart .tradingview-widget-copyright .blue-text {
+  color: hsl(var(--primary));
+}
+

@@ -1,13 +1,11 @@
-import { Activity, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -28,12 +26,6 @@ interface ChartTopBarProps {
   onSymbolChange: (symbol: string) => void;
   timeframe: ChartTimeframe;
   onTimeframeChange: (tf: ChartTimeframe) => void;
-  showEma20: boolean;
-  showEma50: boolean;
-  showRsi: boolean;
-  onToggleEma20: (next: boolean) => void;
-  onToggleEma50: (next: boolean) => void;
-  onToggleRsi: (next: boolean) => void;
   lastPrice: number | null;
 }
 
@@ -46,12 +38,6 @@ export function ChartTopBar({
   onSymbolChange,
   timeframe,
   onTimeframeChange,
-  showEma20,
-  showEma50,
-  showRsi,
-  onToggleEma20,
-  onToggleEma50,
-  onToggleRsi,
   lastPrice,
 }: ChartTopBarProps) {
   const current = instruments.find((item) => item.symbol === symbol);
@@ -140,32 +126,6 @@ export function ChartTopBar({
             {tf}
           </button>
         ))}
-      </div>
-
-      <div className="ml-auto">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-9 rounded-xl px-2.5 hover:bg-foreground/5">
-              <Activity className="h-4 w-4" />
-              Indicators
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="liquid-glass w-48">
-            <DropdownMenuLabel>Overlays</DropdownMenuLabel>
-            <DropdownMenuCheckboxItem checked={showEma20} onCheckedChange={(v) => onToggleEma20(v === true)}>
-              EMA 20
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem checked={showEma50} onCheckedChange={(v) => onToggleEma50(v === true)}>
-              EMA 50
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Oscillators</DropdownMenuLabel>
-            <DropdownMenuCheckboxItem checked={showRsi} onCheckedChange={(v) => onToggleRsi(v === true)}>
-              RSI 14
-            </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </div>
   );
