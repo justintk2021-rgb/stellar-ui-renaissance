@@ -163,12 +163,12 @@ export function PlaybookView() {
   const handleCreateChecklist = async () => {
     if (!newChecklistName.trim() || !newChecklistType) return;
     const newChecklist = await createChecklist(newChecklistName, newChecklistType);
-    if (newChecklist) {
-      setSelectedChecklistId(newChecklist.id);
-    }
     setNewChecklistName("");
     setNewChecklistType(null);
     setIsCreateDialogOpen(false);
+    if (!newChecklist) return;
+    setShowDetailView(false);
+    setSelectedChecklistId(newChecklist.id);
   };
 
   const openTypeSelect = () => {
@@ -1092,8 +1092,18 @@ export function PlaybookView() {
     );
   }
 
+  // Newly created playbooks are selected before the list refetch lands.
+  // The editor below assumes selectedChecklist is defined.
+  if (!selectedChecklist) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   // Detail view - show analytics and overview
-  if (showDetailView && selectedChecklist) {
+  if (showDetailView) {
     return (
       <PlaybookDetailView
         checklist={selectedChecklist}

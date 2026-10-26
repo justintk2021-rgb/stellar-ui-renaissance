@@ -5,69 +5,18 @@ import { useToast } from '@/hooks/use-toast';
 import { Json } from '@/integrations/supabase/types';
 import { queryKeys } from '@/lib/queries/keys';
 import { subscribeChecklistsRealtime } from '@/lib/queries/checklists';
-
-interface ConditionalSubItem {
-  id: string;
-  text: string;
-  checked: boolean;
-  children?: ConditionalSubItem[];
-}
-
-type PercentageType = 'fixed' | 'conditional';
-
-interface ChecklistSubItem {
-  id: string;
-  text: string;
-  checked: boolean;
-  percentage?: number;
-  children?: ConditionalSubItem[];
-}
-
-interface ChecklistItem {
-  id: string;
-  text: string;
-  checked: boolean;
-  percentage?: number;
-  percentageType?: PercentageType;
-  subItems?: ChecklistSubItem[];
-}
-
-type ChecklistType = 'fixed' | 'conditional';
-
-interface Checklist {
-  id: string;
-  name: string;
-  type: ChecklistType;
-  items: ChecklistItem[];
-  notes: string;
-  createdAt: string;
-}
+import {
+  mapDbToChecklist,
+  type Checklist,
+  type ChecklistItem,
+  type ChecklistSubItem,
+  type ChecklistType,
+  type ConditionalSubItem,
+  type PercentageType,
+} from '@/lib/playbookChecklist';
 
 export type { ChecklistItem, ChecklistSubItem, ConditionalSubItem, Checklist, ChecklistType, PercentageType };
-
-function mapDbToChecklist(c: Record<string, unknown>): Checklist {
-  const items = c.items as unknown as { items?: ChecklistItem[]; type?: ChecklistType } | ChecklistItem[];
-
-  if (Array.isArray(items)) {
-    return {
-      id: c.id as string,
-      name: c.name as string,
-      type: 'fixed',
-      items: items || [],
-      notes: (c.notes as string) || '',
-      createdAt: c.created_at as string,
-    };
-  }
-
-  return {
-    id: c.id as string,
-    name: c.name as string,
-    type: (items?.type || 'fixed') as ChecklistType,
-    items: items?.items || [],
-    notes: (c.notes as string) || '',
-    createdAt: c.created_at as string,
-  };
-}
+export { mapDbToChecklist };
 
 async function fetchChecklists(userId: string): Promise<Checklist[]> {
   const { data, error } = await supabase
@@ -132,8 +81,12 @@ export function useChecklists() {
         .single();
 
       if (error) throw error;
-      invalidate();
-      return mapDbToChecklist(data as Record<string, unknown>);
+      const created = mapDbToChecklist(data as Record<string, unknown>);
+      queryClient.setQueryData<Checklist[]>(
+        queryKeys.checklists.list(userId),
+        (prev = []) => [created, ...prev.filter((c) => c.id !== created.id)],
+      );
+      return created;
     } catch (error) {
       console.error('Error creating checklist:', error);
       toast({ title: 'Error', description: 'Failed to create checklist', variant: 'destructive' });
