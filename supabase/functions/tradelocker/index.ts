@@ -1393,12 +1393,9 @@ serve(async (req) => {
         const accountRow = Array.isArray(details)
           ? details.find((item: any) => String(item?.id ?? item?.accountId) === String(accountId)) || details[0]
           : details;
-        const realized = Array.from(plByPosition.values()).reduce((sum, pl) => sum + pl, 0);
-        const inferred = state?.balance != null ? Number(state.balance) - realized : null;
         const deposit =
           extractDepositFromBrokerPayload(accountRow)
-          ?? parseDepositFromAccountName(accountRow?.name)
-          ?? (inferred != null && inferred > 0 ? inferred : null);
+          ?? parseDepositFromAccountName(accountRow?.name);
         if (deposit != null) {
           await persistBrokerDeposit(supabase, connectionId, String(accountId), deposit);
         }

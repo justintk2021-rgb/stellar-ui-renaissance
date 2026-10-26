@@ -51,6 +51,7 @@ describe("parseDepositFromAccountName", () => {
 describe("resolveBrokerStartBalance", () => {
   it("uses the deposit amount instead of live minus trades", () => {
     expect(resolveBrokerStartBalance(25000, 26100, 1100)).toBe(25000);
+    expect(resolveBrokerStartBalance(25000, 26100, 200)).toBe(25000);
     expect(resolveBrokerStartBalance(null, 26100, 1100)).toBe(25000);
   });
 });

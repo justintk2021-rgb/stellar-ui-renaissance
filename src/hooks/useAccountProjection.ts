@@ -26,10 +26,14 @@ function brokerProjectionStorageKey(accountExternalId: string) {
   return `nsync-broker-projection-${accountExternalId}`;
 }
 
+type LocalBrokerProjection = Partial<
+  Pick<BrokerAccountProjection, 'starting_balance' | 'deposit_balance' | 'goal_balance' | 'profit_target'>
+>;
+
 function readLocalBrokerProjection(accountExternalId: string) {
   try {
     const raw = localStorage.getItem(brokerProjectionStorageKey(accountExternalId));
-    return raw ? JSON.parse(raw) as Partial<Pick<BrokerAccountProjection, 'starting_balance' | 'goal_balance' | 'profit_target'>> : {};
+    return raw ? JSON.parse(raw) as LocalBrokerProjection : {};
   } catch {
     return {};
   }
@@ -37,7 +41,7 @@ function readLocalBrokerProjection(accountExternalId: string) {
 
 function writeLocalBrokerProjection(
   accountExternalId: string,
-  patch: Partial<Pick<BrokerAccountProjection, 'starting_balance' | 'goal_balance' | 'profit_target'>>,
+  patch: LocalBrokerProjection,
 ) {
   const current = readLocalBrokerProjection(accountExternalId);
   localStorage.setItem(
@@ -78,7 +82,7 @@ async function fetchBrokerProjection(accountExternalId: string): Promise<BrokerA
       accountName: basic.account_name as string | null,
       brokerName,
       starting_balance: local.starting_balance ?? null,
-      deposit_balance: null,
+      deposit_balance: local.deposit_balance ?? null,
       goal_balance: local.goal_balance ?? null,
       profit_target: local.profit_target ?? null,
     };
@@ -102,7 +106,7 @@ async function fetchBrokerProjection(accountExternalId: string): Promise<BrokerA
     accountName: data.account_name as string | null,
     brokerName,
     starting_balance: row.starting_balance != null ? Number(row.starting_balance) : (local.starting_balance ?? null),
-    deposit_balance: row.deposit_balance != null ? Number(row.deposit_balance) : null,
+    deposit_balance: row.deposit_balance != null ? Number(row.deposit_balance) : (local.deposit_balance ?? null),
     goal_balance: row.goal_balance != null ? Number(row.goal_balance) : (local.goal_balance ?? null),
     profit_target: row.profit_target != null ? Number(row.profit_target) : (local.profit_target ?? null),
   };
@@ -158,7 +162,8 @@ export function useAccountProjection({
     if (isBroker) {
       const deposit =
         brokerProjection?.deposit_balance
-        ?? parseDepositFromAccountName(brokerProjection?.accountName);
+        ?? parseDepositFromAccountName(brokerProjection?.accountName)
+        ?? brokerProjection?.starting_balance;
       return resolveBrokerStartBalance(deposit, brokerBalance, brokerRealizedPnL);
     }
     return deriveStartBalance(manualAccount?.starting_balance, null, netPnL);
@@ -166,6 +171,7 @@ export function useAccountProjection({
     isBroker,
     brokerProjection?.deposit_balance,
     brokerProjection?.accountName,
+    brokerProjection?.starting_balance,
     brokerBalance,
     brokerRealizedPnL,
     netPnL,
@@ -206,10 +212,10 @@ export function useAccountProjection({
     if (!isBroker || !brokerProjection?.id || !brokerAccountExternalId) return;
     if (brokerProjection.deposit_balance != null && brokerProjection.deposit_balance > 0) return;
     const fromName = parseDepositFromAccountName(brokerProjection.accountName);
-    const inferred = brokerHistoryReady && brokerBalance != null
-      ? brokerBalance - brokerRealizedPnL
+    const storedStart = brokerProjection.starting_balance != null && brokerProjection.starting_balance > 0
+      ? brokerProjection.starting_balance
       : null;
-    const deposit = fromName ?? (inferred != null && inferred > 0 ? inferred : null);
+    const deposit = fromName ?? storedStart;
     if (deposit == null) return;
     let cancelled = false;
     supabase
@@ -228,10 +234,8 @@ export function useAccountProjection({
     brokerProjection?.id,
     brokerProjection?.deposit_balance,
     brokerProjection?.accountName,
+    brokerProjection?.starting_balance,
     brokerAccountExternalId,
-    brokerHistoryReady,
-    brokerBalance,
-    brokerRealizedPnL,
     invalidateBroker,
   ]);
 
@@ -269,14 +273,24 @@ export function useAccountProjection({
       }
       const { error } = await supabase
         .from('broker_accounts')
-        .update({ starting_balance: value })
+        .update({ starting_balance: value, deposit_balance: value })
         .eq('id', brokerProjection.id);
       if (error) {
-        writeLocalBrokerProjection(brokerAccountExternalId, { starting_balance: value });
+        await supabase
+          .from('broker_accounts')
+          .update({ starting_balance: value })
+          .eq('id', brokerProjection.id);
+        writeLocalBrokerProjection(brokerAccountExternalId, {
+          starting_balance: value,
+          deposit_balance: value,
+        });
         invalidateBroker();
         return true;
       }
-      writeLocalBrokerProjection(brokerAccountExternalId, { starting_balance: value });
+      writeLocalBrokerProjection(brokerAccountExternalId, {
+        starting_balance: value,
+        deposit_balance: value,
+      });
       invalidateBroker();
       return true;
     }
