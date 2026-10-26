@@ -397,6 +397,7 @@ const Index = () => {
     brokerBalance,
     brokerEquity,
     brokerRealizedPnL,
+    brokerDayTotals: selectedBrokerAccountId ? brokerDayTotals : null,
     updateManualAccount: updateAccount,
   });
   

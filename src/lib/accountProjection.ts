@@ -7,6 +7,8 @@ export interface ProjectionMetricsInput {
   currentBalance: number;
   goalBalance: number | null;
   profitTarget: number | null;
+  /** When set (broker history), pace uses these day totals instead of journal trades. */
+  dailyPnL?: Map<string, number> | null;
 }
 
 export interface ProjectionMetrics {
@@ -28,6 +30,15 @@ export function computeNetPnL(trades: Trade[]): number {
   return sumPnL(trades);
 }
 
+export function computeAvgDailyPnLFromMap(
+  byDay: Map<string, number>,
+): { avgDailyPnL: number | null; tradingDays: number } {
+  const tradingDays = byDay.size;
+  if (tradingDays === 0) return { avgDailyPnL: null, tradingDays: 0 };
+  const total = Array.from(byDay.values()).reduce((a, b) => a + b, 0);
+  return { avgDailyPnL: total / tradingDays, tradingDays };
+}
+
 export function computeAvgDailyPnL(trades: Trade[]): { avgDailyPnL: number | null; tradingDays: number } {
   const byDay = new Map<string, number>();
   for (const trade of dedupeTradesForPnL(trades)) {
@@ -35,15 +46,25 @@ export function computeAvgDailyPnL(trades: Trade[]): { avgDailyPnL: number | nul
     if (!key) continue;
     byDay.set(key, (byDay.get(key) || 0) + getTradeNetResult(trade));
   }
-  const tradingDays = byDay.size;
-  if (tradingDays === 0) return { avgDailyPnL: null, tradingDays: 0 };
-  const total = Array.from(byDay.values()).reduce((a, b) => a + b, 0);
-  return { avgDailyPnL: total / tradingDays, tradingDays };
+  return computeAvgDailyPnLFromMap(byDay);
+}
+
+/** Progress from opening size to the goal. A $25k account aiming at $50k starts at 0%, not 50%. */
+export function computeGoalProgress(
+  startBalance: number,
+  currentBalance: number,
+  goalBalance: number,
+): number {
+  const span = goalBalance - startBalance;
+  if (!(span > 0)) return currentBalance >= goalBalance ? 100 : 0;
+  return Math.min(100, Math.max(0, ((currentBalance - startBalance) / span) * 100));
 }
 
 export function computeProjectionMetrics(input: ProjectionMetricsInput): ProjectionMetrics {
   const netPnL = computeNetPnL(input.trades);
-  const { avgDailyPnL, tradingDays } = computeAvgDailyPnL(input.trades);
+  const { avgDailyPnL, tradingDays } = input.dailyPnL
+    ? computeAvgDailyPnLFromMap(input.dailyPnL)
+    : computeAvgDailyPnL(input.trades);
 
   // Account-level profit derived from balance change so broker and manual stay in sync
   const accountProfit = input.currentBalance - input.startBalance;
@@ -52,7 +73,7 @@ export function computeProjectionMetrics(input: ProjectionMetricsInput): Project
   const profitTarget = input.profitTarget && input.profitTarget > 0 ? input.profitTarget : null;
 
   const goalProgress = goalBalance
-    ? Math.min(100, Math.max(0, (input.currentBalance / goalBalance) * 100))
+    ? computeGoalProgress(input.startBalance, input.currentBalance, goalBalance)
     : 0;
 
   const profitProgress = profitTarget

@@ -112,6 +112,7 @@ export function useAccountProjection({
   brokerBalance,
   brokerEquity,
   brokerRealizedPnL = 0,
+  brokerDayTotals = null,
   updateManualAccount,
 }: {
   userId: string | undefined;
@@ -123,6 +124,7 @@ export function useAccountProjection({
   brokerEquity: number | null;
   /** Closed-trade realized P&L from broker_trade_history for this account. */
   brokerRealizedPnL?: number;
+  brokerDayTotals?: Map<string, number> | null;
   updateManualAccount: (id: string, data: Partial<TradingAccount>) => Promise<boolean>;
 }) {
   const queryClient = useQueryClient();
@@ -174,8 +176,9 @@ export function useAccountProjection({
       currentBalance,
       goalBalance,
       profitTarget,
+      dailyPnL: isBroker ? brokerDayTotals : null,
     }),
-    [trades, startBalance, currentBalance, goalBalance, profitTarget],
+    [trades, startBalance, currentBalance, goalBalance, profitTarget, isBroker, brokerDayTotals],
   );
 
   const invalidateBroker = useCallback(() => {
@@ -264,7 +267,7 @@ export function useAccountProjection({
 
   return {
     isBroker,
-    isLoading: isBroker && brokerLoading,
+    isLoading: isBroker && (brokerLoading || brokerBalance == null),
     accountLabel,
     accountSubtitle,
     startBalance,

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { deriveStartBalance, parseStartingBalance } from "@/lib/accountProjection";
+import {
+  computeGoalProgress,
+  computeProjectionMetrics,
+  deriveStartBalance,
+  parseStartingBalance,
+} from "@/lib/accountProjection";
 
 describe("parseStartingBalance", () => {
   it("returns the number the user typed, including zero", () => {
@@ -30,5 +35,29 @@ describe("deriveStartBalance", () => {
   it("does not fall back to 10000 when nothing is known yet", () => {
     expect(deriveStartBalance(null, null, 0)).toBe(0);
     expect(deriveStartBalance(undefined, null, 150)).toBe(0);
+  });
+});
+
+describe("computeGoalProgress", () => {
+  it("measures the goal from the opening balance, not from zero", () => {
+    expect(computeGoalProgress(25000, 25000, 50000)).toBe(0);
+    expect(computeGoalProgress(25000, 37500, 50000)).toBe(50);
+    expect(computeGoalProgress(25000, 50000, 50000)).toBe(100);
+  });
+});
+
+describe("computeProjectionMetrics", () => {
+  it("uses opening size for profit and goal so a 25k account is not already halfway to 50k", () => {
+    const metrics = computeProjectionMetrics({
+      trades: [],
+      startBalance: 25000,
+      currentBalance: 25800,
+      goalBalance: 50000,
+      profitTarget: 5000,
+    });
+    expect(metrics.accountProfit).toBe(800);
+    expect(metrics.goalProgress).toBe(3.2);
+    expect(metrics.profitProgress).toBe(16);
+    expect(metrics.remainingToGoal).toBe(24200);
   });
 });
