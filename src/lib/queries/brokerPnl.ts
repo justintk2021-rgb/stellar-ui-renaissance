@@ -4,7 +4,15 @@ import { formatLocalDateKey } from "@/lib/tradeFormat";
 export type BrokerPnLData = {
   byDay: Map<string, number>;
   byPosition: Map<string, number>;
+  /** Closed-trade realized P&L for the account (one value per position). */
+  totalRealizedPnL: number;
 };
+
+export function sumRealizedPnL(byPosition: Map<string, number>): number {
+  let total = 0;
+  for (const pl of byPosition.values()) total += pl;
+  return total;
+}
 
 /**
  * Sum broker_trade_history realized P&L by local close day and position id.
@@ -25,7 +33,11 @@ export async function fetchBrokerPnLData(
     .not("closed_at", "is", null);
 
   if (accountIdExternal) {
-    query = query.eq("account_id_external", accountIdExternal);
+    // MT5 and older TradeLocker rows omit account_id_external. Include those
+    // so opening balance still uses the full closed-trade history.
+    query = query.or(
+      `account_id_external.eq.${accountIdExternal},account_id_external.is.null`,
+    );
   }
 
   const { data, error } = await query;
@@ -57,5 +69,5 @@ export async function fetchBrokerPnLData(
     byDay.set(key, (byDay.get(key) || 0) + row.realized_pl);
   }
 
-  return { byDay, byPosition };
+  return { byDay, byPosition, totalRealizedPnL: sumRealizedPnL(byPosition) };
 }

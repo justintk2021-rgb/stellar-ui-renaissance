@@ -90,10 +90,9 @@ export function parseStartingBalance(raw: string): number | null {
 }
 
 /**
- * Resolve the account's starting balance.
- * Manual accounts use the value the user saved. Broker accounts use that
- * stored value when present, otherwise live broker balance minus realized P&L.
- * Never substitutes a $10,000 placeholder.
+ * Resolve the account's starting balance — the size before any trades.
+ * A $25,000 broker account stays $25,000 (live balance minus all closed P&L).
+ * Manual accounts use the value the user saved. Never substitutes $10,000.
  */
 export function deriveStartBalance(
   storedStart: number | null | undefined,

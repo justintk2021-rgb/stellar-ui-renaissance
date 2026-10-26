@@ -111,6 +111,7 @@ export function useAccountProjection({
   brokerAccountExternalId,
   brokerBalance,
   brokerEquity,
+  brokerRealizedPnL = 0,
   updateManualAccount,
 }: {
   userId: string | undefined;
@@ -120,6 +121,8 @@ export function useAccountProjection({
   brokerAccountExternalId: string | null;
   brokerBalance: number | null;
   brokerEquity: number | null;
+  /** Closed-trade realized P&L from broker_trade_history for this account. */
+  brokerRealizedPnL?: number;
   updateManualAccount: (id: string, data: Partial<TradingAccount>) => Promise<boolean>;
 }) {
   const queryClient = useQueryClient();
@@ -144,12 +147,13 @@ export function useAccountProjection({
 
   const startBalance = useMemo(() => {
     if (isBroker) {
-      // Prefer a saved start. Otherwise the broker already knows: live
-      // balance minus realized P&L is the account's opening size.
-      return deriveStartBalance(brokerProjection?.starting_balance, brokerBalance, netPnL);
+      // Opening size before any trades: live balance minus every closed
+      // broker trade. A $25,000 account stays $25,000. Ignore a saved
+      // placeholder so an incomplete journal cannot pin a wrong start.
+      return deriveStartBalance(null, brokerBalance, brokerRealizedPnL);
     }
     return deriveStartBalance(manualAccount?.starting_balance, null, netPnL);
-  }, [isBroker, brokerProjection?.starting_balance, brokerBalance, netPnL, manualAccount?.starting_balance]);
+  }, [isBroker, brokerBalance, brokerRealizedPnL, netPnL, manualAccount?.starting_balance]);
 
   const currentBalance = useMemo(() => {
     if (isBroker) {

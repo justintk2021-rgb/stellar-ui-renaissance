@@ -81,6 +81,7 @@ export function useBrokerTodayPnL(
   const [brokerDayTotals, setBrokerDayTotals] = useState<Map<string, number>>(
     () => new Map(),
   );
+  const [totalRealizedPnL, setTotalRealizedPnL] = useState(0);
   const [connectionId, setConnectionId] = useState<string | null>(null);
 
   const load = useCallback(
@@ -88,6 +89,7 @@ export function useBrokerTodayPnL(
       if (!userId) {
         setBrokerToday(null);
         setBrokerDayTotals(new Map());
+        setTotalRealizedPnL(0);
         setConnectionId(null);
         setBrokerPlByPositionCache(null);
         return;
@@ -97,6 +99,7 @@ export function useBrokerTodayPnL(
       if (!connId) {
         setBrokerToday(null);
         setBrokerDayTotals(new Map());
+        setTotalRealizedPnL(0);
         setConnectionId(null);
         setBrokerPlByPositionCache(null);
         return;
@@ -113,9 +116,11 @@ export function useBrokerTodayPnL(
         byDay = data.byDay;
         byPosition = data.byPosition;
         setBrokerDayTotals(byDay);
+        setTotalRealizedPnL(data.totalRealizedPnL);
         setBrokerPlByPositionCache(byPosition);
       } catch {
         setBrokerDayTotals(new Map());
+        setTotalRealizedPnL(0);
         setBrokerPlByPositionCache(null);
       }
 
@@ -180,5 +185,5 @@ export function useBrokerTodayPnL(
     };
   }, [userId, connectionId, load]);
 
-  return { brokerToday, brokerDayTotals, connectionId, refetch: load };
+  return { brokerToday, brokerDayTotals, totalRealizedPnL, connectionId, refetch: load };
 }

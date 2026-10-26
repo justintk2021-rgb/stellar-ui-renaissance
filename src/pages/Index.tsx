@@ -132,7 +132,7 @@ const Index = () => {
   const [brokerHasOpenPositions, setBrokerHasOpenPositions] = useState<boolean>(false);
   const [brokerSyncing, setBrokerSyncing] = useState(false);
   const queryClient = useQueryClient();
-  const { brokerDayTotals, connectionId: brokerConnectionId } = useBrokerTodayPnL(
+  const { brokerDayTotals, totalRealizedPnL: brokerRealizedPnL, connectionId: brokerConnectionId } = useBrokerTodayPnL(
     user?.id,
     selectedBrokerAccountId,
   );
@@ -396,6 +396,7 @@ const Index = () => {
     brokerAccountExternalId: selectedBrokerAccountId,
     brokerBalance,
     brokerEquity,
+    brokerRealizedPnL,
     updateManualAccount: updateAccount,
   });
   

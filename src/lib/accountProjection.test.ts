@@ -21,8 +21,10 @@ describe("deriveStartBalance", () => {
     expect(deriveStartBalance(0, null, 0)).toBe(0);
   });
 
-  it("for a broker account with no stored start, uses live balance minus P&L", () => {
-    expect(deriveStartBalance(null, 52300, 2300)).toBe(50000);
+  it("a 25000 broker account starts at 25000 even after trades", () => {
+    expect(deriveStartBalance(null, 25000, 0)).toBe(25000);
+    expect(deriveStartBalance(null, 25800, 800)).toBe(25000);
+    expect(deriveStartBalance(null, 24100, -900)).toBe(25000);
   });
 
   it("does not fall back to 10000 when nothing is known yet", () => {
