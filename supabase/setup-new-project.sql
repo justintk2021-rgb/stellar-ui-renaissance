@@ -209,7 +209,7 @@ CREATE TABLE public.trading_accounts (
   user_id UUID NOT NULL,
   name TEXT NOT NULL,
   broker TEXT,
-  starting_balance NUMERIC NOT NULL DEFAULT 10000,
+  starting_balance NUMERIC NOT NULL DEFAULT 0,
   currency TEXT NOT NULL DEFAULT 'USD',
   is_default BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),

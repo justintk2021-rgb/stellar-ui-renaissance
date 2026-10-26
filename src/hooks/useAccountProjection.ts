@@ -144,12 +144,12 @@ export function useAccountProjection({
 
   const startBalance = useMemo(() => {
     if (isBroker) {
-      // Broker profit targets must be based on live account balance vs the
-      // account's starting balance. Do not back into the start from trade P&L.
-      return deriveStartBalance(brokerProjection?.starting_balance, null, 0);
+      // Prefer a saved start. Otherwise the broker already knows: live
+      // balance minus realized P&L is the account's opening size.
+      return deriveStartBalance(brokerProjection?.starting_balance, brokerBalance, netPnL);
     }
     return deriveStartBalance(manualAccount?.starting_balance, null, netPnL);
-  }, [isBroker, brokerProjection?.starting_balance, netPnL, manualAccount?.starting_balance]);
+  }, [isBroker, brokerProjection?.starting_balance, brokerBalance, netPnL, manualAccount?.starting_balance]);
 
   const currentBalance = useMemo(() => {
     if (isBroker) {
@@ -206,6 +206,32 @@ export function useAccountProjection({
     return updateManualAccount(selectedAccountId, { goal_balance: value });
   }, [isBroker, brokerProjection?.id, brokerAccountExternalId, selectedAccountId, updateManualAccount, invalidateBroker]);
 
+  const setStartingBalance = useCallback(async (value: number) => {
+    if (isBroker) {
+      if (!brokerProjection?.id || !brokerAccountExternalId) {
+        toast.error('Broker account not loaded yet');
+        return false;
+      }
+      const { error } = await supabase
+        .from('broker_accounts')
+        .update({ starting_balance: value })
+        .eq('id', brokerProjection.id);
+      if (error) {
+        writeLocalBrokerProjection(brokerAccountExternalId, { starting_balance: value });
+        invalidateBroker();
+        return true;
+      }
+      writeLocalBrokerProjection(brokerAccountExternalId, { starting_balance: value });
+      invalidateBroker();
+      return true;
+    }
+    if (!selectedAccountId) {
+      toast.error('Select an account to set a starting balance');
+      return false;
+    }
+    return updateManualAccount(selectedAccountId, { starting_balance: value });
+  }, [isBroker, brokerProjection?.id, brokerAccountExternalId, selectedAccountId, updateManualAccount, invalidateBroker]);
+
   const setProfitTarget = useCallback(async (value: number) => {
     if (isBroker) {
       if (!brokerProjection?.id || !brokerAccountExternalId) {
@@ -244,5 +270,6 @@ export function useAccountProjection({
     metrics,
     setGoalBalance,
     setProfitTarget,
+    setStartingBalance,
   };
 }

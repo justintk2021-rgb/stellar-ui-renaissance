@@ -215,9 +215,9 @@ export function BalanceCards({
       totalFees += tradeFees > 0 ? tradeFees : 0;
     });
 
-    // Derive the effective starting balance
-    // If broker balance is available, starting balance = brokerBalance - totalNetPnL
-    const effectiveStart = brokerBalance != null ? brokerBalance - totalNetPnL : startBalance;
+    // Start comes from the account the user set, or from the broker
+    // (live balance minus realized P&L). Do not substitute a $10,000 default.
+    const effectiveStart = startBalance;
     const finalBalance = brokerBalance != null ? brokerBalance : effectiveStart + totalNetPnL;
 
     // Build equity curve from effective start

@@ -70,7 +70,7 @@ export function useTradingAccounts(userId: string | undefined) {
           user_id: userId,
           name: accountData.name,
           broker: accountData.broker || null,
-          starting_balance: accountData.starting_balance || 10000,
+          starting_balance: accountData.starting_balance ?? 0,
           currency: accountData.currency || 'USD',
           is_default: false,
         })

@@ -695,11 +695,8 @@ const Index = () => {
   }, [clearAllTrades, notebookEntries, deleteNotebookEntry]);
 
   const handleSetBalance = useCallback(async (value: number) => {
-    if (selectedBrokerAccountId) return;
-    if (selectedAccountId) {
-      await updateAccount(selectedAccountId, { starting_balance: value });
-    }
-  }, [selectedAccountId, selectedBrokerAccountId, updateAccount]);
+    await accountProjection.setStartingBalance(value);
+  }, [accountProjection.setStartingBalance]);
 
   const handleSaveNotes = useCallback(async (id: string, notes: string) => {
     await updateTrade(id, { notebook: notes });

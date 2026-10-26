@@ -82,13 +82,29 @@ export function computeProjectionMetrics(input: ProjectionMetricsInput): Project
   };
 }
 
+/** Parse a starting-balance field. Empty or invalid input is not replaced with a default. */
+export function parseStartingBalance(raw: string): number | null {
+  const n = Number.parseFloat(raw.trim());
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+/**
+ * Resolve the account's starting balance.
+ * Manual accounts use the value the user saved. Broker accounts use that
+ * stored value when present, otherwise live broker balance minus realized P&L.
+ * Never substitutes a $10,000 placeholder.
+ */
 export function deriveStartBalance(
   storedStart: number | null | undefined,
   liveBalance: number | null,
   netPnL: number,
-  fallback = 10000,
 ): number {
-  if (storedStart != null && storedStart > 0) return storedStart;
-  if (liveBalance != null) return liveBalance - netPnL;
-  return fallback;
+  if (storedStart != null && Number.isFinite(storedStart) && storedStart >= 0) {
+    return storedStart;
+  }
+  if (liveBalance != null && Number.isFinite(liveBalance)) {
+    return liveBalance - netPnL;
+  }
+  return 0;
 }

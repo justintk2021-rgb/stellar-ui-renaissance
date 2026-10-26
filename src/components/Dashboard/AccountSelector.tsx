@@ -30,6 +30,7 @@ import {
   writeTradeLockerConnectionId,
 } from "@/lib/brokerStorage";
 import { toast } from "sonner";
+import { parseStartingBalance } from "@/lib/accountProjection";
 
 interface BrokerAccountInfo {
   connectionId: string;
@@ -73,7 +74,7 @@ export const AccountSelector = ({
   const [editingAccount, setEditingAccount] = useState<TradingAccount | null>(null);
   const [newAccountName, setNewAccountName] = useState("");
   const [newAccountBroker, setNewAccountBroker] = useState("");
-  const [newAccountBalance, setNewAccountBalance] = useState("10000");
+  const [newAccountBalance, setNewAccountBalance] = useState("");
   const [brokerAccounts, setBrokerAccounts] = useState<BrokerAccountInfo[]>([]);
   const [selectedBrokerAccount, setSelectedBrokerAccount] = useState<string | null>(() => {
     return localStorage.getItem('selectedBrokerInternalId') || null;
@@ -204,20 +205,22 @@ export const AccountSelector = ({
     ? brokerAccounts.find(b => `broker-${b.connectionId}-${b.accNum}` === selectedBrokerAccount)?.accountName || "Broker Account"
     : selectedAccount?.name || "Select Account";
 
+  const parsedNewBalance = parseStartingBalance(newAccountBalance);
+
   const handleAddAccount = async () => {
-    if (!newAccountName.trim()) return;
+    if (!newAccountName.trim() || parsedNewBalance == null) return;
     
     const result = await onAddAccount({
       name: newAccountName,
       broker: newAccountBroker || undefined,
-      starting_balance: parseFloat(newAccountBalance) || 10000,
+      starting_balance: parsedNewBalance,
     });
     
     if (result) {
       setIsAddDialogOpen(false);
       setNewAccountName("");
       setNewAccountBroker("");
-      setNewAccountBalance("10000");
+      setNewAccountBalance("");
       setSelectedBrokerAccount(null);
       localStorage.removeItem(BROKER_STORAGE_KEYS.selectedBroker);
       clearBrokerSelectionStorage();
@@ -226,12 +229,12 @@ export const AccountSelector = ({
   };
 
   const handleEditAccount = async () => {
-    if (!editingAccount || !newAccountName.trim()) return;
+    if (!editingAccount || !newAccountName.trim() || parsedNewBalance == null) return;
     
     const success = await onUpdateAccount(editingAccount.id, {
       name: newAccountName,
       broker: newAccountBroker || null,
-      starting_balance: parseFloat(newAccountBalance) || 10000,
+      starting_balance: parsedNewBalance,
     });
     
     if (success) {
@@ -517,6 +520,9 @@ export const AccountSelector = ({
               type="button"
               onClick={() => {
                 setIsAccountTypeDialogOpen(false);
+                setNewAccountName("");
+                setNewAccountBroker("");
+                setNewAccountBalance("");
                 setIsAddDialogOpen(true);
               }}
               className="flex flex-col items-start gap-3 rounded-xl border border-border/50 bg-background/50 p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
@@ -586,9 +592,11 @@ export const AccountSelector = ({
               <Input
                 id="balance"
                 type="number"
+                min="0"
+                step="any"
                 value={newAccountBalance}
                 onChange={(e) => setNewAccountBalance(e.target.value)}
-                placeholder="10000"
+                placeholder="What you started this account with"
               />
             </div>
           </div>
@@ -596,7 +604,7 @@ export const AccountSelector = ({
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddAccount} disabled={!newAccountName.trim()}>
+            <Button onClick={handleAddAccount} disabled={!newAccountName.trim() || parsedNewBalance == null}>
               Create Account
             </Button>
           </DialogFooter>
@@ -725,7 +733,7 @@ export const AccountSelector = ({
               <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleEditAccount} disabled={!newAccountName.trim()}>
+              <Button onClick={handleEditAccount} disabled={!newAccountName.trim() || parsedNewBalance == null}>
                 Save
               </Button>
             </div>
