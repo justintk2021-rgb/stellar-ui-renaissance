@@ -357,13 +357,17 @@ async function syncSnapshot(req: Request, body: Record<string, unknown>, supabas
     .eq("account_id_external", accountId)
     .maybeSingle();
 
-  const accountPayload = {
+  const depositBalance = numberOrNull(body.deposit_balance);
+  const accountPayload: Record<string, unknown> = {
     broker_connection_id: auth.connection.id,
     account_id_external: accountId,
     acc_num: accNum,
     account_name: String(account.name || `${brokerName} ${accountId}`),
     is_active: true,
   };
+  if (depositBalance != null && depositBalance > 0) {
+    accountPayload.deposit_balance = depositBalance;
+  }
 
   if (existingAccount) {
     await supabase.from("broker_accounts").update(accountPayload).eq("id", existingAccount.id);

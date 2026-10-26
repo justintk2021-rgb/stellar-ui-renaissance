@@ -82,6 +82,7 @@ export function useBrokerTodayPnL(
     () => new Map(),
   );
   const [totalRealizedPnL, setTotalRealizedPnL] = useState(0);
+  const [historyReady, setHistoryReady] = useState(false);
   const [connectionId, setConnectionId] = useState<string | null>(null);
 
   const load = useCallback(
@@ -90,6 +91,7 @@ export function useBrokerTodayPnL(
         setBrokerToday(null);
         setBrokerDayTotals(new Map());
         setTotalRealizedPnL(0);
+        setHistoryReady(false);
         setConnectionId(null);
         setBrokerPlByPositionCache(null);
         return;
@@ -100,6 +102,7 @@ export function useBrokerTodayPnL(
         setBrokerToday(null);
         setBrokerDayTotals(new Map());
         setTotalRealizedPnL(0);
+        setHistoryReady(false);
         setConnectionId(null);
         setBrokerPlByPositionCache(null);
         return;
@@ -117,10 +120,12 @@ export function useBrokerTodayPnL(
         byPosition = data.byPosition;
         setBrokerDayTotals(byDay);
         setTotalRealizedPnL(data.totalRealizedPnL);
+        setHistoryReady(true);
         setBrokerPlByPositionCache(byPosition);
       } catch {
         setBrokerDayTotals(new Map());
         setTotalRealizedPnL(0);
+        setHistoryReady(true);
         setBrokerPlByPositionCache(null);
       }
 
@@ -185,5 +190,5 @@ export function useBrokerTodayPnL(
     };
   }, [userId, connectionId, load]);
 
-  return { brokerToday, brokerDayTotals, totalRealizedPnL, connectionId, refetch: load };
+  return { brokerToday, brokerDayTotals, totalRealizedPnL, historyReady, connectionId, refetch: load };
 }

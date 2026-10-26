@@ -110,9 +110,72 @@ export function parseStartingBalance(raw: string): number | null {
   return n;
 }
 
+const COMMON_FUNDED_SIZES = new Set([
+  5000, 10000, 15000, 25000, 50000, 100000, 150000, 200000, 250000, 300000, 500000,
+]);
+
+/** Read a funded size from an account name like "25K Challenge" or "FTMO 50,000". */
+export function parseDepositFromAccountName(name: string | null | undefined): number | null {
+  if (!name) return null;
+  const k = name.match(/(?:^|[^\d])(\d{1,3})\s*[kK](?:[^\d]|$)/);
+  if (k) {
+    const value = Number(k[1]) * 1000;
+    if (COMMON_FUNDED_SIZES.has(value)) return value;
+  }
+  const full = name.match(/(\d{1,3}(?:,\d{3})+|\d{4,7})/);
+  if (full) {
+    const value = Number(full[1].replace(/,/g, ""));
+    if (COMMON_FUNDED_SIZES.has(value)) return value;
+  }
+  return null;
+}
+
+export function extractDepositFromBrokerPayload(value: unknown): number | null {
+  if (value == null) return null;
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === "string") {
+    const n = Number.parseFloat(value.replace(/,/g, ""));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  if (typeof value !== "object") return null;
+  const rec = value as Record<string, unknown>;
+  const keys = [
+    "deposit",
+    "depositBalance",
+    "deposit_balance",
+    "initialDeposit",
+    "initial_deposit",
+    "initialBalance",
+    "initial_balance",
+    "startingBalance",
+    "starting_balance",
+    "accountSize",
+    "account_size",
+    "fundedAmount",
+    "funded_amount",
+  ];
+  for (const key of keys) {
+    const found = extractDepositFromBrokerPayload(rec[key]);
+    if (found != null) return found;
+  }
+  return null;
+}
+
+/** Broker start prefers the funded/deposit amount. Otherwise live minus closed P&L. */
+export function resolveBrokerStartBalance(
+  depositBalance: number | null | undefined,
+  liveBalance: number | null,
+  realizedPnL: number,
+): number {
+  if (depositBalance != null && Number.isFinite(depositBalance) && depositBalance > 0) {
+    return depositBalance;
+  }
+  return deriveStartBalance(null, liveBalance, realizedPnL);
+}
+
 /**
  * Resolve the account's starting balance — the size before any trades.
- * A $25,000 broker account stays $25,000 (live balance minus all closed P&L).
+ * A $25,000 broker account stays $25,000 (deposit, or live minus closed P&L).
  * Manual accounts use the value the user saved. Never substitutes $10,000.
  */
 export function deriveStartBalance(

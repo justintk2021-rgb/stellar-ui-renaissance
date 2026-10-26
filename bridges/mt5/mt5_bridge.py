@@ -198,12 +198,34 @@ class Mt5Bridge:
             })
         return result
 
+    def deposit_total(self) -> float:
+        utc_to = datetime.now(timezone.utc)
+        utc_from = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        deals = mt5.history_deals_get(utc_from, utc_to) or []
+        funding_types = {
+            mt5.DEAL_TYPE_BALANCE,
+            mt5.DEAL_TYPE_CREDIT,
+            mt5.DEAL_TYPE_BONUS,
+            mt5.DEAL_TYPE_CORRECTION,
+        }
+        total = 0.0
+        for deal in deals:
+            data = namedtuple_to_dict(deal)
+            if data.get("type") not in funding_types:
+                continue
+            try:
+                total += float(data.get("profit") or 0)
+            except (TypeError, ValueError):
+                continue
+        return total
+
     def sync_snapshot(self) -> None:
         payload = {
             "account": self.account_payload(),
             "positions": self.positions_payload(),
             "orders": self.orders_payload(),
             "history": self.history_payload(),
+            "deposit_balance": self.deposit_total(),
         }
         result = self.post("sync-snapshot", payload)
         print(f"Synced MT5 snapshot: {json.dumps(result.get('stats', {}))}")

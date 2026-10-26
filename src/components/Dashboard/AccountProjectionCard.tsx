@@ -309,7 +309,7 @@ export function AccountProjectionCard({
                   Start{' '}
                   <span className="font-mono font-semibold text-foreground">${startBalance.toFixed(0)}</span>
                   {isBroker && (
-                    <span className="text-muted-foreground/80"> before trades</span>
+                    <span className="text-muted-foreground/80"> deposit</span>
                   )}
                 </span>
                 <span>

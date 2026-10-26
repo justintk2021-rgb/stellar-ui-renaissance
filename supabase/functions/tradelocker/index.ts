@@ -165,6 +165,74 @@ function normalizeTlAccount(acc: any, index: number) {
   };
 }
 
+const COMMON_FUNDED_SIZES = new Set([
+  5000, 10000, 15000, 25000, 50000, 100000, 150000, 200000, 250000, 300000, 500000,
+]);
+
+function parseDepositFromAccountName(name: string | null | undefined): number | null {
+  if (!name) return null;
+  const k = name.match(/(?:^|[^\d])(\d{1,3})\s*[kK](?:[^\d]|$)/);
+  if (k) {
+    const value = Number(k[1]) * 1000;
+    if (COMMON_FUNDED_SIZES.has(value)) return value;
+  }
+  const full = name.match(/(\d{1,3}(?:,\d{3})+|\d{4,7})/);
+  if (full) {
+    const value = Number(full[1].replace(/,/g, ''));
+    if (COMMON_FUNDED_SIZES.has(value)) return value;
+  }
+  return null;
+}
+
+function extractDepositFromBrokerPayload(value: unknown): number | null {
+  if (value == null) return null;
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === 'string') {
+    const n = Number.parseFloat(value.replace(/,/g, ''));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  if (typeof value !== 'object') return null;
+  const rec = value as Record<string, unknown>;
+  const keys = [
+    'deposit', 'depositBalance', 'deposit_balance', 'initialDeposit', 'initial_deposit',
+    'initialBalance', 'initial_balance', 'startingBalance', 'starting_balance',
+    'accountSize', 'account_size', 'fundedAmount', 'funded_amount',
+  ];
+  for (const key of keys) {
+    const found = extractDepositFromBrokerPayload(rec[key]);
+    if (found != null) return found;
+  }
+  return null;
+}
+
+async function tlGetAccountDetails(accessToken: string, accNum: number, environment: string) {
+  const baseUrl = getBaseUrl(environment);
+  const res = await fetch(`${baseUrl}/trade/accounts`, {
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'accNum': String(accNum) },
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.d || data.accounts || [];
+}
+
+async function persistBrokerDeposit(
+  supabase: ReturnType<typeof createClient>,
+  connectionId: string,
+  accountId: string,
+  deposit: number,
+) {
+  if (!(deposit > 0)) return;
+  const { data: row } = await supabase
+    .from('broker_accounts')
+    .select('id, deposit_balance')
+    .eq('broker_connection_id', connectionId)
+    .eq('account_id_external', String(accountId))
+    .maybeSingle();
+  if (!row?.id) return;
+  if (row.deposit_balance != null && Number(row.deposit_balance) > 0) return;
+  await supabase.from('broker_accounts').update({ deposit_balance: deposit }).eq('id', row.id);
+}
+
 async function tlGetAccountState(accessToken: string, accountId: string, accNum: number, environment: string) {
   const baseUrl = getBaseUrl(environment);
   const res = await fetch(`${baseUrl}/trade/accounts/${accountId}/state`, {
@@ -1320,6 +1388,20 @@ serve(async (req) => {
           .from('broker_connections')
           .update({ last_connected_at: now })
           .eq('id', connectionId);
+
+        const details = await tlGetAccountDetails(accessToken, accNum, environment);
+        const accountRow = Array.isArray(details)
+          ? details.find((item: any) => String(item?.id ?? item?.accountId) === String(accountId)) || details[0]
+          : details;
+        const realized = Array.from(plByPosition.values()).reduce((sum, pl) => sum + pl, 0);
+        const inferred = state?.balance != null ? Number(state.balance) - realized : null;
+        const deposit =
+          extractDepositFromBrokerPayload(accountRow)
+          ?? parseDepositFromAccountName(accountRow?.name)
+          ?? (inferred != null && inferred > 0 ? inferred : null);
+        if (deposit != null) {
+          await persistBrokerDeposit(supabase, connectionId, String(accountId), deposit);
+        }
 
         return jsonResponse({ success: true, stats, message: `Synced: ${stats.positionsUpserted} positions, ${stats.ordersUpserted} orders, ${stats.historyInserted} history, ${stats.journalCreated} new journal, ${stats.journalUpdated} updated journal` });
       } catch (e: any) {

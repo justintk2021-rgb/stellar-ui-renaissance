@@ -541,10 +541,15 @@ serve(async (req) => {
       // Pull history
       const history = await mfxHistory(session, accountIdExternal) || [];
       let inserted = 0;
+      let depositBalance = 0;
 
       for (const h of history) {
-        // Skip non-trade entries (deposits/withdrawals)
         const action = String(h.action || "").toLowerCase();
+        if (action.includes("deposit") || action.includes("withdrawal") || action.includes("balance")) {
+          depositBalance += Number(h.profit || h.amount || 0);
+          continue;
+        }
+        // Skip other non-trade entries
         if (!action.includes("buy") && !action.includes("sell")) continue;
 
         const closeDate = parseMfxDate(h.closeTime || h.endTime);
@@ -602,6 +607,14 @@ serve(async (req) => {
           await adminClient.from("trades").insert(tradeRow);
           inserted++;
         }
+      }
+
+      if (depositBalance > 0) {
+        await adminClient
+          .from("broker_accounts")
+          .update({ deposit_balance: depositBalance })
+          .eq("broker_connection_id", connectionId)
+          .eq("account_id_external", String(accountIdExternal));
       }
 
       await adminClient.from("broker_sync_logs").update({

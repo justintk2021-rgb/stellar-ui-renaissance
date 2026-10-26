@@ -8,6 +8,8 @@ import {
   computeNetPnL,
   computeProjectionMetrics,
   deriveStartBalance,
+  parseDepositFromAccountName,
+  resolveBrokerStartBalance,
 } from '@/lib/accountProjection';
 
 export interface BrokerAccountProjection {
@@ -15,6 +17,7 @@ export interface BrokerAccountProjection {
   accountName: string | null;
   brokerName: string | null;
   starting_balance: number | null;
+  deposit_balance: number | null;
   goal_balance: number | null;
   profit_target: number | null;
 }
@@ -46,7 +49,7 @@ function writeLocalBrokerProjection(
 async function fetchBrokerProjection(accountExternalId: string): Promise<BrokerAccountProjection | null> {
   const { data, error } = await supabase
     .from('broker_accounts')
-    .select('id, account_name, starting_balance, goal_balance, profit_target, broker_connection_id')
+    .select('id, account_name, starting_balance, deposit_balance, goal_balance, profit_target, broker_connection_id')
     .eq('account_id_external', accountExternalId)
     .maybeSingle();
 
@@ -75,6 +78,7 @@ async function fetchBrokerProjection(accountExternalId: string): Promise<BrokerA
       accountName: basic.account_name as string | null,
       brokerName,
       starting_balance: local.starting_balance ?? null,
+      deposit_balance: null,
       goal_balance: local.goal_balance ?? null,
       profit_target: local.profit_target ?? null,
     };
@@ -98,6 +102,7 @@ async function fetchBrokerProjection(accountExternalId: string): Promise<BrokerA
     accountName: data.account_name as string | null,
     brokerName,
     starting_balance: row.starting_balance != null ? Number(row.starting_balance) : (local.starting_balance ?? null),
+    deposit_balance: row.deposit_balance != null ? Number(row.deposit_balance) : null,
     goal_balance: row.goal_balance != null ? Number(row.goal_balance) : (local.goal_balance ?? null),
     profit_target: row.profit_target != null ? Number(row.profit_target) : (local.profit_target ?? null),
   };
@@ -113,6 +118,7 @@ export function useAccountProjection({
   brokerEquity,
   brokerRealizedPnL = 0,
   brokerDayTotals = null,
+  brokerHistoryReady = false,
   updateManualAccount,
 }: {
   userId: string | undefined;
@@ -125,6 +131,7 @@ export function useAccountProjection({
   /** Closed-trade realized P&L from broker_trade_history for this account. */
   brokerRealizedPnL?: number;
   brokerDayTotals?: Map<string, number> | null;
+  brokerHistoryReady?: boolean;
   updateManualAccount: (id: string, data: Partial<TradingAccount>) => Promise<boolean>;
 }) {
   const queryClient = useQueryClient();
@@ -149,13 +156,21 @@ export function useAccountProjection({
 
   const startBalance = useMemo(() => {
     if (isBroker) {
-      // Opening size before any trades: live balance minus every closed
-      // broker trade. A $25,000 account stays $25,000. Ignore a saved
-      // placeholder so an incomplete journal cannot pin a wrong start.
-      return deriveStartBalance(null, brokerBalance, brokerRealizedPnL);
+      const deposit =
+        brokerProjection?.deposit_balance
+        ?? parseDepositFromAccountName(brokerProjection?.accountName);
+      return resolveBrokerStartBalance(deposit, brokerBalance, brokerRealizedPnL);
     }
     return deriveStartBalance(manualAccount?.starting_balance, null, netPnL);
-  }, [isBroker, brokerBalance, brokerRealizedPnL, netPnL, manualAccount?.starting_balance]);
+  }, [
+    isBroker,
+    brokerProjection?.deposit_balance,
+    brokerProjection?.accountName,
+    brokerBalance,
+    brokerRealizedPnL,
+    netPnL,
+    manualAccount?.starting_balance,
+  ]);
 
   const currentBalance = useMemo(() => {
     if (isBroker) {
@@ -186,6 +201,39 @@ export function useAccountProjection({
       queryClient.invalidateQueries({ queryKey: ['broker-projection', brokerAccountExternalId] });
     }
   }, [queryClient, brokerAccountExternalId]);
+
+  useEffect(() => {
+    if (!isBroker || !brokerProjection?.id || !brokerAccountExternalId) return;
+    if (brokerProjection.deposit_balance != null && brokerProjection.deposit_balance > 0) return;
+    const fromName = parseDepositFromAccountName(brokerProjection.accountName);
+    const inferred = brokerHistoryReady && brokerBalance != null
+      ? brokerBalance - brokerRealizedPnL
+      : null;
+    const deposit = fromName ?? (inferred != null && inferred > 0 ? inferred : null);
+    if (deposit == null) return;
+    let cancelled = false;
+    supabase
+      .from('broker_accounts')
+      .update({ deposit_balance: deposit })
+      .eq('id', brokerProjection.id)
+      .then(({ error }) => {
+        if (cancelled || error) return;
+        invalidateBroker();
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isBroker,
+    brokerProjection?.id,
+    brokerProjection?.deposit_balance,
+    brokerProjection?.accountName,
+    brokerAccountExternalId,
+    brokerHistoryReady,
+    brokerBalance,
+    brokerRealizedPnL,
+    invalidateBroker,
+  ]);
 
   const setGoalBalance = useCallback(async (value: number) => {
     if (isBroker) {
@@ -267,7 +315,7 @@ export function useAccountProjection({
 
   return {
     isBroker,
-    isLoading: isBroker && (brokerLoading || brokerBalance == null),
+    isLoading: isBroker && (brokerLoading || brokerBalance == null || !brokerHistoryReady),
     accountLabel,
     accountSubtitle,
     startBalance,

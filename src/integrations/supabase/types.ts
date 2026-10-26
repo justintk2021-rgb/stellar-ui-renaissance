@@ -21,6 +21,7 @@ export type Database = {
           account_name: string | null
           broker_connection_id: string
           created_at: string
+          deposit_balance: number | null
           goal_balance: number | null
           id: string
           is_active: boolean | null
@@ -34,6 +35,7 @@ export type Database = {
           account_name?: string | null
           broker_connection_id: string
           created_at?: string
+          deposit_balance?: number | null
           goal_balance?: number | null
           id?: string
           is_active?: boolean | null
@@ -47,6 +49,7 @@ export type Database = {
           account_name?: string | null
           broker_connection_id?: string
           created_at?: string
+          deposit_balance?: number | null
           goal_balance?: number | null
           id?: string
           is_active?: boolean | null

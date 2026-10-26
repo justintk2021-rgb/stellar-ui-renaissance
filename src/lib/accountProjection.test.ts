@@ -3,7 +3,9 @@ import {
   computeGoalProgress,
   computeProjectionMetrics,
   deriveStartBalance,
+  parseDepositFromAccountName,
   parseStartingBalance,
+  resolveBrokerStartBalance,
 } from "@/lib/accountProjection";
 
 describe("parseStartingBalance", () => {
@@ -35,6 +37,21 @@ describe("deriveStartBalance", () => {
   it("does not fall back to 10000 when nothing is known yet", () => {
     expect(deriveStartBalance(null, null, 0)).toBe(0);
     expect(deriveStartBalance(undefined, null, 150)).toBe(0);
+  });
+});
+
+describe("parseDepositFromAccountName", () => {
+  it("reads common funded sizes from the account title", () => {
+    expect(parseDepositFromAccountName("FTMO 25K")).toBe(25000);
+    expect(parseDepositFromAccountName("Challenge 50,000")).toBe(50000);
+    expect(parseDepositFromAccountName("BRAND#abc123")).toBeNull();
+  });
+});
+
+describe("resolveBrokerStartBalance", () => {
+  it("uses the deposit amount instead of live minus trades", () => {
+    expect(resolveBrokerStartBalance(25000, 26100, 1100)).toBe(25000);
+    expect(resolveBrokerStartBalance(null, 26100, 1100)).toBe(25000);
   });
 });
 
