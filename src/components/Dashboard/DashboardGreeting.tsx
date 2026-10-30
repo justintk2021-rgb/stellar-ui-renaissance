@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { motion, useReducedMotion } from "@/lib/motion";
-import { cn } from "@/lib/utils";
+import { TextEffect } from "@/components/core/text-effect";
 import { loadGreetingFont } from "@/lib/greetingFont";
 
 export const DASHBOARD_LOCK_KEY = "nsync-dashboard-locked";
@@ -112,15 +112,24 @@ export function DashboardGreeting({
       className="fixed inset-0 z-[100] flex cursor-default flex-col items-center justify-center gap-8 bg-black/70 backdrop-blur-md"
     >
       <div className="px-6 text-center">
-        <h1
-          key={line}
-          className={cn(
-            "font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl",
-            playGreeting ? "greet-fade greet-fade-delay" : "opacity-0",
-          )}
-        >
-          {line}
-        </h1>
+        {playGreeting && (
+          reduceMotion ? (
+            <h1 className="font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl">
+              {line}
+            </h1>
+          ) : (
+            <TextEffect
+              key={line}
+              per="char"
+              preset="fade"
+              as="h1"
+              delay={0.9}
+              className="font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl"
+            >
+              {line}
+            </TextEffect>
+          )
+        )}
       </div>
       {canEnter ? (
         <motion.p

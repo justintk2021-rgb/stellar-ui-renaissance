@@ -410,22 +410,6 @@
     font-synthesis: none;
   }
 
-  @keyframes greetFadeIn {
-    0%   { opacity: 0; transform: translateY(12px); filter: blur(8px); letter-spacing: 0.08em; }
-    100% { opacity: 1; transform: translateY(0);    filter: blur(0);   letter-spacing: normal; }
-  }
-
-  .greet-fade {
-    opacity: 0;
-    animation: greetFadeIn 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  }
-
-  .greet-fade-delay { animation-delay: 0.9s; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .greet-fade { animation: none; opacity: 1; }
-  }
-
 }
 
 @layer utilities {
