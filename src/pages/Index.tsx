@@ -60,6 +60,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
 import { DashboardGreeting, DASHBOARD_LOCK_KEY, dashboardDisplayName } from "@/components/Dashboard/DashboardGreeting";
+import { circularReveal } from "@/lib/circularReveal";
 import { AnimatePresence, motion } from "@/lib/motion";
 import { Lock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -876,7 +877,13 @@ const Index = () => {
                 showRank={currentPage === 'dashboard'}
                 titleSwitch={currentPage === "notebook" ? {
                   label: notebookView === "study" ? "Notebook" : "Study Area",
-                  onSelect: () => setNotebookView(notebookView === "study" ? "notebook" : "study"),
+                  onSelect: (event) => {
+                    const next = notebookView === "study" ? "notebook" : "study";
+                    circularReveal(
+                      { x: event.clientX, y: event.clientY },
+                      () => setNotebookView(next),
+                    );
+                  },
                 } : null}
                 rightSlot={currentPage === 'dashboard' ? (
                   <div className="flex items-center gap-3">
@@ -1169,7 +1176,7 @@ const Index = () => {
 
               {/* Notebook Page */}
               {currentPage === 'notebook' && (
-                <PageTransition key={notebookView === "study" ? "study-area" : "notebook"}>
+                <PageTransition key="notebook">
                   <Suspense fallback={<PageFallback />}>
                     <NotebookView
                       trades={trades}

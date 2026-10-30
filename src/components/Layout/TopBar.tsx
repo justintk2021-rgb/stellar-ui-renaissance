@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, type MouseEvent } from "react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { RankBadge } from "@/components/Dashboard/RankBadge";
 import { Greeting } from "@/components/Layout/Greeting";
@@ -18,7 +18,7 @@ interface TopBarProps {
   rightSlot?: ReactNode;
   notificationsSlot?: ReactNode;
   /** Hidden until the title is hovered. Click switches the page. */
-  titleSwitch?: { label: string; onSelect: () => void } | null;
+  titleSwitch?: { label: string; onSelect: (event: MouseEvent<HTMLButtonElement>) => void } | null;
 }
 
 export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank = false, greetingName, profileReady = true, showGreeting = false, rightSlot, notificationsSlot, titleSwitch }: TopBarProps) {
@@ -31,7 +31,7 @@ export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank =
           {titleSwitch && (
             <button
               type="button"
-              onClick={titleSwitch.onSelect}
+              onClick={(event) => titleSwitch.onSelect(event)}
               className="ml-3 origin-left translate-y-1 scale-90 text-lg font-semibold tracking-wide text-primary opacity-0 pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/title:translate-y-0 group-hover/title:scale-100 group-hover/title:opacity-100 group-hover/title:pointer-events-auto focus-visible:translate-y-0 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:pointer-events-auto focus-visible:outline-none sm:text-xl"
             >
               {titleSwitch.label}
