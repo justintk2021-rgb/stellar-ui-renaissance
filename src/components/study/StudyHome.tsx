@@ -77,7 +77,7 @@ export function StudyHome({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.2fr)]">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]">
       <div className="space-y-6">
         <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{greetingLineText}</h2>
 
@@ -217,22 +217,20 @@ export function StudyHome({
                 </div>
                 <span className="rounded-full bg-muted/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{folderNotes.length}</span>
               </button>
-              <div className="relative mt-4 h-36 overflow-hidden rounded-xl border border-border/40 bg-background/40">
+              <div className="mt-4 space-y-2 rounded-xl border border-border/40 bg-background/40 p-3">
                 {sheets.length === 0 ? (
-                  <p className="px-4 py-6 text-xs text-muted-foreground">Drop a draft here</p>
-                ) : sheets.map((note, index) => (
+                  <p className="px-1 py-6 text-center text-xs text-muted-foreground">Drop a draft here</p>
+                ) : sheets.map((note) => (
                   <button
                     key={note.id}
                     type="button"
                     onClick={() => onOpenNote(note.id)}
-                    className="absolute inset-x-4 rounded-lg border border-border/50 bg-card px-3 py-2 text-left shadow-sm"
-                    style={{ top: 12 + index * 28, transform: `rotate(${index === 0 ? -1.5 : 1.5}deg)` }}
+                    className="block w-full rounded-lg border border-border/50 bg-card px-3 py-2 text-left shadow-sm"
                   >
                     <p className="truncate text-xs font-medium">{note.title || "Untitled note"}</p>
                     <p className="truncate text-[11px] text-muted-foreground">{studyDocPlainText(note.content) || "Empty note"}</p>
                   </button>
                 ))}
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card to-transparent" />
               </div>
             </div>
           );

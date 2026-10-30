@@ -31,16 +31,34 @@ export interface StudyMention {
 }
 
 async function loadTree(userId: string): Promise<{ folders: StudyFolder[]; notes: StudyNote[] }> {
-  const [folders, notes] = await Promise.all([
+  const full = await Promise.all([
     supabase.from("study_folders").select("id, user_id, parent_id, name, category, sort_order").eq("user_id", userId).order("sort_order"),
     supabase.from("study_notes").select("id, user_id, folder_id, title, category, content, updated_at").eq("user_id", userId).order("updated_at", { ascending: false }),
   ]);
-  if (folders.error) throw folders.error;
-  if (notes.error) throw notes.error;
+  const foldersResult = full[0].error
+    ? await supabase.from("study_folders").select("id, user_id, parent_id, name, sort_order").eq("user_id", userId).order("sort_order")
+    : full[0];
+  const notesResult = full[1].error
+    ? await supabase.from("study_notes").select("id, user_id, folder_id, title, content, updated_at").eq("user_id", userId).order("updated_at", { ascending: false })
+    : full[1];
+  if (foldersResult.error) throw foldersResult.error;
+  if (notesResult.error) throw notesResult.error;
   return {
-    folders: folders.data ?? [],
-    notes: (notes.data ?? []).map((note) => ({
-      ...note,
+    folders: (foldersResult.data ?? []).map((folder) => ({
+      id: folder.id,
+      user_id: folder.user_id,
+      parent_id: folder.parent_id,
+      name: folder.name,
+      sort_order: folder.sort_order,
+      category: "category" in folder && typeof folder.category === "string" && folder.category ? folder.category : "individual",
+    })),
+    notes: (notesResult.data ?? []).map((note) => ({
+      id: note.id,
+      user_id: note.user_id,
+      folder_id: note.folder_id,
+      title: note.title,
+      updated_at: note.updated_at,
+      category: "category" in note && typeof note.category === "string" && note.category ? note.category : "individual",
       content: (note.content as JSONContent) ?? EMPTY_STUDY_DOC,
     })),
   };

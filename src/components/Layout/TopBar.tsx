@@ -30,13 +30,13 @@ export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank =
     )}>
       <div className="min-w-0">
         {showGreeting && <Greeting name={greetingName} profileReady={profileReady} />}
-        <h2 className={cn("group/title inline-flex max-w-full items-baseline", showGreeting && "mt-4 sm:mt-5")}>
+        <h2 className={cn("group/title relative inline-flex max-w-full items-baseline", showGreeting && "mt-4 sm:mt-5")}>
           <span className="text-lg sm:text-xl font-semibold tracking-wide truncate">{title}</span>
           {titleSwitch && (
             <button
               type="button"
               onClick={(event) => titleSwitch.onSelect(event)}
-              className="ml-3 origin-left translate-y-1 scale-90 text-lg font-semibold tracking-wide text-primary opacity-0 pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/title:translate-y-0 group-hover/title:scale-100 group-hover/title:opacity-100 group-hover/title:pointer-events-auto focus-visible:translate-y-0 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:pointer-events-auto focus-visible:outline-none sm:text-xl"
+              className="absolute left-full top-0 ml-3 origin-left translate-y-1 scale-90 whitespace-nowrap text-lg font-semibold tracking-wide text-primary opacity-0 pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/title:translate-y-0 group-hover/title:scale-100 group-hover/title:opacity-100 group-hover/title:pointer-events-auto focus-visible:translate-y-0 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:pointer-events-auto focus-visible:outline-none sm:text-xl"
             >
               {titleSwitch.label}
             </button>
