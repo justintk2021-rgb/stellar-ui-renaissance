@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMetaTrader } from '@/hooks/useMetaTrader';
+import { SymbolMark } from '@/components/ui/AssetIcon';
 
 export function MetaTraderManagement() {
   const {
@@ -263,7 +264,7 @@ export function MetaTraderManagement() {
                 <TableBody>
                   {positions.map((position) => (
                     <TableRow key={position.id}>
-                      <TableCell className="font-medium">{position.symbol}</TableCell>
+                      <TableCell className="font-medium"><SymbolMark symbol={position.symbol} size="sm" /></TableCell>
                       <TableCell>{position.side}</TableCell>
                       <TableCell>{position.volume}</TableCell>
                       <TableCell>{position.open_price}</TableCell>
@@ -297,7 +298,7 @@ export function MetaTraderManagement() {
                 <TableBody>
                   {orders.map((order) => (
                     <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.symbol}</TableCell>
+                      <TableCell className="font-medium"><SymbolMark symbol={order.symbol} size="sm" /></TableCell>
                       <TableCell>{order.order_type}</TableCell>
                       <TableCell>{order.side}</TableCell>
                       <TableCell>{order.size}</TableCell>
@@ -332,7 +333,7 @@ export function MetaTraderManagement() {
                 <TableBody>
                   {history.map((trade) => (
                     <TableRow key={trade.id}>
-                      <TableCell className="font-medium">{trade.symbol}</TableCell>
+                      <TableCell className="font-medium"><SymbolMark symbol={trade.symbol} size="sm" /></TableCell>
                       <TableCell>{trade.side}</TableCell>
                       <TableCell>{trade.size}</TableCell>
                       <TableCell>{trade.entry_price}</TableCell>

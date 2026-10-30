@@ -3,6 +3,7 @@ import { formatMoney, formatPrice, type HistoryTrade, type PendingOrder, type Po
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { SymbolMark } from "@/components/ui/AssetIcon";
 
 interface ChartBottomPanelProps {
   positions: Position[];
@@ -31,7 +32,7 @@ export function ChartBottomPanel({ positions, orders, history, onClose }: ChartB
           <Table
             empty="No open positions"
             rows={positions.map((p) => [
-              p.symbol,
+              <SymbolMark key={`${p.id}-sym`} symbol={p.symbol} size="sm" />,
               p.side.toUpperCase(),
               p.lots.toFixed(2),
               formatPrice(p.entryPrice, p.symbol),
@@ -59,7 +60,7 @@ export function ChartBottomPanel({ positions, orders, history, onClose }: ChartB
           <Table
             empty="No pending orders"
             rows={orders.map((o) => [
-              o.symbol,
+              <SymbolMark key={`${o.id}-sym`} symbol={o.symbol} size="sm" />,
               o.side.toUpperCase(),
               o.type,
               o.lots.toFixed(2),
@@ -75,7 +76,7 @@ export function ChartBottomPanel({ positions, orders, history, onClose }: ChartB
           <Table
             empty="No trade history"
             rows={history.map((h) => [
-              h.symbol,
+              <SymbolMark key={`${h.id}-sym`} symbol={h.symbol} size="sm" />,
               h.side.toUpperCase(),
               h.lots.toFixed(2),
               formatPrice(h.entryPrice, h.symbol),

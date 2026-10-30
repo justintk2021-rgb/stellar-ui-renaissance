@@ -11,6 +11,7 @@ import { formatPnL } from "@/lib/tradeFormat";
 import { cn } from "@/lib/utils";
 import type { UnjournaledTradePayload } from "@/types/notification";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AssetIcon } from "@/components/ui/AssetIcon";
 
 const iconVariants = {
   initial: { rotate: 0 },
@@ -173,6 +174,7 @@ function useNotificationsPanel({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
                             <div className="min-w-0 flex items-center gap-2">
+                              {payload?.pair && <AssetIcon symbol={payload.pair} size="sm" />}
                               <span className="text-sm font-semibold truncate">
                                 {payload?.pair ?? item.title}
                               </span>

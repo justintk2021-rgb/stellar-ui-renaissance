@@ -18,6 +18,7 @@ import {
   pipLabel,
   unitLabel,
 } from "@/lib/positionSizing";
+import { AssetIcon } from "@/components/ui/AssetIcon";
 
 const CATEGORIES: { id: InstrumentCategory; label: string }[] = [
   { id: "forex", label: "Forex" },
@@ -339,7 +340,10 @@ export function LotSizeCalculator({ compact = false, initialSymbol }: LotSizeCal
                       : "hover:bg-muted/50"
                   )}
                 >
-                  <span className="font-medium">{inst.symbol}</span>
+                  <span className="inline-flex items-center gap-1.5 font-medium">
+                    <AssetIcon symbol={inst.symbol} size="sm" />
+                    {inst.symbol}
+                  </span>
                   <span className="text-muted-foreground ml-1 text-[10px]">{inst.name}</span>
                 </button>
               ))}
@@ -351,7 +355,8 @@ export function LotSizeCalculator({ compact = false, initialSymbol }: LotSizeCal
         <div className="glass rounded-lg p-4 border border-border/40 space-y-3">
           <div className="text-center">
             {selectedInstrument && (
-              <p className="text-xs font-semibold mb-1">
+              <p className="text-xs font-semibold mb-1 inline-flex items-center justify-center gap-1.5">
+                <AssetIcon symbol={selectedInstrument.symbol} size="sm" />
                 {selectedInstrument.symbol}
                 <span className="text-muted-foreground font-normal ml-1.5">{selectedInstrument.name}</span>
               </p>
@@ -623,7 +628,10 @@ export function LotSizeCalculator({ compact = false, initialSymbol }: LotSizeCal
                             )}
                           >
                             <div className="flex flex-col items-start">
-                              <span className="font-medium">{instrument.symbol}</span>
+                              <span className="inline-flex items-center gap-1.5 font-medium">
+                                <AssetIcon symbol={instrument.symbol} size="sm" />
+                                {instrument.symbol}
+                              </span>
                               <span className="text-[10px] text-muted-foreground">{instrument.name}</span>
                             </div>
                             <span className="text-[10px] text-muted-foreground font-mono">
@@ -688,7 +696,10 @@ export function LotSizeCalculator({ compact = false, initialSymbol }: LotSizeCal
           {selectedInstrument && (
             <div className="glass rounded-xl p-4 border border-border/40 flex items-center justify-between gap-4">
               <div>
-                <div className="text-lg font-bold">{selectedInstrument.symbol}</div>
+                <div className="text-lg font-bold inline-flex items-center gap-2">
+                  <AssetIcon symbol={selectedInstrument.symbol} size="md" />
+                  {selectedInstrument.symbol}
+                </div>
                 <div className="text-xs text-muted-foreground">{selectedInstrument.name}</div>
               </div>
               <div className="flex items-center gap-5 text-right">

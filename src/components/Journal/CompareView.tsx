@@ -15,6 +15,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SymbolMark } from "@/components/ui/AssetIcon";
 import {
   Collapsible,
   CollapsibleContent,
@@ -865,7 +866,7 @@ function AssetCompareList({
           key={asset}
           className="flex items-center justify-between gap-3 rounded-lg bg-muted/25 px-3 py-2.5 text-sm"
         >
-          <span className="font-medium truncate text-foreground">{asset}</span>
+          <SymbolMark symbol={asset} size="sm" className="min-w-0" textClassName="font-medium text-foreground" />
           <div className="flex gap-4 shrink-0 tabular-nums font-mono text-xs">
             <span className={cn(pnlTextColor(aMap.get(asset)?.pnl ?? 0))}>
               {aMap.has(asset) ? formatPnL(aMap.get(asset)!.pnl) : "—"}
@@ -891,7 +892,7 @@ const TradeHighlight: React.FC<{ trade: Trade | null; type: "best" | "worst" }> 
     <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/25 px-3 py-2.5">
       <div className="flex items-center gap-2 min-w-0">
         {isBest ? <Trophy className="w-4 h-4 text-emerald-500 shrink-0" /> : <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />}
-        <span className="text-sm font-medium truncate">{trade.pair}</span>
+        <SymbolMark symbol={trade.pair} size="sm" className="min-w-0" textClassName="text-sm font-medium" />
       </div>
       <span className={cn("text-sm font-mono tabular-nums font-semibold shrink-0", isBest ? "text-emerald-500" : "text-red-500")}>
         {formatPnL(getTradeNetResult(trade))}

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Upload, FileText, Check, X, AlertCircle, Loader2, Download, Info } from 'lucide-react';
+import { SymbolMark } from '@/components/ui/AssetIcon';
 
 interface ParsedTrade {
   date: string;
@@ -498,7 +499,7 @@ export function CSVImport({ onImport }: CSVImportProps) {
                               )}
                             </TableCell>
                             <TableCell className="text-sm">{trade.date}</TableCell>
-                            <TableCell className="text-sm font-medium">{trade.pair}</TableCell>
+                            <TableCell className="text-sm font-medium"><SymbolMark symbol={trade.pair} size="sm" /></TableCell>
                             <TableCell>
                               <Badge variant={trade.direction === 'Long' ? 'default' : 'secondary'} className="text-xs">
                                 {trade.direction}

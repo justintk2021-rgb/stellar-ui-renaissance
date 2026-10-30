@@ -35,6 +35,7 @@ import {
 } from "@/lib/tradeFormat";
 
 import { toast } from "sonner";
+import { AssetIcon, SymbolMark } from "@/components/ui/AssetIcon";
 
 interface PnLCalendarProps {
   trades: Trade[];
@@ -966,7 +967,8 @@ export function PnLCalendar({
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-muted-foreground">Pairs:</span>
                     {dayMetrics.pairs.map((pair) => (
-                      <Badge key={pair} variant="outline" className="text-xs border-secondary/50 bg-secondary/10">
+                      <Badge key={pair} variant="outline" className="text-xs border-secondary/50 bg-secondary/10 gap-1">
+                        <AssetIcon symbol={pair} size="sm" />
                         {pair}
                       </Badge>
                     ))}
@@ -1023,7 +1025,7 @@ export function PnLCalendar({
                             >
                               {trade.direction}
                             </Badge>
-                            <span className="text-sm font-medium">{trade.pair}</span>
+                            <SymbolMark symbol={trade.pair} size="sm" textClassName="text-sm font-medium" />
                           </div>
                           <div className="flex items-center gap-2">
                             <Button
@@ -1282,7 +1284,10 @@ function DayCumulativeChart({
       if (data.trade === 0) return null;
       return (
         <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
-          <p className="text-xs text-muted-foreground">Trade #{data.trade}: {data.pair}</p>
+          <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+            Trade #{data.trade}:
+            <SymbolMark symbol={data.pair} size="sm" />
+          </p>
           <p className={cn(
             "text-xs font-medium",
             data.result >= 0 ? "text-primary" : "text-destructive"

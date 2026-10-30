@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Sun, Moon, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SymbolMark } from "@/components/ui/AssetIcon";
 
 type ChartTheme = "light" | "dark";
 
@@ -117,7 +118,7 @@ export function LightweightChart() {
             />
           </div>
           <span className="text-sm text-muted-foreground whitespace-nowrap">
-            <span className="text-foreground font-medium">{symbol}</span>
+            <SymbolMark symbol={symbol} size="sm" textClassName="text-foreground font-medium" />
           </span>
           <Button
             variant="ghost"

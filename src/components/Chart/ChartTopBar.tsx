@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { AssetIcon } from "@/components/ui/AssetIcon";
 import {
   CHART_TIMEFRAMES,
   platformLabel,
@@ -95,7 +96,8 @@ export function ChartTopBar({
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-9 rounded-xl px-2.5 hover:bg-foreground/5">
+          <Button variant="ghost" className="h-9 gap-1.5 rounded-xl px-2.5 hover:bg-foreground/5">
+            {symbol && <AssetIcon symbol={symbol} size="sm" />}
             <span className="font-semibold tracking-wide">{current?.name || symbol || "Symbol"}</span>
             {lastPrice != null && (
               <span className="ml-1 font-mono text-xs text-muted-foreground">
@@ -112,6 +114,7 @@ export function ChartTopBar({
           )}
           {instruments.map((item) => (
             <DropdownMenuItem key={item.symbol} onClick={() => onSymbolChange(item.symbol)}>
+              <AssetIcon symbol={item.symbol} size="sm" />
               <span className="font-medium">{item.name}</span>
               <span className="ml-auto text-xs text-muted-foreground">{item.symbol}</span>
             </DropdownMenuItem>

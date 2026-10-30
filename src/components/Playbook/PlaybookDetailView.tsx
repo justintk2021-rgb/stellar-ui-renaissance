@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SymbolMark } from "@/components/ui/AssetIcon";
 import { useCountUp } from "@/hooks/useCountUp";
 import { 
   AreaChart, Area, XAxis, YAxis, ResponsiveContainer, 
@@ -524,7 +525,7 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
                   className="grid grid-cols-4 gap-4 px-4 py-3 hover:bg-muted/30 transition-colors"
                 >
                   <div className="text-sm text-muted-foreground">{trade.date}</div>
-                  <div className="text-sm font-medium">{trade.pair}</div>
+                  <div className="text-sm font-medium"><SymbolMark symbol={trade.pair} size="sm" /></div>
                   <div className={cn(
                     "text-sm font-mono font-semibold text-right",
                     net >= 0 ? "text-primary" : "text-destructive"

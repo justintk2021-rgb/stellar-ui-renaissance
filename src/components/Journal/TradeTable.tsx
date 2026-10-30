@@ -36,6 +36,7 @@ import {
   type HistoryPeriod,
 } from "@/lib/tradeHistoryPeriod";
 import { TradeScreenshot } from "./TradeScreenshot";
+import { AssetIcon, SymbolMark } from "@/components/ui/AssetIcon";
 
 interface Checklist {
   id: string;
@@ -225,7 +226,7 @@ function TradeEntry({ trade, checklists, userId, onEdit, onDelete, onViewNotes, 
           <span className="text-xs text-muted-foreground min-w-[132px] tabular-nums">
             {formatDate(dateKey)}
           </span>
-          <span className="text-sm font-semibold">{trade.pair || "—"}</span>
+          <SymbolMark symbol={trade.pair || "—"} size="sm" textClassName="text-sm font-semibold" />
           <Badge
             variant="outline"
             className={cn(
@@ -660,7 +661,10 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                           </SelectItem>
                           {availableSymbols.map(sym => (
                             <SelectItem key={sym} value={sym} className="rounded-lg text-sm font-mono">
-                              {sym}
+                              <span className="inline-flex items-center gap-1.5">
+                                <AssetIcon symbol={sym} size="sm" />
+                                {sym}
+                              </span>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -849,7 +853,7 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                           </div>
                           <div className="text-left">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold">{trade.pair}</span>
+                              <SymbolMark symbol={trade.pair} size="sm" textClassName="text-sm font-semibold" />
                               <Badge
                                 variant="outline"
                                 className={cn(
@@ -941,7 +945,10 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                       <FileText className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <span className="block">{selectedTrade.pair} • {selectedTrade.direction}</span>
+                      <span className="flex items-center gap-1.5">
+                        <AssetIcon symbol={selectedTrade.pair} size="sm" />
+                        <span>{selectedTrade.pair} • {selectedTrade.direction}</span>
+                      </span>
                       <span className="text-sm font-normal text-muted-foreground">
                         {formatDateOrDash(selectedTrade.date)}
                       </span>

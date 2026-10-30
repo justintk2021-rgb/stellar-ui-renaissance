@@ -7,6 +7,7 @@ import { useTradeDetail } from "@/hooks/useTrades";
 import { TradeScreenshot } from "@/components/Journal/TradeScreenshot";
 import { cn } from "@/lib/utils";
 import { getTradeNetResult, journalTradeStats } from "@/lib/tradeFormat";
+import { SymbolMark } from "@/components/ui/AssetIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -2752,7 +2753,7 @@ export function NotebookView({
             <div className="space-y-2 text-xs">
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Pair</span>
-                <span className="font-medium">{linkedTrade.pair}</span>
+                <SymbolMark symbol={linkedTrade.pair} size="sm" textClassName="font-medium" />
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Direction</span>

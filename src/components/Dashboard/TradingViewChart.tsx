@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { SymbolMark } from "@/components/ui/AssetIcon";
 
 interface TradingViewChartProps {
   pair: string;
@@ -116,7 +117,9 @@ function TradingViewChartComponent({ pair, direction, existingImage }: TradingVi
             )}
           </div>
           <div>
-            <h4 className="font-semibold">{pair}</h4>
+            <h4 className="font-semibold">
+              <SymbolMark symbol={pair} size="sm" textClassName="font-semibold" />
+            </h4>
             <Badge variant="outline" className={cn(
               "text-[10px]",
               direction === 'Long' ? "border-primary/50 text-primary" : "border-destructive/50 text-destructive"

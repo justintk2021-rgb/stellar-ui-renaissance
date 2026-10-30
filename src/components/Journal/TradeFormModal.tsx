@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "@/lib/motion";
 import { ChecklistPopup } from "./ChecklistPopup";
 import { Badge } from "@/components/ui/badge";
 import { compressTradeImage } from "@/lib/tradeImage";
+import { AssetIcon } from "@/components/ui/AssetIcon";
 
 // Common trading pairs and assets
 const TRADING_PAIRS = [
@@ -96,7 +97,10 @@ function PairAutocomplete({ value, onChange }: PairAutocompleteProps) {
               onClick={() => handleSelect(pair)}
               className="w-full px-3 py-2 text-left text-sm hover:bg-muted/80 transition-colors flex items-center justify-between"
             >
-              <span className="font-medium">{pair}</span>
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <AssetIcon symbol={pair} size="sm" />
+                {pair}
+              </span>
               <span className="text-xs text-muted-foreground">
                 {pair.includes("USD") && !pair.includes("USDT") ? "Forex" : 
                  pair.includes("USDT") ? "Crypto" :

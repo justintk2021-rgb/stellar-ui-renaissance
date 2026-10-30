@@ -16,6 +16,8 @@ import {
   type IntelligenceInsight,
   type IntelligenceSummary,
 } from "@/lib/intelligenceMap";
+import { SymbolMark } from "@/components/ui/AssetIcon";
+import { shouldRenderAssetIcon } from "@/lib/assetIcons";
 
 export type IntelligenceViewMode = "network" | "breakdown" | "health" | "signals";
 
@@ -102,7 +104,11 @@ function BreakdownRowItem({ row, maxPnl }: { row: BreakdownRow; maxPnl: number }
     <div className="flex items-center gap-3 py-2 px-2.5 rounded-lg hover:bg-muted/30 transition-colors">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-foreground truncate">{row.label}</span>
+          {shouldRenderAssetIcon(row.label) ? (
+            <SymbolMark symbol={row.label} size="sm" className="min-w-0" textClassName="text-xs font-semibold text-foreground" />
+          ) : (
+            <span className="text-xs font-semibold text-foreground truncate">{row.label}</span>
+          )}
           {row.count > 0 && (
             <span className="text-[9px] text-muted-foreground shrink-0">{row.count} trades</span>
           )}
@@ -300,7 +306,11 @@ function SignalCard({ row, variant }: { row: BreakdownRow; variant: "strength" |
           <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
         )}
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-foreground">{row.label}</p>
+          {shouldRenderAssetIcon(row.label) ? (
+            <SymbolMark symbol={row.label} size="sm" textClassName="text-xs font-semibold text-foreground" />
+          ) : (
+            <p className="text-xs font-semibold text-foreground">{row.label}</p>
+          )}
           {row.detail && (
             <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{row.detail}</p>
           )}

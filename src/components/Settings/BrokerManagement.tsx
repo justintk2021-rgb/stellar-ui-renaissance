@@ -14,6 +14,7 @@ import { useTradeLocker } from '@/hooks/useTradeLocker';
 import { MetaTraderManagement } from '@/components/Settings/MetaTraderManagement';
 import { MyfxbookPanel } from '@/components/Settings/MyfxbookPanel';
 import { toast } from 'sonner';
+import { SymbolMark } from '@/components/ui/AssetIcon';
 import {
   Link2, Unlink, RefreshCw, Loader2, CheckCircle2, XCircle, AlertCircle,
   TrendingUp, TrendingDown, Eye, EyeOff, DollarSign, Activity, Wallet,
@@ -707,7 +708,7 @@ export function BrokerManagement({
                       <TableBody>
                         {positions.map((pos) => (
                           <TableRow key={pos.id}>
-                            <TableCell className="font-medium">{pos.symbol}</TableCell>
+                            <TableCell className="font-medium"><SymbolMark symbol={pos.symbol} size="sm" /></TableCell>
                             <TableCell>
                               <Badge className={pos.side === 'buy' || pos.type?.includes('BUY') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}>
                                 {pos.side || (pos.type?.includes('BUY') ? 'Buy' : 'Sell')}
@@ -782,7 +783,7 @@ export function BrokerManagement({
                       <TableBody>
                         {orders.map((ord) => (
                           <TableRow key={ord.id}>
-                            <TableCell className="font-medium">{ord.symbol}</TableCell>
+                            <TableCell className="font-medium"><SymbolMark symbol={ord.symbol} size="sm" /></TableCell>
                             <TableCell><Badge variant="outline">{ord.order_type}</Badge></TableCell>
                             <TableCell>
                               <Badge className={ord.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}>
@@ -856,7 +857,7 @@ export function BrokerManagement({
                       <TableBody>
                         {history.map((t) => (
                           <TableRow key={t.id}>
-                            <TableCell className="font-medium">{t.symbol}</TableCell>
+                            <TableCell className="font-medium"><SymbolMark symbol={t.symbol} size="sm" /></TableCell>
                             <TableCell>
                               <Badge className={t.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}>
                                 {t.side}

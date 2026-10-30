@@ -1,5 +1,10 @@
 /// <reference types="vite/client" />
 
+declare module "*.svg?url" {
+  const src: string;
+  export default src;
+}
+
 // View Transitions API type declarations
 interface ViewTransition {
   finished: Promise<void>;

@@ -21,6 +21,8 @@ import {
   type MapEdge,
   type NodeType,
 } from "@/lib/intelligenceMap";
+import { SymbolMark } from "@/components/ui/AssetIcon";
+import { shouldRenderAssetIcon } from "@/lib/assetIcons";
 import {
   ViewTabBar,
   BreakdownView,
@@ -248,7 +250,11 @@ function NodeDetail({ node }: { node: MapNode }) {
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <p className="text-sm font-semibold text-foreground truncate">{node.label}</p>
+          {shouldRenderAssetIcon(node.label) ? (
+            <SymbolMark symbol={node.label} size="sm" className="min-w-0" textClassName="text-sm font-semibold text-foreground" />
+          ) : (
+            <p className="text-sm font-semibold text-foreground truncate">{node.label}</p>
+          )}
           <span className="text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">{LAYER_LABELS[node.type]}</span>
         </div>
         {node.meta.detail && <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{node.meta.detail}</p>}

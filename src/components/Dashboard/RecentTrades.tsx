@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useBrokerPositions } from "@/hooks/useBrokerPositions";
 import { subscribeBrokerOrdersRealtime } from "@/lib/queries/broker";
 import { dedupeTradesForPnL, getTradeNetResult } from "@/lib/tradeFormat";
+import { AssetIcon, SymbolMark } from "@/components/ui/AssetIcon";
 
 interface RecentTradesProps {
   trades: Trade[];
@@ -180,7 +181,7 @@ export const RecentTrades = memo(function RecentTrades({ trades, brokerConnectio
                                 "w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold",
                                 isProfit ? "bg-primary/20 text-primary" : isLoss ? "bg-destructive/20 text-destructive" : "bg-muted text-muted-foreground"
                               )}>
-                                {trade.pair.slice(0, 2)}
+                                <AssetIcon symbol={trade.pair} size="md" />
                               </div>
                               <span className="text-sm font-semibold">{trade.pair}</span>
                             </div>
@@ -274,7 +275,7 @@ export const RecentTrades = memo(function RecentTrades({ trades, brokerConnectio
                         className="border-b border-border/20 hover:bg-muted/30 transition-colors"
                       >
                         <td className="py-3 pl-2">
-                          <span className="text-sm font-semibold">{pos.symbol}</span>
+                          <SymbolMark symbol={pos.symbol} size="sm" textClassName="text-sm font-semibold" />
                         </td>
                         <td className="py-3">
                           <div className="flex items-center gap-1">
@@ -339,7 +340,7 @@ export const RecentTrades = memo(function RecentTrades({ trades, brokerConnectio
                         className="border-b border-border/20 hover:bg-muted/30 transition-colors"
                       >
                         <td className="py-3 pl-2">
-                          <span className="text-sm font-semibold">{ord.symbol}</span>
+                          <SymbolMark symbol={ord.symbol} size="sm" textClassName="text-sm font-semibold" />
                         </td>
                         <td className="py-3">
                           <div className="flex items-center gap-1">
