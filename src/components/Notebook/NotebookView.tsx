@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, type DragEvent } from "react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Trade, NotebookEntry } from "@/types/trade";
@@ -99,7 +99,7 @@ import {
   AlignRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { motion, AnimatePresence } from "@/lib/motion";
+import { motion, AnimatePresence, useMotionValue } from "@/lib/motion";
 
 interface NotebookViewProps {
   trades: Trade[];
@@ -228,6 +228,11 @@ export function NotebookView({
   const [isEntriesPanelClosing, setIsEntriesPanelClosing] = useState(false);
   const [isAddFolderDialogOpen, setIsAddFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
+  const dragX = useMotionValue(0);
+  const dragY = useMotionValue(0);
+  const emptyDragImageRef = useRef<HTMLCanvasElement | null>(null);
   const [folderSearchQuery, setFolderSearchQuery] = useState("");
   const deferredFolderSearch = useDebouncedValue(folderSearchQuery, 160);
   const [customFolders, setCustomFolders] = useState<Array<{ id: string; label: string; color?: string }>>(() => {
@@ -775,6 +780,86 @@ export function NotebookView({
     toast.success(`Note moved to ${CATEGORIES.find(c => c.id === newCategory)?.label || newCategory}!`);
   };
 
+  const handleNoteDragStart = (event: DragEvent, entryId: string) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-notebook-note", entryId);
+    event.dataTransfer.setData("text/plain", entryId);
+    if (!emptyDragImageRef.current) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      emptyDragImageRef.current = canvas;
+    }
+    event.dataTransfer.setDragImage(emptyDragImageRef.current, 0, 0);
+    dragX.set(event.clientX);
+    dragY.set(event.clientY);
+    setDraggingNoteId(entryId);
+    setIsFoldersPanelOpen(true);
+  };
+
+  useEffect(() => {
+    if (!draggingNoteId) return;
+    let frame = 0;
+    const point = { x: dragX.get(), y: dragY.get() };
+    const track = (event: globalThis.DragEvent) => {
+      if (!event.clientX && !event.clientY) return;
+      point.x = event.clientX;
+      point.y = event.clientY;
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        dragX.set(point.x);
+        dragY.set(point.y);
+      });
+    };
+    const end = () => {
+      setDraggingNoteId(null);
+      setDropTargetId(null);
+    };
+    document.addEventListener("dragover", track);
+    document.addEventListener("dragend", end);
+    return () => {
+      document.removeEventListener("dragover", track);
+      document.removeEventListener("dragend", end);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [dragX, dragY, draggingNoteId]);
+
+  const handleFolderDragOver = (event: DragEvent, folderId: string) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDropTargetId(folderId);
+  };
+
+  const handleFolderDragLeave = (event: DragEvent, folderId: string) => {
+    const next = event.relatedTarget as Node | null;
+    if (next && event.currentTarget.contains(next)) return;
+    setDropTargetId((current) => (current === folderId ? null : current));
+  };
+
+  const handleNoteDropOnFolder = (event: DragEvent, folderId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDropTargetId(null);
+    setDraggingNoteId(null);
+    const id = event.dataTransfer.getData("application/x-notebook-note") || event.dataTransfer.getData("text/plain");
+    const entry = notebookEntries.find((item) => item.id === id);
+    if (!entry || entry.isDeleted) return;
+    if (folderId === "trash") {
+      onSaveEntry({
+        ...entry,
+        isDeleted: true,
+        deletedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      if (selectedEntryId === entry.id) setSelectedEntryId(null);
+      toast.success("Note moved to trash!");
+      return;
+    }
+    if (entry.category === folderId) return;
+    handleMoveToCategory(entry, folderId);
+  };
+
   // Update folder marker color
   const handleSetFolderMarker = (folderId: string, colorId: string) => {
     const newMarkers = { ...folderMarkers };
@@ -794,46 +879,38 @@ export function NotebookView({
     localStorage.setItem('notebook-view-mode', newMode);
   };
 
-  // Note card colors based on folder marker color (if set), otherwise fall back to a rotating palette
-  const getNoteCardColor = (category: string, index: number): {
+  // Note cards use the folder marker the user picked. With no marker, they use the site accent.
+  const getNoteCardColor = (category: string): {
     bg: string;
     bgDark: string;
     border: string;
     borderDark: string;
     accent: string;
-    text?: string;
-    textDark?: string;
   } => {
-    const fallback = [
-      { bg: 'hsl(210, 100%, 95%)', bgDark: 'hsl(210, 50%, 15%)', border: 'hsl(210, 80%, 85%)', borderDark: 'hsl(210, 40%, 25%)', accent: 'hsl(210, 80%, 55%)' },
-      { bg: 'hsl(142, 70%, 92%)', bgDark: 'hsl(142, 40%, 12%)', border: 'hsl(142, 60%, 80%)', borderDark: 'hsl(142, 30%, 22%)', accent: 'hsl(142, 70%, 45%)' },
-      { bg: 'hsl(48, 95%, 90%)', bgDark: 'hsl(48, 50%, 12%)', border: 'hsl(48, 80%, 80%)', borderDark: 'hsl(48, 40%, 22%)', accent: 'hsl(48, 95%, 50%)' },
-      { bg: 'hsl(0, 85%, 93%)', bgDark: 'hsl(0, 40%, 14%)', border: 'hsl(0, 70%, 85%)', borderDark: 'hsl(0, 30%, 24%)', accent: 'hsl(0, 75%, 55%)' },
-      { bg: 'hsl(262, 80%, 93%)', bgDark: 'hsl(262, 40%, 14%)', border: 'hsl(262, 60%, 85%)', borderDark: 'hsl(262, 30%, 24%)', accent: 'hsl(262, 70%, 55%)' },
-      { bg: 'hsl(330, 80%, 93%)', bgDark: 'hsl(330, 40%, 14%)', border: 'hsl(330, 60%, 85%)', borderDark: 'hsl(330, 30%, 24%)', accent: 'hsl(330, 70%, 55%)' },
-      { bg: 'hsl(186, 80%, 90%)', bgDark: 'hsl(186, 40%, 12%)', border: 'hsl(186, 60%, 80%)', borderDark: 'hsl(186, 30%, 22%)', accent: 'hsl(186, 70%, 45%)' },
-      { bg: 'hsl(25, 90%, 92%)', bgDark: 'hsl(25, 50%, 14%)', border: 'hsl(25, 70%, 82%)', borderDark: 'hsl(25, 35%, 24%)', accent: 'hsl(25, 85%, 50%)' },
-    ];
+    const siteAccent = {
+      bg: "hsl(var(--primary) / 0.14)",
+      bgDark: "hsl(var(--primary) / 0.2)",
+      border: "hsl(var(--primary) / 0.38)",
+      borderDark: "hsl(var(--primary) / 0.48)",
+      accent: "hsl(var(--primary))",
+    };
 
-    // Try to derive from the folder's marker color
     const markerId = folderMarkers[category];
     const marker = markerId ? MARKER_COLORS.find(m => m.id === markerId) : null;
-    if (marker && marker.color && marker.color !== 'transparent') {
-      const match = marker.color.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)/);
-      if (match) {
-        const h = match[1];
-        const s = Number(match[2]);
-        return {
-          bg: `hsl(${h}, ${Math.min(s, 80)}%, 93%)`,
-          bgDark: `hsl(${h}, ${Math.min(s, 50)}%, 14%)`,
-          border: `hsl(${h}, ${Math.min(s, 70)}%, 82%)`,
-          borderDark: `hsl(${h}, ${Math.min(s, 35)}%, 24%)`,
-          accent: marker.color,
-        };
-      }
-    }
+    if (!marker || !marker.color || marker.color === "transparent") return siteAccent;
 
-    return fallback[index % fallback.length];
+    const match = marker.color.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)/);
+    if (!match) return siteAccent;
+
+    const h = match[1];
+    const s = Number(match[2]);
+    return {
+      bg: `hsl(${h}, ${Math.min(s, 80)}%, 93%)`,
+      bgDark: `hsl(${h}, ${Math.min(s, 50)}%, 14%)`,
+      border: `hsl(${h}, ${Math.min(s, 70)}%, 82%)`,
+      borderDark: `hsl(${h}, ${Math.min(s, 35)}%, 24%)`,
+      accent: marker.color,
+    };
   };
 
 
@@ -1139,6 +1216,16 @@ export function NotebookView({
 
   const isViewingTrash = selectedCategory === "trash";
   const isSelectedEntryInTrash = selectedEntry?.isDeleted;
+  const draggedNote = draggingNoteId
+    ? notebookEntries.find((entry) => entry.id === draggingNoteId) ?? null
+    : null;
+  const dragDestination = dropTargetId === "trash"
+    ? "Trash"
+    : dropTargetId
+      ? (CATEGORIES.find((category) => category.id === dropTargetId)?.label
+        || customFolders.find((folder) => folder.id === dropTargetId)?.label
+        || "Folder")
+      : null;
 
   return (
     <>
@@ -1502,7 +1589,16 @@ export function NotebookView({
                     const markerColor = getFolderMarkerColor(cat.id);
                     
                     return (
-                      <div key={cat.id} className="relative group/folder flex items-center gap-1">
+                      <div
+                        key={cat.id}
+                        className={cn(
+                          "relative group/folder flex items-center gap-1 rounded-lg transition-transform duration-200",
+                          cat.id !== "all" && dropTargetId === cat.id && "scale-[1.03] ring-2 ring-primary/50 bg-primary/10 shadow-[0_8px_24px_hsl(var(--primary)/0.18)]",
+                        )}
+                        onDragOver={cat.id === "all" ? undefined : (event) => handleFolderDragOver(event, cat.id)}
+                        onDragLeave={cat.id === "all" ? undefined : (event) => handleFolderDragLeave(event, cat.id)}
+                        onDrop={cat.id === "all" ? undefined : (event) => handleNoteDropOnFolder(event, cat.id)}
+                      >
                         {/* Color Marker */}
                         {markerColor && (
                           <div 
@@ -1585,7 +1681,16 @@ export function NotebookView({
                         const markerColor = getFolderMarkerColor(folder.id);
                         
                           return (
-                          <div key={folder.id} className="relative group/folder flex items-center gap-1">
+                          <div
+                            key={folder.id}
+                            className={cn(
+                              "relative group/folder flex items-center gap-1 rounded-lg transition-transform duration-200",
+                              dropTargetId === folder.id && "scale-[1.03] ring-2 ring-primary/50 bg-primary/10 shadow-[0_8px_24px_hsl(var(--primary)/0.18)]",
+                            )}
+                            onDragOver={(event) => handleFolderDragOver(event, folder.id)}
+                            onDragLeave={(event) => handleFolderDragLeave(event, folder.id)}
+                            onDrop={(event) => handleNoteDropOnFolder(event, folder.id)}
+                          >
                             {markerColor && (
                               <div 
                                 className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full"
@@ -1674,7 +1779,12 @@ export function NotebookView({
                   )}
 
                   {/* Trash */}
-                  <div className="pt-2 mt-2 border-t border-border/30">
+                  <div
+                    className="pt-2 mt-2 border-t border-border/30"
+                    onDragOver={(event) => handleFolderDragOver(event, "trash")}
+                    onDragLeave={(event) => handleFolderDragLeave(event, "trash")}
+                    onDrop={(event) => handleNoteDropOnFolder(event, "trash")}
+                  >
                     <button
                       onClick={() => {
                         setSelectedCategory("trash");
@@ -1687,7 +1797,8 @@ export function NotebookView({
                         "w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
                         selectedCategory === "trash"
                           ? "bg-destructive/20 text-destructive"
-                          : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
+                        dropTargetId === "trash" && "scale-[1.03] ring-2 ring-destructive/50 bg-destructive/10 text-destructive shadow-[0_8px_24px_hsl(var(--destructive)/0.2)]"
                       )}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -1775,7 +1886,13 @@ export function NotebookView({
                           ref={sidebarVirtualizer.measureElement}
                           data-index={virtualRow.index}
                         >
-                          <button onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }} className={cn("w-full text-left p-2 rounded-lg transition-all duration-200 mb-1 border", selectedEntryId === entry.id ? "bg-primary/15 border-primary/30 shadow-[0_0_12px_hsl(var(--primary)/0.15)]" : "border-transparent hover:bg-muted/50 hover:translate-x-0.5")}>
+                          <button
+                            draggable={!entry.isDeleted}
+                            onDragStart={(event) => handleNoteDragStart(event, entry.id)}
+                            onDragEnd={() => setDropTargetId(null)}
+                            onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
+                            className={cn("w-full text-left p-2 rounded-lg transition-all duration-200 mb-1 border cursor-grab active:cursor-grabbing", selectedEntryId === entry.id ? "bg-primary/15 border-primary/30 shadow-[0_0_12px_hsl(var(--primary)/0.15)]" : "border-transparent hover:bg-muted/50 hover:translate-x-0.5", draggingNoteId === entry.id && "opacity-35")}
+                          >
                             <div className="flex items-center gap-2">
                               <ChevronRight className={cn("w-3 h-3 transition-transform duration-200", selectedEntryId === entry.id && "rotate-90 text-primary")} />
                               <span className={cn("text-xs font-medium truncate", selectedEntryId === entry.id && "text-primary")}>{entry.title}</span>
@@ -2533,8 +2650,7 @@ export function NotebookView({
                   {gridVirtualizer.getVirtualItems().map((virtualRow) => {
                     const entry = visibleEntries[virtualRow.index];
                     if (!entry) return null;
-                    const index = virtualRow.index;
-                    const colors = getNoteCardColor(entry.category, index);
+                    const colors = getNoteCardColor(entry.category);
                     const plainText = entry.content.replace(/<[^>]*>/g, '').trim();
                     const contentLines = plainText.split(/[.!?\n]+/).filter(s => s.trim()).slice(0, 3);
                     const isDark = document.documentElement.classList.contains('dark');
@@ -2552,14 +2668,24 @@ export function NotebookView({
                         data-index={virtualRow.index}
                         className="pb-2"
                       >
+                        <div
+                          draggable
+                          onDragStart={(event) => handleNoteDragStart(event, entry.id)}
+                          onDragEnd={() => setDropTargetId(null)}
+                          className={cn("cursor-grab active:cursor-grabbing transition-opacity", draggingNoteId === entry.id && "opacity-35")}
+                        >
                         <motion.button
                           initial={{ opacity: 0, y: 12 }}
                           animate={{ opacity: 1, y: 0 }}
                           whileHover={{ x: 4 }}
                           whileTap={{ scale: 0.99 }}
                           onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
-                          className="note-card w-full text-left rounded-xl overflow-hidden group relative border transition-all duration-300 flex items-center gap-3 p-4 bg-card/50 backdrop-blur border-border/30"
-                          style={{ ['--note-accent' as string]: colors.accent }}
+                          className="note-card w-full text-left rounded-xl overflow-hidden group relative border transition-all duration-300 flex items-center gap-3 p-4 backdrop-blur"
+                          style={{
+                            backgroundColor: isDark ? colors.bgDark : colors.bg,
+                            borderColor: isDark ? colors.borderDark : colors.border,
+                            ["--note-accent" as string]: colors.accent,
+                          }}
                         >
                           <span className="note-shine" aria-hidden />
                           <div
@@ -2572,10 +2698,11 @@ export function NotebookView({
                               <p className="text-xs text-muted-foreground mt-1 truncate">{contentLines[0]}</p>
                             )}
                           </div>
-                          <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: colors.border, color: isDark ? colors.textDark : colors.text }}>
+                          <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: colors.border }}>
                             {CATEGORIES.find(c => c.id === entry.category)?.label || entry.category}
                           </Badge>
                         </motion.button>
+                        </div>
                       </div>
                     );
                   })}
@@ -2591,14 +2718,20 @@ export function NotebookView({
                     className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
                   >
                     {visibleEntries.map((entry, index) => {
-                        const colors = getNoteCardColor(entry.category, index);
+                        const colors = getNoteCardColor(entry.category);
                         const plainText = entry.content.replace(/<[^>]*>/g, '').trim();
                         const contentLines = plainText.split(/[.!?\n]+/).filter(s => s.trim()).slice(0, 3);
                         const isDark = document.documentElement.classList.contains('dark');
                         
                         return (
-                          <motion.button
+                          <div
                             key={entry.id}
+                            draggable
+                            onDragStart={(event) => handleNoteDragStart(event, entry.id)}
+                            onDragEnd={() => setDropTargetId(null)}
+                            className={cn("cursor-grab active:cursor-grabbing transition-opacity", draggingNoteId === entry.id && "opacity-35")}
+                          >
+                          <motion.button
                             initial={{ opacity: 0, y: 12 }}
                             animate={{ 
                               opacity: 1, 
@@ -2617,7 +2750,7 @@ export function NotebookView({
                             whileTap={{ scale: 0.99 }}
                             onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
                             className={cn(
-                              "note-card text-left rounded-2xl overflow-hidden group relative border transition-all duration-300",
+                              "note-card w-full text-left rounded-2xl overflow-hidden group relative border transition-all duration-300",
                               viewMode === 'grid' 
                                 ? "flex flex-col" 
                                 : "flex items-start gap-4 p-4"
@@ -2711,6 +2844,7 @@ export function NotebookView({
                               </>
                             )}
                           </motion.button>
+                          </div>
                         );
                       })}
                     </motion.div>
@@ -3104,6 +3238,44 @@ export function NotebookView({
         )}
       </AnimatePresence>
     </div>
+    <AnimatePresence>
+      {draggedNote && (
+        <motion.div
+          key={draggedNote.id}
+          initial={{ opacity: 0, scale: 0.82, rotate: -8 }}
+          animate={{ opacity: 1, scale: 1, rotate: dragDestination ? 1.5 : -4 }}
+          exit={{ opacity: 0, scale: 0.86, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 420, damping: 26 }}
+          style={{ left: dragX, top: dragY, x: "-50%", y: "-50%" }}
+          className="pointer-events-none fixed z-[90] w-60"
+        >
+          {(() => {
+            const colors = getNoteCardColor(draggedNote.category);
+            const isDark = document.documentElement.classList.contains("dark");
+            const preview = draggedNote.content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+            return (
+              <div
+                className="overflow-hidden rounded-2xl border shadow-2xl"
+                style={{
+                  backgroundColor: isDark ? colors.bgDark : colors.bg,
+                  borderColor: isDark ? colors.borderDark : colors.border,
+                  boxShadow: `0 18px 40px -16px ${colors.accent}`,
+                }}
+              >
+                <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${colors.accent}, transparent 160%)` }} />
+                <div className="space-y-1.5 px-3.5 py-3">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                    {dragDestination ? `Drop into ${dragDestination}` : "Dragging note"}
+                  </p>
+                  <p className="truncate text-sm font-semibold text-foreground">{draggedNote.title || "Untitled"}</p>
+                  <p className="line-clamp-2 text-xs text-muted-foreground">{preview || "No content..."}</p>
+                </div>
+              </div>
+            );
+          })()}
+        </motion.div>
+      )}
+    </AnimatePresence>
     </>
   );
 }
