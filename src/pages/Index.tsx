@@ -1217,6 +1217,7 @@ const Index = () => {
                       onStudyFocusHandled={() => setFocusStudyNoteId(null)}
                       view={notebookView}
                       category={studyCategory}
+                      displayName={displayName}
                     />
                   </Suspense>
                 </PageTransition>

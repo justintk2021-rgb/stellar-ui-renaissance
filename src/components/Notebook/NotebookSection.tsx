@@ -10,12 +10,14 @@ type NotebookProps = ComponentProps<typeof NotebookView>;
 export function NotebookSection({
   view,
   category,
+  displayName,
   focusStudyNoteId,
   onStudyFocusHandled,
   ...notebookProps
 }: NotebookProps & {
   view: "notebook" | "study";
   category: StudyCategory;
+  displayName?: string;
   focusStudyNoteId?: string | null;
   onStudyFocusHandled?: () => void;
 }) {
@@ -34,6 +36,7 @@ export function NotebookSection({
       focusNoteId={focusStudyNoteId}
       onFocusHandled={onStudyFocusHandled}
       category={category}
+      displayName={displayName}
     />
   );
 }

@@ -26,6 +26,17 @@ export function parseYouTubeId(text: string): string | null {
   return match?.[1] ?? null;
 }
 
+export function studyDocPlainText(doc: JSONContent | null | undefined): string {
+  const parts: string[] = [];
+  const visit = (node: JSONContent | undefined) => {
+    if (!node) return;
+    if (node.type === "text" && node.text) parts.push(node.text);
+    node.content?.forEach(visit);
+  };
+  visit(doc ?? undefined);
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
 export function tradeIdsInDoc(doc: JSONContent | null | undefined): string[] {
   const ids: string[] = [];
   const visit = (node: JSONContent | undefined) => {

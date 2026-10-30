@@ -3,13 +3,13 @@ import type { Trade } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { useStudyMutations, useStudyTree } from "@/hooks/useStudyArea";
 import { AnimatePresence, motion } from "@/lib/motion";
-import { STUDY_CATEGORIES, type StudyCategory } from "@/lib/studyArea";
+import type { StudyCategory } from "@/lib/studyArea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { StudyFolderTree } from "./StudyFolderTree";
 import { StudyEditor } from "./StudyEditor";
-import { FolderPlus, Plus } from "lucide-react";
+import { StudyHome } from "./StudyHome";
+import { ArrowLeft } from "lucide-react";
 
 export function StudyArea({
   userId,
@@ -17,12 +17,14 @@ export function StudyArea({
   focusNoteId,
   onFocusHandled,
   category,
+  displayName,
 }: {
   userId?: string;
   trades: Trade[];
   focusNoteId?: string | null;
   onFocusHandled?: () => void;
   category: StudyCategory;
+  displayName?: string;
 }) {
   const tree = useStudyTree(userId);
   const mutations = useStudyMutations(userId);
@@ -36,7 +38,6 @@ export function StudyArea({
   const notes = (tree.data?.notes ?? []).filter((note) => note.category === category);
   const selected = notes.find((note) => note.id === selectedId) ?? null;
   const currentFolder = selected?.folder_id ?? null;
-  const categoryLabel = STUDY_CATEGORIES.find((item) => item.id === category)?.label ?? "Study";
 
   useEffect(() => {
     setSelectedId(null);
@@ -56,35 +57,14 @@ export function StudyArea({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.985 }}
         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-        className="grid min-h-[calc(100vh-10rem)] grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]"
+        className="min-h-[calc(100vh-10rem)]"
       >
-      <aside className="notebook-panel flex flex-col rounded-2xl p-4">
-        <div className="mb-3 flex gap-2">
-          <Button type="button" className="flex-1" onClick={() => { if (!userId) return; void mutations.createNote.mutateAsync({ folderId: currentFolder, category }).then(setSelectedId); }}>
-            <Plus className="h-4 w-4" />
-            New note
-          </Button>
-          <Button type="button" variant="outline" size="icon" aria-label="New folder" onClick={() => { setRenameId(null); setFolderName(""); setFolderOpen(true); }}>
-            <FolderPlus className="h-4 w-4" />
-          </Button>
-        </div>
-        {tree.isError ? (
-          <p className="text-sm text-muted-foreground">Study Area is not available until the new tables are created.</p>
-        ) : (
-          <StudyFolderTree
-            folders={folders}
-            notes={notes}
-            selectedNoteId={selectedId}
-            onSelectNote={setSelectedId}
-            onMoveNote={(id, folderId) => mutations.moveNote.mutate({ id, folderId })}
-            onMoveFolder={(id, parentId) => mutations.moveFolder.mutate({ id, parentId })}
-            onRenameFolder={(folder) => { setRenameId(folder.id); setFolderName(folder.name); setFolderOpen(true); }}
-            onDeleteFolder={(folder) => mutations.deleteFolder.mutate(folder.id)}
-          />
-        )}
-      </aside>
-      <section className="notebook-panel min-h-[520px] rounded-2xl p-5 sm:p-6">
-        {selected && userId ? (
+      {selected && userId ? (
+        <section className="notebook-panel min-h-[520px] rounded-2xl p-5 sm:p-6">
+          <button type="button" onClick={() => setSelectedId(null)} className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
           <StudyEditor
             key={selected.id}
             noteId={selected.id}
@@ -94,17 +74,20 @@ export function StudyArea({
             playbooks={playbooks}
             onSave={async (input) => { await mutations.saveNote.mutateAsync({ id: selected.id, ...input }); }}
           />
-        ) : (
-          <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-3 text-center">
-            <p className="text-lg font-semibold">{categoryLabel}</p>
-            <p className="max-w-md text-sm text-muted-foreground">Nested folders, an autosaving note, YouTube embeds, and live trade cards.</p>
-            <Button type="button" onClick={() => { if (!userId) return; void mutations.createNote.mutateAsync({ folderId: null, category }).then(setSelectedId); }}>
-              <Plus className="h-4 w-4" />
-              New note
-            </Button>
-          </div>
-        )}
-      </section>
+        </section>
+      ) : tree.isError ? (
+        <p className="text-sm text-muted-foreground">Study Area is not available until the new tables are created.</p>
+      ) : (
+        <StudyHome
+          displayName={displayName}
+          folders={folders}
+          notes={notes}
+          onOpenNote={setSelectedId}
+          onCreateNote={(folderId) => { if (!userId) return; void mutations.createNote.mutateAsync({ folderId, category }).then(setSelectedId); }}
+          onCreateFolder={() => { setRenameId(null); setFolderName(""); setFolderOpen(true); }}
+          onMoveNote={(id, folderId) => mutations.moveNote.mutate({ id, folderId })}
+        />
+      )}
       <Dialog open={folderOpen} onOpenChange={setFolderOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>{renameId ? "Rename folder" : "New folder"}</DialogTitle></DialogHeader>
