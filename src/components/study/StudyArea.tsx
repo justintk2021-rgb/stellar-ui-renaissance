@@ -67,8 +67,6 @@ export function StudyArea({
             onSave={async (input) => { await mutations.saveNote.mutateAsync({ id: selected.id, ...input }); }}
           />
         </section>
-      ) : tree.isError ? (
-        <p className="text-sm text-muted-foreground">Study Area is not available until the new tables are created.</p>
       ) : (
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -86,6 +84,9 @@ export function StudyArea({
               onCreateNote={(folderId) => { if (!userId) return; void mutations.createNote.mutateAsync({ folderId, category }).then(setSelectedId); }}
               onCreateFolder={() => { setFolderName(""); setFolderColor(""); setFolderOpen(true); }}
             />
+            {tree.isError ? (
+              <p className="mt-6 text-xs text-muted-foreground">Notes and folders will appear here once Study Area is set up.</p>
+            ) : null}
           </motion.div>
         </AnimatePresence>
       )}
