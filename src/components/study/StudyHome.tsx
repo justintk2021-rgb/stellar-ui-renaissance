@@ -88,6 +88,7 @@ export function StudyHome({
     [folders],
   );
   const visibleDrafts = showAllDrafts ? drafts : drafts.slice(0, 4);
+  const inboxExpanded = inbox.length > 0 && inbox.every((note) => expanded.has(note.id));
 
   const toggleInbox = (id: string) => {
     setExpanded((current) => {
@@ -99,7 +100,7 @@ export function StudyHome({
   };
 
   return (
-    <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(260px,22rem)_minmax(0,1fr)] lg:gap-10">
+    <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(240px,1fr)_minmax(0,2fr)] lg:gap-10">
       <div className="space-y-8">
         <h2 className="text-[1.85rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[2.05rem]">
           {greetingLine(displayName)}
@@ -140,7 +141,7 @@ export function StudyHome({
                   onClick={() => onOpenNote(note.id)}
                   className="flex w-full flex-col gap-0.5 py-2.5 text-left"
                 >
-                  <span className="truncate text-sm font-medium">{note.title || "Untitled note"}</span>
+                  <span className="truncate text-sm font-semibold text-foreground/90">{note.title || "Untitled note"}</span>
                   <span className="truncate text-xs text-muted-foreground">
                     {[place, preview].filter(Boolean).join("  /  ") || "Empty note"}
                   </span>
@@ -168,10 +169,17 @@ export function StudyHome({
             </div>
           </div>
           <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-            <button type="button" onClick={() => setExpanded(new Set(inbox.map((note) => note.id)))} className="hover:text-foreground">
-              Expand all
+            <button
+              type="button"
+              onClick={() => {
+                if (inboxExpanded) setExpanded(new Set());
+                else setExpanded(new Set(inbox.map((note) => note.id)));
+              }}
+              className="hover:text-foreground"
+            >
+              {inboxExpanded ? "Collapse all" : "Expand all"}
             </button>
-            <span>{inbox.length} unfiled</span>
+            <span className="tabular-nums">{inbox.length} unfiled</span>
           </div>
           {inboxSearch && (
             <Input value={inboxQuery} onChange={(event) => setInboxQuery(event.target.value)} placeholder="Search inbox" className="mb-3 h-9 bg-background/50" />
@@ -185,14 +193,35 @@ export function StudyHome({
               const open = expanded.has(note.id);
               const preview = studyDocPlainText(note.content);
               return (
-                <div key={note.id} className="study-glass rounded-xl">
-                  <button type="button" onClick={() => toggleInbox(note.id)} className="flex w-full items-center gap-2 px-3 py-2.5 text-left">
-                    <span className={cn("flex h-4 w-4 items-center justify-center rounded border border-border", open && "border-primary bg-primary/15")}>
-                      {open && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-sm">{note.title || "Untitled note"}</span>
-                    <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} />
-                  </button>
+                <div key={note.id} className="study-glass overflow-hidden rounded-xl">
+                  <div className="flex w-full items-center gap-2 px-3 py-2.5">
+                    <button
+                      type="button"
+                      aria-label={open ? "Collapse note" : "Expand note"}
+                      onClick={() => toggleInbox(note.id)}
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border border-border",
+                        open && "border-primary bg-primary/15",
+                      )}
+                    >
+                      {open && <span className="h-1.5 w-1.5 rounded-[2px] bg-primary" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpenNote(note.id)}
+                      className="min-w-0 flex-1 truncate text-left text-sm font-medium text-foreground/90 hover:text-foreground"
+                    >
+                      {note.title || "Untitled note"}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={open ? "Collapse note" : "Expand note"}
+                      onClick={() => toggleInbox(note.id)}
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
+                    </button>
+                  </div>
                   <AnimatePresence initial={false}>
                     {open && (
                       <motion.div
@@ -264,30 +293,45 @@ export function StudyHome({
                   <ChevronDown className="h-3 w-3" />
                 </span>
               </div>
-              <div className="study-folder-well mt-4">
-                <div className="study-folder-sheet study-folder-sheet--ghost" style={{ top: "2.85rem", transform: "rotate(1.4deg)" }} />
-                <div className="study-folder-sheet study-folder-sheet--ghost" style={{ top: "1.55rem", transform: "rotate(-0.6deg)", opacity: 0.75 }} />
+              <div
+                className="study-folder-well mt-4"
+                style={{ background: `linear-gradient(180deg, color-mix(in oklab, ${color} 14%, transparent), hsl(var(--background) / 0.35))` }}
+              >
                 {sheets.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => onCreateNote(folder.id)}
-                    className="study-folder-sheet study-folder-sheet--note flex items-center justify-center text-xs text-muted-foreground"
-                    style={{ top: "0.7rem" }}
-                  >
-                    Add a note
-                  </button>
+                  <>
+                    <div className="study-folder-sheet study-folder-sheet--ghost" style={{ top: "2.85rem", transform: "rotate(1.4deg)" }} />
+                    <div className="study-folder-sheet study-folder-sheet--ghost" style={{ top: "1.55rem", transform: "rotate(-0.6deg)", opacity: 0.75 }} />
+                    <button
+                      type="button"
+                      onClick={() => onCreateNote(folder.id)}
+                      className="study-folder-sheet study-folder-sheet--note flex items-center justify-center text-xs text-muted-foreground"
+                      style={{ top: "0.7rem" }}
+                    >
+                      Add a note
+                    </button>
+                  </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => onOpenNote(sheets[0].id)}
-                    className="study-folder-sheet study-folder-sheet--note text-left"
-                    style={{ top: "0.7rem" }}
-                  >
-                    <p className="truncate text-xs font-medium">{sheets[0].title || "Untitled note"}</p>
-                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-                      {studyDocPlainText(sheets[0].content) || "Empty note"}
-                    </p>
-                  </button>
+                  <>
+                    <div className="study-folder-sheet study-folder-sheet--ghost" style={{ top: "3.2rem", transform: "rotate(1.8deg)" }} />
+                    {sheets.map((note, index) => (
+                      <button
+                        key={note.id}
+                        type="button"
+                        onClick={() => onOpenNote(note.id)}
+                        className="study-folder-sheet study-folder-sheet--note text-left"
+                        style={{
+                          top: `${0.55 + index * 1.9}rem`,
+                          transform: `rotate(${index === 0 ? -1.5 : 1.3}deg)`,
+                          zIndex: 3 + index,
+                        }}
+                      >
+                        <p className="truncate text-xs font-semibold text-foreground/90">{note.title || "Untitled note"}</p>
+                        <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+                          {studyDocPlainText(note.content) || "Empty note"}
+                        </p>
+                      </button>
+                    ))}
+                  </>
                 )}
               </div>
             </article>

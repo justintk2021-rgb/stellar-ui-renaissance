@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import type { JSONContent } from "@tiptap/core";
 import type { Trade } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
-import { useStudyMutations, useStudyTree } from "@/hooks/useStudyArea";
+import { useStudyMutations, useStudyTree, type StudyFolder, type StudyNote } from "@/hooks/useStudyArea";
 import { STUDY_FOLDER_COLORS, type StudyCategory } from "@/lib/studyArea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,53 @@ import { AnimatePresence, motion } from "@/lib/motion";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+function previewParagraph(text: string): JSONContent {
+  return { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text }] }] };
+}
+
+/** Local-only sample tree so marketing screenshots can show stacked folder cards. */
+function marketingPreviewTree(category: StudyCategory): { folders: StudyFolder[]; notes: StudyNote[] } | null {
+  if (!import.meta.env.DEV || typeof window === "undefined") return null;
+  if (new URLSearchParams(window.location.search).get("preview") !== "marketing") return null;
+  const now = new Date().toISOString();
+  const folder = (id: string, name: string, color: string, sort: number): StudyFolder => ({
+    id: `${category}-${id}`,
+    user_id: "preview",
+    parent_id: null,
+    name,
+    category,
+    color,
+    sort_order: sort,
+    updated_at: now,
+  });
+  const note = (id: string, title: string, folderId: string | null, text: string): StudyNote => ({
+    id: `${category}-${id}`,
+    user_id: "preview",
+    folder_id: folderId,
+    title,
+    category,
+    content: previewParagraph(text),
+    updated_at: now,
+  });
+  const prefix = category === "collaborative" ? "Shared " : category === "case" ? "Case " : "";
+  return {
+    folders: [
+      folder("f1", `${prefix}Setups`, "hsl(217 91% 60%)", 0),
+      folder("f2", `${prefix}Reviews`, "hsl(262 83% 58%)", 1),
+      folder("f3", `${prefix}Playbook`, "hsl(142 71% 45%)", 2),
+    ],
+    notes: [
+      note("n1", "London open checklist", `${category}-f1`, "Mark Asia range, wait for the sweep, then take the displacement."),
+      note("n2", "EURUSD bias", `${category}-f1`, "Daily is still discount. Only take longs against the prior week high."),
+      note("n3", "Friday recap", `${category}-f2`, "Cut size after two losses. The afternoon session was cleaner."),
+      note("n4", "Risk notes", `${category}-f2`, "Cap the day at one R if the first trade is a scratch."),
+      note("n5", "A+ model", `${category}-f3`, "Sweep, displacement, FVG retest. Skip if news is inside 15 minutes."),
+      note("n6", "Quick thought", null, "The 9:30 spike is not a setup by itself."),
+      note("n7", "Session reminder", null, "No trades into the New York lunch chop."),
+    ],
+  };
+}
 
 export function StudyArea({
   userId,
@@ -36,8 +84,11 @@ export function StudyArea({
   const [folderOpen, setFolderOpen] = useState(false);
   const [folderName, setFolderName] = useState("");
   const [folderColor, setFolderColor] = useState("");
-  const folders = (tree.data?.folders ?? []).filter((folder) => folder.category === category);
-  const notes = (tree.data?.notes ?? []).filter((note) => note.category === category);
+  const liveFolders = (tree.data?.folders ?? []).filter((folder) => folder.category === category);
+  const liveNotes = (tree.data?.notes ?? []).filter((note) => note.category === category);
+  const preview = liveFolders.length === 0 && liveNotes.length === 0 ? marketingPreviewTree(category) : null;
+  const folders = preview?.folders ?? liveFolders;
+  const notes = preview?.notes ?? liveNotes;
   const selected = notes.find((note) => note.id === selectedId) ?? null;
 
   useEffect(() => {
