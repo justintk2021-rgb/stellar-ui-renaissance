@@ -42,9 +42,9 @@ export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank =
             </button>
           )}
         </h2>
-        {!showGreeting && (
+        {!showGreeting && subtitle ? (
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">{subtitle}</p>
-        )}
+        ) : null}
       </div>
       {centerSlot ? <div className="flex justify-center">{centerSlot}</div> : null}
       <div className={cn("flex items-center gap-2 sm:gap-3 flex-wrap", centerSlot ? "sm:justify-end" : "sm:justify-end")}>

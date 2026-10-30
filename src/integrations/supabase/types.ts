@@ -1075,6 +1075,7 @@ export type Database = {
       study_folders: {
         Row: {
           created_at: string
+          color: string | null
           id: string
           name: string
           category: string
@@ -1085,6 +1086,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          color?: string | null
           id?: string
           name: string
           category?: string
@@ -1095,6 +1097,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          color?: string | null
           id?: string
           name?: string
           category?: string

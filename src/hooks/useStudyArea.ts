@@ -11,7 +11,9 @@ export interface StudyFolder {
   parent_id: string | null;
   name: string;
   category: string;
+  color: string | null;
   sort_order: number;
+  updated_at?: string;
 }
 
 export interface StudyNote {
@@ -32,24 +34,29 @@ export interface StudyMention {
 
 async function loadTree(userId: string): Promise<{ folders: StudyFolder[]; notes: StudyNote[] }> {
   const full = await Promise.all([
-    supabase.from("study_folders").select("id, user_id, parent_id, name, category, sort_order").eq("user_id", userId).order("sort_order"),
+    supabase.from("study_folders").select("id, user_id, parent_id, name, category, color, sort_order, updated_at").eq("user_id", userId).order("sort_order"),
     supabase.from("study_notes").select("id, user_id, folder_id, title, category, content, updated_at").eq("user_id", userId).order("updated_at", { ascending: false }),
   ]);
   const foldersResult = full[0].error
-    ? await supabase.from("study_folders").select("id, user_id, parent_id, name, sort_order").eq("user_id", userId).order("sort_order")
+    ? await supabase.from("study_folders").select("id, user_id, parent_id, name, category, sort_order, updated_at").eq("user_id", userId).order("sort_order")
     : full[0];
+  const foldersFallback = foldersResult.error
+    ? await supabase.from("study_folders").select("id, user_id, parent_id, name, sort_order").eq("user_id", userId).order("sort_order")
+    : foldersResult;
   const notesResult = full[1].error
     ? await supabase.from("study_notes").select("id, user_id, folder_id, title, content, updated_at").eq("user_id", userId).order("updated_at", { ascending: false })
     : full[1];
-  if (foldersResult.error) throw foldersResult.error;
+  if (foldersFallback.error) throw foldersFallback.error;
   if (notesResult.error) throw notesResult.error;
   return {
-    folders: (foldersResult.data ?? []).map((folder) => ({
+    folders: (foldersFallback.data ?? []).map((folder) => ({
       id: folder.id,
       user_id: folder.user_id,
       parent_id: folder.parent_id,
       name: folder.name,
       sort_order: folder.sort_order,
+      updated_at: "updated_at" in folder && typeof folder.updated_at === "string" ? folder.updated_at : undefined,
+      color: "color" in folder && typeof folder.color === "string" && folder.color ? folder.color : null,
       category: "category" in folder && typeof folder.category === "string" && folder.category ? folder.category : "individual",
     })),
     notes: (notesResult.data ?? []).map((note) => ({
@@ -108,13 +115,18 @@ export function useStudyMutations(userId: string | undefined) {
   const invalidate = useInvalidate(userId);
 
   const createFolder = useMutation({
-    mutationFn: async (input: { name: string; parentId: string | null; category: string }) => {
-      const { error } = await supabase.from("study_folders").insert({
+    mutationFn: async (input: { name: string; parentId: string | null; category: string; color?: string | null }) => {
+      const payload = {
         user_id: userId!,
         name: input.name,
         parent_id: input.parentId,
         category: input.category,
-      });
+        color: input.color ?? null,
+      };
+      const withColor = await supabase.from("study_folders").insert(payload);
+      if (!withColor.error) return;
+      const { color: _color, ...withoutColor } = payload;
+      const { error } = await supabase.from("study_folders").insert(withoutColor);
       if (error) throw error;
     },
     onSuccess: invalidate,

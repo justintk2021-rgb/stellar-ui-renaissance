@@ -10,6 +10,22 @@ export const STUDY_CATEGORIES: { id: StudyCategory; label: string }[] = [
   { id: "case", label: "Case" },
 ];
 
+export const STUDY_FOLDER_COLORS = [
+  { id: "primary", value: "" },
+  { id: "red", value: "hsl(0 84% 60%)" },
+  { id: "orange", value: "hsl(25 95% 53%)" },
+  { id: "yellow", value: "hsl(48 96% 53%)" },
+  { id: "green", value: "hsl(142 71% 45%)" },
+  { id: "blue", value: "hsl(217 91% 60%)" },
+  { id: "purple", value: "hsl(262 83% 58%)" },
+  { id: "pink", value: "hsl(330 81% 60%)" },
+  { id: "cyan", value: "hsl(186 94% 41%)" },
+] as const;
+
+export function studyFolderColor(color?: string | null): string {
+  return color?.trim() || "hsl(var(--primary))";
+}
+
 const YOUTUBE_ID = "([A-Za-z0-9_-]{11})";
 const YOUTUBE_URL = new RegExp(
   `^(?:https?:\\/\\/)?(?:www\\.)?(?:youtube\\.com\\/(?:watch\\?(?:[^\\s]*&)?v=|embed\\/|shorts\\/)|youtu\\.be\\/)${YOUTUBE_ID}(?:[&?#].*)?$`,

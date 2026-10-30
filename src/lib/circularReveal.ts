@@ -2,6 +2,8 @@ import { flushSync } from "react-dom";
 
 let revealRunning = false;
 let revealAnimation: Animation | null = null;
+let revealTimeout = 0;
+let activeTransition: { skipTransition?: () => void } | null = null;
 
 function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -24,16 +26,39 @@ function circleClipPaths(x: number, y: number): [string, string] {
   ];
 }
 
-/** Circle clip-path reveal used by the theme toggle. */
+function clearStuckReveal(): void {
+  window.clearTimeout(revealTimeout);
+  revealTimeout = 0;
+  revealRunning = false;
+  revealAnimation?.cancel();
+  revealAnimation = null;
+  try {
+    activeTransition?.skipTransition?.();
+  } catch {
+    // The view transition may already have finished.
+  }
+  activeTransition = null;
+  const root = document.documentElement;
+  delete root.dataset.magicuiThemeVt;
+  root.style.removeProperty("--magicui-theme-toggle-vt-duration");
+  root.style.removeProperty("--magicui-theme-vt-clip-from");
+  root.style.removeProperty("clip-path");
+}
+
+/** Circle clip-path reveal used by the notebook / Study Area switch. */
 export function circularReveal(
-  origin: { x: number; y: number },
+  origin: { x: number, y: number },
   applyChange: () => void,
   options?: { duration?: number },
 ): void {
   const duration = options?.duration ?? 520;
   const root = document.documentElement;
 
-  if (revealRunning || root.dataset.magicuiThemeVt === "active") return;
+  if (revealRunning || root.dataset.magicuiThemeVt === "active") {
+    clearStuckReveal();
+    applyChange();
+    return;
+  }
 
   if (prefersReducedMotion() || typeof document.startViewTransition !== "function") {
     applyChange();
@@ -45,33 +70,23 @@ export function circularReveal(
   root.style.setProperty("--magicui-theme-toggle-vt-duration", `${duration}ms`);
   root.style.setProperty("--magicui-theme-vt-clip-from", clipPath[0]);
 
-  const cleanup = () => {
-    revealRunning = false;
-    revealAnimation?.cancel();
-    revealAnimation = null;
-    delete root.dataset.magicuiThemeVt;
-    root.style.removeProperty("--magicui-theme-toggle-vt-duration");
-    root.style.removeProperty("--magicui-theme-vt-clip-from");
-  };
-
   revealRunning = true;
+  revealTimeout = window.setTimeout(clearStuckReveal, duration + 280);
+
   let transition: ReturnType<NonNullable<Document["startViewTransition"]>>;
   try {
     transition = document.startViewTransition(() => {
       flushSync(applyChange);
     });
+    activeTransition = transition;
   } catch {
-    cleanup();
+    clearStuckReveal();
     applyChange();
     return;
   }
 
-  window.setTimeout(cleanup, duration + 400);
-
   if (typeof transition?.finished?.finally === "function") {
-    transition.finished.finally(cleanup).catch(cleanup);
-  } else {
-    cleanup();
+    transition.finished.finally(clearStuckReveal).catch(clearStuckReveal);
   }
 
   const ready = transition?.ready;
@@ -87,9 +102,10 @@ export function circularReveal(
             pseudoElement: "::view-transition-new(root)",
           },
         );
+        revealAnimation.addEventListener("finish", clearStuckReveal);
       })
-      .catch(cleanup);
+      .catch(clearStuckReveal);
   } else {
-    cleanup();
+    clearStuckReveal();
   }
 }

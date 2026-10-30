@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import type { Trade } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { useStudyMutations, useStudyTree } from "@/hooks/useStudyArea";
-import type { StudyCategory } from "@/lib/studyArea";
+import { STUDY_FOLDER_COLORS, type StudyCategory } from "@/lib/studyArea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StudyEditor } from "./StudyEditor";
 import { StudyHome } from "./StudyHome";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function StudyArea({
   userId,
@@ -32,11 +34,10 @@ export function StudyArea({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [folderOpen, setFolderOpen] = useState(false);
   const [folderName, setFolderName] = useState("");
-  const [renameId, setRenameId] = useState<string | null>(null);
+  const [folderColor, setFolderColor] = useState("");
   const folders = (tree.data?.folders ?? []).filter((folder) => folder.category === category);
   const notes = (tree.data?.notes ?? []).filter((note) => note.category === category);
   const selected = notes.find((note) => note.id === selectedId) ?? null;
-  const currentFolder = selected?.folder_id ?? null;
 
   useEffect(() => {
     setSelectedId(null);
@@ -49,9 +50,9 @@ export function StudyArea({
   }, [focusNoteId, onFocusHandled]);
 
   return (
-    <div key={category} className="min-h-[calc(100vh-10rem)]">
+    <div className="min-h-[calc(100vh-10rem)]">
       {selected && userId ? (
-        <section className="notebook-panel min-h-[520px] rounded-2xl p-5 sm:p-6">
+        <section className="study-glass min-h-[520px] rounded-2xl p-5 sm:p-6">
           <button type="button" onClick={() => setSelectedId(null)} className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
             Back
@@ -69,27 +70,57 @@ export function StudyArea({
       ) : tree.isError ? (
         <p className="text-sm text-muted-foreground">Study Area is not available until the new tables are created.</p>
       ) : (
-        <StudyHome
-          displayName={displayName}
-          folders={folders}
-          notes={notes}
-          onOpenNote={setSelectedId}
-          onCreateNote={(folderId) => { if (!userId) return; void mutations.createNote.mutateAsync({ folderId, category }).then(setSelectedId); }}
-          onCreateFolder={() => { setRenameId(null); setFolderName(""); setFolderOpen(true); }}
-          onMoveNote={(id, folderId) => mutations.moveNote.mutate({ id, folderId })}
-        />
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={category}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <StudyHome
+              displayName={displayName}
+              folders={folders}
+              notes={notes}
+              onOpenNote={setSelectedId}
+              onCreateNote={(folderId) => { if (!userId) return; void mutations.createNote.mutateAsync({ folderId, category }).then(setSelectedId); }}
+              onCreateFolder={() => { setFolderName(""); setFolderColor(""); setFolderOpen(true); }}
+            />
+          </motion.div>
+        </AnimatePresence>
       )}
       <Dialog open={folderOpen} onOpenChange={setFolderOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{renameId ? "Rename folder" : "New folder"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>New folder</DialogTitle></DialogHeader>
           <Input value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="Folder name" className="mt-2" />
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">Color</p>
+            <div className="flex flex-wrap gap-2">
+              {STUDY_FOLDER_COLORS.map((swatch) => {
+                const value = swatch.value;
+                const selectedColor = folderColor === value;
+                return (
+                  <button
+                    key={swatch.id}
+                    type="button"
+                    aria-label={swatch.id}
+                    onClick={() => setFolderColor(value)}
+                    className={cn(
+                      "h-7 w-7 rounded-full border border-border/60",
+                      selectedColor && "ring-2 ring-foreground/70 ring-offset-2 ring-offset-background",
+                    )}
+                    style={{ background: value || "hsl(var(--primary))" }}
+                  />
+                );
+              })}
+            </div>
+          </div>
           <DialogFooter className="mt-4">
             <Button type="button" variant="outline" onClick={() => setFolderOpen(false)}>Cancel</Button>
             <Button type="button" onClick={() => {
               const name = folderName.trim();
               if (!name || !userId) return;
-              if (renameId) mutations.renameFolder.mutate({ id: renameId, name });
-              else mutations.createFolder.mutate({ name, parentId: currentFolder, category });
+              mutations.createFolder.mutate({ name, parentId: null, category, color: folderColor || null });
               setFolderOpen(false);
             }}>Save folder</Button>
           </DialogFooter>
