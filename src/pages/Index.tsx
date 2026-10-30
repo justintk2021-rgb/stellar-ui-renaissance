@@ -59,9 +59,10 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
-import { LoadingScreen } from "@/components/Layout/LoadingScreen";
+import { DashboardGreeting, DASHBOARD_LOCK_KEY, dashboardDisplayName } from "@/components/Dashboard/DashboardGreeting";
 import { AnimatePresence, motion } from "@/lib/motion";
-import { RefreshCw } from "lucide-react";
+import { Lock, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const PageFallback = () => (
   <div className="flex items-center justify-center min-h-[40vh]">
@@ -112,10 +113,15 @@ const Index = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(isMarketingPreview);
   const [authReady, setAuthReady] = useState(isMarketingPreview);
-  // Post-login boot screen: stays up until the initial data has loaded so the
-  // dashboard appears fully populated instead of popping in piece by piece.
-  const [bootComplete, setBootComplete] = useState(isMarketingPreview);
-  const bootStartRef = useRef<number>(Date.now());
+  const [locked, setLocked] = useState(() => {
+    if (isMarketingPreview) return false;
+    try {
+      return sessionStorage.getItem(DASHBOARD_LOCK_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [entryDismissed, setEntryDismissed] = useState(isMarketingPreview);
   const [currentPage, setCurrentPage] = useState(() => {
     if (isMarketingPreview) {
       const page = new URLSearchParams(window.location.search).get("page");
@@ -170,23 +176,6 @@ const Index = () => {
     clearAllTrades, 
     importTrades 
   } = useTrades(user?.id, selectedBrokerAccountId ? null : selectedAccountId, selectedBrokerAccountId);
-
-  // Dismiss the boot screen once auth + initial data are ready (min 1.2s so
-  // the transition feels intentional, max 8s failsafe so it can never hang).
-  useEffect(() => {
-    if (bootComplete || !authReady || !session) return;
-    if (tradesLoading || accountsLoading) return;
-    const MIN_BOOT_MS = 1200;
-    const elapsed = Date.now() - bootStartRef.current;
-    const t = setTimeout(() => setBootComplete(true), Math.max(0, MIN_BOOT_MS - elapsed));
-    return () => clearTimeout(t);
-  }, [bootComplete, authReady, session, tradesLoading, accountsLoading]);
-
-  useEffect(() => {
-    if (bootComplete) return;
-    const t = setTimeout(() => setBootComplete(true), 8000);
-    return () => clearTimeout(t);
-  }, [bootComplete]);
 
   // Auto-sync with broker - throttled to once per 60s, runs in background
   const lastSyncRef = useRef<number>(0);
@@ -618,6 +607,11 @@ const Index = () => {
   }, [navigate, fetchProfile]);
 
   const handleLogout = async () => {
+    try {
+      sessionStorage.removeItem(DASHBOARD_LOCK_KEY);
+    } catch {
+      // Ignore storage failures and still sign out.
+    }
     const { error } = await supabase.auth.signOut();
     if (error) {
       toast.error(error.message);
@@ -757,8 +751,42 @@ const Index = () => {
     ? brokerDayTotals.get(todayKey)
     : undefined;
 
+  const displayName = dashboardDisplayName(userProfile, user);
+  const showEntry = !entryDismissed && !locked;
+  const showGreetingOverlay = showEntry || locked;
+
+  const lockDashboard = useCallback(() => {
+    try {
+      sessionStorage.setItem(DASHBOARD_LOCK_KEY, "1");
+    } catch {
+      // The overlay still locks this view if storage is unavailable.
+    }
+    setLocked(true);
+  }, []);
+
+  const dismissGreeting = useCallback(() => {
+    if (locked) {
+      try {
+        sessionStorage.removeItem(DASHBOARD_LOCK_KEY);
+      } catch {
+        // Clearing storage is best-effort; the in-memory lock still lifts.
+      }
+      setLocked(false);
+    }
+    setEntryDismissed(true);
+  }, [locked]);
+
   if (!authReady || !session) {
-    return <LoadingScreen />;
+    return (
+      <DashboardGreeting
+        variant="entry"
+        name={displayName}
+        nameReady={profileLoaded}
+        dataReady={false}
+        hold
+        onDismiss={() => {}}
+      />
+    );
   }
 
   // Chart page uses full-width layout
@@ -771,8 +799,18 @@ const Index = () => {
         <meta name="description" content="Track your trades, analyze performance, and keep detailed notes with NSYNC Journal - your personal trading journal." />
       </Helmet>
 
-      {/* Boot overlay — app mounts and loads underneath, then this fades out */}
-      <AnimatePresence>{!bootComplete && <LoadingScreen />}</AnimatePresence>
+      {/* Greeting overlay — dashboard stays mounted underneath */}
+      <AnimatePresence>
+        {showGreetingOverlay && (
+          <DashboardGreeting
+            variant={locked ? "lock" : "entry"}
+            name={displayName}
+            nameReady={profileLoaded}
+            dataReady={!tradesLoading && !accountsLoading}
+            onDismiss={dismissGreeting}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Global Sidebar - works for all pages */}
       <Sidebar 
@@ -819,11 +857,18 @@ const Index = () => {
                 onThemeChange={handleThemeChange}
                 trades={trades}
                 showRank={currentPage === 'dashboard'}
-                showGreeting={currentPage === 'dashboard'}
-                greetingName={userProfile?.first_name || null}
-                profileReady={profileLoaded}
                 rightSlot={currentPage === 'dashboard' ? (
                   <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={lockDashboard}
+                      aria-label="Lock dashboard"
+                      className="h-9 w-9 rounded-full"
+                    >
+                      <Lock className="h-4 w-4" />
+                    </Button>
                     <AccountSelector
                       accounts={accounts}
                       selectedAccount={selectedAccount}
