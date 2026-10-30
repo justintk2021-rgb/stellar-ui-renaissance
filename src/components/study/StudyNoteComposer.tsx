@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { JSONContent } from "@tiptap/core";
 import { BookOpen, Clapperboard, FileText, Link2, Upload } from "lucide-react";
 import type { Trade } from "@/types/trade";
@@ -34,8 +35,13 @@ export function StudyNoteComposer({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
   }, [onClose]);
 
   const journalTrades = useMemo(() => {
@@ -86,8 +92,8 @@ export function StudyNoteComposer({
     reader.readAsDataURL(file);
   };
 
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/45 p-4 backdrop-blur-xl" onMouseDown={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-background/55 p-4 backdrop-blur-2xl" onMouseDown={onClose}>
       <div
         role="dialog"
         aria-modal="true"
@@ -200,7 +206,8 @@ export function StudyNoteComposer({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
