@@ -857,9 +857,6 @@ const Index = () => {
                 onThemeChange={handleThemeChange}
                 trades={trades}
                 showRank={currentPage === 'dashboard'}
-                showGreeting={currentPage === 'dashboard'}
-                greetingName={userProfile?.first_name || null}
-                profileReady={profileLoaded}
                 rightSlot={currentPage === 'dashboard' ? (
                   <div className="flex items-center gap-3">
                     <Button

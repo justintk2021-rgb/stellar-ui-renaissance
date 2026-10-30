@@ -133,7 +133,7 @@ export function DashboardGreeting({
           )
         )}
       </div>
-      {canEnter ? (
+      {canEnter && (
         <motion.p
           initial={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -142,11 +142,6 @@ export function DashboardGreeting({
         >
           Click anywhere to enter
         </motion.p>
-      ) : (
-        <div className="relative" aria-hidden>
-          <div className="boot-spinner" />
-          <div className="boot-spinnerin" />
-        </div>
       )}
     </motion.div>
   );
