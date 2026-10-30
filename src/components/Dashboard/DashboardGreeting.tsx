@@ -62,7 +62,7 @@ export function DashboardGreeting({
   const greeting = greetingForHour(new Date().getHours());
   const line = name ? `${greeting}, ${name}` : greeting;
   const canEnter = !hold && (variant === "lock" || (minElapsed && (dataReady || maxElapsed)));
-  const playGreeting = fontReady && (hold || nameReady);
+  const playGreeting = fontReady && nameReady && !hold;
 
   useEffect(() => {
     let cancelled = false;
@@ -123,9 +123,9 @@ export function DashboardGreeting({
               per="char"
               preset="fade"
               as="h1"
-              delay={0.2}
-              speedReveal={0.55}
-              segmentTransition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              delay={0.5}
+              speedReveal={0.5}
+              segmentTransition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
               className="font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl"
             >
               {line}
