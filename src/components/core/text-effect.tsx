@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { AnimatePresence, motion } from '@/lib/motion';
+import { motion } from 'framer-motion';
 import type {
   TargetAndTransition,
   Transition,
@@ -127,7 +127,7 @@ const AnimationComponent: React.FC<{
         {segment}
       </motion.span>
     ) : (
-      <motion.span className='inline-block whitespace-pre'>
+      <>
         {segment.split('').map((char, charIndex) => (
           <motion.span
             key={`char-${charIndex}`}
@@ -135,10 +135,10 @@ const AnimationComponent: React.FC<{
             variants={variants}
             className='inline-block whitespace-pre'
           >
-            {char}
+            {char === ' ' ? '\u00A0' : char}
           </motion.span>
         ))}
-      </motion.span>
+      </>
     );
 
   if (!segmentWrapperClassName) {
@@ -261,30 +261,25 @@ export function TextEffect({
   };
 
   return (
-    <AnimatePresence mode='popLayout'>
-      {trigger && (
-        <MotionTag
-          initial='hidden'
-          animate='visible'
-          exit='exit'
-          variants={computedVariants.container}
-          className={className}
-          onAnimationComplete={onAnimationComplete}
-          onAnimationStart={onAnimationStart}
-          style={style}
-        >
-          {per !== 'line' ? <span className='sr-only'>{children}</span> : null}
-          {segments.map((segment, index) => (
-            <AnimationComponent
-              key={`${per}-${index}-${segment}`}
-              segment={segment}
-              variants={computedVariants.item}
-              per={per}
-              segmentWrapperClassName={segmentWrapperClassName}
-            />
-          ))}
-        </MotionTag>
-      )}
-    </AnimatePresence>
+    <MotionTag
+      initial='hidden'
+      animate={trigger ? 'visible' : 'hidden'}
+      variants={computedVariants.container}
+      className={className}
+      onAnimationComplete={onAnimationComplete}
+      onAnimationStart={onAnimationStart}
+      style={style}
+    >
+      {per !== 'line' ? <span className='sr-only'>{children}</span> : null}
+      {segments.map((segment, index) => (
+        <AnimationComponent
+          key={`${per}-${index}-${segment}`}
+          segment={segment}
+          variants={computedVariants.item}
+          per={per}
+          segmentWrapperClassName={segmentWrapperClassName}
+        />
+      ))}
+    </MotionTag>
   );
 }

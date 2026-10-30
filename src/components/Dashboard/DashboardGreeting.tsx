@@ -123,7 +123,9 @@ export function DashboardGreeting({
               per="char"
               preset="fade"
               as="h1"
-              delay={0.9}
+              delay={0.2}
+              speedReveal={0.55}
+              segmentTransition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
               className="font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl"
             >
               {line}
