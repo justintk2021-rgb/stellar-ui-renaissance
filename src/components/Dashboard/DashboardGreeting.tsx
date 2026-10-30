@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { motion, useReducedMotion } from "@/lib/motion";
-import { TextEffect } from "@/components/core/text-effect";
+import { TextAnimate } from "@/registry/magicui/text-animate";
 import { loadGreetingFont } from "@/lib/greetingFont";
 
 export const DASHBOARD_LOCK_KEY = "nsync-dashboard-locked";
@@ -118,18 +118,17 @@ export function DashboardGreeting({
               {line}
             </h1>
           ) : (
-            <TextEffect
+            <TextAnimate
               key={line}
-              per="char"
-              preset="fade"
+              animation="blurInUp"
+              by="character"
+              once
               as="h1"
-              delay={0.5}
-              speedReveal={0.5}
-              segmentTransition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              startOnView={false}
               className="font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl"
             >
               {line}
-            </TextEffect>
+            </TextAnimate>
           )
         )}
       </div>
