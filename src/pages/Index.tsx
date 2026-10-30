@@ -537,6 +537,7 @@ const Index = () => {
   const handlePageChange = useCallback((page: string) => {
     closeCompareView();
     setCurrentPage(page);
+    if (page === "notebook") setNotebookView("notebook");
   }, [closeCompareView]);
 
   const handleOpenJournal = useCallback((target: OpenJournalTarget) => {

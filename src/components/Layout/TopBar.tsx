@@ -28,7 +28,7 @@ export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank =
       "flex flex-col gap-3 pb-3 sm:pb-4 mb-4 sm:mb-6 sm:gap-4",
       centerSlot ? "sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center" : "sm:flex-row sm:items-end sm:justify-between",
     )}>
-      <div className="min-w-0">
+      <div className="relative z-20 min-w-0 overflow-visible">
         {showGreeting && <Greeting name={greetingName} profileReady={profileReady} />}
         <h2 className={cn("group/title relative inline-flex max-w-full items-baseline", showGreeting && "mt-4 sm:mt-5")}>
           <span className="text-lg sm:text-xl font-semibold tracking-wide truncate">{title}</span>
@@ -36,7 +36,7 @@ export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank =
             <button
               type="button"
               onClick={(event) => titleSwitch.onSelect(event)}
-              className="absolute left-full top-0 ml-3 origin-left translate-y-1 scale-90 whitespace-nowrap text-lg font-semibold tracking-wide text-primary opacity-0 pointer-events-none transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/title:translate-y-0 group-hover/title:scale-100 group-hover/title:opacity-100 group-hover/title:pointer-events-auto focus-visible:translate-y-0 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:pointer-events-auto focus-visible:outline-none sm:text-xl"
+              className="absolute left-0 top-full z-30 mt-1 whitespace-nowrap text-lg font-semibold tracking-wide text-primary opacity-0 translate-y-1 scale-90 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/title:translate-y-0 group-hover/title:scale-100 group-hover/title:opacity-100 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:scale-100 [@media(hover:none)]:opacity-100 focus-visible:translate-y-0 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none sm:text-xl"
             >
               {titleSwitch.label}
             </button>
