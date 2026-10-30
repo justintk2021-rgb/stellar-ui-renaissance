@@ -1057,6 +1057,41 @@
     inset 0 1px 0 hsl(0 0% 100% / 0.06);
 }
 
+.notebook-theme {
+  padding: 2px;
+}
+
+.notebook-theme button {
+  border: 1px solid hsl(var(--border) / 0.9);
+  background-color: hsl(var(--card) / 0.92);
+  color: hsl(var(--foreground));
+}
+
+.notebook-theme button:hover {
+  border-color: hsl(var(--primary) / 0.45);
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.notebook-theme button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.notebook-theme .notebook-panel {
+  margin-bottom: 0.25rem;
+}
+
+.study-prose p {
+  margin: 0.4rem 0;
+}
+
+.study-prose h2 {
+  margin: 0.9rem 0 0.35rem;
+  font-size: 1.3rem;
+  font-weight: 650;
+}
+
 .animate-shimmer {
   background: linear-gradient(
     90deg,

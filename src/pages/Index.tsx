@@ -43,7 +43,7 @@ const TradeTable = lazy(() => import("@/components/Journal/TradeTable").then(m =
 const CompareView = lazy(() => import("@/components/Journal/CompareView").then(m => ({ default: m.CompareView })));
 
 // Lazy-load heavy/secondary pages so the dashboard paints instantly.
-const NotebookView = lazy(() => import("@/components/Notebook/NotebookView").then(m => ({ default: m.NotebookView })));
+const NotebookView = lazy(() => import("@/components/Notebook/NotebookSection").then(m => ({ default: m.NotebookSection })));
 const SettingsView = lazy(() => import("@/components/Settings/SettingsView").then(m => ({ default: m.SettingsView })));
 const CustomChart = lazy(() => import("@/components/Chart/CustomChart").then(m => ({ default: m.CustomChart })));
 const PlaybookView = lazy(() => import("@/components/Playbook/PlaybookView").then(m => ({ default: m.PlaybookView })));
@@ -420,6 +420,7 @@ const Index = () => {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
+  const [focusStudyNoteId, setFocusStudyNoteId] = useState<string | null>(null);
   const [journalFilter, setJournalFilter] = useState<JournalFilter>('all');
   const [journalDateRange, setJournalDateRange] = useState<{ start: Date; end: Date } | null>(null);
   const [journalFocusTradeId, setJournalFocusTradeId] = useState<string | null>(null);
@@ -1071,6 +1072,10 @@ const Index = () => {
                               }}
                               onDelete={handleDeleteTrade}
                               onSelectForNotebook={handleSelectForNotebook}
+                              onOpenStudyNote={(noteId) => {
+                                setFocusStudyNoteId(noteId);
+                                setCurrentPage("notebook");
+                              }}
                               onOpenPlaybook={() => setCurrentPage('playbook')}
                               onUpdateTrade={async (id, updates) => {
                                 await updateTrade(id, updates);
@@ -1159,6 +1164,8 @@ const Index = () => {
                       }}
                       notebookFont={notebookFont}
                       onFontChange={setNotebookFont}
+                      focusStudyNoteId={focusStudyNoteId}
+                      onStudyFocusHandled={() => setFocusStudyNoteId(null)}
                     />
                   </Suspense>
                 </PageTransition>
