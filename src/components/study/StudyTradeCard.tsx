@@ -12,12 +12,16 @@ export function StudyTradeCard({
   playbooks,
   active = false,
   onSelect,
+  onOpenJournal,
+  onOpenPlaybook,
 }: {
   tradeId: string;
   trades: Trade[];
   playbooks: StudyPlaybook[];
   active?: boolean;
   onSelect?: () => void;
+  onOpenJournal?: (tradeId: string) => void;
+  onOpenPlaybook?: (playbookId: string | null) => void;
 }) {
   const trade = trades.find((item) => item.id === tradeId);
   if (!trade) {
@@ -68,8 +72,22 @@ export function StudyTradeCard({
     );
   }
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/80 px-3 py-2.5">
-      {body}
+    <div className="rounded-xl border border-border/50 bg-card/80 px-3 py-2.5">
+      <div className="flex items-center gap-3">{body}</div>
+      {onOpenJournal || onOpenPlaybook ? (
+        <div className="mt-2 flex gap-3 pl-9 text-[11px]">
+          {onOpenJournal ? (
+            <button type="button" onClick={() => onOpenJournal(trade.id)} className="text-primary hover:underline">
+              Open in journal
+            </button>
+          ) : null}
+          {onOpenPlaybook ? (
+            <button type="button" onClick={() => onOpenPlaybook(trade.checklistId ?? null)} className="text-primary hover:underline">
+              Open playbook
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

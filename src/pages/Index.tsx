@@ -1219,6 +1219,11 @@ const Index = () => {
                       view={notebookView}
                       category={studyCategory}
                       displayName={displayName}
+                      onOpenStudyJournal={(tradeId) => {
+                        setJournalFocusTradeId(tradeId);
+                        setCurrentPage("journal");
+                      }}
+                      onOpenStudyPlaybook={() => setCurrentPage("playbook")}
                     />
                   </Suspense>
                 </PageTransition>

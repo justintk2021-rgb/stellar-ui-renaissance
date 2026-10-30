@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StudyEditor } from "./StudyEditor";
 import { StudyHome } from "./StudyHome";
+import { StudyNoteComposer } from "./StudyNoteComposer";
 import { AnimatePresence, motion } from "@/lib/motion";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,8 @@ export function StudyArea({
   onFocusHandled,
   category,
   displayName,
+  onOpenJournal,
+  onOpenPlaybook,
 }: {
   userId?: string;
   trades: Trade[];
@@ -75,6 +78,8 @@ export function StudyArea({
   onFocusHandled?: () => void;
   category: StudyCategory;
   displayName?: string;
+  onOpenJournal?: (tradeId: string) => void;
+  onOpenPlaybook?: (playbookId: string | null) => void;
 }) {
   const tree = useStudyTree(userId);
   const mutations = useStudyMutations(userId);
@@ -82,6 +87,7 @@ export function StudyArea({
   const playbooks = useMemo(() => checklists.map((item) => ({ id: item.id, name: item.name })), [checklists]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [folderOpen, setFolderOpen] = useState(false);
+  const [composerFolderId, setComposerFolderId] = useState<string | null | undefined>(undefined);
   const [folderName, setFolderName] = useState("");
   const [folderColor, setFolderColor] = useState("");
   const liveFolders = (tree.data?.folders ?? []).filter((folder) => folder.category === category);
@@ -130,6 +136,8 @@ export function StudyArea({
             trades={trades}
             playbooks={playbooks}
             onSave={async (input) => { await mutations.saveNote.mutateAsync({ id: selected.id, ...input }); }}
+            onOpenJournal={onOpenJournal}
+            onOpenPlaybook={onOpenPlaybook}
           />
         </section>
       ) : (
@@ -151,17 +159,29 @@ export function StudyArea({
                   toast.error("Sign in to create a note.");
                   return;
                 }
-                void mutations.createNote.mutateAsync({ folderId, category })
-                  .then(setSelectedId)
-                  .catch((error: unknown) => {
-                    toast.error(error instanceof Error ? error.message : "Could not create the note.");
-                  });
+                setComposerFolderId(folderId);
               }}
               onCreateFolder={() => { setFolderName("Untitled folder"); setFolderColor(""); setFolderOpen(true); }}
             />
           </motion.div>
         </AnimatePresence>
       )}
+      {composerFolderId !== undefined ? (
+        <StudyNoteComposer
+          trades={trades}
+          playbooks={playbooks}
+          onClose={() => setComposerFolderId(undefined)}
+          onCreate={(input) => {
+            const folderId = composerFolderId ?? null;
+            setComposerFolderId(undefined);
+            void mutations.createNote.mutateAsync({ folderId, category, title: input.title, content: input.content })
+              .then(setSelectedId)
+              .catch((error: unknown) => {
+                toast.error(error instanceof Error ? error.message : "Could not create the note.");
+              });
+          }}
+        />
+      ) : null}
       <Dialog open={folderOpen} onOpenChange={setFolderOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>New folder</DialogTitle></DialogHeader>

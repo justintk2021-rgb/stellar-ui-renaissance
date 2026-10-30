@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { isFolderDescendant, matchSlashTrade, parseYouTubeId, tradeIdsInDoc } from "@/lib/studyArea";
+import { isFolderDescendant, matchSlashTrade, parseYouTubeId, tradeIdsInDoc, videoBlockFromLink } from "@/lib/studyArea";
 
 describe("study area helpers", () => {
   it("reads a YouTube id from common links", () => {
     expect(parseYouTubeId("https://www.youtube.com/watch?v=dQw4w9wgGcQ")).toBe("dQw4w9wgGcQ");
     expect(parseYouTubeId("https://youtu.be/dQw4w9wgGcQ")).toBe("dQw4w9wgGcQ");
     expect(parseYouTubeId("not a link")).toBeNull();
+    expect(videoBlockFromLink("https://youtu.be/dQw4w9wgGcQ")?.attrs).toMatchObject({ videoId: "dQw4w9wgGcQ" });
+    expect(videoBlockFromLink("https://cdn.example.com/clip.mp4")?.attrs).toMatchObject({ src: "https://cdn.example.com/clip.mp4" });
+    expect(videoBlockFromLink("not a link")).toBeNull();
   });
 
   it("collects trade ids stored in the note document", () => {

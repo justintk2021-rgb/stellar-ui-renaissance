@@ -42,6 +42,24 @@ export function parseYouTubeId(text: string): string | null {
   return match?.[1] ?? null;
 }
 
+export function studyDocWith(block: JSONContent): JSONContent {
+  return { type: "doc", content: [block, { type: "paragraph" }] };
+}
+
+export function videoBlockFromLink(raw: string): JSONContent | null {
+  const text = raw.trim();
+  if (!text) return null;
+  const videoId = parseYouTubeId(text);
+  if (videoId) return { type: "studyYoutube", attrs: { videoId, src: null } };
+  try {
+    const url = new URL(text);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return { type: "studyYoutube", attrs: { videoId: null, src: url.toString() } };
+  } catch {
+    return null;
+  }
+}
+
 export function studyDocPlainText(doc: JSONContent | null | undefined): string {
   const parts: string[] = [];
   const visit = (node: JSONContent | undefined) => {

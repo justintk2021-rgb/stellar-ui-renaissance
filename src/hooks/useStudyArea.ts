@@ -235,15 +235,17 @@ export function useStudyMutations(userId: string | undefined) {
   });
 
   const createNote = useMutation({
-    mutationFn: async (input: { folderId: string | null; category: string }) => {
+    mutationFn: async (input: { folderId: string | null; category: string; title?: string; content?: JSONContent }) => {
       if (!userId) throw new Error("Sign in to create a note.");
+      const title = input.title?.trim() || "Untitled note";
+      const content = input.content ?? EMPTY_STUDY_DOC;
       const note: StudyNote = {
         id: newId(),
         user_id: userId,
         folder_id: input.folderId,
-        title: "Untitled note",
+        title,
         category: input.category,
-        content: EMPTY_STUDY_DOC,
+        content,
         updated_at: nowIso(),
       };
       const inserted = await supabase.from("study_notes").insert({
@@ -251,8 +253,8 @@ export function useStudyMutations(userId: string | undefined) {
         user_id: userId,
         folder_id: input.folderId,
         category: input.category,
-        title: note.title,
-        content: EMPTY_STUDY_DOC as Json,
+        title,
+        content: content as Json,
       }).select("id").single();
       if (!inserted.error && inserted.data?.id) note.id = inserted.data.id;
       const tree = currentTree(userId, queryClient);

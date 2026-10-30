@@ -13,6 +13,8 @@ export function NotebookSection({
   displayName,
   focusStudyNoteId,
   onStudyFocusHandled,
+  onOpenStudyJournal,
+  onOpenStudyPlaybook,
   ...notebookProps
 }: NotebookProps & {
   view: "notebook" | "study";
@@ -20,6 +22,8 @@ export function NotebookSection({
   displayName?: string;
   focusStudyNoteId?: string | null;
   onStudyFocusHandled?: () => void;
+  onOpenStudyJournal?: (tradeId: string) => void;
+  onOpenStudyPlaybook?: (playbookId: string | null) => void;
 }) {
   if (view === "notebook") {
     return (
@@ -37,6 +41,8 @@ export function NotebookSection({
       onFocusHandled={onStudyFocusHandled}
       category={category}
       displayName={displayName}
+      onOpenJournal={onOpenStudyJournal}
+      onOpenPlaybook={onOpenStudyPlaybook}
     />
   );
 }

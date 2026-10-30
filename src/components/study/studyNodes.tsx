@@ -5,21 +5,30 @@ import { StudyTradeCard } from "./StudyTradeCard";
 import { useStudyEditorData } from "./studyEditorData";
 
 function TradeNodeView({ node }: ReactNodeViewProps) {
-  const { trades, playbooks } = useStudyEditorData();
+  const { trades, playbooks, onOpenJournal, onOpenPlaybook } = useStudyEditorData();
   const tradeId = String(node.attrs.tradeId || "");
   return (
     <NodeViewWrapper className="my-3" data-study-trade={tradeId}>
-      <StudyTradeCard tradeId={tradeId} trades={trades} playbooks={playbooks} />
+      <StudyTradeCard
+        tradeId={tradeId}
+        trades={trades}
+        playbooks={playbooks}
+        onOpenJournal={onOpenJournal}
+        onOpenPlaybook={onOpenPlaybook}
+      />
     </NodeViewWrapper>
   );
 }
 
 function YoutubeNodeView({ node }: ReactNodeViewProps) {
   const videoId = String(node.attrs.videoId || "");
+  const src = String(node.attrs.src || "");
   return (
-    <NodeViewWrapper className="my-3" data-study-youtube={videoId}>
+    <NodeViewWrapper className="my-3" data-study-youtube={videoId || src}>
       <div className="aspect-video overflow-hidden rounded-xl border border-border/50 bg-black/40">
-        {videoId ? (
+        {src ? (
+          <video className="h-full w-full" src={src} controls playsInline />
+        ) : videoId ? (
           <iframe
             className="h-full w-full"
             src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}`}
@@ -59,7 +68,10 @@ export const StudyYoutubeNode = Node.create({
   atom: true,
   selectable: true,
   addAttributes() {
-    return { videoId: { default: null } };
+    return {
+      videoId: { default: null },
+      src: { default: null },
+    };
   },
   parseHTML() {
     return [{ tag: "div[data-study-youtube]" }];

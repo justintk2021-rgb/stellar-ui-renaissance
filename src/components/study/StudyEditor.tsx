@@ -19,9 +19,11 @@ interface StudyEditorProps {
   trades: Trade[];
   playbooks: StudyPlaybook[];
   onSave: (input: { title: string; content: JSONContent }) => Promise<void>;
+  onOpenJournal?: (tradeId: string) => void;
+  onOpenPlaybook?: (playbookId: string | null) => void;
 }
 
-export function StudyEditor({ noteId, title, content, trades, playbooks, onSave }: StudyEditorProps) {
+export function StudyEditor({ noteId, title, content, trades, playbooks, onSave, onOpenJournal, onOpenPlaybook }: StudyEditorProps) {
   const [draftTitle, setDraftTitle] = useState(title);
   const [status, setStatus] = useState<"saved" | "saving" | "idle">("idle");
   const [slash, setSlash] = useState<{ query: string; from: number; to: number; x: number; y: number } | null>(null);
@@ -119,7 +121,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave 
   };
 
   return (
-    <StudyEditorDataProvider value={{ trades, playbooks }}>
+    <StudyEditorDataProvider value={{ trades, playbooks, onOpenJournal, onOpenPlaybook }}>
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
@@ -170,7 +172,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave 
           ) : (
             <div className="space-y-2">
               {tradeIds.map((tradeId) => (
-                <StudyTradeCard key={tradeId} tradeId={tradeId} trades={trades} playbooks={playbooks} />
+                <StudyTradeCard key={tradeId} tradeId={tradeId} trades={trades} playbooks={playbooks} onOpenJournal={onOpenJournal} onOpenPlaybook={onOpenPlaybook} />
               ))}
             </div>
           )}
