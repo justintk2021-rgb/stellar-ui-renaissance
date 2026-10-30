@@ -1,7 +1,14 @@
-import { useMemo, useState } from "react";
-import { ChevronRight, FolderPlus, Plus, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, FolderPlus, Plus, Search } from "lucide-react";
 import { studyDocPlainText, studyFolderColor } from "@/lib/studyArea";
 import type { StudyFolder, StudyNote } from "@/hooks/useStudyArea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 function greetingLine(name?: string): string {
   const hour = new Date().getHours();
@@ -26,16 +33,36 @@ export function StudyHome({
   onCreateFolder: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [folderId, setFolderId] = useState("all");
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
-  const featured = useMemo(
-    () => [...notes].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ?? null,
-    [notes],
+  const orderedFolders = useMemo(
+    () => [...folders].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+    [folders],
   );
+
+  useEffect(() => {
+    if (folderId === "all" || folderId === "inbox") return;
+    if (!folderById.has(folderId)) setFolderId("all");
+  }, [folderById, folderId]);
+
+  const scopedNotes = useMemo(() => {
+    if (folderId === "inbox") return notes.filter((note) => !note.folder_id);
+    if (folderId === "all") return notes;
+    return notes.filter((note) => note.folder_id === folderId);
+  }, [folderId, notes]);
+
+  const featured = useMemo(
+    () => [...scopedNotes].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ?? null,
+    [scopedNotes],
+  );
+  const activeFolder = folderId !== "all" && folderId !== "inbox" ? folderById.get(folderId) : undefined;
+  const folderLabel = folderId === "all" ? "All folders" : folderId === "inbox" ? "Inbox" : activeFolder?.name ?? "Folder";
+  const createFolderId = folderId === "all" || folderId === "inbox" ? null : folderId;
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const matches = (text: string) => !needle || text.toLowerCase().includes(needle);
-    const noteRows = [...notes]
+    const noteRows = [...scopedNotes]
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
       .filter((note) => matches(`${note.title} ${studyDocPlainText(note.content)} ${folderById.get(note.folder_id ?? "")?.name ?? "Inbox"}`))
       .map((note) => {
@@ -49,19 +76,17 @@ export function StudyHome({
           onClick: () => onOpenNote(note.id),
         };
       });
-    const emptyFolders = [...folders]
-      .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
-      .filter((folder) => !notes.some((note) => note.folder_id === folder.id))
-      .filter((folder) => matches(folder.name))
-      .map((folder) => ({
-        key: folder.id,
-        title: folder.name,
-        detail: "Empty folder · add a note",
-        color: studyFolderColor(folder.color),
-        onClick: () => onCreateNote(folder.id),
-      }));
-    return [...noteRows, ...emptyFolders];
-  }, [folderById, folders, notes, onCreateNote, onOpenNote, query]);
+    const showEmptyFolder = activeFolder && noteRows.length === 0 && matches(activeFolder.name);
+    return showEmptyFolder
+      ? [{
+          key: activeFolder.id,
+          title: activeFolder.name,
+          detail: "Empty folder · add a note",
+          color: studyFolderColor(activeFolder.color),
+          onClick: () => onCreateNote(activeFolder.id),
+        }]
+      : noteRows;
+  }, [activeFolder, folderById, onCreateNote, onOpenNote, query, scopedNotes]);
 
   const featuredPreview = featured ? studyDocPlainText(featured.content) : "";
   const featuredFolder = featured?.folder_id ? folderById.get(featured.folder_id)?.name : "Inbox";
@@ -69,7 +94,37 @@ export function StudyHome({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">{greetingLine(displayName)}</p>
+        <div className="flex min-w-0 flex-col items-start gap-2">
+          <p className="text-sm text-muted-foreground">{greetingLine(displayName)}</p>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex h-10 max-w-full items-center gap-2 rounded-full border border-border/50 bg-muted/40 px-3 text-sm font-medium text-foreground"
+              >
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ background: studyFolderColor(activeFolder?.color) }}
+                />
+                <span className="truncate">{folderLabel}</span>
+                <span className="text-xs tabular-nums text-muted-foreground">{scopedNotes.length}</span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64">
+              <DropdownMenuRadioGroup value={folderId} onValueChange={setFolderId}>
+                <DropdownMenuRadioItem value="all">All folders</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="inbox">Inbox</DropdownMenuRadioItem>
+                {orderedFolders.map((folder) => (
+                  <DropdownMenuRadioItem key={folder.id} value={folder.id}>
+                    <span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ background: studyFolderColor(folder.color) }} />
+                    {folder.name}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         <div className="flex w-full items-center gap-2 sm:w-auto">
           <label className="relative block min-w-0 flex-1 sm:w-64">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -82,7 +137,7 @@ export function StudyHome({
           </label>
           <button
             type="button"
-            onClick={() => onCreateNote(null)}
+            onClick={() => onCreateNote(createFolderId)}
             className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
           >
             <Plus className="h-4 w-4" />
@@ -120,7 +175,7 @@ export function StudyHome({
         </div>
         <button
           type="button"
-          onClick={() => (featured ? onOpenNote(featured.id) : onCreateNote(null))}
+          onClick={() => (featured ? onOpenNote(featured.id) : onCreateNote(createFolderId))}
           className="shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
         >
           {featured ? "Open" : "New note"}
@@ -131,7 +186,7 @@ export function StudyHome({
         {rows.length === 0 ? (
           <button
             type="button"
-            onClick={() => onCreateNote(null)}
+            onClick={() => onCreateNote(createFolderId)}
             className="col-span-full rounded-xl px-2 py-8 text-left text-sm text-muted-foreground hover:text-foreground"
           >
             No notes in this category yet. Create one.
