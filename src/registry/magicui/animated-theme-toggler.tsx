@@ -11,7 +11,6 @@ import { flushSync } from "react-dom";
 
 import { cn } from "@/lib/utils";
 import { getDocumentTheme, setDocumentTheme, type AppTheme } from "@/lib/theme";
-import { circularReveal } from "@/lib/circularReveal";
 
 export type TransitionVariant =
   | "circle"
@@ -232,11 +231,6 @@ export const AnimatedThemeToggler = forwardRef<HTMLButtonElement, AnimatedThemeT
         setInternalIsDark(newTheme === "dark");
       }
     };
-
-    if (shape === "circle") {
-      circularReveal({ x, y }, applyTheme, { duration });
-      return;
-    }
 
     if (typeof document.startViewTransition !== "function") {
       applyTheme();
