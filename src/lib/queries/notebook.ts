@@ -26,7 +26,6 @@ export function mapDbToEntry(db: DbNotebookEntry): NotebookEntry {
     category: db.category,
     date: db.date,
     tradeId: db.trade_id || undefined,
-    folderId: db.folder_id || undefined,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
     isDeleted: db.is_deleted,

@@ -37,7 +37,6 @@ import {
 } from "@/lib/tradeHistoryPeriod";
 import { TradeScreenshot } from "./TradeScreenshot";
 import { AssetIcon, SymbolMark } from "@/components/ui/AssetIcon";
-import { notesMentioningTrade } from "@/lib/studyNotes";
 
 interface Checklist {
   id: string;
@@ -54,7 +53,6 @@ interface TradeTableProps {
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
   onSelectForNotebook: (id: string, quickNotes?: string) => void | Promise<void>;
-  onOpenStudyNote?: (entryId: string) => void;
   onOpenPlaybook?: () => void;
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void | Promise<void>;
   onClearAll?: () => void;
@@ -433,7 +431,7 @@ function TradeEntry({ trade, checklists, userId, onEdit, onDelete, onViewNotes, 
   );
 }
 
-export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onOpenStudyNote, onOpenPlaybook, onUpdateTrade, focusTradeId, openNotesOnFocus = false, onFocusHandled }: TradeTableProps) {
+export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onOpenPlaybook, onUpdateTrade, focusTradeId, openNotesOnFocus = false, onFocusHandled }: TradeTableProps) {
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [dayTrades, setDayTrades] = useState<Trade[] | null>(null);
@@ -574,9 +572,6 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
   const selectedTradeNote = selectedTrade 
     ? getTradeNote(notebookEntries, selectedTrade.id)
     : null;
-  const selectedTradeMentions = selectedTrade
-    ? notesMentioningTrade(notebookEntries, selectedTrade.id)
-    : [];
 
   return (
     <>
@@ -832,8 +827,7 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                   {dayTrades.map((trade, i) => {
                     const pl = getTradeNetResult(trade);
                     const isProfit = pl >= 0;
-                    const mentioningNotes = notesMentioningTrade(notebookEntries, trade.id);
-                    const hasNote = mentioningNotes.length > 0 || !!trade.notes;
+                    const hasNote = !!getTradeNote(notebookEntries, trade.id) || !!trade.notes;
                     return (
                       <motion.div
                         key={trade.id}
@@ -987,26 +981,10 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                         className="min-h-[160px] resize-none bg-background/40"
                         aria-label="Quick notes"
                       />
-                      {selectedTradeMentions.length > 0 && (
-                        <div className="mt-3 space-y-1.5">
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            Study notes mentioning this trade
-                          </p>
-                          {selectedTradeMentions.map((note) => (
-                            <button
-                              key={note.id}
-                              type="button"
-                              onClick={() => {
-                                onOpenStudyNote?.(note.id);
-                                handleCloseModal();
-                              }}
-                              className="flex w-full items-center justify-between gap-2 rounded-lg border border-border/40 bg-background/50 px-3 py-2 text-left text-sm hover:border-primary/30 hover:bg-primary/5"
-                            >
-                              <span className="truncate font-medium">{note.title || "Untitled note"}</span>
-                              <span className="shrink-0 text-[11px] text-primary">Open</span>
-                            </button>
-                          ))}
-                        </div>
+                      {selectedTradeNote && (
+                        <p className="text-[11px] text-muted-foreground mt-2">
+                          A notebook page exists for this trade. Edit here or open it in the Notebook.
+                        </p>
                       )}
                     </div>
                     <div>
@@ -1070,20 +1048,16 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                     </Button>
                   )}
                   <Button
-                    variant={selectedTradeMentions.length > 0 ? "outline" : "ghost"}
+                    variant={selectedTradeNote ? "outline" : "ghost"}
                     onClick={async () => {
                       if (!selectedTrade) return;
-                      if (selectedTradeMentions[0] && onOpenStudyNote) {
-                        onOpenStudyNote(selectedTradeMentions[0].id);
-                      } else {
-                        await onSelectForNotebook(selectedTrade.id, notesDraft);
-                      }
+                      await onSelectForNotebook(selectedTrade.id, notesDraft);
                       handleCloseModal();
                     }}
                     className="gap-2"
                   >
                     <Pencil className="w-4 h-4" />
-                    {selectedTradeNote || selectedTradeMentions.length > 0 ? 'Open in Study Notes' : 'Create study note'}
+                    {selectedTradeNote ? 'Edit in Notebook' : 'Create Note'}
                   </Button>
                   <Button variant="outline" onClick={handleCloseModal}>
                     Close

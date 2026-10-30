@@ -55,7 +55,6 @@ export function useNotebookEntries(userId: string | undefined) {
         category: entry.category,
         date: entry.date,
         trade_id: entry.tradeId || null,
-        folder_id: entry.folderId || null,
         is_deleted: entry.isDeleted || false,
         deleted_at: entry.deletedAt || null,
         created_at: entry.createdAt,
@@ -93,7 +92,6 @@ export function useNotebookEntries(userId: string | undefined) {
             category: entry.category,
             date: entry.date,
             trade_id: entry.tradeId || null,
-            folder_id: entry.folderId || null,
             is_deleted: entry.isDeleted || false,
             deleted_at: entry.deletedAt || null,
           })
@@ -111,7 +109,6 @@ export function useNotebookEntries(userId: string | undefined) {
             category: entry.category,
             date: entry.date,
             trade_id: entry.tradeId || null,
-            folder_id: entry.folderId || null,
             is_deleted: entry.isDeleted || false,
             deleted_at: entry.deletedAt || null,
             created_at: entry.createdAt,

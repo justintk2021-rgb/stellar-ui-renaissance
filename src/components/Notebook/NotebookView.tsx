@@ -1,2 +1,3195 @@
-export { StudyNotesView as NotebookView } from "./StudyNotesView";
-export type { StudyNotesViewProps as NotebookViewProps } from "./StudyNotesView";
+import { useState, useRef, useEffect, useMemo, type DragEvent } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { Trade, NotebookEntry } from "@/types/trade";
+import { useChecklists } from "@/hooks/useChecklists";
+import { useTradeDetail } from "@/hooks/useTrades";
+import { TradeScreenshot } from "@/components/Journal/TradeScreenshot";
+import { cn } from "@/lib/utils";
+import { getTradeNetResult, journalTradeStats } from "@/lib/tradeFormat";
+import { SymbolMark } from "@/components/ui/AssetIcon";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
+} from "@/components/ui/dropdown-menu";
+import {
+  Bold,
+  Italic,
+  Underline,
+  List,
+  Heading1,
+  Heading2,
+  Heading3,
+  Save,
+  Plus,
+  FolderPlus,
+  FolderOpen,
+  FileText,
+  BookOpen,
+  Target,
+  TrendingUp,
+  AlertTriangle,
+  Lightbulb,
+  Calendar,
+  Search,
+  Trash2,
+  ChevronRight,
+  ChevronLeft,
+  ListOrdered,
+  Quote,
+  MoreHorizontal,
+  Copy,
+  Download,
+  Lock,
+  Unlock,
+  Type,
+  Maximize2,
+  Minimize2,
+  Clock,
+  Star,
+  RotateCcw,
+  PanelLeftOpen,
+  Link,
+  FolderInput,
+  CheckSquare,
+  ListCollapse,
+  ChevronDown,
+  MessageSquare,
+  Table,
+  Minus,
+  ExternalLink,
+  Languages,
+  Undo2,
+  SpellCheck,
+  X,
+  LayoutGrid,
+  LayoutList,
+  Pin,
+  Share2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+} from "lucide-react";
+import { toast } from "sonner";
+import { motion, AnimatePresence } from "@/lib/motion";
+
+interface NotebookViewProps {
+  trades: Trade[];
+  userId?: string;
+  selectedTradeId: string | null;
+  onSelectTrade: (id: string) => void;
+  onSaveNotes: (id: string, notes: string) => void;
+  notebookEntries: NotebookEntry[];
+  onSaveEntry: (entry: NotebookEntry) => void;
+  onDeleteEntry: (id: string) => void;
+  onUpdateTrade?: (id: string, updates: Partial<Trade>) => void | Promise<void>;
+  notebookFont?: string;
+  onFontChange?: (font: string) => void;
+}
+
+const MARKER_COLORS = [
+  { id: 'none', label: 'None', color: 'transparent' },
+  { id: 'red', label: 'Red', color: 'hsl(0, 84%, 60%)' },
+  { id: 'orange', label: 'Orange', color: 'hsl(25, 95%, 53%)' },
+  { id: 'yellow', label: 'Yellow', color: 'hsl(48, 96%, 53%)' },
+  { id: 'green', label: 'Green', color: 'hsl(142, 71%, 45%)' },
+  { id: 'blue', label: 'Blue', color: 'hsl(217, 91%, 60%)' },
+  { id: 'purple', label: 'Purple', color: 'hsl(262, 83%, 58%)' },
+  { id: 'pink', label: 'Pink', color: 'hsl(330, 81%, 60%)' },
+  { id: 'cyan', label: 'Cyan', color: 'hsl(186, 94%, 41%)' },
+];
+
+const CATEGORIES = [
+  { id: "all", label: "All Notes", icon: FileText },
+  { id: "trade-notes", label: "Trade Notes", icon: TrendingUp },
+  { id: "daily-journal", label: "Daily Journal", icon: Calendar },
+  { id: "trading-plan", label: "Trading Plan", icon: Target },
+  { id: "goals", label: "Goals", icon: Lightbulb },
+  { id: "mistakes", label: "Mistakes & Lessons", icon: AlertTriangle },
+  { id: "general", label: "General Notes", icon: BookOpen },
+  { id: "trash", label: "Trash", icon: Trash2 },
+];
+
+// 50 Fonts organized by category
+const NOTEBOOK_FONTS = [
+  // Sans Serif - Modern
+  { id: 'inter', name: 'Inter', family: "'Inter', sans-serif", category: 'Sans Serif' },
+  { id: 'roboto', name: 'Roboto', family: "'Roboto', sans-serif", category: 'Sans Serif' },
+  { id: 'open-sans', name: 'Open Sans', family: "'Open Sans', sans-serif", category: 'Sans Serif' },
+  { id: 'lato', name: 'Lato', family: "'Lato', sans-serif", category: 'Sans Serif' },
+  { id: 'montserrat', name: 'Montserrat', family: "'Montserrat', sans-serif", category: 'Sans Serif' },
+  { id: 'poppins', name: 'Poppins', family: "'Poppins', sans-serif", category: 'Sans Serif' },
+  { id: 'raleway', name: 'Raleway', family: "'Raleway', sans-serif", category: 'Sans Serif' },
+  { id: 'nunito', name: 'Nunito', family: "'Nunito', sans-serif", category: 'Sans Serif' },
+  { id: 'ubuntu', name: 'Ubuntu', family: "'Ubuntu', sans-serif", category: 'Sans Serif' },
+  { id: 'rubik', name: 'Rubik', family: "'Rubik', sans-serif", category: 'Sans Serif' },
+  { id: 'oswald', name: 'Oswald', family: "'Oswald', sans-serif", category: 'Sans Serif' },
+  { id: 'dm-sans', name: 'DM Sans', family: "'DM Sans', sans-serif", category: 'Sans Serif' },
+  { id: 'space-grotesk', name: 'Space Grotesk', family: "'Space Grotesk', sans-serif", category: 'Sans Serif' },
+  { id: 'outfit', name: 'Outfit', family: "'Outfit', sans-serif", category: 'Sans Serif' },
+  { id: 'work-sans', name: 'Work Sans', family: "'Work Sans', sans-serif", category: 'Sans Serif' },
+  { id: 'plus-jakarta', name: 'Plus Jakarta Sans', family: "'Plus Jakarta Sans', sans-serif", category: 'Sans Serif' },
+  { id: 'manrope', name: 'Manrope', family: "'Manrope', sans-serif", category: 'Sans Serif' },
+  { id: 'sora', name: 'Sora', family: "'Sora', sans-serif", category: 'Sans Serif' },
+  { id: 'lexend', name: 'Lexend', family: "'Lexend', sans-serif", category: 'Sans Serif' },
+  { id: 'urbanist', name: 'Urbanist', family: "'Urbanist', sans-serif", category: 'Sans Serif' },
+  { id: 'figtree', name: 'Figtree', family: "'Figtree', sans-serif", category: 'Sans Serif' },
+  { id: 'archivo', name: 'Archivo', family: "'Archivo', sans-serif", category: 'Sans Serif' },
+  { id: 'barlow', name: 'Barlow', family: "'Barlow', sans-serif", category: 'Sans Serif' },
+  { id: 'karla', name: 'Karla', family: "'Karla', sans-serif", category: 'Sans Serif' },
+  { id: 'quicksand', name: 'Quicksand', family: "'Quicksand', sans-serif", category: 'Sans Serif' },
+  { id: 'comfortaa', name: 'Comfortaa', family: "'Comfortaa', sans-serif", category: 'Sans Serif' },
+  { id: 'varela-round', name: 'Varela Round', family: "'Varela Round', sans-serif", category: 'Sans Serif' },
+  // Serif - Classic
+  { id: 'merriweather', name: 'Merriweather', family: "'Merriweather', serif", category: 'Serif' },
+  { id: 'playfair', name: 'Playfair Display', family: "'Playfair Display', serif", category: 'Serif' },
+  { id: 'libre-baskerville', name: 'Libre Baskerville', family: "'Libre Baskerville', serif", category: 'Serif' },
+  { id: 'crimson', name: 'Crimson Text', family: "'Crimson Text', serif", category: 'Serif' },
+  { id: 'source-serif', name: 'Source Serif 4', family: "'Source Serif 4', serif", category: 'Serif' },
+  { id: 'cormorant', name: 'Cormorant Garamond', family: "'Cormorant Garamond', serif", category: 'Serif' },
+  { id: 'eb-garamond', name: 'EB Garamond', family: "'EB Garamond', serif", category: 'Serif' },
+  { id: 'spectral', name: 'Spectral', family: "'Spectral', serif", category: 'Serif' },
+  { id: 'bitter', name: 'Bitter', family: "'Bitter', serif", category: 'Serif' },
+  { id: 'lora', name: 'Lora', family: "'Lora', serif", category: 'Serif' },
+  // Monospace - Code
+  { id: 'source-code', name: 'Source Code Pro', family: "'Source Code Pro', monospace", category: 'Monospace' },
+  { id: 'fira-code', name: 'Fira Code', family: "'Fira Code', monospace", category: 'Monospace' },
+  { id: 'jetbrains', name: 'JetBrains Mono', family: "'JetBrains Mono', monospace", category: 'Monospace' },
+  { id: 'ibm-plex', name: 'IBM Plex Mono', family: "'IBM Plex Mono', monospace", category: 'Monospace' },
+  { id: 'space-mono', name: 'Space Mono', family: "'Space Mono', monospace", category: 'Monospace' },
+  { id: 'roboto-mono', name: 'Roboto Mono', family: "'Roboto Mono', monospace", category: 'Monospace' },
+  { id: 'cousine', name: 'Cousine', family: "'Cousine', monospace", category: 'Monospace' },
+  { id: 'anonymous', name: 'Anonymous Pro', family: "'Anonymous Pro', monospace", category: 'Monospace' },
+  { id: 'overpass-mono', name: 'Overpass Mono', family: "'Overpass Mono', monospace", category: 'Monospace' },
+  { id: 'inconsolata', name: 'Inconsolata', family: "'Inconsolata', monospace", category: 'Monospace' },
+];
+
+type FontStyle = string;
+
+export function NotebookView({
+  trades,
+  userId,
+  selectedTradeId,
+  onSelectTrade,
+  onSaveNotes,
+  notebookEntries,
+  onSaveEntry,
+  onDeleteEntry,
+  onUpdateTrade,
+  notebookFont = 'inter',
+  onFontChange,
+}: NotebookViewProps) {
+  const { checklists } = useChecklists();
+
+  useEffect(() => {
+    import('@/lib/fonts').then(({ loadGoogleFont }) => loadGoogleFont(notebookFont));
+  }, [notebookFont]);
+
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const deferredSearch = useDebouncedValue(searchQuery, 160);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [isSmallText, setIsSmallText] = useState(false);
+  const [isFullWidth, setIsFullWidth] = useState(false);
+  const [isFullWidthClosing, setIsFullWidthClosing] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [isFoldersPanelOpen, setIsFoldersPanelOpen] = useState(false);
+  const [isFoldersPanelClosing, setIsFoldersPanelClosing] = useState(false);
+  const [isEntriesPanelOpen, setIsEntriesPanelOpen] = useState(false);
+  const [isEntriesPanelClosing, setIsEntriesPanelClosing] = useState(false);
+  const [isAddFolderDialogOpen, setIsAddFolderDialogOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [folderSearchQuery, setFolderSearchQuery] = useState("");
+  const deferredFolderSearch = useDebouncedValue(folderSearchQuery, 160);
+  const [customFolders, setCustomFolders] = useState<Array<{ id: string; label: string; color?: string }>>(() => {
+    const saved = localStorage.getItem('notebook-custom-folders');
+    console.log('Loading custom folders:', saved);
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [folderMarkers, setFolderMarkers] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('notebook-folder-markers');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [isBlockMenuOpen, setIsBlockMenuOpen] = useState(false);
+  const [blockMenuPosition, setBlockMenuPosition] = useState({ x: 0, y: 0 });
+  const [showBlockButton, setShowBlockButton] = useState(false);
+  const [blockButtonPosition, setBlockButtonPosition] = useState({ x: 0, y: 0 });
+  const [showTableControls, setShowTableControls] = useState(false);
+  const [selectedTable, setSelectedTable] = useState<HTMLTableElement | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isImagePreviewClosing, setIsImagePreviewClosing] = useState(false);
+  const [fullscreenShowBlockButton, setFullscreenShowBlockButton] = useState(false);
+  const [fullscreenBlockButtonPosition, setFullscreenBlockButtonPosition] = useState({ x: 0, y: 0 });
+  const [fullscreenBlockMenuOpen, setFullscreenBlockMenuOpen] = useState(false);
+  const [fullscreenBlockMenuPosition, setFullscreenBlockMenuPosition] = useState({ x: 0, y: 0 });
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    const saved = localStorage.getItem('notebook-view-mode');
+    return (saved === 'list' ? 'list' : 'grid') as 'grid' | 'list';
+  });
+  
+  // Right-click context menu state
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [showTextColorPicker, setShowTextColorPicker] = useState(false);
+  const [showHighlightColorPicker, setShowHighlightColorPicker] = useState(false);
+  
+  const editorRef = useRef<HTMLDivElement>(null);
+  const fullscreenEditorRef = useRef<HTMLDivElement>(null);
+  const fullscreenEditorContainerRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const fullscreenTitleRef = useRef<HTMLInputElement>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+
+  // Find selected entry
+  const selectedEntry = notebookEntries.find((e) => e.id === selectedEntryId);
+
+  // Live writing stats (words / characters / reading time) + autosave indicator
+  const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 });
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
+  const updateEditorStats = (el: HTMLElement | null) => {
+    const text = el?.innerText || "";
+    const trimmed = text.trim();
+    setEditorStats({
+      words: trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0,
+      chars: trimmed.length,
+    });
+  };
+
+  /** Focus a contentEditable editor and place the caret at the end. */
+  const focusEditorAtEnd = (el: HTMLElement | null) => {
+    if (!el) return;
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  };
+
+  /** Click-to-write: focus the editor, placing the caret as close to the
+      click as possible (falls back to end of content). */
+  const handleEditorAreaClick = (
+    e: React.MouseEvent,
+    targetEditor: HTMLElement | null,
+  ) => {
+    if (isLocked || selectedEntry?.isDeleted || !targetEditor) return;
+    const target = e.target as HTMLElement;
+    // Don't steal clicks from interactive controls or the editor itself
+    if (targetEditor.contains(target)) return;
+    if (target.closest('button, a, input, textarea, [role="menu"], [contenteditable]')) return;
+
+    targetEditor.focus();
+    // Try to place the caret at the exact click point (works when clicking
+    // beside a line); otherwise collapse to the end of the note.
+    const docAny = document as Document & {
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    };
+    const range = docAny.caretRangeFromPoint?.(e.clientX, e.clientY);
+    const sel = window.getSelection();
+    if (range && targetEditor.contains(range.startContainer)) {
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    } else {
+      focusEditorAtEnd(targetEditor);
+    }
+  };
+
+  // Filter entries by category and search (excluding trash unless viewing trash)
+  const filteredEntries = useMemo(() => notebookEntries.filter((entry) => {
+    if (selectedCategory === "trash") {
+      return entry.isDeleted === true;
+    }
+    if (entry.isDeleted) return false;
+    const matchesCategory = selectedCategory === "all" || entry.category === selectedCategory;
+    const matchesSearch = entry.title.toLowerCase().includes(deferredSearch.toLowerCase()) ||
+      entry.content.toLowerCase().includes(deferredSearch.toLowerCase());
+    return matchesCategory && matchesSearch;
+  }), [notebookEntries, selectedCategory, deferredSearch]);
+
+  const trashCount = useMemo(
+    () => notebookEntries.filter(e => e.isDeleted).length,
+    [notebookEntries],
+  );
+
+  const groupedEntries = useMemo(() => filteredEntries.reduce((acc, entry) => {
+    const date = entry.isDeleted && entry.deletedAt
+      ? entry.deletedAt.slice(0, 10)
+      : entry.date;
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(entry);
+    return acc;
+  }, {} as Record<string, NotebookEntry[]>), [filteredEntries]);
+
+  const sortedDates = useMemo(
+    () => Object.keys(groupedEntries).sort((a, b) => b.localeCompare(a)),
+    [groupedEntries],
+  );
+
+  const visibleEntries = useMemo(() => notebookEntries
+    .filter(e => {
+      if (e.isDeleted) return false;
+      if (selectedCategory !== "all" && e.category !== selectedCategory) return false;
+      if (deferredSearch) {
+        const query = deferredSearch.toLowerCase();
+        return e.title.toLowerCase().includes(query) ||
+          e.content.toLowerCase().includes(query);
+      }
+      return true;
+    })
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+  [notebookEntries, selectedCategory, deferredSearch]);
+
+  type SidebarRow =
+    | { type: 'header'; date: string }
+    | { type: 'entry'; entry: NotebookEntry };
+
+  const sidebarRows = useMemo(() => {
+    const rows: SidebarRow[] = [];
+    for (const date of sortedDates) {
+      rows.push({ type: 'header', date });
+      for (const entry of groupedEntries[date]) {
+        rows.push({ type: 'entry', entry });
+      }
+    }
+    return rows;
+  }, [sortedDates, groupedEntries]);
+
+  const sidebarScrollRef = useRef<HTMLDivElement>(null);
+  const gridScrollRef = useRef<HTMLDivElement>(null);
+
+  const sidebarVirtualizer = useVirtualizer({
+    count: sidebarRows.length,
+    getScrollElement: () => sidebarScrollRef.current,
+    estimateSize: (index) => (sidebarRows[index]?.type === 'header' ? 28 : 40),
+    overscan: 12,
+    getItemKey: (index) => {
+      const row = sidebarRows[index];
+      return row?.type === 'header' ? `h-${row.date}` : `e-${row.entry.id}`;
+    },
+  });
+
+  const gridVirtualizer = useVirtualizer({
+    count: viewMode === 'list' ? visibleEntries.length : 0,
+    getScrollElement: () => gridScrollRef.current,
+    estimateSize: () => 88,
+    overscan: 8,
+    getItemKey: (index) => visibleEntries[index]?.id ?? index,
+  });
+
+  // Load entry content into editor when switching notes or when Journal
+  // pushes new quick-notes content into this trade-linked page.
+  useEffect(() => {
+    if (editorRef.current && selectedEntry) {
+      const incoming = selectedEntry.content || "";
+      if (editorRef.current.innerHTML !== incoming) {
+        const editorIsFocused = document.activeElement === editorRef.current;
+        if (!editorIsFocused || !editorRef.current.innerHTML.trim()) {
+          editorRef.current.innerHTML = incoming;
+        }
+      }
+    } else if (editorRef.current && isCreatingNew) {
+      editorRef.current.innerHTML = "";
+    }
+    updateEditorStats(editorRef.current);
+    setLastSavedAt(null);
+    if (editorRef.current && !selectedEntry?.isDeleted && !isLocked && (selectedEntry || isCreatingNew)) {
+      requestAnimationFrame(() => focusEditorAtEnd(editorRef.current));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEntry?.id, selectedEntry?.content, selectedTradeId, isCreatingNew]);
+
+  // Sync content when entering fullscreen
+  useEffect(() => {
+    if (isFullWidth && editorRef.current && fullscreenEditorRef.current) {
+      fullscreenEditorRef.current.innerHTML = editorRef.current.innerHTML;
+      if (titleRef.current && fullscreenTitleRef.current) {
+        fullscreenTitleRef.current.value = titleRef.current.value;
+      }
+    }
+  }, [isFullWidth]);
+
+  // Close fullscreen with animation and sync content back
+  const closeFullscreen = () => {
+    // Sync content back to main editor before closing
+    if (fullscreenEditorRef.current && editorRef.current) {
+      editorRef.current.innerHTML = fullscreenEditorRef.current.innerHTML;
+    }
+    if (fullscreenTitleRef.current && titleRef.current) {
+      titleRef.current.value = fullscreenTitleRef.current.value;
+    }
+    setIsFullWidthClosing(true);
+    setTimeout(() => {
+      setIsFullWidth(false);
+      setIsFullWidthClosing(false);
+    }, 200);
+  };
+
+  // Auto-select notebook entry when navigating from trade log
+  useEffect(() => {
+    if (selectedTradeId) {
+      // Find the notebook entry linked to this trade
+      const linkedEntry = notebookEntries.find(e => e.tradeId === selectedTradeId && !e.isDeleted);
+      if (linkedEntry) {
+        setSelectedEntryId(linkedEntry.id);
+        setSelectedCategory(linkedEntry.category || 'trade-notes');
+        setIsCreatingNew(false);
+      }
+    }
+  }, [selectedTradeId, notebookEntries]);
+
+  // Handle Escape key to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullWidth) {
+        closeFullscreen();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullWidth]);
+
+  // Auto-save (every 5 seconds) — works in both fullscreen and normal mode
+  useEffect(() => {
+    if (!selectedEntry || isLocked) return;
+
+    const autoSaveInterval = setInterval(() => {
+      const currentEditorRef = isFullWidth ? fullscreenEditorRef : editorRef;
+      const currentTitleRef = isFullWidth ? fullscreenTitleRef : titleRef;
+      if (!currentEditorRef.current) return;
+
+      const content = currentEditorRef.current.innerHTML;
+      const title = currentTitleRef.current?.value || selectedEntry.title || "Untitled Note";
+
+      // Only save if something actually changed
+      if (content === selectedEntry.content && title === selectedEntry.title) return;
+
+      onSaveEntry({
+        ...selectedEntry,
+        title,
+        content,
+        updatedAt: new Date().toISOString(),
+      });
+      setLastSavedAt(new Date());
+    }, 5000);
+
+    return () => clearInterval(autoSaveInterval);
+  }, [isFullWidth, selectedEntry, isLocked, onSaveEntry]);
+
+  // Save on blur (when user leaves the editor) for instant persistence
+  useEffect(() => {
+    if (!selectedEntry || isLocked) return;
+
+    const handleBlur = () => {
+      const currentEditorRef = isFullWidth ? fullscreenEditorRef : editorRef;
+      const currentTitleRef = isFullWidth ? fullscreenTitleRef : titleRef;
+      if (!currentEditorRef.current) return;
+
+      const content = currentEditorRef.current.innerHTML;
+      const title = currentTitleRef.current?.value || selectedEntry.title || "Untitled Note";
+
+      if (content === selectedEntry.content && title === selectedEntry.title) return;
+
+      onSaveEntry({
+        ...selectedEntry,
+        title,
+        content,
+        updatedAt: new Date().toISOString(),
+      });
+      setLastSavedAt(new Date());
+    };
+
+    const editorEl = (isFullWidth ? fullscreenEditorRef : editorRef).current;
+    const titleEl = (isFullWidth ? fullscreenTitleRef : titleRef).current;
+    editorEl?.addEventListener('blur', handleBlur);
+    titleEl?.addEventListener('blur', handleBlur);
+
+    return () => {
+      editorEl?.removeEventListener('blur', handleBlur);
+      titleEl?.removeEventListener('blur', handleBlur);
+    };
+  }, [isFullWidth, selectedEntry, isLocked, onSaveEntry]);
+
+  const closeFoldersPanel = () => {
+    setIsFoldersPanelClosing(true);
+    setTimeout(() => {
+      setIsFoldersPanelOpen(false);
+      setIsFoldersPanelClosing(false);
+    }, 200);
+  };
+
+  const toggleFoldersPanel = () => {
+    if (isFoldersPanelOpen) {
+      closeFoldersPanel();
+    } else {
+      setIsFoldersPanelOpen(true);
+    }
+  };
+
+  const closeEntriesPanel = () => {
+    setIsEntriesPanelClosing(true);
+    setTimeout(() => {
+      setIsEntriesPanelOpen(false);
+      setIsEntriesPanelClosing(false);
+    }, 200);
+  };
+
+  const toggleEntriesPanel = () => {
+    if (isEntriesPanelOpen) {
+      closeEntriesPanel();
+    } else {
+      setIsEntriesPanelOpen(true);
+    }
+  };
+
+  const execCommand = (cmd: string, value?: string) => {
+    if (isLocked) return;
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, value);
+  };
+
+  const handleSave = () => {
+    // Use fullscreen refs if in fullscreen mode, otherwise use regular refs
+    const currentEditorRef = isFullWidth ? fullscreenEditorRef : editorRef;
+    const currentTitleRef = isFullWidth ? fullscreenTitleRef : titleRef;
+    
+    if (!currentEditorRef.current) return;
+    
+    const content = currentEditorRef.current.innerHTML;
+    const title = currentTitleRef.current?.value || "Untitled Note";
+    
+    if (isCreatingNew) {
+      const newEntry: NotebookEntry = {
+        id: Date.now().toString(),
+        title,
+        content,
+        category: selectedCategory === "all" || selectedCategory === "trash" ? "general" : selectedCategory,
+        date: new Date().toISOString().slice(0, 10),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      onSaveEntry(newEntry);
+      setSelectedEntryId(newEntry.id);
+      setIsCreatingNew(false);
+      setLastSavedAt(new Date());
+      toast.success("Note created!");
+    } else if (selectedEntry) {
+      onSaveEntry({
+        ...selectedEntry,
+        title,
+        content,
+        updatedAt: new Date().toISOString(),
+      });
+      setLastSavedAt(new Date());
+      toast.success("Note saved!");
+    }
+  };
+
+  const handleNewNote = () => {
+    if (selectedCategory === "trash") {
+      setSelectedCategory("general");
+    }
+    setIsCreatingNew(true);
+    setSelectedEntryId(null);
+    setIsLocked(false);
+    if (titleRef.current) titleRef.current.value = "";
+    if (editorRef.current) editorRef.current.innerHTML = "";
+  };
+
+  // Soft delete - move to trash
+  const handleMoveToTrash = () => {
+    if (selectedEntry) {
+      onSaveEntry({
+        ...selectedEntry,
+        isDeleted: true,
+        deletedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      setSelectedEntryId(null);
+      toast.success("Note moved to trash!");
+    }
+  };
+
+  // Restore from trash
+  const handleRestoreFromTrash = () => {
+    if (selectedEntry) {
+      onSaveEntry({
+        ...selectedEntry,
+        isDeleted: false,
+        deletedAt: undefined,
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success("Note restored!");
+    }
+  };
+
+  // Permanent delete
+  const handlePermanentDelete = () => {
+    if (selectedEntry) {
+      onDeleteEntry(selectedEntry.id);
+      setSelectedEntryId(null);
+      toast.success("Note permanently deleted!");
+    }
+  };
+
+  // Empty trash
+  const handleEmptyTrash = () => {
+    const trashedEntries = notebookEntries.filter(e => e.isDeleted);
+    trashedEntries.forEach(entry => {
+      onDeleteEntry(entry.id);
+    });
+    setSelectedEntryId(null);
+    toast.success("Trash emptied!");
+  };
+
+  const handleDuplicate = () => {
+    if (!selectedEntry || !editorRef.current) return;
+    
+    const duplicatedEntry: NotebookEntry = {
+      id: Date.now().toString(),
+      title: `${selectedEntry.title} (Copy)`,
+      content: editorRef.current.innerHTML,
+      category: selectedEntry.category,
+      date: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    onSaveEntry(duplicatedEntry);
+    setSelectedEntryId(duplicatedEntry.id);
+    toast.success("Note duplicated!");
+  };
+
+  const handleCopyContent = () => {
+    if (!editorRef.current) return;
+    const text = editorRef.current.innerText;
+    navigator.clipboard.writeText(text);
+    toast.success("Content copied to clipboard!");
+  };
+
+  const handleExport = () => {
+    if (!selectedEntry || !editorRef.current) return;
+    
+    const text = editorRef.current.innerText;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedEntry.title.replace(/[^a-z0-9]/gi, '_')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Note exported!");
+  };
+
+  // Undo action
+  const handleUndo = () => {
+    document.execCommand('undo', false);
+    toast.success("Undo applied");
+  };
+
+  // Translation (opens browser translate - placeholder for now)
+  const handleTranslate = () => {
+    if (!editorRef.current) return;
+    const selectedText = window.getSelection()?.toString();
+    if (selectedText) {
+      const url = `https://translate.google.com/?sl=auto&tl=en&text=${encodeURIComponent(selectedText)}`;
+      window.open(url, '_blank');
+    } else {
+      toast.info("Select text to translate");
+    }
+  };
+
+  // Spell check toggle
+  const handleSpellCheck = () => {
+    if (editorRef.current) {
+      const currentSpellcheck = editorRef.current.spellcheck;
+      editorRef.current.spellcheck = !currentSpellcheck;
+      editorRef.current.focus();
+      toast.success(currentSpellcheck ? "Spell check disabled" : "Spell check enabled");
+    }
+  };
+
+  // Copy note link to clipboard
+  const handleCopyLink = (entry: NotebookEntry) => {
+    const link = `${window.location.origin}/?note=${entry.id}`;
+    navigator.clipboard.writeText(link);
+    toast.success("Link copied to clipboard!");
+  };
+
+  // Duplicate a specific entry
+  const handleDuplicateEntry = (entry: NotebookEntry) => {
+    const duplicatedEntry: NotebookEntry = {
+      id: Date.now().toString(),
+      title: `${entry.title} (Copy)`,
+      content: entry.content,
+      category: entry.category,
+      date: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    onSaveEntry(duplicatedEntry);
+    setSelectedEntryId(duplicatedEntry.id);
+    toast.success("Note duplicated!");
+  };
+
+  // Move entry to a different category
+  const handleMoveToCategory = (entry: NotebookEntry, newCategory: string) => {
+    onSaveEntry({
+      ...entry,
+      category: newCategory,
+      updatedAt: new Date().toISOString(),
+    });
+    toast.success(`Note moved to ${CATEGORIES.find(c => c.id === newCategory)?.label || newCategory}!`);
+  };
+
+  const handleNoteDragStart = (event: DragEvent, entryId: string) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-notebook-note", entryId);
+    event.dataTransfer.setData("text/plain", entryId);
+    setIsFoldersPanelOpen(true);
+  };
+
+  const handleFolderDragOver = (event: DragEvent, folderId: string) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDropTargetId(folderId);
+  };
+
+  const handleFolderDragLeave = (event: DragEvent, folderId: string) => {
+    const next = event.relatedTarget as Node | null;
+    if (next && event.currentTarget.contains(next)) return;
+    setDropTargetId((current) => (current === folderId ? null : current));
+  };
+
+  const handleNoteDropOnFolder = (event: DragEvent, folderId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDropTargetId(null);
+    const id = event.dataTransfer.getData("application/x-notebook-note") || event.dataTransfer.getData("text/plain");
+    const entry = notebookEntries.find((item) => item.id === id);
+    if (!entry || entry.isDeleted) return;
+    if (folderId === "trash") {
+      onSaveEntry({
+        ...entry,
+        isDeleted: true,
+        deletedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      if (selectedEntryId === entry.id) setSelectedEntryId(null);
+      toast.success("Note moved to trash!");
+      return;
+    }
+    if (entry.category === folderId) return;
+    handleMoveToCategory(entry, folderId);
+  };
+
+  // Update folder marker color
+  const handleSetFolderMarker = (folderId: string, colorId: string) => {
+    const newMarkers = { ...folderMarkers };
+    if (colorId === 'none') {
+      delete newMarkers[folderId];
+    } else {
+      newMarkers[folderId] = colorId;
+    }
+    setFolderMarkers(newMarkers);
+    localStorage.setItem('notebook-folder-markers', JSON.stringify(newMarkers));
+  };
+
+  // Toggle view mode
+  const toggleViewMode = () => {
+    const newMode = viewMode === 'grid' ? 'list' : 'grid';
+    setViewMode(newMode);
+    localStorage.setItem('notebook-view-mode', newMode);
+  };
+
+  // Note card colors based on folder marker color (if set), otherwise fall back to a rotating palette
+  const getNoteCardColor = (category: string, index: number): {
+    bg: string;
+    bgDark: string;
+    border: string;
+    borderDark: string;
+    accent: string;
+    text?: string;
+    textDark?: string;
+  } => {
+    const fallback = [
+      { bg: 'hsl(210, 100%, 95%)', bgDark: 'hsl(210, 50%, 15%)', border: 'hsl(210, 80%, 85%)', borderDark: 'hsl(210, 40%, 25%)', accent: 'hsl(210, 80%, 55%)' },
+      { bg: 'hsl(142, 70%, 92%)', bgDark: 'hsl(142, 40%, 12%)', border: 'hsl(142, 60%, 80%)', borderDark: 'hsl(142, 30%, 22%)', accent: 'hsl(142, 70%, 45%)' },
+      { bg: 'hsl(48, 95%, 90%)', bgDark: 'hsl(48, 50%, 12%)', border: 'hsl(48, 80%, 80%)', borderDark: 'hsl(48, 40%, 22%)', accent: 'hsl(48, 95%, 50%)' },
+      { bg: 'hsl(0, 85%, 93%)', bgDark: 'hsl(0, 40%, 14%)', border: 'hsl(0, 70%, 85%)', borderDark: 'hsl(0, 30%, 24%)', accent: 'hsl(0, 75%, 55%)' },
+      { bg: 'hsl(262, 80%, 93%)', bgDark: 'hsl(262, 40%, 14%)', border: 'hsl(262, 60%, 85%)', borderDark: 'hsl(262, 30%, 24%)', accent: 'hsl(262, 70%, 55%)' },
+      { bg: 'hsl(330, 80%, 93%)', bgDark: 'hsl(330, 40%, 14%)', border: 'hsl(330, 60%, 85%)', borderDark: 'hsl(330, 30%, 24%)', accent: 'hsl(330, 70%, 55%)' },
+      { bg: 'hsl(186, 80%, 90%)', bgDark: 'hsl(186, 40%, 12%)', border: 'hsl(186, 60%, 80%)', borderDark: 'hsl(186, 30%, 22%)', accent: 'hsl(186, 70%, 45%)' },
+      { bg: 'hsl(25, 90%, 92%)', bgDark: 'hsl(25, 50%, 14%)', border: 'hsl(25, 70%, 82%)', borderDark: 'hsl(25, 35%, 24%)', accent: 'hsl(25, 85%, 50%)' },
+    ];
+
+    // Try to derive from the folder's marker color
+    const markerId = folderMarkers[category];
+    const marker = markerId ? MARKER_COLORS.find(m => m.id === markerId) : null;
+    if (marker && marker.color && marker.color !== 'transparent') {
+      const match = marker.color.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)/);
+      if (match) {
+        const h = match[1];
+        const s = Number(match[2]);
+        return {
+          bg: `hsl(${h}, ${Math.min(s, 80)}%, 93%)`,
+          bgDark: `hsl(${h}, ${Math.min(s, 50)}%, 14%)`,
+          border: `hsl(${h}, ${Math.min(s, 70)}%, 82%)`,
+          borderDark: `hsl(${h}, ${Math.min(s, 35)}%, 24%)`,
+          accent: marker.color,
+        };
+      }
+    }
+
+    return fallback[index % fallback.length];
+  };
+
+
+  const handleDeleteFolder = (folderId: string) => {
+    // Move all notes in this folder to general
+    notebookEntries
+      .filter(e => e.category === folderId)
+      .forEach(entry => {
+        onSaveEntry({
+          ...entry,
+          category: 'general',
+          updatedAt: new Date().toISOString(),
+        });
+      });
+    
+    // Remove folder from list
+    const updatedFolders = customFolders.filter(f => f.id !== folderId);
+    setCustomFolders(updatedFolders);
+    localStorage.setItem('notebook-custom-folders', JSON.stringify(updatedFolders));
+    
+    // Remove folder marker if exists
+    const newMarkers = { ...folderMarkers };
+    delete newMarkers[folderId];
+    setFolderMarkers(newMarkers);
+    localStorage.setItem('notebook-folder-markers', JSON.stringify(newMarkers));
+    
+    // If currently viewing the deleted folder, switch to all
+    if (selectedCategory === folderId) {
+      setSelectedCategory('all');
+    }
+    
+    toast.success("Folder deleted!");
+  };
+
+  // Get marker color for a folder
+  const getFolderMarkerColor = (folderId: string) => {
+    const markerId = folderMarkers[folderId];
+    if (!markerId) return null;
+    return MARKER_COLORS.find(m => m.id === markerId)?.color || null;
+  };
+
+  // Block formatting options
+  const BLOCK_OPTIONS = [
+    { id: 'text', label: 'Text', icon: Type, command: 'formatBlock', value: 'p' },
+    { id: 'h1', label: 'Heading 1', icon: Heading1, command: 'formatBlock', value: 'h1' },
+    { id: 'h2', label: 'Heading 2', icon: Heading2, command: 'formatBlock', value: 'h2' },
+    { id: 'h3', label: 'Heading 3', icon: Heading3, command: 'formatBlock', value: 'h3' },
+    { id: 'bullet', label: 'Bulleted list', icon: List, command: 'insertUnorderedList', value: '' },
+    { id: 'numbered', label: 'Numbered list', icon: ListOrdered, command: 'insertOrderedList', value: '' },
+    { id: 'todo', label: 'To-do list', icon: CheckSquare, command: 'custom', value: '' },
+    { id: 'toggle', label: 'Toggle list', icon: ChevronDown, command: 'formatBlock', value: 'details' },
+    { id: 'quote', label: 'Quote', icon: Quote, command: 'formatBlock', value: 'blockquote' },
+    { id: 'callout', label: 'Callout', icon: MessageSquare, command: 'formatBlock', value: 'aside' },
+    { id: 'divider', label: 'Divider', icon: Minus, command: 'insertHorizontalRule', value: '' },
+    { id: 'table', label: 'Table', icon: Table, command: 'insertTable', value: '' },
+    { id: 'link', label: 'Link to page', icon: ExternalLink, command: 'createLink', value: '' },
+  ];
+
+  const handleBlockFormat = (option: typeof BLOCK_OPTIONS[0], isFullscreen = false) => {
+    const targetRef = isFullscreen ? fullscreenEditorRef : editorRef;
+    if (!targetRef.current) return;
+    targetRef.current.focus();
+    
+    if (option.id === 'divider') {
+      document.execCommand('insertHTML', false, '<hr class="my-4 border-border" />');
+    } else if (option.id === 'table') {
+      const tableHTML = `
+        <div class="notebook-table-wrapper my-4 relative group" contenteditable="false">
+          <table class="notebook-table w-full border-separate border-spacing-0 rounded-xl overflow-hidden bg-muted/30">
+            <tbody>
+              <tr>
+                <td class="p-3 border border-border/50 first:rounded-tl-xl" contenteditable="true">Cell 1</td>
+                <td class="p-3 border border-border/50 last:rounded-tr-xl" contenteditable="true">Cell 2</td>
+              </tr>
+              <tr>
+                <td class="p-3 border border-border/50 first:rounded-bl-xl" contenteditable="true">Cell 3</td>
+                <td class="p-3 border border-border/50 last:rounded-br-xl" contenteditable="true">Cell 4</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="notebook-table-controls absolute -right-10 top-0 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onclick="this.closest('.notebook-table-wrapper').querySelector('table tbody').insertAdjacentHTML('beforeend', '<tr>' + Array(this.closest('.notebook-table-wrapper').querySelector('tr').cells.length).fill('<td class=\\'p-3 border border-border/50\\' contenteditable=\\'true\\'>New</td>').join('') + '</tr>')" class="w-7 h-7 rounded-lg bg-primary/20 hover:bg-primary/40 flex items-center justify-center text-[10px] font-medium text-primary transition-colors" title="Add row">+R</button>
+            <button onclick="this.closest('.notebook-table-wrapper').querySelectorAll('tr').forEach(r => r.insertAdjacentHTML('beforeend', '<td class=\\'p-3 border border-border/50\\' contenteditable=\\'true\\'>New</td>'))" class="w-7 h-7 rounded-lg bg-primary/20 hover:bg-primary/40 flex items-center justify-center text-[10px] font-medium text-primary transition-colors" title="Add column">+C</button>
+            <button onclick="const rows = this.closest('.notebook-table-wrapper').querySelectorAll('tr'); if(rows.length > 1) rows[rows.length-1].remove();" class="w-7 h-7 rounded-lg bg-destructive/20 hover:bg-destructive/40 flex items-center justify-center text-[10px] font-medium text-destructive transition-colors" title="Remove row">-R</button>
+            <button onclick="this.closest('.notebook-table-wrapper').querySelectorAll('tr').forEach(r => { if(r.cells.length > 1) r.deleteCell(-1); });" class="w-7 h-7 rounded-lg bg-destructive/20 hover:bg-destructive/40 flex items-center justify-center text-[10px] font-medium text-destructive transition-colors" title="Remove column">-C</button>
+            <div class="h-px bg-border/50 my-1"></div>
+            <button onclick="this.closest('.notebook-table-wrapper').remove();" class="w-7 h-7 rounded-lg bg-destructive hover:bg-destructive/80 flex items-center justify-center text-[10px] font-medium text-destructive-foreground transition-colors" title="Delete table">✕</button>
+          </div>
+        </div>
+      `;
+      document.execCommand('insertHTML', false, tableHTML);
+    } else if (option.id === 'callout') {
+      document.execCommand('insertHTML', false, '<div class="bg-primary/10 border-l-4 border-primary p-3 my-2 rounded-r">Type your callout here...</div>');
+    } else if (option.id === 'toggle') {
+      document.execCommand('insertHTML', false, '<details class="my-2"><summary class="cursor-pointer font-medium">Toggle title</summary><div class="pl-4 pt-2">Toggle content...</div></details>');
+    } else if (option.id === 'todo') {
+      const todoHTML = `
+        <div class="notebook-todo-item flex items-center gap-3 my-2 py-2 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all group" contenteditable="false">
+          <label class="todo-checkbox-wrapper relative flex items-center justify-center w-5 h-5 cursor-pointer">
+            <input type="checkbox" class="peer sr-only" onchange="const text = this.closest('.notebook-todo-item').querySelector('.todo-text'); text.classList.toggle('line-through', this.checked); text.classList.toggle('text-muted-foreground', this.checked);" />
+            <div class="w-5 h-5 rounded-md border-2 border-primary/40 peer-checked:border-primary peer-checked:bg-primary transition-all duration-200 flex items-center justify-center">
+              <svg class="w-3 h-3 text-primary-foreground opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          </label>
+          <span contenteditable="true" class="todo-text flex-1 outline-none transition-all duration-200 text-sm">New task</span>
+          <button onclick="this.closest('.notebook-todo-item').remove();" class="w-6 h-6 rounded-md opacity-0 group-hover:opacity-100 bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center text-destructive transition-all duration-150" title="Delete">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      `;
+      document.execCommand('insertHTML', false, todoHTML);
+    } else if (option.id === 'link') {
+      const url = prompt('Enter URL:');
+      if (url) {
+        document.execCommand('createLink', false, url);
+      }
+    } else if (option.value) {
+      document.execCommand(option.command, false, option.value);
+    } else {
+      document.execCommand(option.command, false);
+    }
+    
+    if (isFullscreen) {
+      setFullscreenBlockMenuOpen(false);
+      setFullscreenShowBlockButton(false);
+    } else {
+      setIsBlockMenuOpen(false);
+      setShowBlockButton(false);
+    }
+  };
+
+  // Handle mouse move over editor to show block button
+  const handleEditorMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isLocked || isSelectedEntryInTrash) return;
+    
+    const editorContainer = editorContainerRef.current;
+    if (!editorContainer) return;
+    
+    const rect = editorContainer.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    
+    // Show button on the left side
+    setShowBlockButton(true);
+    setBlockButtonPosition({ x: 8, y: relativeY - 12 });
+  };
+
+  const handleEditorMouseLeave = () => {
+    if (!isBlockMenuOpen) {
+      setShowBlockButton(false);
+    }
+  };
+
+  const openBlockMenu = () => {
+    const editorContainer = editorContainerRef.current;
+    if (!editorContainer) return;
+    
+    setBlockMenuPosition({ x: blockButtonPosition.x + 32, y: blockButtonPosition.y });
+    setIsBlockMenuOpen(true);
+  };
+
+  // Fullscreen editor mouse handlers
+  const handleFullscreenEditorMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isLocked) return;
+    
+    const container = fullscreenEditorContainerRef.current;
+    if (!container) return;
+    
+    const rect = container.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    
+    setFullscreenShowBlockButton(true);
+    setFullscreenBlockButtonPosition({ x: 8, y: relativeY - 12 });
+  };
+
+  const handleFullscreenEditorMouseLeave = () => {
+    if (!fullscreenBlockMenuOpen) {
+      setFullscreenShowBlockButton(false);
+    }
+  };
+
+  const openFullscreenBlockMenu = () => {
+    setFullscreenBlockMenuPosition({ x: fullscreenBlockButtonPosition.x + 32, y: fullscreenBlockButtonPosition.y });
+    setFullscreenBlockMenuOpen(true);
+  };
+
+  // Text and highlight colors
+  const TEXT_COLORS = [
+    { id: 'default', label: 'Default', color: 'inherit' },
+    { id: 'red', label: 'Red', color: '#ef4444' },
+    { id: 'orange', label: 'Orange', color: '#f97316' },
+    { id: 'yellow', label: 'Yellow', color: '#eab308' },
+    { id: 'green', label: 'Green', color: '#22c55e' },
+    { id: 'blue', label: 'Blue', color: '#3b82f6' },
+    { id: 'purple', label: 'Purple', color: '#a855f7' },
+    { id: 'pink', label: 'Pink', color: '#ec4899' },
+    { id: 'gray', label: 'Gray', color: '#6b7280' },
+  ];
+
+  const HIGHLIGHT_COLORS = [
+    { id: 'none', label: 'None', color: 'transparent' },
+    { id: 'yellow', label: 'Yellow', color: 'rgba(234, 179, 8, 0.3)' },
+    { id: 'green', label: 'Green', color: 'rgba(34, 197, 94, 0.3)' },
+    { id: 'blue', label: 'Blue', color: 'rgba(59, 130, 246, 0.3)' },
+    { id: 'purple', label: 'Purple', color: 'rgba(168, 85, 247, 0.3)' },
+    { id: 'pink', label: 'Pink', color: 'rgba(236, 72, 153, 0.3)' },
+    { id: 'red', label: 'Red', color: 'rgba(239, 68, 68, 0.3)' },
+    { id: 'orange', label: 'Orange', color: 'rgba(249, 115, 22, 0.3)' },
+    { id: 'gray', label: 'Gray', color: 'rgba(107, 114, 128, 0.3)' },
+  ];
+
+  // Handle right-click context menu for text formatting
+  const handleContextMenu = (e: React.MouseEvent) => {
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 0) {
+      e.preventDefault();
+      setContextMenuPosition({ x: e.clientX, y: e.clientY });
+      setContextMenuOpen(true);
+      setShowTextColorPicker(false);
+      setShowHighlightColorPicker(false);
+    }
+  };
+
+  // Apply text color to selected text
+  const applyTextColor = (color: string) => {
+    if (color === 'inherit') {
+      document.execCommand('removeFormat', false);
+    } else {
+      document.execCommand('foreColor', false, color);
+    }
+    setContextMenuOpen(false);
+    setShowTextColorPicker(false);
+  };
+
+  // Apply highlight/background color to selected text
+  const applyHighlightColor = (color: string) => {
+    if (color === 'transparent') {
+      document.execCommand('removeFormat', false);
+    } else {
+      document.execCommand('hiliteColor', false, color);
+    }
+    setContextMenuOpen(false);
+    setShowHighlightColorPicker(false);
+  };
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuOpen) {
+        setContextMenuOpen(false);
+        setShowTextColorPicker(false);
+        setShowHighlightColorPicker(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [contextMenuOpen]);
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", { 
+      month: "short", 
+      day: "numeric", 
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    });
+  };
+
+  // Find linked trade for entry
+  const linkedTrade = selectedEntry?.tradeId ? trades.find((t) => t.id === selectedEntry.tradeId) : null;
+  const linkedNet = linkedTrade ? getTradeNetResult(linkedTrade) : 0;
+  const { data: linkedTradeDetail } = useTradeDetail(userId, selectedEntry?.tradeId ?? null);
+  const linkedTradeChecklistState = linkedTradeDetail?.checklistState ?? linkedTrade?.checklistState;
+  
+  // Find the checklist used for the linked trade
+  const linkedChecklist = linkedTrade?.checklistId 
+    ? checklists.find(c => c.id === linkedTrade.checklistId) 
+    : null;
+  // Calculate overall trade stats
+  const tradeStats = journalTradeStats(trades);
+  const overallStats = {
+    totalTrades: tradeStats.total,
+    wins: tradeStats.wins,
+    losses: tradeStats.losses,
+    netPnL: tradeStats.netPnL,
+    winRate: tradeStats.winRate,
+  };
+
+  // Get font family from NOTEBOOK_FONTS array
+  const selectedFontFamily = useMemo(() => {
+    const font = NOTEBOOK_FONTS.find(f => f.id === notebookFont);
+    return font?.family || "'Inter', sans-serif";
+  }, [notebookFont]);
+
+  const isViewingTrash = selectedCategory === "trash";
+  const isSelectedEntryInTrash = selectedEntry?.isDeleted;
+
+  return (
+    <>
+    {/* Fullscreen Overlay */}
+    {(isFullWidth || isFullWidthClosing) && selectedEntry && (
+      <div 
+        className={cn(
+          "fixed inset-0 z-50 bg-background/60 backdrop-blur-2xl flex items-center justify-center p-4 md:p-8 transition-all duration-300",
+          isFullWidthClosing ? "opacity-0" : "opacity-100"
+        )}
+        onClick={closeFullscreen}
+      >
+        {/* Fullscreen Container - Glass morphism card */}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ 
+            opacity: isFullWidthClosing ? 0 : 1, 
+            scale: isFullWidthClosing ? 0.95 : 1, 
+            y: isFullWidthClosing ? 20 : 0 
+          }}
+          transition={{ 
+            duration: 0.35, 
+            ease: [0.25, 0.46, 0.45, 0.94],
+            scale: { type: "spring", stiffness: 300, damping: 25 }
+          }}
+          className="perf-contain w-full max-w-4xl h-[90vh] glass-strong rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.3 }}
+            className="flex items-center justify-between px-6 py-4 border-b border-border/20"
+          >
+            <h2 className="text-xl font-semibold tracking-tight">Notes</h2>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-9 w-9 p-0 rounded-xl hover:bg-muted/50"
+              >
+                <Share2 className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  closeFullscreen();
+                }}
+                className="h-9 px-4 rounded-xl text-sm hover:bg-muted/50"
+              >
+                Discard
+              </Button>
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => {
+                  handleSave();
+                  closeFullscreen();
+                }}
+                disabled={isLocked} 
+                className="h-9 px-5 rounded-xl text-sm bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+              >
+                Save & Close
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={closeFullscreen}
+                className="h-9 w-9 p-0 rounded-xl hover:bg-destructive/10 hover:text-destructive ml-1"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </motion.div>
+
+          {/* Formatting Toolbar */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15, duration: 0.3 }}
+            className="flex items-center justify-center gap-1 px-6 py-3 border-b border-border/10"
+          >
+            <div className="flex items-center gap-1 bg-muted/30 rounded-xl p-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('bold')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <Bold className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('italic')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <Italic className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('underline')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <Underline className="w-4 h-4" />
+              </Button>
+              
+              <div className="w-px h-5 bg-border/50 mx-1" />
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('justifyLeft')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <AlignLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('justifyCenter')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <AlignCenter className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('justifyRight')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <AlignRight className="w-4 h-4" />
+              </Button>
+              
+              <div className="w-px h-5 bg-border/50 mx-1" />
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const url = prompt('Enter URL:');
+                  if (url) document.execCommand('createLink', false, url);
+                }}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <Link className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => document.execCommand('formatBlock', false, 'blockquote')}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
+                disabled={isLocked}
+              >
+                <Quote className="w-4 h-4" />
+              </Button>
+            </div>
+          </motion.div>
+
+          {/* Content Area */}
+          <ScrollArea
+            className="flex-1 cursor-text"
+            onClick={(e) => handleEditorAreaClick(e, fullscreenEditorRef.current)}
+          >
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.4 }}
+              ref={fullscreenEditorContainerRef}
+              className="max-w-3xl mx-auto px-8 md:px-12 py-8"
+              onMouseMove={handleFullscreenEditorMouseMove}
+              onMouseLeave={handleFullscreenEditorMouseLeave}
+            >
+              {/* Title Section */}
+              <div className="mb-6">
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium">
+                  Title
+                </span>
+                <Input
+                  ref={fullscreenTitleRef}
+                  defaultValue={selectedEntry?.title || ""}
+                  placeholder="Untitled"
+                  disabled={isLocked}
+                  className="text-xl font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 mt-1"
+                />
+              </div>
+
+              {/* Floating Block Button - Fullscreen */}
+              {fullscreenShowBlockButton && !isLocked && (
+                <div
+                  className="absolute z-20"
+                  style={{ left: fullscreenBlockButtonPosition.x, top: fullscreenBlockButtonPosition.y }}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-6 h-6 p-0 opacity-30 hover:opacity-100 hover:bg-muted rounded transition-opacity duration-150"
+                    onClick={openFullscreenBlockMenu}
+                  >
+                    <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                  </Button>
+                </div>
+              )}
+
+              {/* Block Format Menu - Fullscreen */}
+              {fullscreenBlockMenuOpen && (
+                <div
+                  className="absolute z-50 bg-background border border-border rounded-xl shadow-xl py-1 w-48 max-h-64 overflow-y-auto animate-scale-in"
+                  style={{ left: fullscreenBlockMenuPosition.x, top: fullscreenBlockMenuPosition.y }}
+                  onMouseLeave={() => {
+                    setFullscreenBlockMenuOpen(false);
+                    setFullscreenShowBlockButton(false);
+                  }}
+                >
+                  <div className="px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
+                    Basic blocks
+                  </div>
+                  {BLOCK_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => handleBlockFormat(option, true)}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted/50 transition-colors text-left group"
+                      >
+                        <div className="w-6 h-6 flex items-center justify-center rounded border border-border/50 bg-background group-hover:border-primary/30 transition-colors">
+                          <Icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                        </div>
+                        <span className="flex-1">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Editor Content */}
+              <div
+                ref={fullscreenEditorRef}
+                contentEditable={!isLocked}
+                style={{ fontFamily: selectedFontFamily }}
+                onInput={(e) => updateEditorStats(e.currentTarget)}
+                data-placeholder="Start writing your notes..."
+                className={cn(
+                  "min-h-[calc(100vh-400px)] outline-none focus:outline-none caret-primary",
+                  isSmallText ? "text-sm leading-relaxed" : "text-base leading-loose",
+                  isLocked && "cursor-not-allowed opacity-70",
+                  "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-3",
+                  "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2",
+                  "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2",
+                  "[&_p]:mb-3 [&_p]:text-foreground/90",
+                  "[&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-3 [&_ul]:space-y-1",
+                  "[&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-3 [&_ol]:space-y-1",
+                  "[&_li]:text-foreground/90 [&_li]:pl-1",
+                  "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/60 [&_blockquote]:pl-4 [&_blockquote]:py-1 [&_blockquote]:italic [&_blockquote]:text-foreground/80 [&_blockquote]:my-4 [&_blockquote]:bg-primary/5 [&_blockquote]:rounded-r-lg",
+                  "[&_strong]:font-semibold [&_strong]:text-foreground",
+                  "[&_em]:italic",
+                  "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:hover:text-primary/80",
+                  "[&_.notebook-table-wrapper]:relative",
+                  "[&_.notebook-table]:rounded-xl [&_.notebook-table]:overflow-hidden",
+                  "[&_.notebook-table_td]:bg-background/50 [&_.notebook-table_td]:hover:bg-muted/50 [&_.notebook-table_td]:transition-colors",
+                  "[&_.notebook-table_td:focus]:outline-none [&_.notebook-table_td:focus]:ring-2 [&_.notebook-table_td:focus]:ring-primary/30 [&_.notebook-table_td:focus]:ring-inset"
+                )}
+                suppressContentEditableWarning
+              />
+            </motion.div>
+          </ScrollArea>
+        </motion.div>
+      </div>
+    )}
+    
+    <div className={cn(
+      "h-[calc(100vh-200px)] flex gap-4 transition-all duration-300 relative",
+      isFullWidth && "invisible"
+    )}>
+      {/* Bookmark Tab Toggle - Folders */}
+      {!isEntriesPanelOpen && !isFoldersPanelOpen && (
+        <button
+          onMouseEnter={() => setIsFoldersPanelOpen(true)}
+          className="bookmark-tab bookmark-tab--folders"
+          style={{ top: '72px', animationDelay: '0.05s' }}
+          title="Open folders"
+        >
+          <FolderOpen className="w-4 h-4" />
+          <span className="bookmark-label">Folders</span>
+        </button>
+      )}
+
+      {/* Bookmark Tab Toggle - Notes */}
+      {!isEntriesPanelOpen && !isFoldersPanelOpen && (
+        <button
+          onMouseEnter={() => setIsEntriesPanelOpen(true)}
+          className="bookmark-tab"
+          style={{ top: '136px', animationDelay: '0.12s' }}
+          title="Open notes list"
+        >
+          <FileText className="w-4 h-4" />
+          <span className="bookmark-label">Notes</span>
+        </button>
+      )}
+
+      {/* Editor - Full width with toggle for entries panel */}
+      <div className="flex-1 flex overflow-hidden gap-3 relative" onClick={() => (isEntriesPanelOpen || isFoldersPanelOpen) && (closeEntriesPanel(), closeFoldersPanel())}>
+        {/* Folders Panel - displayed in same location as entries panel */}
+        {isFoldersPanelOpen && !isEntriesPanelOpen && (
+          <div 
+            className={cn(
+              "w-72 flex-shrink-0 notebook-panel rounded-2xl overflow-hidden flex flex-col",
+              isFoldersPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col h-[400px]">
+              {/* Header */}
+              <div className="relative p-3 border-b border-border/30 space-y-2 shrink-0">
+                <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" aria-hidden />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center">
+                      <FolderOpen className="w-3.5 h-3.5 text-primary" />
+                    </span>
+                    <span className="font-semibold text-sm">Folders</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsAddFolderDialogOpen(true)}
+                    className="h-7 w-7 p-0 hover:bg-primary/10 hover:text-primary transition-colors"
+                  >
+                    <FolderPlus className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Search folders..."
+                    value={folderSearchQuery}
+                    onChange={(e) => setFolderSearchQuery(e.target.value)}
+                    className="h-8 pl-7 text-xs rounded-lg border border-border/40 bg-card/50 focus-visible:ring-2 focus-visible:ring-primary/40"
+                  />
+                </div>
+              </div>
+
+              {/* Categories */}
+              <ScrollArea className="flex-1 overflow-hidden">
+                <div className="p-2 space-y-0.5">
+                  {CATEGORIES.filter(c => c.id !== "trash" && c.label.toLowerCase().includes(deferredFolderSearch.toLowerCase())).map((cat) => {
+                    const Icon = cat.icon;
+                    const count = cat.id === "all" 
+                      ? notebookEntries.filter(e => !e.isDeleted).length 
+                      : notebookEntries.filter((e) => e.category === cat.id && !e.isDeleted).length;
+                    const markerColor = getFolderMarkerColor(cat.id);
+                    
+                    return (
+                      <div
+                        key={cat.id}
+                        className={cn(
+                          "relative group/folder flex items-center gap-1 rounded-lg",
+                          cat.id !== "all" && dropTargetId === cat.id && "ring-2 ring-primary/45 bg-primary/10",
+                        )}
+                        onDragOver={cat.id === "all" ? undefined : (event) => handleFolderDragOver(event, cat.id)}
+                        onDragLeave={cat.id === "all" ? undefined : (event) => handleFolderDragLeave(event, cat.id)}
+                        onDrop={cat.id === "all" ? undefined : (event) => handleNoteDropOnFolder(event, cat.id)}
+                      >
+                        {/* Color Marker */}
+                        {markerColor && (
+                          <div 
+                            className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full"
+                            style={{ backgroundColor: markerColor, boxShadow: `0 0 8px ${markerColor}` }}
+                          />
+                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedCategory(cat.id);
+                            setSelectedEntryId(null);
+                            setIsCreatingNew(false);
+                            closeFoldersPanel();
+                            setIsEntriesPanelOpen(true);
+                          }}
+                          className={cn(
+                            "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all duration-200",
+                            markerColor && "pl-3",
+                            selectedCategory === cat.id
+                              ? "bg-primary/15 text-primary border border-primary/25 shadow-[0_0_12px_hsl(var(--primary)/0.15)]"
+                              : "border border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground hover:translate-x-0.5"
+                          )}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          <span className="flex-1 text-left truncate">{cat.label}</span>
+                          <span className="text-[10px] text-muted-foreground">{count}</span>
+                        </button>
+                        
+                        {/* Marker Color Picker */}
+                        {cat.id !== "all" && (
+                          <DropdownMenu onOpenChange={setIsColorPickerOpen}>
+                            <DropdownMenuTrigger asChild>
+                              <button 
+                                className="w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-accent flex items-center justify-center transition-all border border-border shadow-sm"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div 
+                                  className={cn(
+                                    "w-3 h-3 rounded-full border",
+                                    markerColor ? "border-white/60" : "border-dashed border-foreground/40 bg-muted"
+                                  )}
+                                  style={{ backgroundColor: markerColor || undefined }}
+                                />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-36 p-2 bg-popover border border-border z-50">
+                              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-1">Marker Color</div>
+                              <div className="grid grid-cols-5 gap-1.5">
+                                {MARKER_COLORS.map((color) => (
+                                  <button
+                                    key={color.id}
+                                    onClick={() => handleSetFolderMarker(cat.id, color.id)}
+                                    className={cn(
+                                      "w-5 h-5 rounded-full border-2 transition-all hover:scale-110 shadow-sm",
+                                      folderMarkers[cat.id] === color.id 
+                                        ? "border-foreground ring-2 ring-primary/30" 
+                                        : "border-white/30 hover:border-foreground/50",
+                                      color.id === 'none' && "border-dashed border-muted-foreground/50 bg-muted/50"
+                                    )}
+                                    style={{ backgroundColor: color.id === 'none' ? 'transparent' : color.color }}
+                                    title={color.label}
+                                  />
+                                ))}
+                              </div>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Custom Folders */}
+                  {customFolders.filter(f => f.label.toLowerCase().includes(deferredFolderSearch.toLowerCase())).length > 0 && (
+                    <>
+                      <div className="text-[9px] uppercase tracking-wider text-muted-foreground px-2 pt-3 pb-1">
+                        Custom
+                      </div>
+                      {customFolders.filter(f => f.label.toLowerCase().includes(deferredFolderSearch.toLowerCase())).map((folder) => {
+                        const count = notebookEntries.filter((e) => e.category === folder.id && !e.isDeleted).length;
+                        const markerColor = getFolderMarkerColor(folder.id);
+                        
+                          return (
+                          <div
+                            key={folder.id}
+                            className={cn(
+                              "relative group/folder flex items-center gap-1 rounded-lg",
+                              dropTargetId === folder.id && "ring-2 ring-primary/45 bg-primary/10",
+                            )}
+                            onDragOver={(event) => handleFolderDragOver(event, folder.id)}
+                            onDragLeave={(event) => handleFolderDragLeave(event, folder.id)}
+                            onDrop={(event) => handleNoteDropOnFolder(event, folder.id)}
+                          >
+                            {markerColor && (
+                              <div 
+                                className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full"
+                                style={{ backgroundColor: markerColor, boxShadow: `0 0 8px ${markerColor}` }}
+                              />
+                            )}
+                            <button
+                              onClick={() => {
+                                setSelectedCategory(folder.id);
+                                setSelectedEntryId(null);
+                                setIsCreatingNew(false);
+                                closeFoldersPanel();
+                                setIsEntriesPanelOpen(true);
+                              }}
+                              className={cn(
+                                "flex-1 flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all duration-200",
+                                markerColor && "pl-3",
+                                selectedCategory === folder.id
+                                  ? "bg-primary/15 text-primary border border-primary/25 shadow-[0_0_12px_hsl(var(--primary)/0.15)]"
+                                  : "border border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground hover:translate-x-0.5"
+                              )}
+                            >
+                              <FolderOpen className="w-3.5 h-3.5" />
+                              <span className="flex-1 text-left truncate">{folder.label}</span>
+                              <span className="text-[10px] text-muted-foreground">{count}</span>
+                            </button>
+                            
+                            {/* Delete Folder Button */}
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <ConfirmDialog
+                                trigger={
+                                  <button 
+                                    className="w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-all border border-border shadow-sm"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                }
+                                title="Delete Folder"
+                                description={`Are you sure you want to delete "${folder.label}"? Notes in this folder will be moved to General Notes.`}
+                                confirmLabel="Delete"
+                                variant="destructive"
+                                onConfirm={() => handleDeleteFolder(folder.id)}
+                              />
+                            </div>
+                            
+                            <DropdownMenu onOpenChange={setIsColorPickerOpen}>
+                              <DropdownMenuTrigger asChild>
+                                <button 
+                                  className="w-6 h-6 rounded-md opacity-0 group-hover/folder:opacity-100 bg-background hover:bg-accent flex items-center justify-center transition-all border border-border shadow-sm"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <div 
+                                    className={cn(
+                                      "w-3 h-3 rounded-full border",
+                                      markerColor ? "border-white/60" : "border-dashed border-foreground/40 bg-muted"
+                                    )}
+                                    style={{ backgroundColor: markerColor || undefined }}
+                                  />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-36 p-2 bg-popover border border-border z-50">
+                                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-1">Marker Color</div>
+                                <div className="grid grid-cols-5 gap-1.5">
+                                  {MARKER_COLORS.map((color) => (
+                                    <button
+                                      key={color.id}
+                                      onClick={() => handleSetFolderMarker(folder.id, color.id)}
+                                      className={cn(
+                                        "w-5 h-5 rounded-full border-2 transition-all hover:scale-110 shadow-sm",
+                                        folderMarkers[folder.id] === color.id 
+                                          ? "border-foreground ring-2 ring-primary/30" 
+                                          : "border-white/30 hover:border-foreground/50",
+                                        color.id === 'none' && "border-dashed border-muted-foreground/50 bg-muted/50"
+                                      )}
+                                      style={{ backgroundColor: color.id === 'none' ? 'transparent' : color.color }}
+                                      title={color.label}
+                                    />
+                                  ))}
+                                </div>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {/* Trash */}
+                  <div
+                    className="pt-2 mt-2 border-t border-border/30"
+                    onDragOver={(event) => handleFolderDragOver(event, "trash")}
+                    onDragLeave={(event) => handleFolderDragLeave(event, "trash")}
+                    onDrop={(event) => handleNoteDropOnFolder(event, "trash")}
+                  >
+                    <button
+                      onClick={() => {
+                        setSelectedCategory("trash");
+                        setSelectedEntryId(null);
+                        setIsCreatingNew(false);
+                        closeFoldersPanel();
+                        setIsEntriesPanelOpen(true);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all",
+                        selectedCategory === "trash"
+                          ? "bg-destructive/20 text-destructive"
+                          : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
+                        dropTargetId === "trash" && "ring-2 ring-destructive/40 bg-destructive/10 text-destructive"
+                      )}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span className="flex-1 text-left">Trash</span>
+                      {trashCount > 0 && (
+                        <span className="text-[10px] text-destructive">{trashCount}</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+        )}
+
+        {/* Entries List Panel - Left Side */}
+        {isEntriesPanelOpen && (
+          <div 
+            className={cn(
+              "w-72 flex-shrink-0 notebook-panel rounded-2xl overflow-hidden flex flex-col",
+              isEntriesPanelClosing ? "animate-entries-panel-out" : "animate-entries-panel-in"
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative p-3 border-b border-border/30 space-y-2">
+              <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" aria-hidden />
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => { closeEntriesPanel(); setIsFoldersPanelOpen(true); }} className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary transition-colors">
+                  <PanelLeftOpen className="w-4 h-4" />
+                </Button>
+                <span className="text-sm font-semibold flex-1">
+                  {selectedCategory.startsWith("custom_") 
+                    ? customFolders.find(f => f.id === selectedCategory)?.label || "Folder"
+                    : CATEGORIES.find((c) => c.id === selectedCategory)?.label}
+                </span>
+                <Button variant="ghost" size="sm" onClick={closeEntriesPanel} className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive">
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="relative">
+                <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-7 text-xs pl-7 rounded-lg border border-border/40 bg-card/50 focus-visible:ring-2 focus-visible:ring-primary/40" />
+              </div>
+            </div>
+            <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto custom-scrollbar">
+              <div className="p-2">
+                {sidebarRows.length === 0 ? (
+                  <div className="text-center text-xs text-muted-foreground py-8">No notes yet</div>
+                ) : (
+                  <div
+                    style={{ height: `${sidebarVirtualizer.getTotalSize()}px`, position: 'relative' }}
+                  >
+                    {sidebarVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const row = sidebarRows[virtualRow.index];
+                      if (!row) return null;
+                      if (row.type === 'header') {
+                        return (
+                          <div
+                            key={`h-${row.date}`}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              transform: `translateY(${virtualRow.start}px)`,
+                            }}
+                            ref={sidebarVirtualizer.measureElement}
+                            data-index={virtualRow.index}
+                          >
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1">{formatDate(row.date)}</div>
+                          </div>
+                        );
+                      }
+                      const entry = row.entry;
+                      return (
+                        <div
+                          key={entry.id}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                          ref={sidebarVirtualizer.measureElement}
+                          data-index={virtualRow.index}
+                        >
+                          <button
+                            draggable={!entry.isDeleted}
+                            onDragStart={(event) => handleNoteDragStart(event, entry.id)}
+                            onDragEnd={() => setDropTargetId(null)}
+                            onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
+                            className={cn("w-full text-left p-2 rounded-lg transition-all duration-200 mb-1 border cursor-grab active:cursor-grabbing", selectedEntryId === entry.id ? "bg-primary/15 border-primary/30 shadow-[0_0_12px_hsl(var(--primary)/0.15)]" : "border-transparent hover:bg-muted/50 hover:translate-x-0.5")}
+                          >
+                            <div className="flex items-center gap-2">
+                              <ChevronRight className={cn("w-3 h-3 transition-transform duration-200", selectedEntryId === entry.id && "rotate-90 text-primary")} />
+                              <span className={cn("text-xs font-medium truncate", selectedEntryId === entry.id && "text-primary")}>{entry.title}</span>
+                            </div>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        
+        <div className="flex-1 overflow-hidden flex flex-col">
+        {selectedEntry || isCreatingNew ? (
+          <motion.div
+            key={selectedEntry?.id || 'new-note'}
+            initial={{ opacity: 0, x: 30, scale: 0.98 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{ 
+              duration: 0.4, 
+              ease: [0.25, 0.46, 0.45, 0.94],
+              opacity: { duration: 0.3 },
+              scale: { duration: 0.35 }
+            }}
+            className="flex flex-col flex-1 overflow-hidden"
+          >
+            {/* Header */}
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="p-4 border-b border-border/30"
+            >
+              {/* Trash Banner */}
+              {isSelectedEntryInTrash && (
+                <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/30 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-destructive">
+                    <Trash2 className="w-4 h-4" />
+                    <span>This note is in the trash</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRestoreFromTrash}
+                      className="h-7 text-xs border-primary/50 text-primary hover:bg-primary/10"
+                    >
+                      <RotateCcw className="w-3 h-3 mr-1" />
+                      Restore
+                    </Button>
+                    <ConfirmDialog
+                      trigger={
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs border-destructive/50 text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Delete Forever
+                        </Button>
+                      }
+                      title="Delete Permanently"
+                      description="Are you sure you want to permanently delete this note? This action cannot be undone."
+                      confirmLabel="Delete Forever"
+                      variant="destructive"
+                      onConfirm={handlePermanentDelete}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-2 flex-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleFoldersPanel}
+                    className="h-8 w-8 p-0 shrink-0"
+                  >
+                    <PanelLeftOpen className="w-4 h-4" />
+                  </Button>
+                  <div className="flex-1">
+                    <Input
+                      ref={titleRef}
+                      defaultValue={selectedEntry?.title || ""}
+                      placeholder="Note title..."
+                      disabled={isLocked || isSelectedEntryInTrash}
+                      className={cn(
+                        "text-lg font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0 focus:ring-0 focus:outline-none placeholder:text-muted-foreground/50",
+                        (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70"
+                      )}
+                    />
+                    <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground flex-wrap">
+                      <Calendar className="w-3 h-3" />
+                      <span>{selectedEntry ? formatDate(selectedEntry.date) : formatDate(new Date().toISOString().slice(0, 10))}</span>
+                      {selectedEntry && (
+                        <>
+                          <span>•</span>
+                          <span>Last updated: {new Date(selectedEntry.updatedAt).toLocaleTimeString()}</span>
+                        </>
+                      )}
+                      {linkedTrade && (
+                        <>
+                          <span>•</span>
+                          <Badge variant="outline" className="text-[10px] border-secondary/50 bg-secondary/10">
+                            <TrendingUp className="w-3 h-3 mr-1" />
+                            Trade Note
+                          </Badge>
+                        </>
+                      )}
+                      {isLocked && (
+                        <>
+                          <span>•</span>
+                          <Badge variant="outline" className="text-[10px] border-yellow-500/50 bg-yellow-500/10 text-yellow-600">
+                            <Lock className="w-3 h-3 mr-1" />
+                            Locked
+                          </Badge>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions - hidden for trash items */}
+              {!isSelectedEntryInTrash && (
+                <div className="flex items-center gap-2 mt-4">
+                  <div className="flex-1" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 bg-background border border-border z-50 p-2">
+                      {/* Font Style Selector */}
+                      <div className="flex items-center justify-center gap-2 mb-2 p-1">
+                        <button 
+                          onClick={() => onFontChange?.('inter')}
+                          className={cn(
+                            "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors",
+                            notebookFont === 'inter' ? "bg-primary/20 text-primary" : "hover:bg-muted"
+                          )}
+                        >
+                          <span className="text-lg font-sans">Ag</span>
+                          <span className="text-[10px] text-muted-foreground">Default</span>
+                        </button>
+                        <button 
+                          onClick={() => onFontChange?.('merriweather')}
+                          className={cn(
+                            "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors",
+                            notebookFont === 'merriweather' ? "bg-primary/20 text-primary" : "hover:bg-muted"
+                          )}
+                        >
+                          <span className="text-lg font-serif">Ag</span>
+                          <span className="text-[10px] text-muted-foreground">Serif</span>
+                        </button>
+                        <button 
+                          onClick={() => onFontChange?.('source-code')}
+                          className={cn(
+                            "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors",
+                            notebookFont === 'source-code' ? "bg-primary/20 text-primary" : "hover:bg-muted"
+                          )}
+                        >
+                          <span className="text-lg font-mono">Ag</span>
+                          <span className="text-[10px] text-muted-foreground">Mono</span>
+                        </button>
+                      </div>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleDuplicate} className="text-xs">
+                        <Copy className="w-3.5 h-3.5 mr-2" />
+                        Duplicate
+                        <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+D</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger className="text-xs">
+                          <FolderInput className="w-3.5 h-3.5 mr-2" />
+                          Move to
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                          <DropdownMenuSubContent className="w-48 z-[100] max-h-64 overflow-y-auto">
+                            {CATEGORIES.filter(c => c.id !== "all" && c.id !== "trash" && c.id !== selectedEntry?.category).map((cat) => {
+                              const Icon = cat.icon;
+                              return (
+                                <DropdownMenuItem
+                                  key={cat.id}
+                                  onClick={() => selectedEntry && handleMoveToCategory(selectedEntry, cat.id)}
+                                  className="text-xs"
+                                >
+                                  <Icon className="w-3.5 h-3.5 mr-2" />
+                                  {cat.label}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                            {customFolders.length > 0 && (
+                              <>
+                                <DropdownMenuSeparator />
+                                {customFolders.filter(f => f.id !== selectedEntry?.category).map((folder) => (
+                                  <DropdownMenuItem
+                                    key={folder.id}
+                                    onClick={() => selectedEntry && handleMoveToCategory(selectedEntry, folder.id)}
+                                    className="text-xs"
+                                  >
+                                    <FolderOpen className="w-3.5 h-3.5 mr-2" style={{ color: folder.color || 'currentColor' }} />
+                                    {folder.label}
+                                  </DropdownMenuItem>
+                                ))}
+                              </>
+                            )}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                      </DropdownMenuSub>
+                      <DropdownMenuItem onClick={handleMoveToTrash} className="text-xs text-destructive">
+                        <Trash2 className="w-3.5 h-3.5 mr-2" />
+                        Move to Trash
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <div className="flex items-center justify-between px-2 py-1.5">
+                        <div className="flex items-center gap-2 text-xs">
+                          <Type className="w-3.5 h-3.5" />
+                          Small text
+                        </div>
+                        <Switch 
+                          checked={isSmallText} 
+                          onCheckedChange={setIsSmallText}
+                          className="scale-75"
+                        />
+                      </div>
+                      <DropdownMenuItem 
+                        onClick={() => setIsFullWidth(true)} 
+                        className="flex items-center justify-between text-xs"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Maximize2 className="w-3.5 h-3.5" />
+                          Full width
+                        </div>
+                        <Switch 
+                          checked={isFullWidth} 
+                          onCheckedChange={() => setIsFullWidth(true)}
+                          className="scale-75 pointer-events-none"
+                        />
+                      </DropdownMenuItem>
+                      <div className="flex items-center justify-between px-2 py-1.5">
+                        <div className="flex items-center gap-2 text-xs">
+                          <Lock className="w-3.5 h-3.5" />
+                          Lock page
+                        </div>
+                        <Switch 
+                          checked={isLocked} 
+                          onCheckedChange={setIsLocked}
+                          className="scale-75"
+                        />
+                      </div>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleUndo} className="text-xs">
+                        <Undo2 className="w-3.5 h-3.5 mr-2" />
+                        Undo
+                        <span className="ml-auto text-[10px] text-muted-foreground">Ctrl+Z</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleTranslate} className="text-xs">
+                        <Languages className="w-3.5 h-3.5 mr-2" />
+                        Translate
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleSpellCheck} className="text-xs">
+                        <SpellCheck className="w-3.5 h-3.5 mr-2" />
+                        Spell Check
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleExport} className="text-xs">
+                        <Download className="w-3.5 h-3.5 mr-2" />
+                        Export
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button size="sm" onClick={handleSave} disabled={isLocked || isSelectedEntryInTrash} className="h-7 px-3 text-xs rounded-lg bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] text-primary-foreground border-0 shadow-[0_2px_12px_hsl(var(--primary)/0.35)] hover:shadow-[0_4px_18px_hsl(var(--primary)/0.5)] hover:opacity-95 transition-all">
+                    <Save className="w-3 h-3 mr-1" />
+                    Save
+                  </Button>
+                </div>
+              )}
+            </motion.div>
+
+            {/* Formatting Toolbar - Word-style */}
+            {!isSelectedEntryInTrash && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.15, duration: 0.3 }}
+                className="flex items-center gap-1 px-4 py-2 mx-3 mt-2 rounded-xl border border-border/40 bg-card/60 backdrop-blur shadow-[0_4px_16px_-8px_hsl(var(--foreground)/0.15)]"
+              >
+                {/* Font Selector */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 rounded hover:bg-muted text-xs gap-1 min-w-[120px] justify-between"
+                      disabled={isLocked}
+                    >
+                      <span style={{ fontFamily: NOTEBOOK_FONTS.find(f => f.id === notebookFont)?.family }}>
+                        {NOTEBOOK_FONTS.find(f => f.id === notebookFont)?.name || 'Inter'}
+                      </span>
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto bg-background border border-border z-50">
+                    {/* Sans Serif */}
+                    <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
+                      Sans Serif
+                    </div>
+                    {NOTEBOOK_FONTS.filter(f => f.category === 'Sans Serif').map((font) => (
+                      <DropdownMenuItem 
+                        key={font.id}
+                        onClick={() => onFontChange?.(font.id)}
+                        className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
+                        style={{ fontFamily: font.family }}
+                      >
+                        {font.name}
+                      </DropdownMenuItem>
+                    ))}
+                    {/* Serif */}
+                    <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background mt-1">
+                      Serif
+                    </div>
+                    {NOTEBOOK_FONTS.filter(f => f.category === 'Serif').map((font) => (
+                      <DropdownMenuItem 
+                        key={font.id}
+                        onClick={() => onFontChange?.(font.id)}
+                        className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
+                        style={{ fontFamily: font.family }}
+                      >
+                        {font.name}
+                      </DropdownMenuItem>
+                    ))}
+                    {/* Monospace */}
+                    <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background mt-1">
+                      Monospace
+                    </div>
+                    {NOTEBOOK_FONTS.filter(f => f.category === 'Monospace').map((font) => (
+                      <DropdownMenuItem 
+                        key={font.id}
+                        onClick={() => onFontChange?.(font.id)}
+                        className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
+                        style={{ fontFamily: font.family }}
+                      >
+                        {font.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <div className="w-px h-5 bg-border/50 mx-1" />
+                
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('bold')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Bold (Ctrl+B)"
+                  >
+                    <Bold className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('italic')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Italic (Ctrl+I)"
+                  >
+                    <Italic className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('underline')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Underline (Ctrl+U)"
+                  >
+                    <Underline className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('strikeThrough')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Strikethrough"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+                
+                <div className="w-px h-5 bg-border/50 mx-1" />
+                
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('justifyLeft')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Align Left"
+                  >
+                    <AlignLeft className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('justifyCenter')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Align Center"
+                  >
+                    <AlignCenter className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('justifyRight')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Align Right"
+                  >
+                    <AlignRight className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+                
+                <div className="w-px h-5 bg-border/50 mx-1" />
+                
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('insertUnorderedList')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Bullet List"
+                  >
+                    <List className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('insertOrderedList')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Numbered List"
+                  >
+                    <ListOrdered className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+                
+                <div className="w-px h-5 bg-border/50 mx-1" />
+                
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const url = prompt('Enter URL:');
+                      if (url) document.execCommand('createLink', false, url);
+                    }}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Insert Link"
+                  >
+                    <Link className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => document.execCommand('formatBlock', false, 'blockquote')}
+                    className="h-7 w-7 p-0 rounded hover:bg-muted"
+                    disabled={isLocked}
+                    title="Quote"
+                  >
+                    <Quote className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Editor with Block Menu */}
+            <ScrollArea className="flex-1">
+              <div 
+                ref={editorContainerRef}
+                className="relative min-h-full cursor-text"
+                onMouseMove={handleEditorMouseMove}
+                onMouseLeave={handleEditorMouseLeave}
+                onClick={(e) => handleEditorAreaClick(e, editorRef.current)}
+              >
+                {/* Floating Block Button */}
+                {showBlockButton && !isLocked && !isSelectedEntryInTrash && (
+                  <div
+                    className="absolute z-20"
+                    style={{ left: blockButtonPosition.x, top: blockButtonPosition.y }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-6 h-6 p-0 opacity-30 hover:opacity-100 hover:bg-muted rounded transition-opacity duration-150"
+                      onClick={openBlockMenu}
+                    >
+                      <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Block Format Menu */}
+                {isBlockMenuOpen && (
+                  <div
+                    className="absolute z-50 bg-background border border-border rounded-lg shadow-xl py-1 w-48 max-h-64 overflow-y-auto animate-scale-in"
+                    style={{ left: blockMenuPosition.x, top: blockMenuPosition.y }}
+                    onMouseLeave={() => {
+                      setIsBlockMenuOpen(false);
+                      setShowBlockButton(false);
+                    }}
+                  >
+                    <div className="px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
+                      Basic blocks
+                    </div>
+                    {BLOCK_OPTIONS.map((option) => {
+                      const Icon = option.icon;
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => handleBlockFormat(option)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted/50 transition-colors text-left group"
+                        >
+                          <div className="w-6 h-6 flex items-center justify-center rounded border border-border/50 bg-background group-hover:border-primary/30 transition-colors">
+                            <Icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                          </div>
+                          <span className="flex-1">{option.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div
+                  ref={editorRef}
+                  contentEditable={!isLocked && !isSelectedEntryInTrash}
+                  style={{ fontFamily: selectedFontFamily }}
+                  onContextMenu={handleContextMenu}
+                  onInput={(e) => updateEditorStats(e.currentTarget)}
+                  className={cn(
+                    "min-h-[calc(100vh-430px)] p-4 pl-12 pr-12 pb-16 outline-none focus:outline-none focus-visible:outline-none transition-all caret-primary",
+                    isSmallText ? "text-xs" : "text-sm",
+                    (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70",
+                    "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2",
+                    "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2",
+                    "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1",
+                    "[&_p]:mb-2",
+                    "[&_ul]:list-disc [&_ul]:ml-5 [&_ul]:mb-2",
+                    "[&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:mb-2",
+                    "[&_li]:text-foreground [&_li]:mb-1",
+                    "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2",
+                    "[&_strong]:font-semibold",
+                    "[&_em]:italic",
+                    "[&_.notebook-table-wrapper]:relative",
+                    "[&_.notebook-table]:rounded-xl [&_.notebook-table]:overflow-hidden",
+                    "[&_.notebook-table_td]:bg-background/50 [&_.notebook-table_td]:hover:bg-muted/50 [&_.notebook-table_td]:transition-colors",
+                    "[&_.notebook-table_td:focus]:outline-none [&_.notebook-table_td:focus]:ring-2 [&_.notebook-table_td:focus]:ring-primary/30 [&_.notebook-table_td:focus]:ring-inset"
+                  )}
+                  data-placeholder="Start writing your notes..."
+                />
+              </div>
+            </ScrollArea>
+
+            {/* Writing status bar — live word/char count, reading time, autosave state */}
+            {!isSelectedEntryInTrash && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="shrink-0 mx-3 mb-2 px-4 py-1.5 rounded-xl border border-border/40 bg-card/60 backdrop-blur flex items-center gap-3 text-[11px] text-muted-foreground"
+              >
+                <span className="font-medium tabular-nums">{editorStats.words} {editorStats.words === 1 ? 'word' : 'words'}</span>
+                <span className="opacity-40">•</span>
+                <span className="tabular-nums">{editorStats.chars.toLocaleString()} characters</span>
+                <span className="opacity-40">•</span>
+                <span className="tabular-nums">~{Math.max(1, Math.ceil(editorStats.words / 200))} min read</span>
+                <span className="flex-1" />
+                {isLocked ? (
+                  <span className="flex items-center gap-1.5 text-yellow-600">
+                    <Lock className="w-3 h-3" />
+                    Locked
+                  </span>
+                ) : lastSavedAt ? (
+                  <span className="flex items-center gap-1.5 text-primary">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    Saved {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3 h-3" />
+                    Auto-saves every 5s
+                  </span>
+                )}
+              </motion.div>
+            )}
+
+            {/* Floating Add Note Button — positioned bottom-right so it doesn't cover note text */}
+            {!isViewingTrash && (
+              <button
+                onClick={handleNewNote}
+                className="notebook-fab absolute bottom-6 right-6 w-12 h-12 group z-30"
+                title="New note"
+              >
+                <Plus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
+              </button>
+            )}
+          </motion.div>
+        ) : (
+          <motion.div 
+            className="flex-1 flex flex-col overflow-hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            {/* All Notes Header */}
+            <div className="px-6 lg:px-10 py-5 border-b border-border/20">
+              <motion.div 
+                initial={{ opacity: 0, y: -15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="flex items-center justify-between gap-4"
+              >
+                {/* Category Filter Tabs */}
+                <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                  className="flex items-center gap-1 overflow-x-auto scrollbar-hide p-1 rounded-xl border border-border/40 bg-card/50 backdrop-blur"
+                >
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'daily-journal', label: 'Journal' },
+                    { id: 'trading-plan', label: 'Plans' },
+                    { id: 'trade-notes', label: 'Trades' },
+                    { id: 'goals', label: 'Goals' },
+                    { id: 'general', label: 'General' },
+                  ].map((tab) => (
+                    <motion.button
+                      key={tab.id}
+                      onClick={() => setSelectedCategory(tab.id)}
+                      whileTap={{ scale: 0.96 }}
+                      className={cn(
+                        "relative px-4 py-1.5 text-sm font-medium rounded-lg transition-colors duration-200 whitespace-nowrap",
+                        selectedCategory === tab.id
+                          ? "text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {selectedCategory === tab.id && (
+                        <motion.span
+                          layoutId="notebookCategoryTab"
+                          className="absolute inset-0 rounded-lg bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] shadow-[0_2px_12px_hsl(var(--primary)/0.4)]"
+                          transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                        />
+                      )}
+                      <span className="relative z-10">{tab.label}</span>
+                    </motion.button>
+                  ))}
+                </motion.div>
+
+                <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  className="flex items-center gap-3 shrink-0"
+                >
+                  {/* Search */}
+                  <div className="relative group/search">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none transition-colors group-focus-within/search:text-primary" />
+                    <Input
+                      type="text"
+                      placeholder="Search notes..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-48 focus:w-60 transition-[width] duration-300 pl-9 h-9 rounded-xl border border-border/40 bg-card/50 backdrop-blur focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_16px_hsl(var(--primary)/0.2)]"
+                    />
+                  </div>
+                  {/* View Toggle */}
+                  <div className="relative flex items-center gap-0.5 p-1 rounded-xl border border-border/40 bg-card/50 backdrop-blur">
+                    {([
+                      { id: 'grid' as const, Icon: LayoutGrid },
+                      { id: 'list' as const, Icon: LayoutList },
+                    ]).map(({ id, Icon }) => (
+                      <button
+                        key={id}
+                        onClick={() => { setViewMode(id); localStorage.setItem('notebook-view-mode', id); }}
+                        className={cn(
+                          "relative p-1.5 rounded-lg transition-colors duration-200",
+                          viewMode === id ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {viewMode === id && (
+                          <motion.span
+                            layoutId="notebookViewToggle"
+                            className="absolute inset-0 rounded-lg bg-primary/15 border border-primary/25"
+                            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                          />
+                        )}
+                        <Icon className="relative z-10 w-4 h-4" />
+                      </button>
+                    ))}
+                  </div>
+                  <motion.button
+                    onClick={handleNewNote}
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.96 }}
+                    className="inline-flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-semibold text-primary-foreground bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] shadow-[0_4px_16px_hsl(var(--primary)/0.35)] hover:shadow-[0_6px_24px_hsl(var(--primary)/0.5)] transition-shadow group/add"
+                  >
+                    <Plus className="w-4 h-4 transition-transform duration-300 group-hover/add:rotate-90" />
+                    Add new note
+                  </motion.button>
+                </motion.div>
+              </motion.div>
+            </div>
+
+            {/* Notes Grid/List */}
+            <div ref={gridScrollRef} className="flex-1 overflow-y-auto px-6 lg:px-10 py-6 custom-scrollbar">
+              {visibleEntries.length === 0 ? (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  className="flex flex-col items-center justify-center py-20 text-muted-foreground"
+                >
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.8, delay: 0.2 }}
+                    className="relative mb-5"
+                  >
+                    <div className="absolute inset-0 rounded-full bg-primary/20 blur-2xl scale-150" aria-hidden />
+                    <div className="relative w-20 h-20 rounded-3xl border border-primary/20 bg-primary/10 backdrop-blur flex items-center justify-center">
+                      {searchQuery ? <Search className="w-9 h-9 text-primary/60" /> : <BookOpen className="w-9 h-9 text-primary/60" />}
+                    </div>
+                  </motion.div>
+                  <p className="text-base font-medium">{searchQuery ? 'No matching notes' : 'No notes yet'}</p>
+                  <p className="text-sm mt-1 text-muted-foreground/70">{searchQuery ? 'Try a different search term' : 'Create your first note to get started'}</p>
+                </motion.div>
+              ) : viewMode === 'list' ? (
+                <div style={{ height: `${gridVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                  {gridVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const entry = visibleEntries[virtualRow.index];
+                    if (!entry) return null;
+                    const index = virtualRow.index;
+                    const colors = getNoteCardColor(entry.category, index);
+                    const plainText = entry.content.replace(/<[^>]*>/g, '').trim();
+                    const contentLines = plainText.split(/[.!?\n]+/).filter(s => s.trim()).slice(0, 3);
+                    const isDark = document.documentElement.classList.contains('dark');
+                    return (
+                      <div
+                        key={entry.id}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                        ref={gridVirtualizer.measureElement}
+                        data-index={virtualRow.index}
+                        className="pb-2"
+                      >
+                        <div
+                          draggable
+                          onDragStart={(event) => handleNoteDragStart(event, entry.id)}
+                          onDragEnd={() => setDropTargetId(null)}
+                          className="cursor-grab active:cursor-grabbing"
+                        >
+                        <motion.button
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          whileHover={{ x: 4 }}
+                          whileTap={{ scale: 0.99 }}
+                          onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
+                          className="note-card w-full text-left rounded-xl overflow-hidden group relative border transition-all duration-300 flex items-center gap-3 p-4 bg-card/50 backdrop-blur border-border/30"
+                          style={{ ['--note-accent' as string]: colors.accent }}
+                        >
+                          <span className="note-shine" aria-hidden />
+                          <div
+                            className="w-1 h-10 rounded-full shrink-0 shadow-[0_0_8px_var(--note-accent)]"
+                            style={{ backgroundColor: colors.accent }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-sm truncate transition-colors duration-300 group-hover:[color:var(--note-accent)]">{entry.title || 'Untitled'}</h4>
+                            {contentLines.length > 0 && (
+                              <p className="text-xs text-muted-foreground mt-1 truncate">{contentLines[0]}</p>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: colors.border, color: isDark ? colors.textDark : colors.text }}>
+                            {CATEGORIES.find(c => c.id === entry.category)?.label || entry.category}
+                          </Badge>
+                        </motion.button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <AnimatePresence mode="wait">
+                  <motion.div 
+                    key={selectedCategory + viewMode}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                  >
+                    {visibleEntries.map((entry, index) => {
+                        const colors = getNoteCardColor(entry.category, index);
+                        const plainText = entry.content.replace(/<[^>]*>/g, '').trim();
+                        const contentLines = plainText.split(/[.!?\n]+/).filter(s => s.trim()).slice(0, 3);
+                        const isDark = document.documentElement.classList.contains('dark');
+                        
+                        return (
+                          <div
+                            key={entry.id}
+                            draggable
+                            onDragStart={(event) => handleNoteDragStart(event, entry.id)}
+                            onDragEnd={() => setDropTargetId(null)}
+                            className="cursor-grab active:cursor-grabbing"
+                          >
+                          <motion.button
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ 
+                              opacity: 1, 
+                              y: 0,
+                              transition: {
+                                delay: index * 0.03,
+                                type: "spring",
+                                stiffness: 400,
+                                damping: 28
+                              }
+                            }}
+                            whileHover={{ 
+                              y: viewMode === 'grid' ? -5 : 0,
+                              transition: { type: "spring", stiffness: 500, damping: 25 } 
+                            }}
+                            whileTap={{ scale: 0.99 }}
+                            onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
+                            className={cn(
+                              "note-card w-full text-left rounded-2xl overflow-hidden group relative border transition-all duration-300",
+                              viewMode === 'grid' 
+                                ? "flex flex-col" 
+                                : "flex items-start gap-4 p-4"
+                            )}
+                            style={{
+                              backgroundColor: isDark ? colors.bgDark : colors.bg,
+                              borderColor: isDark ? colors.borderDark : colors.border,
+                              ['--note-accent' as string]: colors.accent,
+                            }}
+                          >
+                            <span className="note-shine" aria-hidden />
+                            {viewMode === 'grid' ? (
+                              <>
+                                {/* Color accent bar - top (gradient fade) */}
+                                <div 
+                                  className="h-1.5 w-full"
+                                  style={{ background: `linear-gradient(90deg, ${colors.accent}, transparent 160%)` }}
+                                />
+                                
+                                <div className="p-4 flex flex-col flex-1 gap-2">
+                                  {/* Date + accent dot */}
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="w-2 h-2 rounded-full shrink-0 shadow-[0_0_8px_var(--note-accent)]"
+                                      style={{ backgroundColor: colors.accent }}
+                                    />
+                                    <p className="text-[11px] text-muted-foreground font-medium">
+                                      {new Date(entry.date).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </p>
+                                  </div>
+                                  
+                                  {/* Title */}
+                                  <h3 className="font-semibold text-foreground leading-snug line-clamp-2 text-[15px] transition-colors duration-300 group-hover:[color:var(--note-accent)]">
+                                    {entry.title || 'Untitled'}
+                                  </h3>
+                                  
+                                  {/* Content Preview */}
+                                  <div className="flex-1 space-y-1 mt-1">
+                                    {contentLines.length > 0 ? (
+                                      contentLines.map((line, i) => (
+                                        <div 
+                                          key={i}
+                                          className="flex items-start gap-2 text-[13px] text-muted-foreground leading-relaxed"
+                                        >
+                                          <span className="mt-0.5 shrink-0 opacity-60" style={{ color: colors.accent }}>•</span>
+                                          <span className="line-clamp-1">{line.trim()}</span>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <p className="text-[13px] text-muted-foreground/50 italic">No content...</p>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Trade indicator */}
+                                  {entry.tradeId && (
+                                    <div className="mt-2 pt-2 border-t" style={{ borderColor: isDark ? colors.borderDark : colors.border }}>
+                                      <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-border/50 bg-background/50">
+                                        <TrendingUp className="w-2.5 h-2.5 mr-1" />
+                                        Linked Trade
+                                      </Badge>
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                {/* List View */}
+                                <div 
+                                  className="w-1 h-12 rounded-full shrink-0 self-center"
+                                  style={{ backgroundColor: colors.accent, boxShadow: `0 0 10px ${colors.accent}` }}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-0.5">
+                                    <h3 className="font-semibold text-foreground truncate text-sm">
+                                      {entry.title || 'Untitled'}
+                                    </h3>
+                                    {entry.tradeId && (
+                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-background/50 shrink-0 border-border/50">
+                                        <TrendingUp className="w-2.5 h-2.5 mr-1" />
+                                        Trade
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-[13px] text-muted-foreground line-clamp-1">
+                                    {plainText || 'No content...'}
+                                  </p>
+                                </div>
+                                <div className="text-xs text-muted-foreground shrink-0">
+                                  {new Date(entry.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
+                                </div>
+                              </>
+                            )}
+                          </motion.button>
+                          </div>
+                        );
+                      })}
+                    </motion.div>
+                  </AnimatePresence>
+              )}
+            </div>
+          </motion.div>
+        )}
+        </div>
+        
+        {/* Trade Metrics Panel - Right Side */}
+        {linkedTrade && !isSelectedEntryInTrash && (
+          <div className={cn(
+            "w-44 flex-shrink-0 glass rounded-xl border border-border/40 p-3 h-fit",
+            linkedNet >= 0 
+              ? "bg-primary/5" 
+              : "bg-destructive/5"
+          )}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center",
+                linkedNet >= 0 ? "bg-primary/20" : "bg-destructive/20"
+              )}>
+                <TrendingUp className={cn(
+                  "w-4 h-4",
+                  linkedNet >= 0 ? "text-primary" : "text-destructive"
+                )} />
+              </div>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Result</div>
+                <div className={cn(
+                  "text-lg font-bold font-mono leading-tight",
+                  linkedNet >= 0 ? "text-primary" : "text-destructive"
+                )}>
+                  {linkedNet >= 0 ? "+" : ""}${linkedNet.toFixed(0)}
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Pair</span>
+                <SymbolMark symbol={linkedTrade.pair} size="sm" textClassName="font-medium" />
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Direction</span>
+                <Badge variant="outline" className={cn(
+                  "text-[10px] px-1.5 py-0",
+                  linkedTrade.direction === 'Long' 
+                    ? "border-primary/50 text-primary" 
+                    : "border-destructive/50 text-destructive"
+                )}>
+                  {linkedTrade.direction}
+                </Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Session</span>
+                <span className="font-medium">{linkedTrade.session || '—'}</span>
+              </div>
+              {linkedChecklist && (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Checklist</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary max-w-[80px] truncate">
+                      {linkedChecklist.name}
+                    </Badge>
+                  </div>
+                  
+                  {/* Checklist Grade */}
+                  {linkedTradeChecklistState && linkedTradeChecklistState.length > 0 && (() => {
+                    const state = linkedTradeChecklistState;
+                    const hasCustomPercentages = state.some((item: any) => item.percentage !== undefined);
+                    let percentage: number;
+                    
+                    if (hasCustomPercentages) {
+                      percentage = state
+                        .filter((item: any) => item.checked)
+                        .reduce((sum: number, item: any) => sum + (item.percentage || 0), 0);
+                    } else {
+                      const checkedCount = state.filter((item: any) => item.checked).length;
+                      percentage = (checkedCount / state.length) * 100;
+                    }
+                    
+                    const getGrade = (p: number) => {
+                      if (p >= 90) return { grade: "A Setup", color: "text-emerald-500", bgColor: "bg-emerald-500/20" };
+                      if (p >= 75) return { grade: "B Setup", color: "text-blue-500", bgColor: "bg-blue-500/20" };
+                      if (p >= 60) return { grade: "C Setup", color: "text-yellow-500", bgColor: "bg-yellow-500/20" };
+                      return { grade: "D Setup", color: "text-red-500", bgColor: "bg-red-500/20" };
+                    };
+                    
+                    const { grade, color, bgColor } = getGrade(percentage);
+                    
+                    return (
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Grade</span>
+                        <Badge className={cn("text-[10px] px-1.5 py-0 border-0", bgColor, color)}>
+                          {grade}
+                        </Badge>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+            
+            {/* Checklist Details */}
+            {linkedTradeChecklistState && linkedTradeChecklistState.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border/30">
+                <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-2">Checklist Items</div>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {linkedTradeChecklistState.map((item: any, index: number) => (
+                    <div 
+                      key={item.id || index}
+                      className={cn(
+                        "flex items-center gap-1.5 text-[10px]",
+                        item.checked ? "text-muted-foreground" : "text-foreground"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-3 h-3 rounded-sm border flex items-center justify-center shrink-0",
+                        item.checked 
+                          ? "bg-primary/20 border-primary/50" 
+                          : "border-border"
+                      )}>
+                        {item.checked && (
+                          <CheckSquare className="w-2 h-2 text-primary" />
+                        )}
+                      </div>
+                      <span className={cn(item.checked && "line-through")}>{item.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selectedEntry?.tradeId && (
+              <div className="mt-3 pt-3 border-t border-border/30">
+                <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-2">Chart</div>
+                <TradeScreenshot
+                  tradeId={selectedEntry.tradeId}
+                  userId={userId}
+                  editable={!!onUpdateTrade}
+                  onUpdate={
+                    onUpdateTrade
+                      ? (chartImage) => onUpdateTrade(selectedEntry.tradeId!, { chartImage })
+                      : undefined
+                  }
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
+
+      {/* Add Folder Dialog */}
+      <Dialog open={isAddFolderDialogOpen} onOpenChange={setIsAddFolderDialogOpen}>
+        <DialogContent className="sm:max-w-md overflow-hidden rounded-2xl border border-border/50 bg-card/70 backdrop-blur-2xl shadow-[0_24px_60px_-16px_hsl(var(--foreground)/0.18),0_0_40px_-16px_hsl(var(--primary)/0.3)]">
+          <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" aria-hidden />
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center">
+                <FolderPlus className="w-4 h-4 text-primary" />
+              </span>
+              Create New Folder
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Enter a name for your new folder to organize your notes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              placeholder="Enter folder name..."
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              className="w-full rounded-xl border border-border/40 bg-card/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_16px_hsl(var(--primary)/0.2)]"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newFolderName.trim()) {
+                  const folderId = `custom-${Date.now()}`;
+                  const newFolder = { id: folderId, label: newFolderName.trim() };
+                  const updatedFolders = [...customFolders, newFolder];
+                  setCustomFolders(updatedFolders);
+                  localStorage.setItem('notebook-custom-folders', JSON.stringify(updatedFolders));
+                  toast.success(`Folder "${newFolderName}" created!`);
+                  setNewFolderName("");
+                  setIsAddFolderDialogOpen(false);
+                }
+              }}
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNewFolderName("");
+                setIsAddFolderDialogOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (newFolderName.trim()) {
+                  const folderId = `custom-${Date.now()}`;
+                  const newFolder = { id: folderId, label: newFolderName.trim() };
+                  const updatedFolders = [...customFolders, newFolder];
+                  setCustomFolders(updatedFolders);
+                  localStorage.setItem('notebook-custom-folders', JSON.stringify(updatedFolders));
+                  toast.success(`Folder "${newFolderName}" created!`);
+                  setNewFolderName("");
+                  setIsAddFolderDialogOpen(false);
+                } else {
+                  toast.error("Please enter a folder name");
+                }
+              }}
+              className="rounded-xl bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] text-primary-foreground shadow-[0_4px_16px_hsl(var(--primary)/0.35)] hover:shadow-[0_6px_24px_hsl(var(--primary)/0.5)] hover:opacity-95 transition-all"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Preview Modal */}
+      {imagePreview && (
+        <div 
+          className={cn(
+            "fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-md transition-all duration-300",
+            isImagePreviewClosing ? "opacity-0" : "opacity-100"
+          )}
+          onClick={() => {
+            setIsImagePreviewClosing(true);
+            setTimeout(() => {
+              setImagePreview(null);
+              setIsImagePreviewClosing(false);
+            }, 300);
+          }}
+        >
+          <div 
+            className={cn(
+              "relative max-w-[90vw] max-h-[90vh] transition-all duration-300 ease-out",
+              isImagePreviewClosing 
+                ? "scale-90 opacity-0 translate-y-4" 
+                : "scale-100 opacity-100 translate-y-0"
+            )}
+            style={{
+              animation: !isImagePreviewClosing ? 'imageZoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' : undefined
+            }}
+          >
+            <img
+              src={imagePreview}
+              alt="Trade chart preview"
+              className="max-w-full max-h-[90vh] rounded-xl border border-border/50 shadow-2xl object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <Button
+              variant="secondary"
+              size="icon"
+              className="absolute top-3 right-3 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background transition-transform hover:scale-110"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsImagePreviewClosing(true);
+                setTimeout(() => {
+                  setImagePreview(null);
+                  setIsImagePreviewClosing(false);
+                }, 300);
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes imageZoomIn {
+          0% {
+            opacity: 0;
+            transform: scale(0.8) translateY(20px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+      `}</style>
+
+      {/* Right-click Context Menu for Text Color/Highlight */}
+      <AnimatePresence>
+        {contextMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -8 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25, duration: 0.2 }}
+            className="fixed z-[9999] bg-background/95 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl p-1.5 min-w-[180px]"
+            style={{ left: contextMenuPosition.x, top: contextMenuPosition.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <motion.button
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.05 }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted/80 rounded-lg transition-all duration-200"
+              onClick={() => setShowTextColorPicker(!showTextColorPicker)}
+            >
+              <Type className="w-4 h-4 text-muted-foreground" />
+              <span className="flex-1 text-left">Text Color</span>
+              <motion.div
+                animate={{ rotate: showTextColorPicker ? 90 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+              </motion.div>
+            </motion.button>
+            <AnimatePresence>
+              {showTextColorPicker && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex flex-wrap gap-1.5 p-2 border-t border-border/30 mt-1">
+                    {TEXT_COLORS.map((color, index) => (
+                      <motion.button
+                        key={color.id}
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.03 }}
+                        whileHover={{ scale: 1.2 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => applyTextColor(color.color)}
+                        className="w-7 h-7 rounded-lg border border-border/50 shadow-sm hover:shadow-md transition-shadow"
+                        style={{ backgroundColor: color.id === 'default' ? 'transparent' : color.color }}
+                        title={color.label}
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <motion.button
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted/80 rounded-lg transition-all duration-200"
+              onClick={() => setShowHighlightColorPicker(!showHighlightColorPicker)}
+            >
+              <div className="w-4 h-4 rounded bg-gradient-to-br from-yellow-300/60 to-yellow-400/60" />
+              <span className="flex-1 text-left">Highlight</span>
+              <motion.div
+                animate={{ rotate: showHighlightColorPicker ? 90 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+              </motion.div>
+            </motion.button>
+            <AnimatePresence>
+              {showHighlightColorPicker && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex flex-wrap gap-1.5 p-2 border-t border-border/30 mt-1">
+                    {HIGHLIGHT_COLORS.map((color, index) => (
+                      <motion.button
+                        key={color.id}
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.03 }}
+                        whileHover={{ scale: 1.2 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => applyHighlightColor(color.color)}
+                        className="w-7 h-7 rounded-lg border border-border/50 shadow-sm hover:shadow-md transition-shadow"
+                        style={{ backgroundColor: color.color }}
+                        title={color.label}
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+    </>
+  );
+}

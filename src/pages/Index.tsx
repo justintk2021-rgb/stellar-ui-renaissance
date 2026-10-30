@@ -29,9 +29,10 @@ import {
 } from "@/lib/tradeFormat";
 import { isUnjournaledTrade, type JournalFilter } from "@/lib/notifications";
 import {
+  notebookPlainText,
   plainTextToNotebookHtml,
+  shouldWriteQuickNotesToNotebook,
 } from "@/lib/notebookSync";
-import { seedStudyNoteHtml } from "@/lib/studyNotes";
 import type { OpenJournalTarget } from "@/components/Dashboard/NotificationsCard";
 import { queryKeys } from "@/lib/queries/keys";
 import { fetchTradesList } from "@/lib/queries/trades";
@@ -74,7 +75,7 @@ const pageInfo: Record<string, { title: string; subtitle: string }> = {
   chart: { title: 'Chart', subtitle: 'Interactive chart with drawing tools' },
   calendar: { title: 'Economic Calendar', subtitle: 'Live economic news and events' },
   playbook: { title: 'Playbook', subtitle: 'Your trading checklists and rules' },
-  notebook: { title: 'Study Notes', subtitle: 'Folders, live trade cards, and study write-ups' },
+  notebook: { title: 'Notebook', subtitle: 'Your personal trading notes and journal' },
   propfirm: { title: 'Prop Firm', subtitle: 'Challenge progress for the selected account' },
   learning: { title: 'Learning', subtitle: 'Short lessons on risk, execution, and journaling' },
   community: { title: 'Community', subtitle: 'Chat with other traders' },
@@ -430,7 +431,6 @@ const Index = () => {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
-  const [selectedNotebookEntryId, setSelectedNotebookEntryId] = useState<string | null>(null);
   const [journalFilter, setJournalFilter] = useState<JournalFilter>('all');
   const [journalDateRange, setJournalDateRange] = useState<{ start: Date; end: Date } | null>(null);
   const [journalFocusTradeId, setJournalFocusTradeId] = useState<string | null>(null);
@@ -650,6 +650,16 @@ const Index = () => {
       }
       const success = await updateTrade(editingTrade.id, updateData);
       if (success) {
+        // Update linked notebook entry if exists
+        const linkedEntry = notebookEntries.find(e => e.tradeId === editingTrade.id);
+        if (linkedEntry) {
+          await saveNotebookEntry({
+            ...linkedEntry,
+            title: `${tradeData.pair} - ${tradeData.direction} Trade`,
+            date: tradeData.date,
+            updatedAt: new Date().toISOString(),
+          });
+        }
         setEditingTrade(null);
       }
     } else {
@@ -659,21 +669,33 @@ const Index = () => {
         // Notes are created manually by the user via the "Note" button on the Trade Log
       }
     }
-  }, [editingTrade, addTrade, updateTrade]);
+  }, [editingTrade, addTrade, updateTrade, notebookEntries, saveNotebookEntry]);
 
   const handleDeleteTrade = useCallback(async (id: string) => {
     const success = await deleteTrade(id);
-    if (success && selectedTradeId === id) {
-      setSelectedTradeId(trades.length > 1 ? trades.find(t => t.id !== id)?.id || null : null);
+    if (success) {
+      // Also delete linked notebook entry
+      const linkedEntry = notebookEntries.find(e => e.tradeId === id);
+      if (linkedEntry) {
+        await deleteNotebookEntry(linkedEntry.id);
+      }
+      if (selectedTradeId === id) {
+        setSelectedTradeId(trades.length > 1 ? trades.find(t => t.id !== id)?.id || null : null);
+      }
     }
-  }, [selectedTradeId, trades, deleteTrade]);
+  }, [selectedTradeId, trades, deleteTrade, notebookEntries, deleteNotebookEntry]);
 
   const handleClearAll = useCallback(async () => {
     const success = await clearAllTrades();
     if (success) {
+      // Delete all trade-linked notebook entries
+      const tradeEntries = notebookEntries.filter(e => e.tradeId);
+      for (const entry of tradeEntries) {
+        await deleteNotebookEntry(entry.id);
+      }
       setSelectedTradeId(null);
     }
-  }, [clearAllTrades]);
+  }, [clearAllTrades, notebookEntries, deleteNotebookEntry]);
 
   const handleSetBalance = useCallback(async (value: number) => {
     await accountProjection.setStartingBalance(value);
@@ -685,7 +707,10 @@ const Index = () => {
 
   const handleSaveEntry = useCallback(async (entry: NotebookEntry) => {
     await saveNotebookEntry(entry);
-  }, [saveNotebookEntry]);
+    if (entry.tradeId) {
+      await updateTrade(entry.tradeId, { notes: notebookPlainText(entry.content) });
+    }
+  }, [saveNotebookEntry, updateTrade]);
 
   const handleDeleteEntry = useCallback(async (id: string) => {
     await deleteNotebookEntry(id);
@@ -695,23 +720,25 @@ const Index = () => {
     const trade = trades.find((t) => t.id === id);
     const existing = notebookEntries.find((e) => e.tradeId === id && !e.isDeleted);
     const seed = (quickNotes ?? trade?.notes ?? "").trim();
-    if (existing) {
+    if (!shouldWriteQuickNotesToNotebook(seed, existing?.content) && existing) {
       if (seed) await updateTrade(id, { notes: seed });
       return existing;
     }
 
-    const html = seedStudyNoteHtml(id, plainTextToNotebookHtml(seed));
+    const html = plainTextToNotebookHtml(seed);
     const now = new Date().toISOString();
-    const entry: NotebookEntry = {
-      id: crypto.randomUUID(),
-      title: trade ? `${trade.pair} — ${trade.direction}` : "Trade note",
-      content: html,
-      category: "trade-notes",
-      date: trade?.date || now.slice(0, 10),
-      tradeId: id,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const entry: NotebookEntry = existing
+      ? { ...existing, content: html || existing.content, updatedAt: now }
+      : {
+          id: crypto.randomUUID(),
+          title: trade ? `${trade.pair} - ${trade.direction} Trade` : "Trade note",
+          content: html,
+          category: "trade-notes",
+          date: trade?.date || now.slice(0, 10),
+          tradeId: id,
+          createdAt: now,
+          updatedAt: now,
+        };
 
     await saveNotebookEntry(entry);
     if (seed) await updateTrade(id, { notes: seed });
@@ -719,16 +746,10 @@ const Index = () => {
   }, [notebookEntries, trades, saveNotebookEntry, updateTrade]);
 
   const handleSelectForNotebook = useCallback(async (id: string, quickNotes?: string) => {
-    const entry = await upsertNotebookFromQuickNotes(id, quickNotes);
+    await upsertNotebookFromQuickNotes(id, quickNotes);
     setSelectedTradeId(id);
-    setSelectedNotebookEntryId(entry.id);
     setCurrentPage('notebook');
   }, [upsertNotebookFromQuickNotes]);
-
-  const handleOpenStudyNote = useCallback((entryId: string) => {
-    setSelectedNotebookEntryId(entryId);
-    setCurrentPage('notebook');
-  }, []);
 
   const { title, subtitle } = pageInfo[currentPage] ?? pageInfo.dashboard;
   const todayKey = formatLocalDateKey(new Date());
@@ -1005,7 +1026,6 @@ const Index = () => {
                               }}
                               onDelete={handleDeleteTrade}
                               onSelectForNotebook={handleSelectForNotebook}
-                              onOpenStudyNote={handleOpenStudyNote}
                               onOpenPlaybook={() => setCurrentPage('playbook')}
                               onUpdateTrade={async (id, updates) => {
                                 await updateTrade(id, updates);
@@ -1076,7 +1096,7 @@ const Index = () => {
                 </PageTransition>
               )}
 
-              {/* Study Notes Page */}
+              {/* Notebook Page */}
               {currentPage === 'notebook' && (
                 <PageTransition key="notebook">
                   <Suspense fallback={<PageFallback />}>
@@ -1094,8 +1114,6 @@ const Index = () => {
                       }}
                       notebookFont={notebookFont}
                       onFontChange={setNotebookFont}
-                      selectedEntryId={selectedNotebookEntryId}
-                      onSelectedEntryHandled={() => setSelectedNotebookEntryId(null)}
                     />
                   </Suspense>
                 </PageTransition>

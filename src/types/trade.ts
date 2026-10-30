@@ -67,8 +67,7 @@ export interface NotebookEntry {
   content: string;
   category: string;
   date: string;
-  tradeId?: string; // Optional legacy 1:1 link to a trade
-  folderId?: string | null;
+  tradeId?: string; // Optional link to a trade
   createdAt: string;
   updatedAt: string;
   isDeleted?: boolean; // Soft delete flag for trash

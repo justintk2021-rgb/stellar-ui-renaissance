@@ -150,9 +150,9 @@ const featureCards = [
   },
   {
     icon: NotebookPen,
-    title: "Study Notes",
-    description: "Nested folders, autosave, YouTube embeds, and live journal trade cards in your notes.",
-    metrics: ["Live trade cards", "YouTube embeds"],
+    title: "Rich notebook",
+    description: "Categories, folders, rich text, and dozens of fonts for plans, journals, and trade notes.",
+    metrics: ["50+ fonts", "Trade links"],
   },
   {
     icon: Trophy,
