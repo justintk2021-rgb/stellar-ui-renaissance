@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { Trade } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { useStudyMutations, useStudyTree } from "@/hooks/useStudyArea";
-import { AnimatePresence, motion } from "@/lib/motion";
 import type { StudyCategory } from "@/lib/studyArea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,15 +49,7 @@ export function StudyArea({
   }, [focusNoteId, onFocusHandled]);
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={category}
-        initial={{ opacity: 0, y: 12, scale: 0.985 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.985 }}
-        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-        className="min-h-[calc(100vh-10rem)]"
-      >
+    <div key={category} className="min-h-[calc(100vh-10rem)]">
       {selected && userId ? (
         <section className="notebook-panel min-h-[520px] rounded-2xl p-5 sm:p-6">
           <button type="button" onClick={() => setSelectedId(null)} className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
@@ -104,7 +95,6 @@ export function StudyArea({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      </motion.div>
-    </AnimatePresence>
+    </div>
   );
 }

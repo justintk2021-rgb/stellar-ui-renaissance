@@ -55,12 +55,21 @@ export function circularReveal(
   };
 
   revealRunning = true;
-  const transition = document.startViewTransition(() => {
-    flushSync(applyChange);
-  });
+  let transition: ReturnType<NonNullable<Document["startViewTransition"]>>;
+  try {
+    transition = document.startViewTransition(() => {
+      flushSync(applyChange);
+    });
+  } catch {
+    cleanup();
+    applyChange();
+    return;
+  }
+
+  window.setTimeout(cleanup, duration + 400);
 
   if (typeof transition?.finished?.finally === "function") {
-    transition.finished.finally(cleanup).catch(() => {});
+    transition.finished.finally(cleanup).catch(cleanup);
   } else {
     cleanup();
   }
@@ -79,6 +88,8 @@ export function circularReveal(
           },
         );
       })
-      .catch(() => {});
+      .catch(cleanup);
+  } else {
+    cleanup();
   }
 }
