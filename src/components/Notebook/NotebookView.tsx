@@ -99,7 +99,7 @@ import {
   AlignRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { motion, AnimatePresence } from "@/lib/motion";
+import { motion, AnimatePresence, useMotionValue, useSpring } from "@/lib/motion";
 
 interface NotebookViewProps {
   trades: Trade[];
@@ -229,6 +229,12 @@ export function NotebookView({
   const [isAddFolderDialogOpen, setIsAddFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
+  const dragX = useMotionValue(0);
+  const dragY = useMotionValue(0);
+  const dragSpringX = useSpring(dragX, { stiffness: 520, damping: 34, mass: 0.35 });
+  const dragSpringY = useSpring(dragY, { stiffness: 520, damping: 34, mass: 0.35 });
+  const emptyDragImageRef = useRef<HTMLCanvasElement | null>(null);
   const [folderSearchQuery, setFolderSearchQuery] = useState("");
   const deferredFolderSearch = useDebouncedValue(folderSearchQuery, 160);
   const [customFolders, setCustomFolders] = useState<Array<{ id: string; label: string; color?: string }>>(() => {
@@ -780,8 +786,46 @@ export function NotebookView({
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("application/x-notebook-note", entryId);
     event.dataTransfer.setData("text/plain", entryId);
+    if (!emptyDragImageRef.current) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      emptyDragImageRef.current = canvas;
+    }
+    event.dataTransfer.setDragImage(emptyDragImageRef.current, 0, 0);
+    dragX.set(event.clientX + 18);
+    dragY.set(event.clientY + 14);
+    setDraggingNoteId(entryId);
     setIsFoldersPanelOpen(true);
   };
+
+  useEffect(() => {
+    if (!draggingNoteId) return;
+    let frame = 0;
+    const point = { x: dragX.get(), y: dragY.get() };
+    const track = (event: globalThis.DragEvent) => {
+      if (!event.clientX && !event.clientY) return;
+      point.x = event.clientX + 18;
+      point.y = event.clientY + 14;
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        dragX.set(point.x);
+        dragY.set(point.y);
+      });
+    };
+    const end = () => {
+      setDraggingNoteId(null);
+      setDropTargetId(null);
+    };
+    document.addEventListener("dragover", track);
+    document.addEventListener("dragend", end);
+    return () => {
+      document.removeEventListener("dragover", track);
+      document.removeEventListener("dragend", end);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [dragX, dragY, draggingNoteId]);
 
   const handleFolderDragOver = (event: DragEvent, folderId: string) => {
     event.preventDefault();
@@ -799,6 +843,7 @@ export function NotebookView({
     event.preventDefault();
     event.stopPropagation();
     setDropTargetId(null);
+    setDraggingNoteId(null);
     const id = event.dataTransfer.getData("application/x-notebook-note") || event.dataTransfer.getData("text/plain");
     const entry = notebookEntries.find((item) => item.id === id);
     if (!entry || entry.isDeleted) return;
@@ -1181,6 +1226,16 @@ export function NotebookView({
 
   const isViewingTrash = selectedCategory === "trash";
   const isSelectedEntryInTrash = selectedEntry?.isDeleted;
+  const draggedNote = draggingNoteId
+    ? notebookEntries.find((entry) => entry.id === draggingNoteId) ?? null
+    : null;
+  const dragDestination = dropTargetId === "trash"
+    ? "Trash"
+    : dropTargetId
+      ? (CATEGORIES.find((category) => category.id === dropTargetId)?.label
+        || customFolders.find((folder) => folder.id === dropTargetId)?.label
+        || "Folder")
+      : null;
 
   return (
     <>
@@ -1547,8 +1602,8 @@ export function NotebookView({
                       <div
                         key={cat.id}
                         className={cn(
-                          "relative group/folder flex items-center gap-1 rounded-lg",
-                          cat.id !== "all" && dropTargetId === cat.id && "ring-2 ring-primary/45 bg-primary/10",
+                          "relative group/folder flex items-center gap-1 rounded-lg transition-transform duration-200",
+                          cat.id !== "all" && dropTargetId === cat.id && "scale-[1.03] ring-2 ring-primary/50 bg-primary/10 shadow-[0_8px_24px_hsl(var(--primary)/0.18)]",
                         )}
                         onDragOver={cat.id === "all" ? undefined : (event) => handleFolderDragOver(event, cat.id)}
                         onDragLeave={cat.id === "all" ? undefined : (event) => handleFolderDragLeave(event, cat.id)}
@@ -1639,8 +1694,8 @@ export function NotebookView({
                           <div
                             key={folder.id}
                             className={cn(
-                              "relative group/folder flex items-center gap-1 rounded-lg",
-                              dropTargetId === folder.id && "ring-2 ring-primary/45 bg-primary/10",
+                              "relative group/folder flex items-center gap-1 rounded-lg transition-transform duration-200",
+                              dropTargetId === folder.id && "scale-[1.03] ring-2 ring-primary/50 bg-primary/10 shadow-[0_8px_24px_hsl(var(--primary)/0.18)]",
                             )}
                             onDragOver={(event) => handleFolderDragOver(event, folder.id)}
                             onDragLeave={(event) => handleFolderDragLeave(event, folder.id)}
@@ -1753,7 +1808,7 @@ export function NotebookView({
                         selectedCategory === "trash"
                           ? "bg-destructive/20 text-destructive"
                           : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
-                        dropTargetId === "trash" && "ring-2 ring-destructive/40 bg-destructive/10 text-destructive"
+                        dropTargetId === "trash" && "scale-[1.03] ring-2 ring-destructive/50 bg-destructive/10 text-destructive shadow-[0_8px_24px_hsl(var(--destructive)/0.2)]"
                       )}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -1846,7 +1901,7 @@ export function NotebookView({
                             onDragStart={(event) => handleNoteDragStart(event, entry.id)}
                             onDragEnd={() => setDropTargetId(null)}
                             onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
-                            className={cn("w-full text-left p-2 rounded-lg transition-all duration-200 mb-1 border cursor-grab active:cursor-grabbing", selectedEntryId === entry.id ? "bg-primary/15 border-primary/30 shadow-[0_0_12px_hsl(var(--primary)/0.15)]" : "border-transparent hover:bg-muted/50 hover:translate-x-0.5")}
+                            className={cn("w-full text-left p-2 rounded-lg transition-all duration-200 mb-1 border cursor-grab active:cursor-grabbing", selectedEntryId === entry.id ? "bg-primary/15 border-primary/30 shadow-[0_0_12px_hsl(var(--primary)/0.15)]" : "border-transparent hover:bg-muted/50 hover:translate-x-0.5", draggingNoteId === entry.id && "opacity-35")}
                           >
                             <div className="flex items-center gap-2">
                               <ChevronRight className={cn("w-3 h-3 transition-transform duration-200", selectedEntryId === entry.id && "rotate-90 text-primary")} />
@@ -2628,7 +2683,7 @@ export function NotebookView({
                           draggable
                           onDragStart={(event) => handleNoteDragStart(event, entry.id)}
                           onDragEnd={() => setDropTargetId(null)}
-                          className="cursor-grab active:cursor-grabbing"
+                          className={cn("cursor-grab active:cursor-grabbing transition-opacity", draggingNoteId === entry.id && "opacity-35")}
                         >
                         <motion.button
                           initial={{ opacity: 0, y: 12 }}
@@ -2681,7 +2736,7 @@ export function NotebookView({
                             draggable
                             onDragStart={(event) => handleNoteDragStart(event, entry.id)}
                             onDragEnd={() => setDropTargetId(null)}
-                            className="cursor-grab active:cursor-grabbing"
+                            className={cn("cursor-grab active:cursor-grabbing transition-opacity", draggingNoteId === entry.id && "opacity-35")}
                           >
                           <motion.button
                             initial={{ opacity: 0, y: 12 }}
@@ -3190,6 +3245,44 @@ export function NotebookView({
         )}
       </AnimatePresence>
     </div>
+    <AnimatePresence>
+      {draggedNote && (
+        <motion.div
+          key={draggedNote.id}
+          initial={{ opacity: 0, scale: 0.82, rotate: -8 }}
+          animate={{ opacity: 1, scale: 1, rotate: dragDestination ? 1.5 : -4 }}
+          exit={{ opacity: 0, scale: 0.86, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 420, damping: 26 }}
+          style={{ x: dragSpringX, y: dragSpringY }}
+          className="pointer-events-none fixed left-0 top-0 z-[90] w-60"
+        >
+          {(() => {
+            const colors = getNoteCardColor(draggedNote.category, 0);
+            const isDark = document.documentElement.classList.contains("dark");
+            const preview = draggedNote.content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+            return (
+              <div
+                className="overflow-hidden rounded-2xl border shadow-2xl"
+                style={{
+                  backgroundColor: isDark ? colors.bgDark : colors.bg,
+                  borderColor: isDark ? colors.borderDark : colors.border,
+                  boxShadow: `0 18px 40px -16px ${colors.accent}`,
+                }}
+              >
+                <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${colors.accent}, transparent 160%)` }} />
+                <div className="space-y-1.5 px-3.5 py-3">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                    {dragDestination ? `Drop into ${dragDestination}` : "Dragging note"}
+                  </p>
+                  <p className="truncate text-sm font-semibold text-foreground">{draggedNote.title || "Untitled"}</p>
+                  <p className="line-clamp-2 text-xs text-muted-foreground">{preview || "No content..."}</p>
+                </div>
+              </div>
+            );
+          })()}
+        </motion.div>
+      )}
+    </AnimatePresence>
     </>
   );
 }
