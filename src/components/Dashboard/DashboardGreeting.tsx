@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { motion, useReducedMotion } from "@/lib/motion";
+import { useReducedMotion } from "@/lib/motion";
+import { motion } from "framer-motion";
 import { TextAnimate } from "@/registry/magicui/text-animate";
 import { loadGreetingFont } from "@/lib/greetingFont";
 
@@ -63,6 +64,22 @@ export function DashboardGreeting({
   const line = name ? `${greeting}, ${name}` : greeting;
   const canEnter = !hold && (variant === "lock" || (minElapsed && (dataReady || maxElapsed)));
   const playGreeting = fontReady && nameReady && !hold;
+  const [leaving, setLeaving] = useState(false);
+
+  const requestDismiss = () => {
+    if (!canEnter || leaving) return;
+    if (reduceMotion) {
+      onDismiss();
+      return;
+    }
+    setLeaving(true);
+  };
+
+  useEffect(() => {
+    if (!leaving) return;
+    const timer = window.setTimeout(onDismiss, 700);
+    return () => window.clearTimeout(timer);
+  }, [leaving, onDismiss]);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,14 +104,18 @@ export function DashboardGreeting({
   useEffect(() => {
     if (!canEnter) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      if (leaving) return;
+      if (reduceMotion) {
         onDismiss();
+        return;
       }
+      setLeaving(true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [canEnter, onDismiss]);
+  }, [canEnter, leaving, onDismiss, reduceMotion]);
 
   return (
     <motion.div
@@ -102,13 +123,15 @@ export function DashboardGreeting({
       role="dialog"
       aria-modal="true"
       aria-label={line}
-      initial={{ opacity: reduceMotion ? 1 : 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: reduceMotion ? 0 : 0.5, ease: "easeOut" } }}
-      transition={{ duration: reduceMotion ? 0 : 0.45, ease: "easeOut" }}
-      onClick={() => {
-        if (canEnter) onDismiss();
-      }}
+      initial={{ opacity: reduceMotion ? 1 : 0, y: 0, scale: 1, filter: "blur(0px)" }}
+      animate={
+        leaving
+          ? { opacity: 0, y: -36, scale: 1.04, filter: "blur(10px)" }
+          : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
+      }
+      exit={{ opacity: 0, y: -36, filter: "blur(10px)" }}
+      transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
+      onClick={requestDismiss}
       className="fixed inset-0 z-[100] flex cursor-default flex-col items-center justify-center gap-8 bg-black/70 backdrop-blur-md"
     >
       <div className="px-6 text-center">
