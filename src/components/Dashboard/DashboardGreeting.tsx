@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { motion, useReducedMotion } from "@/lib/motion";
+import { cn } from "@/lib/utils";
+import { loadGreetingFont } from "@/lib/greetingFont";
 
 export const DASHBOARD_LOCK_KEY = "nsync-dashboard-locked";
 
@@ -49,9 +51,26 @@ export function DashboardGreeting({
   const reduceMotion = useReducedMotion();
   const [minElapsed, setMinElapsed] = useState(variant === "lock");
   const [maxElapsed, setMaxElapsed] = useState(variant === "lock");
+  const [textVisible, setTextVisible] = useState(false);
   const greeting = greetingForHour(new Date().getHours());
   const line = name ? `${greeting}, ${name}` : greeting;
   const canEnter = !hold && (variant === "lock" || (minElapsed && (dataReady || maxElapsed)));
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      await loadGreetingFont();
+      if (cancelled) return;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!cancelled) setTextVisible(true);
+        });
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (variant !== "entry" || hold) return;
@@ -91,7 +110,15 @@ export function DashboardGreeting({
       className="fixed inset-0 z-[100] flex cursor-default flex-col items-center justify-center gap-8 bg-black/70 backdrop-blur-md"
     >
       <div className="px-6 text-center">
-        <h1 className="text-3xl font-semibold tracking-wide text-white sm:text-4xl">{line}</h1>
+        <h1
+          className={cn(
+            "font-greeting inline-block text-3xl font-semibold tracking-wide text-primary md:text-4xl",
+            "transition-opacity duration-700 ease-[cubic-bezier(0.4,0,0.2,1)]",
+            textVisible || reduceMotion ? "opacity-100" : "opacity-0",
+          )}
+        >
+          {line}
+        </h1>
       </div>
       {canEnter ? (
         <motion.p
