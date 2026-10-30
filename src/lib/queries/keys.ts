@@ -21,6 +21,11 @@ export const queryKeys = {
     all: ['checklists'] as const,
     list: (userId: string) => ['checklists', 'list', userId] as const,
   },
+  study: {
+    all: ['study'] as const,
+    tree: (userId: string) => ['study', 'tree', userId] as const,
+    mentions: (userId: string) => ['study', 'mentions', userId] as const,
+  },
   broker: {
     connections: (userId: string) => ['broker', 'connections', userId] as const,
     positions: (connectionId: string) => ['broker', 'positions', connectionId] as const,

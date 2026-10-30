@@ -43,7 +43,7 @@ const TradeTable = lazy(() => import("@/components/Journal/TradeTable").then(m =
 const CompareView = lazy(() => import("@/components/Journal/CompareView").then(m => ({ default: m.CompareView })));
 
 // Lazy-load heavy/secondary pages so the dashboard paints instantly.
-const NotebookView = lazy(() => import("@/components/Notebook/NotebookView").then(m => ({ default: m.NotebookView })));
+const NotebookView = lazy(() => import("@/components/Notebook/NotebookSection").then(m => ({ default: m.NotebookSection })));
 const SettingsView = lazy(() => import("@/components/Settings/SettingsView").then(m => ({ default: m.SettingsView })));
 const CustomChart = lazy(() => import("@/components/Chart/CustomChart").then(m => ({ default: m.CustomChart })));
 const PlaybookView = lazy(() => import("@/components/Playbook/PlaybookView").then(m => ({ default: m.PlaybookView })));
@@ -60,6 +60,9 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
 import { DashboardGreeting, DASHBOARD_LOCK_KEY, dashboardDisplayName } from "@/components/Dashboard/DashboardGreeting";
+import { circularReveal } from "@/lib/circularReveal";
+import { StudyCategorySwitch } from "@/components/study/StudyCategorySwitch";
+import type { StudyCategory } from "@/lib/studyArea";
 import { AnimatePresence, motion } from "@/lib/motion";
 import { Lock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -420,6 +423,37 @@ const Index = () => {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
+  const [focusStudyNoteId, setFocusStudyNoteId] = useState<string | null>(null);
+  const [notebookView, setNotebookView] = useState<"notebook" | "study">(() => {
+    try {
+      return localStorage.getItem("nsync-notebook-view") === "study" ? "study" : "notebook";
+    } catch {
+      return "notebook";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("nsync-notebook-view", notebookView);
+    } catch {
+      // Preference is optional if storage is blocked.
+    }
+  }, [notebookView]);
+  const [studyCategory, setStudyCategory] = useState<StudyCategory>(() => {
+    try {
+      const saved = localStorage.getItem("nsync-study-category");
+      if (saved === "collaborative" || saved === "case" || saved === "individual") return saved;
+    } catch {
+      // Fall through to the default category.
+    }
+    return "individual";
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("nsync-study-category", studyCategory);
+    } catch {
+      // Preference is optional if storage is blocked.
+    }
+  }, [studyCategory]);
   const [journalFilter, setJournalFilter] = useState<JournalFilter>('all');
   const [journalDateRange, setJournalDateRange] = useState<{ start: Date; end: Date } | null>(null);
   const [journalFocusTradeId, setJournalFocusTradeId] = useState<string | null>(null);
@@ -503,6 +537,7 @@ const Index = () => {
   const handlePageChange = useCallback((page: string) => {
     closeCompareView();
     setCurrentPage(page);
+    if (page === "notebook") setNotebookView("notebook");
   }, [closeCompareView]);
 
   const handleOpenJournal = useCallback((target: OpenJournalTarget) => {
@@ -745,7 +780,9 @@ const Index = () => {
     setCurrentPage('notebook');
   }, [upsertNotebookFromQuickNotes]);
 
-  const { title, subtitle } = pageInfo[currentPage] ?? pageInfo.dashboard;
+  const { title, subtitle } = currentPage === "notebook" && notebookView === "study"
+    ? { title: "Study Area", subtitle: "Folders and notes for the category you pick" }
+    : (pageInfo[currentPage] ?? pageInfo.dashboard);
   const todayKey = formatLocalDateKey(new Date());
   const brokerTodayPnL = selectedBrokerAccountId && brokerDayTotals.has(todayKey)
     ? brokerDayTotals.get(todayKey)
@@ -857,6 +894,19 @@ const Index = () => {
                 onThemeChange={handleThemeChange}
                 trades={trades}
                 showRank={currentPage === 'dashboard'}
+                titleSwitch={currentPage === "notebook" ? {
+                  label: notebookView === "study" ? "Notebook" : "Study Area",
+                  onSelect: (event) => {
+                    const next = notebookView === "study" ? "notebook" : "study";
+                    circularReveal(
+                      { x: event.clientX, y: event.clientY },
+                      () => setNotebookView(next),
+                    );
+                  },
+                } : null}
+                centerSlot={currentPage === "notebook" && notebookView === "study" ? (
+                  <StudyCategorySwitch value={studyCategory} onChange={setStudyCategory} />
+                ) : null}
                 rightSlot={currentPage === 'dashboard' ? (
                   <div className="flex items-center gap-3">
                     <Button
@@ -1071,6 +1121,11 @@ const Index = () => {
                               }}
                               onDelete={handleDeleteTrade}
                               onSelectForNotebook={handleSelectForNotebook}
+                              onOpenStudyNote={(noteId) => {
+                                setNotebookView("study");
+                                setFocusStudyNoteId(noteId);
+                                setCurrentPage("notebook");
+                              }}
                               onOpenPlaybook={() => setCurrentPage('playbook')}
                               onUpdateTrade={async (id, updates) => {
                                 await updateTrade(id, updates);
@@ -1159,6 +1214,16 @@ const Index = () => {
                       }}
                       notebookFont={notebookFont}
                       onFontChange={setNotebookFont}
+                      focusStudyNoteId={focusStudyNoteId}
+                      onStudyFocusHandled={() => setFocusStudyNoteId(null)}
+                      view={notebookView}
+                      category={studyCategory}
+                      displayName={displayName}
+                      onOpenStudyJournal={(tradeId) => {
+                        setJournalFocusTradeId(tradeId);
+                        setCurrentPage("journal");
+                      }}
+                      onOpenStudyPlaybook={() => setCurrentPage("playbook")}
                     />
                   </Suspense>
                 </PageTransition>

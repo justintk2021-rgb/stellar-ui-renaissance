@@ -37,6 +37,7 @@ import {
 } from "@/lib/tradeHistoryPeriod";
 import { TradeScreenshot } from "./TradeScreenshot";
 import { AssetIcon, SymbolMark } from "@/components/ui/AssetIcon";
+import { StudyNoteMentions } from "@/components/study/StudyNoteMentions";
 
 interface Checklist {
   id: string;
@@ -53,6 +54,7 @@ interface TradeTableProps {
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
   onSelectForNotebook: (id: string, quickNotes?: string) => void | Promise<void>;
+  onOpenStudyNote?: (noteId: string) => void;
   onOpenPlaybook?: () => void;
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void | Promise<void>;
   onClearAll?: () => void;
@@ -431,7 +433,7 @@ function TradeEntry({ trade, checklists, userId, onEdit, onDelete, onViewNotes, 
   );
 }
 
-export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onOpenPlaybook, onUpdateTrade, focusTradeId, openNotesOnFocus = false, onFocusHandled }: TradeTableProps) {
+export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onOpenStudyNote, onOpenPlaybook, onUpdateTrade, focusTradeId, openNotesOnFocus = false, onFocusHandled }: TradeTableProps) {
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [dayTrades, setDayTrades] = useState<Trade[] | null>(null);
@@ -986,6 +988,10 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                           A notebook page exists for this trade. Edit here or open it in the Notebook.
                         </p>
                       )}
+                      <StudyNoteMentions tradeId={selectedTrade.id} onOpen={(noteId) => {
+                        onOpenStudyNote?.(noteId);
+                        handleCloseModal();
+                      }} />
                     </div>
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">

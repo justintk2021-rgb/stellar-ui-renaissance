@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { useReducedMotion } from "@/lib/motion";
 import { motion } from "framer-motion";
-import { TextAnimate } from "@/registry/magicui/text-animate";
-import { loadGreetingFont } from "@/lib/greetingFont";
 
 export const DASHBOARD_LOCK_KEY = "nsync-dashboard-locked";
 
@@ -51,7 +49,6 @@ interface DashboardGreetingProps {
 export function DashboardGreeting({
   variant,
   name,
-  nameReady = true,
   dataReady,
   hold = false,
   onDismiss,
@@ -59,11 +56,9 @@ export function DashboardGreeting({
   const reduceMotion = useReducedMotion();
   const [minElapsed, setMinElapsed] = useState(variant === "lock");
   const [maxElapsed, setMaxElapsed] = useState(variant === "lock");
-  const [fontReady, setFontReady] = useState(false);
   const greeting = greetingForHour(new Date().getHours());
   const line = name ? `${greeting}, ${name}` : greeting;
   const canEnter = !hold && (variant === "lock" || (minElapsed && (dataReady || maxElapsed)));
-  const playGreeting = fontReady && nameReady && !hold;
   const [leaving, setLeaving] = useState(false);
 
   const requestDismiss = () => {
@@ -80,16 +75,6 @@ export function DashboardGreeting({
     const timer = window.setTimeout(onDismiss, 700);
     return () => window.clearTimeout(timer);
   }, [leaving, onDismiss]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadGreetingFont().then(() => {
-      if (!cancelled) setFontReady(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (variant !== "entry" || hold) return;
@@ -123,7 +108,7 @@ export function DashboardGreeting({
       role="dialog"
       aria-modal="true"
       aria-label={line}
-      initial={{ opacity: reduceMotion ? 1 : 0, y: 0, scale: 1, filter: "blur(0px)" }}
+      initial={false}
       animate={
         leaving
           ? { opacity: 0, y: -36, scale: 1.04, filter: "blur(10px)" }
@@ -135,25 +120,9 @@ export function DashboardGreeting({
       className="fixed inset-0 z-[100] flex cursor-default flex-col items-center justify-center gap-8 bg-black/70 backdrop-blur-md"
     >
       <div className="px-6 text-center">
-        {playGreeting && (
-          reduceMotion ? (
-            <h1 className="font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl">
-              {line}
-            </h1>
-          ) : (
-            <TextAnimate
-              key={line}
-              animation="blurInUp"
-              by="character"
-              once
-              as="h1"
-              startOnView={false}
-              className="font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl"
-            >
-              {line}
-            </TextAnimate>
-          )
-        )}
+        <h1 className="font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl">
+          {line}
+        </h1>
       </div>
       {canEnter && (
         <motion.p
