@@ -881,46 +881,38 @@ export function NotebookView({
     localStorage.setItem('notebook-view-mode', newMode);
   };
 
-  // Note card colors based on folder marker color (if set), otherwise fall back to a rotating palette
-  const getNoteCardColor = (category: string, index: number): {
+  // Note cards use the folder marker the user picked. With no marker, they use the site accent.
+  const getNoteCardColor = (category: string): {
     bg: string;
     bgDark: string;
     border: string;
     borderDark: string;
     accent: string;
-    text?: string;
-    textDark?: string;
   } => {
-    const fallback = [
-      { bg: 'hsl(210, 100%, 95%)', bgDark: 'hsl(210, 50%, 15%)', border: 'hsl(210, 80%, 85%)', borderDark: 'hsl(210, 40%, 25%)', accent: 'hsl(210, 80%, 55%)' },
-      { bg: 'hsl(142, 70%, 92%)', bgDark: 'hsl(142, 40%, 12%)', border: 'hsl(142, 60%, 80%)', borderDark: 'hsl(142, 30%, 22%)', accent: 'hsl(142, 70%, 45%)' },
-      { bg: 'hsl(48, 95%, 90%)', bgDark: 'hsl(48, 50%, 12%)', border: 'hsl(48, 80%, 80%)', borderDark: 'hsl(48, 40%, 22%)', accent: 'hsl(48, 95%, 50%)' },
-      { bg: 'hsl(0, 85%, 93%)', bgDark: 'hsl(0, 40%, 14%)', border: 'hsl(0, 70%, 85%)', borderDark: 'hsl(0, 30%, 24%)', accent: 'hsl(0, 75%, 55%)' },
-      { bg: 'hsl(262, 80%, 93%)', bgDark: 'hsl(262, 40%, 14%)', border: 'hsl(262, 60%, 85%)', borderDark: 'hsl(262, 30%, 24%)', accent: 'hsl(262, 70%, 55%)' },
-      { bg: 'hsl(330, 80%, 93%)', bgDark: 'hsl(330, 40%, 14%)', border: 'hsl(330, 60%, 85%)', borderDark: 'hsl(330, 30%, 24%)', accent: 'hsl(330, 70%, 55%)' },
-      { bg: 'hsl(186, 80%, 90%)', bgDark: 'hsl(186, 40%, 12%)', border: 'hsl(186, 60%, 80%)', borderDark: 'hsl(186, 30%, 22%)', accent: 'hsl(186, 70%, 45%)' },
-      { bg: 'hsl(25, 90%, 92%)', bgDark: 'hsl(25, 50%, 14%)', border: 'hsl(25, 70%, 82%)', borderDark: 'hsl(25, 35%, 24%)', accent: 'hsl(25, 85%, 50%)' },
-    ];
+    const siteAccent = {
+      bg: "hsl(var(--primary) / 0.14)",
+      bgDark: "hsl(var(--primary) / 0.2)",
+      border: "hsl(var(--primary) / 0.38)",
+      borderDark: "hsl(var(--primary) / 0.48)",
+      accent: "hsl(var(--primary))",
+    };
 
-    // Try to derive from the folder's marker color
     const markerId = folderMarkers[category];
     const marker = markerId ? MARKER_COLORS.find(m => m.id === markerId) : null;
-    if (marker && marker.color && marker.color !== 'transparent') {
-      const match = marker.color.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)/);
-      if (match) {
-        const h = match[1];
-        const s = Number(match[2]);
-        return {
-          bg: `hsl(${h}, ${Math.min(s, 80)}%, 93%)`,
-          bgDark: `hsl(${h}, ${Math.min(s, 50)}%, 14%)`,
-          border: `hsl(${h}, ${Math.min(s, 70)}%, 82%)`,
-          borderDark: `hsl(${h}, ${Math.min(s, 35)}%, 24%)`,
-          accent: marker.color,
-        };
-      }
-    }
+    if (!marker || !marker.color || marker.color === "transparent") return siteAccent;
 
-    return fallback[index % fallback.length];
+    const match = marker.color.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)/);
+    if (!match) return siteAccent;
+
+    const h = match[1];
+    const s = Number(match[2]);
+    return {
+      bg: `hsl(${h}, ${Math.min(s, 80)}%, 93%)`,
+      bgDark: `hsl(${h}, ${Math.min(s, 50)}%, 14%)`,
+      border: `hsl(${h}, ${Math.min(s, 70)}%, 82%)`,
+      borderDark: `hsl(${h}, ${Math.min(s, 35)}%, 24%)`,
+      accent: marker.color,
+    };
   };
 
 
@@ -2660,8 +2652,7 @@ export function NotebookView({
                   {gridVirtualizer.getVirtualItems().map((virtualRow) => {
                     const entry = visibleEntries[virtualRow.index];
                     if (!entry) return null;
-                    const index = virtualRow.index;
-                    const colors = getNoteCardColor(entry.category, index);
+                    const colors = getNoteCardColor(entry.category);
                     const plainText = entry.content.replace(/<[^>]*>/g, '').trim();
                     const contentLines = plainText.split(/[.!?\n]+/).filter(s => s.trim()).slice(0, 3);
                     const isDark = document.documentElement.classList.contains('dark');
@@ -2691,8 +2682,12 @@ export function NotebookView({
                           whileHover={{ x: 4 }}
                           whileTap={{ scale: 0.99 }}
                           onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
-                          className="note-card w-full text-left rounded-xl overflow-hidden group relative border transition-all duration-300 flex items-center gap-3 p-4 bg-card/50 backdrop-blur border-border/30"
-                          style={{ ['--note-accent' as string]: colors.accent }}
+                          className="note-card w-full text-left rounded-xl overflow-hidden group relative border transition-all duration-300 flex items-center gap-3 p-4 backdrop-blur"
+                          style={{
+                            backgroundColor: isDark ? colors.bgDark : colors.bg,
+                            borderColor: isDark ? colors.borderDark : colors.border,
+                            ["--note-accent" as string]: colors.accent,
+                          }}
                         >
                           <span className="note-shine" aria-hidden />
                           <div
@@ -2705,7 +2700,7 @@ export function NotebookView({
                               <p className="text-xs text-muted-foreground mt-1 truncate">{contentLines[0]}</p>
                             )}
                           </div>
-                          <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: colors.border, color: isDark ? colors.textDark : colors.text }}>
+                          <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: colors.border }}>
                             {CATEGORIES.find(c => c.id === entry.category)?.label || entry.category}
                           </Badge>
                         </motion.button>
@@ -2725,7 +2720,7 @@ export function NotebookView({
                     className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
                   >
                     {visibleEntries.map((entry, index) => {
-                        const colors = getNoteCardColor(entry.category, index);
+                        const colors = getNoteCardColor(entry.category);
                         const plainText = entry.content.replace(/<[^>]*>/g, '').trim();
                         const contentLines = plainText.split(/[.!?\n]+/).filter(s => s.trim()).slice(0, 3);
                         const isDark = document.documentElement.classList.contains('dark');
@@ -3257,7 +3252,7 @@ export function NotebookView({
           className="pointer-events-none fixed left-0 top-0 z-[90] w-60"
         >
           {(() => {
-            const colors = getNoteCardColor(draggedNote.category, 0);
+            const colors = getNoteCardColor(draggedNote.category);
             const isDark = document.documentElement.classList.contains("dark");
             const preview = draggedNote.content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
             return (
