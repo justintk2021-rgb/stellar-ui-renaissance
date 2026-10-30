@@ -781,6 +781,7 @@ const Index = () => {
       <DashboardGreeting
         variant="entry"
         name={displayName}
+        nameReady={profileLoaded}
         dataReady={false}
         hold
         onDismiss={() => {}}
@@ -804,6 +805,7 @@ const Index = () => {
           <DashboardGreeting
             variant={locked ? "lock" : "entry"}
             name={displayName}
+            nameReady={profileLoaded}
             dataReady={!tradesLoading && !accountsLoading}
             onDismiss={dismissGreeting}
           />

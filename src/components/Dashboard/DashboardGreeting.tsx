@@ -23,6 +23,10 @@ export function dashboardDisplayName(
   if (fullName) return fullName;
 
   const meta = user?.user_metadata ?? {};
+  const metaName = [meta.full_name, meta.name]
+    .find((value) => typeof value === "string" && value.trim() && !value.includes("@"));
+  if (typeof metaName === "string") return metaName.trim();
+
   const username = [meta.username, meta.user_name, meta.preferred_username]
     .find((value) => typeof value === "string" && value.trim());
   if (typeof username === "string" && username.trim()) return username.trim();
@@ -35,6 +39,8 @@ export function dashboardDisplayName(
 interface DashboardGreetingProps {
   variant: "entry" | "lock";
   name: string;
+  /** Profile lookup finished, so `name` is the final display name. */
+  nameReady?: boolean;
   dataReady: boolean;
   /** Stay on the spinner. Used while the session itself is still resolving. */
   hold?: boolean;
@@ -44,6 +50,7 @@ interface DashboardGreetingProps {
 export function DashboardGreeting({
   variant,
   name,
+  nameReady = true,
   dataReady,
   hold = false,
   onDismiss,
@@ -51,22 +58,17 @@ export function DashboardGreeting({
   const reduceMotion = useReducedMotion();
   const [minElapsed, setMinElapsed] = useState(variant === "lock");
   const [maxElapsed, setMaxElapsed] = useState(variant === "lock");
-  const [textVisible, setTextVisible] = useState(false);
+  const [fontReady, setFontReady] = useState(false);
   const greeting = greetingForHour(new Date().getHours());
   const line = name ? `${greeting}, ${name}` : greeting;
   const canEnter = !hold && (variant === "lock" || (minElapsed && (dataReady || maxElapsed)));
+  const playGreeting = fontReady && (hold || nameReady);
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      await loadGreetingFont();
-      if (cancelled) return;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (!cancelled) setTextVisible(true);
-        });
-      });
-    })();
+    void loadGreetingFont().then(() => {
+      if (!cancelled) setFontReady(true);
+    });
     return () => {
       cancelled = true;
     };
@@ -111,10 +113,10 @@ export function DashboardGreeting({
     >
       <div className="px-6 text-center">
         <h1
+          key={line}
           className={cn(
-            "font-greeting inline-block text-3xl font-semibold tracking-wide text-primary md:text-4xl",
-            "transition-opacity duration-700 ease-[cubic-bezier(0.4,0,0.2,1)]",
-            textVisible || reduceMotion ? "opacity-100" : "opacity-0",
+            "font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl",
+            playGreeting ? "greet-fade greet-fade-delay" : "opacity-0",
           )}
         >
           {line}
