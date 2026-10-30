@@ -13,7 +13,7 @@ export function StudyCategorySwitch({
     <div
       role="tablist"
       aria-label="Study category"
-      className="inline-flex items-center rounded-full border border-border/50 bg-muted/40 p-1 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.06)]"
+      className="inline-flex items-center rounded-full bg-muted/50 p-1"
     >
       {STUDY_CATEGORIES.map((category) => {
         const selected = value === category.id;
@@ -26,13 +26,13 @@ export function StudyCategorySwitch({
             onClick={() => onChange(category.id)}
             className={cn(
               "relative rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:px-4",
-              selected ? "text-primary" : "text-muted-foreground hover:text-foreground",
+              selected ? "text-foreground" : "text-muted-foreground hover:text-foreground",
             )}
           >
             {selected && (
               <motion.span
                 layoutId="study-category-bubble"
-                className="absolute inset-0 rounded-full border border-primary/35 bg-primary/15 shadow-[0_6px_18px_-8px_hsl(var(--primary)/0.9)]"
+                className="absolute inset-0 rounded-full bg-background/80 shadow-sm"
                 transition={{ type: "spring", stiffness: 460, damping: 34 }}
               />
             )}

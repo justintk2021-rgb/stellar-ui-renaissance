@@ -1,49 +1,13 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, Plus, Search } from "lucide-react";
-import { AnimatePresence, motion } from "@/lib/motion";
-import { cn } from "@/lib/utils";
+import { useMemo, useState } from "react";
+import { ChevronRight, FolderPlus, Plus, Search } from "lucide-react";
 import { studyDocPlainText, studyFolderColor } from "@/lib/studyArea";
 import type { StudyFolder, StudyNote } from "@/hooks/useStudyArea";
-import { Input } from "@/components/ui/input";
 
 function greetingLine(name?: string): string {
   const hour = new Date().getHours();
   const greeting = hour >= 5 && hour < 12 ? "Good morning" : hour >= 12 && hour < 18 ? "Good afternoon" : "Good evening";
   const first = name?.trim().split(" ")[0];
   return first ? `${greeting}, ${first}` : greeting;
-}
-
-function editedLabel(iso?: string): string {
-  if (!iso) return "No notes yet";
-  const ms = Date.now() - new Date(iso).getTime();
-  const minutes = Math.max(0, Math.floor(ms / 60000));
-  if (minutes < 1) return "Edited just now";
-  if (minutes < 60) return `Edited ${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `Edited ${hours} hr${hours === 1 ? "" : "s"} ago`;
-  const days = Math.floor(hours / 24);
-  return `Edited ${days} day${days === 1 ? "" : "s"} ago`;
-}
-
-function IconButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
-    >
-      {children}
-    </button>
-  );
 }
 
 export function StudyHome({
@@ -53,7 +17,6 @@ export function StudyHome({
   onOpenNote,
   onCreateNote,
   onCreateFolder,
-  onMoveNote,
 }: {
   displayName?: string;
   folders: StudyFolder[];
@@ -61,291 +24,138 @@ export function StudyHome({
   onOpenNote: (id: string) => void;
   onCreateNote: (folderId: string | null) => void;
   onCreateFolder: () => void;
-  onMoveNote?: (id: string, folderId: string | null) => void;
 }) {
-  const [draftQuery, setDraftQuery] = useState("");
-  const [inboxQuery, setInboxQuery] = useState("");
-  const [draftSearch, setDraftSearch] = useState(false);
-  const [inboxSearch, setInboxSearch] = useState(false);
-  const [showAllDrafts, setShowAllDrafts] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  const folderName = (id: string | null) => folders.find((folder) => folder.id === id)?.name;
-  const drafts = useMemo(() => {
-    const needle = draftQuery.trim().toLowerCase();
-    return [...notes]
-      .filter((note) => !needle || `${note.title} ${studyDocPlainText(note.content)}`.toLowerCase().includes(needle))
-      .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  }, [draftQuery, notes]);
-  const inbox = useMemo(() => {
-    const needle = inboxQuery.trim().toLowerCase();
-    return notes
-      .filter((note) => !note.folder_id)
-      .filter((note) => !needle || `${note.title} ${studyDocPlainText(note.content)}`.toLowerCase().includes(needle));
-  }, [inboxQuery, notes]);
-  const folderCards = useMemo(
-    () => [...folders].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
-    [folders],
+  const [query, setQuery] = useState("");
+  const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
+  const featured = useMemo(
+    () => [...notes].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ?? null,
+    [notes],
   );
-  const visibleDrafts = showAllDrafts ? drafts : drafts.slice(0, 4);
-  const inboxExpanded = inbox.length > 0 && inbox.every((note) => expanded.has(note.id));
 
-  const toggleInbox = (id: string) => {
-    setExpanded((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const rows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const matches = (text: string) => !needle || text.toLowerCase().includes(needle);
+    const noteRows = [...notes]
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+      .filter((note) => matches(`${note.title} ${studyDocPlainText(note.content)} ${folderById.get(note.folder_id ?? "")?.name ?? "Inbox"}`))
+      .map((note) => {
+        const folder = note.folder_id ? folderById.get(note.folder_id) : undefined;
+        const preview = studyDocPlainText(note.content);
+        return {
+          key: note.id,
+          title: note.title || "Untitled note",
+          detail: [folder?.name ?? "Inbox", preview].filter(Boolean).join(" · ") || "Empty note",
+          color: studyFolderColor(folder?.color),
+          onClick: () => onOpenNote(note.id),
+        };
+      });
+    const emptyFolders = [...folders]
+      .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
+      .filter((folder) => !notes.some((note) => note.folder_id === folder.id))
+      .filter((folder) => matches(folder.name))
+      .map((folder) => ({
+        key: folder.id,
+        title: folder.name,
+        detail: "Empty folder · add a note",
+        color: studyFolderColor(folder.color),
+        onClick: () => onCreateNote(folder.id),
+      }));
+    return [...noteRows, ...emptyFolders];
+  }, [folderById, folders, notes, onCreateNote, onOpenNote, query]);
+
+  const featuredPreview = featured ? studyDocPlainText(featured.content) : "";
+  const featuredFolder = featured?.folder_id ? folderById.get(featured.folder_id)?.name : "Inbox";
 
   return (
-    <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(240px,1fr)_minmax(0,2fr)] lg:gap-10">
-      <div className="space-y-8">
-        <h2 className="text-[1.85rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[2.05rem]">
-          {greetingLine(displayName)}
-        </h2>
-
-        <section>
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-foreground">Recent drafts</h3>
-            <div className="flex items-center">
-              <IconButton label="Search drafts" onClick={() => setDraftSearch((open) => !open)}>
-                <Search className="h-4 w-4" />
-              </IconButton>
-              <IconButton label="New draft" onClick={() => onCreateNote(null)}>
-                <Plus className="h-4 w-4" />
-              </IconButton>
-            </div>
-          </div>
-          {draftSearch && (
-            <Input value={draftQuery} onChange={(event) => setDraftQuery(event.target.value)} placeholder="Search drafts" className="mb-2 h-9 bg-background/50" />
-          )}
-          <div>
-            {visibleDrafts.length === 0 ? (
-              <p className="py-5 text-sm text-muted-foreground">No drafts in this category yet.</p>
-            ) : visibleDrafts.map((note) => {
-              const preview = studyDocPlainText(note.content);
-              const place = folderName(note.folder_id);
-              return (
-                <button
-                  key={note.id}
-                  type="button"
-                  draggable={!!onMoveNote}
-                  onDragStart={(event) => {
-                    if (!onMoveNote) return;
-                    const payload = JSON.stringify({ type: "note", id: note.id });
-                    event.dataTransfer.setData("application/x-study-area", payload);
-                    event.dataTransfer.setData("text/plain", payload);
-                  }}
-                  onClick={() => onOpenNote(note.id)}
-                  className="flex w-full flex-col gap-0.5 py-2.5 text-left"
-                >
-                  <span className="truncate text-sm font-semibold text-foreground/90">{note.title || "Untitled note"}</span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {[place, preview].filter(Boolean).join("  /  ") || "Empty note"}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {drafts.length > 4 && (
-            <button type="button" onClick={() => setShowAllDrafts((open) => !open)} className="mt-1 text-sm text-muted-foreground hover:text-foreground">
-              {showAllDrafts ? "See less" : "See more"}
-            </button>
-          )}
-        </section>
-
-        <section>
-          <div className="mb-1 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-foreground">Thought inbox</h3>
-            <div className="flex items-center">
-              <IconButton label="Search inbox" onClick={() => setInboxSearch((open) => !open)}>
-                <Search className="h-4 w-4" />
-              </IconButton>
-              <IconButton label="New inbox note" onClick={() => onCreateNote(null)}>
-                <Plus className="h-4 w-4" />
-              </IconButton>
-            </div>
-          </div>
-          <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-            <button
-              type="button"
-              onClick={() => {
-                if (inboxExpanded) setExpanded(new Set());
-                else setExpanded(new Set(inbox.map((note) => note.id)));
-              }}
-              className="hover:text-foreground"
-            >
-              {inboxExpanded ? "Collapse all" : "Expand all"}
-            </button>
-            <span className="tabular-nums">{inbox.length} unfiled</span>
-          </div>
-          {inboxSearch && (
-            <Input value={inboxQuery} onChange={(event) => setInboxQuery(event.target.value)} placeholder="Search inbox" className="mb-3 h-9 bg-background/50" />
-          )}
-          <div className="space-y-2">
-            {inbox.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-border/50 px-3 py-4 text-sm text-muted-foreground">
-                Unfiled notes show up here.
-              </p>
-            ) : inbox.map((note) => {
-              const open = expanded.has(note.id);
-              const preview = studyDocPlainText(note.content);
-              return (
-                <div key={note.id} className="study-glass overflow-hidden rounded-xl">
-                  <div className="flex w-full items-center gap-2 px-3 py-2.5">
-                    <button
-                      type="button"
-                      aria-label={open ? "Collapse note" : "Expand note"}
-                      onClick={() => toggleInbox(note.id)}
-                      className={cn(
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border border-border",
-                        open && "border-primary bg-primary/15",
-                      )}
-                    >
-                      {open && <span className="h-1.5 w-1.5 rounded-[2px] bg-primary" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onOpenNote(note.id)}
-                      className="min-w-0 flex-1 truncate text-left text-sm font-medium text-foreground/90 hover:text-foreground"
-                    >
-                      {note.title || "Untitled note"}
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={open ? "Collapse note" : "Expand note"}
-                      onClick={() => toggleInbox(note.id)}
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                    >
-                      <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
-                    </button>
-                  </div>
-                  <AnimatePresence initial={false}>
-                    {open && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <button type="button" onClick={() => onOpenNote(note.id)} className="block w-full px-9 pb-3 text-left text-xs leading-5 text-muted-foreground">
-                          {preview || "Empty note"}
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">{greetingLine(displayName)}</p>
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <label className="relative block min-w-0 flex-1 sm:w-64">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search notes"
+              className="h-10 w-full rounded-full border border-border/50 bg-muted/40 pl-9 pr-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/40"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => onCreateNote(null)}
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" />
+            Note
+          </button>
+          <button
+            type="button"
+            onClick={onCreateFolder}
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <FolderPlus className="h-4 w-4" />
+            Folder
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        {folderCards.length === 0 ? (
+      <section className="relative flex min-h-[148px] items-center justify-between gap-4 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/30 via-primary/10 to-transparent px-5 py-5 sm:px-6">
+        <div className="flex min-w-0 items-center gap-4">
+          <span
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-background/70 text-lg font-semibold text-foreground shadow-sm"
+            style={{ color: featured ? studyFolderColor(folderById.get(featured.folder_id ?? "")?.color) : undefined }}
+          >
+            {(featured?.title || "N").slice(0, 1).toUpperCase()}
+          </span>
+          <div className="min-w-0">
+            <h3 className="truncate text-lg font-semibold tracking-tight">
+              {featured?.title || "Start a study note"}
+            </h3>
+            <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
+              {featured
+                ? [featuredFolder, featuredPreview].filter(Boolean).join(" · ") || "Empty note"
+                : "Write a note, then keep it in a folder."}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => (featured ? onOpenNote(featured.id) : onCreateNote(null))}
+          className="shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+        >
+          {featured ? "Open" : "New note"}
+        </button>
+      </section>
+
+      <div className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
+        {rows.length === 0 ? (
           <button
             type="button"
-            onClick={onCreateFolder}
-            className="study-glass flex min-h-52 items-center justify-center rounded-2xl border-dashed px-5 py-8 text-sm text-muted-foreground"
+            onClick={() => onCreateNote(null)}
+            className="col-span-full rounded-xl px-2 py-8 text-left text-sm text-muted-foreground hover:text-foreground"
           >
-            Create a folder
+            No notes in this category yet. Create one.
           </button>
-        ) : folderCards.map((folder) => {
-          const folderNotes = notes
-            .filter((note) => note.folder_id === folder.id)
-            .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-          const latest = folderNotes[0]?.updated_at ?? folder.updated_at;
-          const color = studyFolderColor(folder.color);
-          const sheets = folderNotes.slice(0, 2);
-          return (
-            <article
-              key={folder.id}
-              className="study-glass rounded-2xl p-4"
-              onDragOver={(event) => {
-                if (!onMoveNote) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
-              }}
-              onDrop={(event) => {
-                if (!onMoveNote) return;
-                event.preventDefault();
-                try {
-                  const raw = event.dataTransfer.getData("application/x-study-area") || event.dataTransfer.getData("text/plain");
-                  const payload = JSON.parse(raw) as { type?: string; id?: string };
-                  if (payload.type === "note" && payload.id) onMoveNote(payload.id, folder.id);
-                } catch {
-                  // Ignore drops that are not study notes.
-                }
-              }}
+        ) : rows.map((row) => (
+          <button
+            key={row.key}
+            type="button"
+            onClick={row.onClick}
+            className="flex items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-muted/40"
+          >
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-background"
+              style={{ background: row.color }}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
-                    <h4 className="truncate text-base font-semibold tracking-tight">{folder.name}</h4>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">{editedLabel(latest)}</p>
-                </div>
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-background/55 px-2 py-0.5 text-[11px] tabular-nums text-muted-foreground">
-                  {folderNotes.length}
-                  <ChevronDown className="h-3 w-3" />
-                </span>
-              </div>
-              <div
-                className="study-folder-well mt-4"
-                style={{ background: `linear-gradient(180deg, color-mix(in oklab, ${color} 14%, transparent), hsl(var(--background) / 0.35))` }}
-              >
-                {sheets.length === 0 ? (
-                  <>
-                    <div className="study-folder-sheet study-folder-sheet--ghost" style={{ top: "2.85rem", transform: "rotate(1.4deg)" }} />
-                    <div className="study-folder-sheet study-folder-sheet--ghost" style={{ top: "1.55rem", transform: "rotate(-0.6deg)", opacity: 0.75 }} />
-                    <button
-                      type="button"
-                      onClick={() => onCreateNote(folder.id)}
-                      className="study-folder-sheet study-folder-sheet--note flex items-center justify-center text-xs text-muted-foreground"
-                      style={{ top: "0.7rem" }}
-                    >
-                      Add a note
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="study-folder-sheet study-folder-sheet--ghost" style={{ top: "3.2rem", transform: "rotate(1.8deg)" }} />
-                    {sheets.map((note, index) => (
-                      <button
-                        key={note.id}
-                        type="button"
-                        onClick={() => onOpenNote(note.id)}
-                        className="study-folder-sheet study-folder-sheet--note text-left"
-                        style={{
-                          top: `${0.55 + index * 1.9}rem`,
-                          transform: `rotate(${index === 0 ? -1.5 : 1.3}deg)`,
-                          zIndex: 3 + index,
-                        }}
-                      >
-                        <p className="truncate text-xs font-semibold text-foreground/90">{note.title || "Untitled note"}</p>
-                        <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-                          {studyDocPlainText(note.content) || "Empty note"}
-                        </p>
-                      </button>
-                    ))}
-                  </>
-                )}
-              </div>
-            </article>
-          );
-        })}
-        {folderCards.length > 0 && (
-          <button
-            type="button"
-            onClick={onCreateFolder}
-            className="study-glass flex min-h-52 items-center justify-center rounded-2xl border-dashed px-5 py-8 text-sm text-muted-foreground"
-          >
-            Create a folder
+              {row.title.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{row.title}</span>
+              <span className="block truncate text-xs text-muted-foreground">{row.detail}</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           </button>
-        )}
+        ))}
       </div>
     </div>
   );

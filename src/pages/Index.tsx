@@ -781,7 +781,7 @@ const Index = () => {
   }, [upsertNotebookFromQuickNotes]);
 
   const { title, subtitle } = currentPage === "notebook" && notebookView === "study"
-    ? { title: "Study Area", subtitle: "" }
+    ? { title: "Study Area", subtitle: "Folders and notes for the category you pick" }
     : (pageInfo[currentPage] ?? pageInfo.dashboard);
   const todayKey = formatLocalDateKey(new Date());
   const brokerTodayPnL = selectedBrokerAccountId && brokerDayTotals.has(todayKey)

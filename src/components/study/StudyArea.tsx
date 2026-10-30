@@ -158,10 +158,6 @@ export function StudyArea({
                   });
               }}
               onCreateFolder={() => { setFolderName("Untitled folder"); setFolderColor(""); setFolderOpen(true); }}
-              onMoveNote={(id, folderId) => {
-                if (!userId) return;
-                mutations.moveNote.mutate({ id, folderId });
-              }}
             />
           </motion.div>
         </AnimatePresence>
