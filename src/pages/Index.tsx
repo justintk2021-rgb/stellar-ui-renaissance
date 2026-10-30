@@ -421,6 +421,20 @@ const Index = () => {
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
   const [focusStudyNoteId, setFocusStudyNoteId] = useState<string | null>(null);
+  const [notebookView, setNotebookView] = useState<"notebook" | "study">(() => {
+    try {
+      return localStorage.getItem("nsync-notebook-view") === "study" ? "study" : "notebook";
+    } catch {
+      return "notebook";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("nsync-notebook-view", notebookView);
+    } catch {
+      // Preference is optional if storage is blocked.
+    }
+  }, [notebookView]);
   const [journalFilter, setJournalFilter] = useState<JournalFilter>('all');
   const [journalDateRange, setJournalDateRange] = useState<{ start: Date; end: Date } | null>(null);
   const [journalFocusTradeId, setJournalFocusTradeId] = useState<string | null>(null);
@@ -746,7 +760,9 @@ const Index = () => {
     setCurrentPage('notebook');
   }, [upsertNotebookFromQuickNotes]);
 
-  const { title, subtitle } = pageInfo[currentPage] ?? pageInfo.dashboard;
+  const { title, subtitle } = currentPage === "notebook" && notebookView === "study"
+    ? { title: "Study Area", subtitle: "Folders, notes, and live trade cards" }
+    : (pageInfo[currentPage] ?? pageInfo.dashboard);
   const todayKey = formatLocalDateKey(new Date());
   const brokerTodayPnL = selectedBrokerAccountId && brokerDayTotals.has(todayKey)
     ? brokerDayTotals.get(todayKey)
@@ -858,6 +874,10 @@ const Index = () => {
                 onThemeChange={handleThemeChange}
                 trades={trades}
                 showRank={currentPage === 'dashboard'}
+                titleSwitch={currentPage === "notebook" ? {
+                  label: notebookView === "study" ? "Notebook" : "Study Area",
+                  onSelect: () => setNotebookView(notebookView === "study" ? "notebook" : "study"),
+                } : null}
                 rightSlot={currentPage === 'dashboard' ? (
                   <div className="flex items-center gap-3">
                     <Button
@@ -1073,6 +1093,7 @@ const Index = () => {
                               onDelete={handleDeleteTrade}
                               onSelectForNotebook={handleSelectForNotebook}
                               onOpenStudyNote={(noteId) => {
+                                setNotebookView("study");
                                 setFocusStudyNoteId(noteId);
                                 setCurrentPage("notebook");
                               }}
@@ -1148,7 +1169,7 @@ const Index = () => {
 
               {/* Notebook Page */}
               {currentPage === 'notebook' && (
-                <PageTransition key="notebook">
+                <PageTransition key={notebookView === "study" ? "study-area" : "notebook"}>
                   <Suspense fallback={<PageFallback />}>
                     <NotebookView
                       trades={trades}
@@ -1166,6 +1187,7 @@ const Index = () => {
                       onFontChange={setNotebookFont}
                       focusStudyNoteId={focusStudyNoteId}
                       onStudyFocusHandled={() => setFocusStudyNoteId(null)}
+                      view={notebookView}
                     />
                   </Suspense>
                 </PageTransition>
