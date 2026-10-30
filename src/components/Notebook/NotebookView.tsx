@@ -99,7 +99,7 @@ import {
   AlignRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { motion, AnimatePresence, useMotionValue, useSpring } from "@/lib/motion";
+import { motion, AnimatePresence, useMotionValue } from "@/lib/motion";
 
 interface NotebookViewProps {
   trades: Trade[];
@@ -232,8 +232,6 @@ export function NotebookView({
   const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
   const dragX = useMotionValue(0);
   const dragY = useMotionValue(0);
-  const dragSpringX = useSpring(dragX, { stiffness: 520, damping: 34, mass: 0.35 });
-  const dragSpringY = useSpring(dragY, { stiffness: 520, damping: 34, mass: 0.35 });
   const emptyDragImageRef = useRef<HTMLCanvasElement | null>(null);
   const [folderSearchQuery, setFolderSearchQuery] = useState("");
   const deferredFolderSearch = useDebouncedValue(folderSearchQuery, 160);
@@ -793,8 +791,8 @@ export function NotebookView({
       emptyDragImageRef.current = canvas;
     }
     event.dataTransfer.setDragImage(emptyDragImageRef.current, 0, 0);
-    dragX.set(event.clientX + 18);
-    dragY.set(event.clientY + 14);
+    dragX.set(event.clientX);
+    dragY.set(event.clientY);
     setDraggingNoteId(entryId);
     setIsFoldersPanelOpen(true);
   };
@@ -805,8 +803,8 @@ export function NotebookView({
     const point = { x: dragX.get(), y: dragY.get() };
     const track = (event: globalThis.DragEvent) => {
       if (!event.clientX && !event.clientY) return;
-      point.x = event.clientX + 18;
-      point.y = event.clientY + 14;
+      point.x = event.clientX;
+      point.y = event.clientY;
       if (frame) return;
       frame = window.requestAnimationFrame(() => {
         frame = 0;
@@ -3248,8 +3246,8 @@ export function NotebookView({
           animate={{ opacity: 1, scale: 1, rotate: dragDestination ? 1.5 : -4 }}
           exit={{ opacity: 0, scale: 0.86, rotate: 0 }}
           transition={{ type: "spring", stiffness: 420, damping: 26 }}
-          style={{ x: dragSpringX, y: dragSpringY }}
-          className="pointer-events-none fixed left-0 top-0 z-[90] w-60"
+          style={{ left: dragX, top: dragY, x: "-50%", y: "-50%" }}
+          className="pointer-events-none fixed z-[90] w-60"
         >
           {(() => {
             const colors = getNoteCardColor(draggedNote.category);
