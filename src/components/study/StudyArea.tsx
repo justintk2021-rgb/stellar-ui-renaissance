@@ -11,6 +11,7 @@ import { StudyHome } from "./StudyHome";
 import { AnimatePresence, motion } from "@/lib/motion";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export function StudyArea({
   userId,
@@ -49,9 +50,22 @@ export function StudyArea({
     onFocusHandled?.();
   }, [focusNoteId, onFocusHandled]);
 
+  const saveFolder = () => {
+    if (!userId) {
+      toast.error("Sign in to create a folder.");
+      return;
+    }
+    const name = folderName.trim() || "Untitled folder";
+    void mutations.createFolder.mutateAsync({ name, parentId: null, category, color: folderColor || null })
+      .then(() => setFolderOpen(false))
+      .catch((error: unknown) => {
+        toast.error(error instanceof Error ? error.message : "Could not create the folder.");
+      });
+  };
+
   return (
     <div className="min-h-[calc(100vh-10rem)]">
-      {selected && userId ? (
+      {selected ? (
         <section className="study-glass min-h-[520px] rounded-2xl p-5 sm:p-6">
           <button type="button" onClick={() => setSelectedId(null)} className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
@@ -81,19 +95,40 @@ export function StudyArea({
               folders={folders}
               notes={notes}
               onOpenNote={setSelectedId}
-              onCreateNote={(folderId) => { if (!userId) return; void mutations.createNote.mutateAsync({ folderId, category }).then(setSelectedId); }}
-              onCreateFolder={() => { setFolderName(""); setFolderColor(""); setFolderOpen(true); }}
+              onCreateNote={(folderId) => {
+                if (!userId) {
+                  toast.error("Sign in to create a note.");
+                  return;
+                }
+                void mutations.createNote.mutateAsync({ folderId, category })
+                  .then(setSelectedId)
+                  .catch((error: unknown) => {
+                    toast.error(error instanceof Error ? error.message : "Could not create the note.");
+                  });
+              }}
+              onCreateFolder={() => { setFolderName("Untitled folder"); setFolderColor(""); setFolderOpen(true); }}
+              onMoveNote={(id, folderId) => {
+                if (!userId) return;
+                mutations.moveNote.mutate({ id, folderId });
+              }}
             />
-            {tree.isError ? (
-              <p className="mt-6 text-xs text-muted-foreground">Notes and folders will appear here once Study Area is set up.</p>
-            ) : null}
           </motion.div>
         </AnimatePresence>
       )}
       <Dialog open={folderOpen} onOpenChange={setFolderOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>New folder</DialogTitle></DialogHeader>
-          <Input value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="Folder name" className="mt-2" />
+          <Input
+            value={folderName}
+            onChange={(event) => setFolderName(event.target.value)}
+            placeholder="Folder name"
+            className="mt-2"
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              saveFolder();
+            }}
+          />
           <div className="mt-4">
             <p className="mb-2 text-xs font-medium text-muted-foreground">Color</p>
             <div className="flex flex-wrap gap-2">
@@ -118,12 +153,7 @@ export function StudyArea({
           </div>
           <DialogFooter className="mt-4">
             <Button type="button" variant="outline" onClick={() => setFolderOpen(false)}>Cancel</Button>
-            <Button type="button" onClick={() => {
-              const name = folderName.trim();
-              if (!name || !userId) return;
-              mutations.createFolder.mutate({ name, parentId: null, category, color: folderColor || null });
-              setFolderOpen(false);
-            }}>Save folder</Button>
+            <Button type="button" onClick={saveFolder}>Save folder</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
