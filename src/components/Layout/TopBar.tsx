@@ -19,11 +19,15 @@ interface TopBarProps {
   notificationsSlot?: ReactNode;
   /** Hidden until the title is hovered. Click switches the page. */
   titleSwitch?: { label: string; onSelect: (event: MouseEvent<HTMLButtonElement>) => void } | null;
+  centerSlot?: ReactNode;
 }
 
-export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank = false, greetingName, profileReady = true, showGreeting = false, rightSlot, notificationsSlot, titleSwitch }: TopBarProps) {
+export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank = false, greetingName, profileReady = true, showGreeting = false, rightSlot, notificationsSlot, titleSwitch, centerSlot }: TopBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 pb-3 sm:pb-4 mb-4 sm:mb-6">
+    <div className={cn(
+      "flex flex-col gap-3 pb-3 sm:pb-4 mb-4 sm:mb-6 sm:gap-4",
+      centerSlot ? "sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center" : "sm:flex-row sm:items-end sm:justify-between",
+    )}>
       <div className="min-w-0">
         {showGreeting && <Greeting name={greetingName} profileReady={profileReady} />}
         <h2 className={cn("group/title inline-flex max-w-full items-baseline", showGreeting && "mt-4 sm:mt-5")}>
@@ -42,7 +46,8 @@ export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank =
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">{subtitle}</p>
         )}
       </div>
-      <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:justify-end">
+      {centerSlot ? <div className="flex justify-center">{centerSlot}</div> : null}
+      <div className={cn("flex items-center gap-2 sm:gap-3 flex-wrap", centerSlot ? "sm:justify-end" : "sm:justify-end")}>
         {rightSlot}
         {showRank && (
           <RankBadge trades={trades} />

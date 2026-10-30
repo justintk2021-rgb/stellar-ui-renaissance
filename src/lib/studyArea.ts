@@ -2,6 +2,14 @@ import type { JSONContent } from "@tiptap/core";
 import type { Trade } from "@/types/trade";
 import { getTradeLocalDateKey, parseLocalDateKey } from "@/lib/tradeFormat";
 
+export type StudyCategory = "individual" | "collaborative" | "case";
+
+export const STUDY_CATEGORIES: { id: StudyCategory; label: string }[] = [
+  { id: "individual", label: "Individual" },
+  { id: "collaborative", label: "Collaborative" },
+  { id: "case", label: "Case" },
+];
+
 const YOUTUBE_ID = "([A-Za-z0-9_-]{11})";
 const YOUTUBE_URL = new RegExp(
   `^(?:https?:\\/\\/)?(?:www\\.)?(?:youtube\\.com\\/(?:watch\\?(?:[^\\s]*&)?v=|embed\\/|shorts\\/)|youtu\\.be\\/)${YOUTUBE_ID}(?:[&?#].*)?$`,

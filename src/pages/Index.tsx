@@ -61,6 +61,8 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
 import { DashboardGreeting, DASHBOARD_LOCK_KEY, dashboardDisplayName } from "@/components/Dashboard/DashboardGreeting";
 import { circularReveal } from "@/lib/circularReveal";
+import { StudyCategorySwitch } from "@/components/study/StudyCategorySwitch";
+import type { StudyCategory } from "@/lib/studyArea";
 import { AnimatePresence, motion } from "@/lib/motion";
 import { Lock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -436,6 +438,22 @@ const Index = () => {
       // Preference is optional if storage is blocked.
     }
   }, [notebookView]);
+  const [studyCategory, setStudyCategory] = useState<StudyCategory>(() => {
+    try {
+      const saved = localStorage.getItem("nsync-study-category");
+      if (saved === "collaborative" || saved === "case" || saved === "individual") return saved;
+    } catch {
+      // Fall through to the default category.
+    }
+    return "individual";
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("nsync-study-category", studyCategory);
+    } catch {
+      // Preference is optional if storage is blocked.
+    }
+  }, [studyCategory]);
   const [journalFilter, setJournalFilter] = useState<JournalFilter>('all');
   const [journalDateRange, setJournalDateRange] = useState<{ start: Date; end: Date } | null>(null);
   const [journalFocusTradeId, setJournalFocusTradeId] = useState<string | null>(null);
@@ -885,6 +903,9 @@ const Index = () => {
                     );
                   },
                 } : null}
+                centerSlot={currentPage === "notebook" && notebookView === "study" ? (
+                  <StudyCategorySwitch value={studyCategory} onChange={setStudyCategory} />
+                ) : null}
                 rightSlot={currentPage === 'dashboard' ? (
                   <div className="flex items-center gap-3">
                     <Button
@@ -1195,6 +1216,7 @@ const Index = () => {
                       focusStudyNoteId={focusStudyNoteId}
                       onStudyFocusHandled={() => setFocusStudyNoteId(null)}
                       view={notebookView}
+                      category={studyCategory}
                     />
                   </Suspense>
                 </PageTransition>

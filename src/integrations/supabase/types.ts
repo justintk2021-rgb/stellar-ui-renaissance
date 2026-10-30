@@ -1077,6 +1077,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          category: string
           parent_id: string | null
           sort_order: number
           updated_at: string
@@ -1086,6 +1087,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          category?: string
           parent_id?: string | null
           sort_order?: number
           updated_at?: string
@@ -1095,6 +1097,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          category?: string
           parent_id?: string | null
           sort_order?: number
           updated_at?: string
@@ -1109,6 +1112,7 @@ export type Database = {
           folder_id: string | null
           id: string
           title: string
+          category: string
           updated_at: string
           user_id: string
         }
@@ -1118,6 +1122,7 @@ export type Database = {
           folder_id?: string | null
           id?: string
           title?: string
+          category?: string
           updated_at?: string
           user_id: string
         }
@@ -1127,6 +1132,7 @@ export type Database = {
           folder_id?: string | null
           id?: string
           title?: string
+          category?: string
           updated_at?: string
           user_id?: string
         }

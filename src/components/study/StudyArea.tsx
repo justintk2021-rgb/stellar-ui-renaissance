@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { Trade } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { useStudyMutations, useStudyTree } from "@/hooks/useStudyArea";
+import { AnimatePresence, motion } from "@/lib/motion";
+import { STUDY_CATEGORIES, type StudyCategory } from "@/lib/studyArea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,11 +16,13 @@ export function StudyArea({
   trades,
   focusNoteId,
   onFocusHandled,
+  category,
 }: {
   userId?: string;
   trades: Trade[];
   focusNoteId?: string | null;
   onFocusHandled?: () => void;
+  category: StudyCategory;
 }) {
   const tree = useStudyTree(userId);
   const mutations = useStudyMutations(userId);
@@ -28,10 +32,15 @@ export function StudyArea({
   const [folderOpen, setFolderOpen] = useState(false);
   const [folderName, setFolderName] = useState("");
   const [renameId, setRenameId] = useState<string | null>(null);
-  const folders = tree.data?.folders ?? [];
-  const notes = tree.data?.notes ?? [];
+  const folders = (tree.data?.folders ?? []).filter((folder) => folder.category === category);
+  const notes = (tree.data?.notes ?? []).filter((note) => note.category === category);
   const selected = notes.find((note) => note.id === selectedId) ?? null;
   const currentFolder = selected?.folder_id ?? null;
+  const categoryLabel = STUDY_CATEGORIES.find((item) => item.id === category)?.label ?? "Study";
+
+  useEffect(() => {
+    setSelectedId(null);
+  }, [category]);
 
   useEffect(() => {
     if (!focusNoteId) return;
@@ -40,10 +49,18 @@ export function StudyArea({
   }, [focusNoteId, onFocusHandled]);
 
   return (
-    <div className="grid min-h-[calc(100vh-10rem)] grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={category}
+        initial={{ opacity: 0, y: 12, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -10, scale: 0.985 }}
+        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        className="grid min-h-[calc(100vh-10rem)] grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]"
+      >
       <aside className="notebook-panel flex flex-col rounded-2xl p-4">
         <div className="mb-3 flex gap-2">
-          <Button type="button" className="flex-1" onClick={() => { if (!userId) return; void mutations.createNote.mutateAsync(currentFolder).then(setSelectedId); }}>
+          <Button type="button" className="flex-1" onClick={() => { if (!userId) return; void mutations.createNote.mutateAsync({ folderId: currentFolder, category }).then(setSelectedId); }}>
             <Plus className="h-4 w-4" />
             New note
           </Button>
@@ -79,9 +96,9 @@ export function StudyArea({
           />
         ) : (
           <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-3 text-center">
-            <p className="text-lg font-semibold">Study Area</p>
+            <p className="text-lg font-semibold">{categoryLabel}</p>
             <p className="max-w-md text-sm text-muted-foreground">Nested folders, an autosaving note, YouTube embeds, and live trade cards.</p>
-            <Button type="button" onClick={() => { if (!userId) return; void mutations.createNote.mutateAsync(null).then(setSelectedId); }}>
+            <Button type="button" onClick={() => { if (!userId) return; void mutations.createNote.mutateAsync({ folderId: null, category }).then(setSelectedId); }}>
               <Plus className="h-4 w-4" />
               New note
             </Button>
@@ -98,12 +115,13 @@ export function StudyArea({
               const name = folderName.trim();
               if (!name || !userId) return;
               if (renameId) mutations.renameFolder.mutate({ id: renameId, name });
-              else mutations.createFolder.mutate({ name, parentId: currentFolder });
+              else mutations.createFolder.mutate({ name, parentId: currentFolder, category });
               setFolderOpen(false);
             }}>Save folder</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

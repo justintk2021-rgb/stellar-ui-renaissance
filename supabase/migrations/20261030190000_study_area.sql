@@ -5,6 +5,7 @@ CREATE TABLE public.study_folders (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   parent_id UUID REFERENCES public.study_folders(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'individual' CHECK (category IN ('individual', 'collaborative', 'case')),
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
@@ -15,6 +16,7 @@ CREATE TABLE public.study_notes (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   folder_id UUID REFERENCES public.study_folders(id) ON DELETE SET NULL,
   title TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT 'individual' CHECK (category IN ('individual', 'collaborative', 'case')),
   content JSONB NOT NULL DEFAULT '{"type":"doc","content":[{"type":"paragraph"}]}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()

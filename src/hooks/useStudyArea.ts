@@ -10,6 +10,7 @@ export interface StudyFolder {
   user_id: string;
   parent_id: string | null;
   name: string;
+  category: string;
   sort_order: number;
 }
 
@@ -18,6 +19,7 @@ export interface StudyNote {
   user_id: string;
   folder_id: string | null;
   title: string;
+  category: string;
   content: JSONContent;
   updated_at: string;
 }
@@ -30,8 +32,8 @@ export interface StudyMention {
 
 async function loadTree(userId: string): Promise<{ folders: StudyFolder[]; notes: StudyNote[] }> {
   const [folders, notes] = await Promise.all([
-    supabase.from("study_folders").select("id, user_id, parent_id, name, sort_order").eq("user_id", userId).order("sort_order"),
-    supabase.from("study_notes").select("id, user_id, folder_id, title, content, updated_at").eq("user_id", userId).order("updated_at", { ascending: false }),
+    supabase.from("study_folders").select("id, user_id, parent_id, name, category, sort_order").eq("user_id", userId).order("sort_order"),
+    supabase.from("study_notes").select("id, user_id, folder_id, title, category, content, updated_at").eq("user_id", userId).order("updated_at", { ascending: false }),
   ]);
   if (folders.error) throw folders.error;
   if (notes.error) throw notes.error;
@@ -88,11 +90,12 @@ export function useStudyMutations(userId: string | undefined) {
   const invalidate = useInvalidate(userId);
 
   const createFolder = useMutation({
-    mutationFn: async (input: { name: string; parentId: string | null }) => {
+    mutationFn: async (input: { name: string; parentId: string | null; category: string }) => {
       const { error } = await supabase.from("study_folders").insert({
         user_id: userId!,
         name: input.name,
         parent_id: input.parentId,
+        category: input.category,
       });
       if (error) throw error;
     },
@@ -124,10 +127,11 @@ export function useStudyMutations(userId: string | undefined) {
   });
 
   const createNote = useMutation({
-    mutationFn: async (folderId: string | null) => {
+    mutationFn: async (input: { folderId: string | null; category: string }) => {
       const { data, error } = await supabase.from("study_notes").insert({
         user_id: userId!,
-        folder_id: folderId,
+        folder_id: input.folderId,
+        category: input.category,
         title: "Untitled note",
         content: EMPTY_STUDY_DOC as Json,
       }).select("id").single();
