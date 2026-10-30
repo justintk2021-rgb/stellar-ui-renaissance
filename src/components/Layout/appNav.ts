@@ -28,7 +28,7 @@ export const appNavItems: AppNavItem[] = [
   { id: "chart", label: "Chart", short: "Chart", icon: BarChart3 },
   { id: "calendar", label: "Economic Calendar", short: "Calendar", icon: CalendarClock },
   { id: "playbook", label: "Playbook", short: "Playbook", icon: ClipboardList },
-  { id: "notebook", label: "Notebook", short: "Notes", icon: NotebookPen },
+  { id: "notebook", label: "Study Notes", short: "Notes", icon: NotebookPen },
   { id: "community", label: "Community", short: "Chat", icon: Users },
   { id: "settings", label: "Settings", short: "Settings", icon: Settings },
 ];
