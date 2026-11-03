@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, FolderPlus, Inbox, LayoutGrid, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, FolderPlus, LayoutGrid, List, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { studyDocPlainText, studyFolderColor } from "@/lib/studyArea";
 import type { StudyFolder, StudyNote } from "@/hooks/useStudyArea";
@@ -98,6 +98,7 @@ export function StudyHome({
 }) {
   const [query, setQuery] = useState("");
   const [folderId, setFolderId] = useState("all");
+  const [noteView, setNoteView] = useState<"list" | "pages">("list");
   const [boardId, setBoardId] = useState<string | null>(null);
   const [boards, setBoards] = useState<StudyBoard[]>(readBoards);
   const [boardName, setBoardName] = useState("");
@@ -110,7 +111,7 @@ export function StudyHome({
   );
 
   useEffect(() => {
-    if (folderId === "all" || folderId === "inbox") return;
+    if (folderId === "all") return;
     if (!folderById.has(folderId)) setFolderId("all");
   }, [folderById, folderId]);
 
@@ -123,7 +124,6 @@ export function StudyHome({
   }, [boards]);
 
   const scopedNotes = useMemo(() => {
-    if (folderId === "inbox") return notes.filter((note) => !note.folder_id);
     if (folderId === "all") return notes;
     return notes.filter((note) => note.folder_id === folderId);
   }, [folderId, notes]);
@@ -132,8 +132,7 @@ export function StudyHome({
     () => [...scopedNotes].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ?? null,
     [scopedNotes],
   );
-  const activeFolder = folderId !== "all" && folderId !== "inbox" ? folderById.get(folderId) : undefined;
-  const createFolderId = folderId === "all" || folderId === "inbox" ? null : folderId;
+  const createFolderId = folderId === "all" ? null : folderId;
   const activeBoard = boards.find((board) => board.id === boardId) ?? null;
 
   const rows = useMemo(() => {
@@ -141,32 +140,26 @@ export function StudyHome({
     const matches = (text: string) => !needle || text.toLowerCase().includes(needle);
     const noteRows = [...scopedNotes]
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-      .filter((note) => matches(`${note.title} ${studyDocPlainText(note.content)} ${folderById.get(note.folder_id ?? "")?.name ?? "Inbox"}`))
+      .filter((note) => matches(`${note.title} ${studyDocPlainText(note.content)} ${folderById.get(note.folder_id ?? "")?.name ?? ""}`))
       .map((note) => {
         const folder = note.folder_id ? folderById.get(note.folder_id) : undefined;
         const preview = studyDocPlainText(note.content);
         return {
           key: note.id,
+          note,
           title: note.title || "Untitled note",
-          detail: [folder?.name ?? "Inbox", preview].filter(Boolean).join(" · ") || "Empty note",
+          folderName: folder?.name,
+          preview,
+          detail: [folder?.name, preview].filter(Boolean).join(" · ") || "Empty note",
           color: studyFolderColor(folder?.color),
           onClick: () => onOpenNote(note.id),
         };
       });
-    const showEmptyFolder = activeFolder && noteRows.length === 0 && matches(activeFolder.name);
-    return showEmptyFolder
-      ? [{
-          key: activeFolder.id,
-          title: activeFolder.name,
-          detail: "Empty folder · add a note",
-          color: studyFolderColor(activeFolder.color),
-          onClick: () => onCreateNote(activeFolder.id),
-        }]
-      : noteRows;
-  }, [activeFolder, folderById, onCreateNote, onOpenNote, query, scopedNotes]);
+    return noteRows;
+  }, [folderById, onOpenNote, query, scopedNotes]);
 
   const featuredPreview = featured ? studyDocPlainText(featured.content) : "";
-  const featuredFolder = featured?.folder_id ? folderById.get(featured.folder_id)?.name : "Inbox";
+  const featuredFolder = featured?.folder_id ? folderById.get(featured.folder_id)?.name : "All notes";
   const selectNotes = (nextFolder: string) => {
     setBoardId(null);
     setFolderId(nextFolder);
@@ -191,14 +184,8 @@ export function StudyHome({
           <PanelItem
             label="All notes"
             selected={!activeBoard && folderId === "all"}
-            icon={<Search className="h-3.5 w-3.5" />}
+            icon={<List className="h-3.5 w-3.5" />}
             onClick={() => selectNotes("all")}
-          />
-          <PanelItem
-            label="Inbox"
-            selected={!activeBoard && folderId === "inbox"}
-            icon={<Inbox className="h-3.5 w-3.5" />}
-            onClick={() => selectNotes("inbox")}
           />
         </PanelSection>
         <PanelSection title="Folders" open={openSections.folders} onToggle={() => toggleSection("folders")}>
@@ -272,6 +259,26 @@ export function StudyHome({
                     className="h-10 w-full rounded-full border border-border/50 bg-muted/40 pl-9 pr-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/40"
                   />
                 </label>
+                <div className="inline-flex h-10 shrink-0 items-center rounded-full border border-border/50 bg-muted/40 p-1">
+                  <button
+                    type="button"
+                    aria-label="List view"
+                    aria-pressed={noteView === "list"}
+                    onClick={() => setNoteView("list")}
+                    className={cn("flex h-8 w-8 items-center justify-center rounded-full", noteView === "list" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
+                  >
+                    <List className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Page view"
+                    aria-pressed={noteView === "pages"}
+                    onClick={() => setNoteView("pages")}
+                    className={cn("flex h-8 w-8 items-center justify-center rounded-full", noteView === "pages" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => onCreateNote(createFolderId)}
@@ -311,36 +318,79 @@ export function StudyHome({
               </button>
             </section>
 
-            <div className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
-              {rows.length === 0 ? (
-                <button
-                  type="button"
-                  onClick={() => onCreateNote(createFolderId)}
-                  className="col-span-full rounded-xl px-2 py-8 text-left text-sm text-muted-foreground hover:text-foreground"
-                >
-                  No notes in this category yet. Create one.
-                </button>
-              ) : rows.map((row) => (
-                <button
-                  key={row.key}
-                  type="button"
-                  onClick={row.onClick}
-                  className="flex items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-muted/40"
-                >
-                  <span
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-background"
-                    style={{ background: row.color }}
+            {noteView === "list" ? (
+              <div className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
+                {rows.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => onCreateNote(createFolderId)}
+                    className="col-span-full rounded-xl px-2 py-8 text-left text-sm text-muted-foreground hover:text-foreground"
                   >
-                    {row.title.slice(0, 1).toUpperCase()}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{row.title}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{row.detail}</span>
-                  </span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </button>
-              ))}
-            </div>
+                    No notes in this category yet. Create one.
+                  </button>
+                ) : rows.map((row) => (
+                  <button
+                    key={row.key}
+                    type="button"
+                    onClick={row.onClick}
+                    className="flex items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-muted/40"
+                  >
+                    <span
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-background"
+                      style={{ background: row.color }}
+                    >
+                      {row.title.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{row.title}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{row.detail}</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {rows.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => onCreateNote(createFolderId)}
+                    className="col-span-full rounded-2xl border border-dashed border-border/60 px-4 py-10 text-left text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    No notes in this category yet. Create one.
+                  </button>
+                ) : rows.map((row) => (
+                  <article key={row.key} className="study-glass rounded-2xl p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                      <h3 className="truncate text-sm font-semibold">{row.folderName || row.title}</h3>
+                      <button
+                        type="button"
+                        aria-label="New note"
+                        onClick={() => onCreateNote(row.note.folder_id)}
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={row.onClick}
+                      className="block h-52 w-full overflow-hidden rounded-xl border border-border/40 bg-background/90 p-4 text-left shadow-sm"
+                    >
+                      {row.folderName ? (
+                        <span className="inline-flex rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          {row.folderName}
+                        </span>
+                      ) : null}
+                      <p className="mt-2 line-clamp-2 text-base font-semibold leading-snug">{row.title}</p>
+                      <p className="mt-2 line-clamp-5 text-xs leading-5 text-muted-foreground">
+                        {row.preview || "Empty note"}
+                      </p>
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
