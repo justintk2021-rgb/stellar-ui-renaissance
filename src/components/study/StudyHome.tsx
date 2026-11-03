@@ -125,7 +125,7 @@ export function StudyHome({
 
   const scopedNotes = useMemo(() => {
     if (folderId === "recent") {
-      return [...notes].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 12);
+      return [...notes].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 5);
     }
     if (folderId === "all") return notes;
     return notes.filter((note) => note.folder_id === folderId);
