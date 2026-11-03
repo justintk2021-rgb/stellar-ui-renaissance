@@ -137,6 +137,15 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
     setRevision((value) => value + 1);
   };
 
+  const forgetTrade = (tradeId: string) => {
+    const next = tradeIdsRef.current.filter((id) => id !== tradeId);
+    tradeIdsRef.current = next;
+    setTradeIds(next);
+    if (next.length === 0) setTradesOpen(false);
+    dirtyRef.current = true;
+    setRevision((value) => value + 1);
+  };
+
   const journalTrades = useMemo(() => {
     const needle = tradeQuery.trim().toLowerCase();
     const source = trades.some((trade) => !isUnjournaledTrade(trade) || trade.checklistId)
@@ -285,6 +294,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
                   playbooks={playbooks}
                   onOpenJournal={onOpenJournal}
                   onOpenPlaybook={onOpenPlaybook}
+                  onRemove={forgetTrade}
                 />
               ))}
             </div>

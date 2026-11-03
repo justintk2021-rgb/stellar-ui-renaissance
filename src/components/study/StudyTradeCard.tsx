@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { formatPnL, getTradeNetResult } from "@/lib/tradeFormat";
 import { formatStudyTradeWhen } from "@/lib/studyArea";
 import { AssetIcon } from "@/components/ui/AssetIcon";
-import { BookMarked } from "lucide-react";
+import { BookMarked, X } from "lucide-react";
 import type { StudyPlaybook } from "./studyEditorData";
 
 export function StudyTradeCard({
@@ -14,6 +14,7 @@ export function StudyTradeCard({
   onSelect,
   onOpenJournal,
   onOpenPlaybook,
+  onRemove,
 }: {
   tradeId: string;
   trades: Trade[];
@@ -22,12 +23,18 @@ export function StudyTradeCard({
   onSelect?: () => void;
   onOpenJournal?: (tradeId: string) => void;
   onOpenPlaybook?: (playbookId: string | null) => void;
+  onRemove?: (tradeId: string) => void;
 }) {
   const trade = trades.find((item) => item.id === tradeId);
   if (!trade) {
     return (
-      <div className="rounded-xl border border-dashed border-border/70 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
-        Trade removed
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border/70 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
+        <span>Trade removed</span>
+        {onRemove ? (
+          <button type="button" aria-label="Remove trade" onClick={() => onRemove(tradeId)} className="text-muted-foreground hover:text-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -74,7 +81,7 @@ export function StudyTradeCard({
   return (
     <div className="rounded-xl border border-border/50 bg-card/80 px-3 py-2.5">
       <div className="flex items-center gap-3">{body}</div>
-      {onOpenJournal || onOpenPlaybook ? (
+      {onOpenJournal || onOpenPlaybook || onRemove ? (
         <div className="mt-2 flex gap-3 pl-9 text-[11px]">
           {onOpenJournal ? (
             <button type="button" onClick={() => onOpenJournal(trade.id)} className="text-primary hover:underline">
@@ -84,6 +91,11 @@ export function StudyTradeCard({
           {onOpenPlaybook ? (
             <button type="button" onClick={() => onOpenPlaybook(trade.checklistId ?? null)} className="text-primary hover:underline">
               Open playbook
+            </button>
+          ) : null}
+          {onRemove ? (
+            <button type="button" onClick={() => onRemove(trade.id)} className="text-muted-foreground hover:text-destructive">
+              Remove
             </button>
           ) : null}
         </div>
