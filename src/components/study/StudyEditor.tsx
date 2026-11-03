@@ -6,11 +6,12 @@ import type { JSONContent } from "@tiptap/core";
 import type { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { isUnjournaledTrade } from "@/lib/notifications";
 import { matchSlashTrade, parseYouTubeId, tradeIdsInDoc } from "@/lib/studyArea";
 import { StudyTradeCard } from "./StudyTradeCard";
 import { StudyEditorDataProvider, type StudyPlaybook } from "./studyEditorData";
 import { StudyTradeNode, StudyYoutubeNode } from "./studyNodes";
-import { Bold, Heading2, Italic, List, ListOrdered } from "lucide-react";
+import { Bold, Heading2, Italic, List, ListOrdered, Plus } from "lucide-react";
 
 interface StudyEditorProps {
   noteId: string;
@@ -29,6 +30,8 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
   const [slash, setSlash] = useState<{ query: string; from: number; to: number; x: number; y: number } | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
   const [tradeIds, setTradeIds] = useState<string[]>(() => tradeIdsInDoc(content));
+  const [addingTrade, setAddingTrade] = useState(false);
+  const [tradeQuery, setTradeQuery] = useState("");
   const [revision, setRevision] = useState(0);
   const dirtyRef = useRef(false);
   const onSaveRef = useRef(onSave);
@@ -112,13 +115,30 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
   }, [playbooks, slash?.query, trades]);
 
   const insertTrade = (tradeId: string) => {
-    if (!editor || !slash) return;
-    editor.chain().focus().deleteRange({ from: slash.from, to: slash.to }).insertContent({
-      type: "studyTrade",
-      attrs: { tradeId },
-    }).run();
+    if (!editor) return;
+    const chain = editor.chain().focus();
+    if (slash) chain.deleteRange({ from: slash.from, to: slash.to });
+    chain.insertContent({ type: "studyTrade", attrs: { tradeId } }).run();
     setSlash(null);
+    setAddingTrade(false);
+    setTradeQuery("");
   };
+
+  const journalTrades = useMemo(() => {
+    const needle = tradeQuery.trim().toLowerCase();
+    const source = trades.some((trade) => !isUnjournaledTrade(trade) || trade.checklistId)
+      ? trades.filter((trade) => !isUnjournaledTrade(trade) || trade.checklistId)
+      : trades;
+    return [...source]
+      .filter((trade) => !tradeIds.includes(trade.id))
+      .sort((a, b) => (b.openTime || b.date).localeCompare(a.openTime || a.date))
+      .filter((trade) => {
+        if (!needle) return true;
+        const playbook = playbooks.find((item) => item.id === trade.checklistId)?.name ?? "";
+        return [trade.pair, trade.direction, trade.date, playbook].join(" ").toLowerCase().includes(needle);
+      })
+      .slice(0, 8);
+  }, [playbooks, tradeIds, tradeQuery, trades]);
 
   return (
     <StudyEditorDataProvider value={{ trades, playbooks, onOpenJournal, onOpenPlaybook }}>
@@ -166,16 +186,37 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
           }}
         />
         <div className="mt-6 border-t border-border/40 pt-4">
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Trades in this note</p>
-          {tradeIds.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No journal trades yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {tradeIds.map((tradeId) => (
-                <StudyTradeCard key={tradeId} tradeId={tradeId} trades={trades} playbooks={playbooks} onOpenJournal={onOpenJournal} onOpenPlaybook={onOpenPlaybook} />
-              ))}
+          <button
+            type="button"
+            onClick={() => setAddingTrade((open) => !open)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-2 text-sm font-medium text-background"
+          >
+            <Plus className="h-4 w-4" />
+            Add trade
+          </button>
+          {addingTrade ? (
+            <div className="mt-3 max-w-xl rounded-2xl border border-border/50 bg-background/50 p-3">
+              <input
+                value={tradeQuery}
+                onChange={(event) => setTradeQuery(event.target.value)}
+                placeholder="Search journal trades or playbooks"
+                className="mb-2 h-10 w-full rounded-xl border border-border/50 bg-background/70 px-3 text-sm outline-none focus:border-primary/40"
+              />
+              <div className="max-h-72 space-y-1 overflow-y-auto">
+                {journalTrades.length === 0 ? (
+                  <p className="px-2 py-4 text-sm text-muted-foreground">No journaled trades match.</p>
+                ) : journalTrades.map((trade) => (
+                  <StudyTradeCard
+                    key={trade.id}
+                    tradeId={trade.id}
+                    trades={trades}
+                    playbooks={playbooks}
+                    onSelect={() => insertTrade(trade.id)}
+                  />
+                ))}
+              </div>
             </div>
-          )}
+          ) : null}
         </div>
         {slash && (
           <div
