@@ -71,6 +71,21 @@ export function studyDocPlainText(doc: JSONContent | null | undefined): string {
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
+export function splitStudyTrades(doc: JSONContent | null | undefined): { doc: JSONContent; tradeIds: string[] } {
+  const tradeIds: string[] = [];
+  const content = (doc?.content ?? []).filter((node) => {
+    if (node.type === "studyTrade" && typeof node.attrs?.tradeId === "string" && node.attrs.tradeId) {
+      tradeIds.push(node.attrs.tradeId);
+      return false;
+    }
+    return true;
+  });
+  return {
+    doc: { type: "doc", content: content.length ? content : [{ type: "paragraph" }] },
+    tradeIds: [...new Set(tradeIds)],
+  };
+}
+
 export function tradeIdsInDoc(doc: JSONContent | null | undefined): string[] {
   const ids: string[] = [];
   const visit = (node: JSONContent | undefined) => {

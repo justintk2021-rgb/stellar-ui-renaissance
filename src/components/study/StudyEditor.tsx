@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { isUnjournaledTrade } from "@/lib/notifications";
-import { matchSlashTrade, parseYouTubeId, tradeIdsInDoc } from "@/lib/studyArea";
+import { matchSlashTrade, parseYouTubeId, splitStudyTrades } from "@/lib/studyArea";
 import { StudyTradeCard } from "./StudyTradeCard";
 import { StudyEditorDataProvider, type StudyPlaybook } from "./studyEditorData";
 import { StudyTradeNode, StudyYoutubeNode } from "./studyNodes";
@@ -20,7 +20,7 @@ interface StudyEditorProps {
   content: JSONContent;
   trades: Trade[];
   playbooks: StudyPlaybook[];
-  onSave: (input: { title: string; content: JSONContent }) => Promise<void>;
+  onSave: (input: { title: string; content: JSONContent; tradeIds: string[] }) => Promise<void>;
   onOpenJournal?: (tradeId: string) => void;
   onOpenPlaybook?: (playbookId: string | null) => void;
 }
@@ -30,7 +30,9 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
   const [status, setStatus] = useState<"saved" | "saving" | "idle">("idle");
   const [slash, setSlash] = useState<{ query: string; from: number; to: number; x: number; y: number } | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
-  const [tradeIds, setTradeIds] = useState<string[]>(() => tradeIdsInDoc(content));
+  const opened = useRef(splitStudyTrades(content));
+  const [tradeIds, setTradeIds] = useState<string[]>(opened.current.tradeIds);
+  const tradeIdsRef = useRef(opened.current.tradeIds);
   const [addingTrade, setAddingTrade] = useState(false);
   const [tradeQuery, setTradeQuery] = useState("");
   const [revision, setRevision] = useState(0);
@@ -45,7 +47,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
       StudyTradeNode,
       StudyYoutubeNode,
     ],
-    content,
+    content: opened.current.doc,
     editorProps: {
       attributes: {
         class: "study-prose min-h-[280px] px-1 py-2 text-[15px] leading-7 outline-none",
@@ -64,8 +66,6 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
     onUpdate: ({ editor: current }) => {
       dirtyRef.current = true;
       setRevision((value) => value + 1);
-      const json = current.getJSON();
-      setTradeIds(tradeIdsInDoc(json));
       const { from } = current.state.selection;
       const before = current.state.doc.textBetween(Math.max(0, from - 80), from, "\n", "\n");
       const match = matchSlashTrade(before);
@@ -96,9 +96,17 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
     dirtyRef.current = false;
     const snapshotTitle = draftTitle;
     const snapshot = editor.getJSON();
+    const prose = (snapshot.content ?? []).filter((node) => node.type !== "studyTrade");
+    const saved = {
+      ...snapshot,
+      content: [
+        ...(prose.length ? prose : [{ type: "paragraph" }]),
+        ...tradeIdsRef.current.map((tradeId) => ({ type: "studyTrade", attrs: { tradeId } })),
+      ],
+    };
     const handle = window.setTimeout(() => {
       setStatus("saving");
-      void onSaveRef.current({ title: snapshotTitle, content: snapshot })
+      void onSaveRef.current({ title: snapshotTitle, content: saved, tradeIds: tradeIdsRef.current })
         .then(() => setStatus("saved"))
         .catch(() => setStatus("idle"));
     }, 700);
@@ -115,14 +123,17 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
     }).slice(0, 12);
   }, [playbooks, slash?.query, trades]);
 
-  const insertTrade = (tradeId: string) => {
-    if (!editor) return;
-    const chain = editor.chain().focus();
-    if (slash) chain.deleteRange({ from: slash.from, to: slash.to });
-    chain.insertContent({ type: "studyTrade", attrs: { tradeId } }).run();
+  const rememberTrade = (tradeId: string) => {
+    if (slash && editor) editor.chain().focus().deleteRange({ from: slash.from, to: slash.to }).run();
     setSlash(null);
     setAddingTrade(false);
     setTradeQuery("");
+    if (tradeIdsRef.current.includes(tradeId)) return;
+    const next = [...tradeIdsRef.current, tradeId];
+    tradeIdsRef.current = next;
+    setTradeIds(next);
+    dirtyRef.current = true;
+    setRevision((value) => value + 1);
   };
 
   const journalTrades = useMemo(() => {
@@ -182,7 +193,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
               setSlashIndex((index) => Math.max(index - 1, 0));
             } else if (event.key === "Enter" && results[slashIndex]) {
               event.preventDefault();
-              insertTrade(results[slashIndex].id);
+              rememberTrade(results[slashIndex].id);
             }
           }}
         />
@@ -221,12 +232,26 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
                     tradeId={trade.id}
                     trades={trades}
                     playbooks={playbooks}
-                    onSelect={() => insertTrade(trade.id)}
+                    onSelect={() => rememberTrade(trade.id)}
                   />
                 ))}
               </div>
             </PopoverContent>
           </Popover>
+          {tradeIds.length > 0 ? (
+            <div className="mt-3 max-w-xl space-y-2">
+              {tradeIds.map((tradeId) => (
+                <StudyTradeCard
+                  key={tradeId}
+                  tradeId={tradeId}
+                  trades={trades}
+                  playbooks={playbooks}
+                  onOpenJournal={onOpenJournal}
+                  onOpenPlaybook={onOpenPlaybook}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
         {slash && (
           <div
@@ -246,7 +271,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
                   trades={trades}
                   playbooks={playbooks}
                   active={index === slashIndex}
-                  onSelect={() => insertTrade(trade.id)}
+                  onSelect={() => rememberTrade(trade.id)}
                 />
               ))}
             </div>

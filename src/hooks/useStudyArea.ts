@@ -264,13 +264,13 @@ export function useStudyMutations(userId: string | undefined) {
   });
 
   const saveNote = useMutation({
-    mutationFn: async (input: { id: string; title: string; content: JSONContent }) => {
+    mutationFn: async (input: { id: string; title: string; content: JSONContent; tradeIds?: string[] }) => {
       if (!userId) throw new Error("Sign in to save a note.");
       await supabase.from("study_notes").update({
         title: input.title,
         content: input.content as Json,
       }).eq("id", input.id).eq("user_id", userId);
-      const ids = tradeIdsInDoc(input.content);
+      const ids = input.tradeIds ?? tradeIdsInDoc(input.content);
       await supabase.from("study_note_trades").delete().eq("note_id", input.id);
       if (ids.length) {
         await supabase.from("study_note_trades").insert(ids.map((tradeId) => ({ note_id: input.id, trade_id: tradeId })));
