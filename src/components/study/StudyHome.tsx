@@ -1,10 +1,9 @@
-import { forwardRef, useEffect, useMemo, useState, type ReactNode } from "react";
+import { forwardRef, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Clock, FolderPlus, LayoutGrid, List, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { studyDocPlainText, studyFolderColor } from "@/lib/studyArea";
 import { studyDragProps, useStudyTrash } from "./StudyTrash";
 import type { StudyFolder, StudyNote } from "@/hooks/useStudyArea";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 
 const BOARDS_KEY = "nsync-study-boards";
 
@@ -60,6 +59,7 @@ const PanelItem = forwardRef<HTMLButtonElement, {
   icon?: ReactNode;
   trailing?: ReactNode;
   onClick: () => void;
+  onContextMenu?: (event: MouseEvent<HTMLButtonElement>) => void;
   drag?: ReturnType<typeof studyDragProps>;
 }>(function PanelItem({
   label,
@@ -67,6 +67,7 @@ const PanelItem = forwardRef<HTMLButtonElement, {
   icon,
   trailing,
   onClick,
+  onContextMenu,
   drag,
 }, ref) {
   return (
@@ -74,6 +75,7 @@ const PanelItem = forwardRef<HTMLButtonElement, {
       ref={ref}
       type="button"
       onClick={onClick}
+      onContextMenu={onContextMenu}
       {...drag}
       className={cn(
         "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm",
@@ -213,21 +215,19 @@ export function StudyHome({
         </PanelSection>
         <PanelSection title="Folders" open={openSections.folders} onToggle={() => toggleSection("folders")}>
           {orderedFolders.map((folder) => (
-            <ContextMenu key={folder.id}>
-              <ContextMenuTrigger asChild>
-                <PanelItem
-                  label={folder.name}
-                  selected={!activeBoard && folderId === folder.id}
-                  icon={<span className="h-2.5 w-2.5 rounded-full" style={{ background: studyFolderColor(folder.color) }} />}
-                  trailing={<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                  onClick={() => selectNotes(folder.id)}
-                  drag={studyDragProps({ kind: "folder", id: folder.id, label: folder.name }, beginDrag)}
-                />
-              </ContextMenuTrigger>
-              <ContextMenuContent>
-                <ContextMenuItem onSelect={() => onEditFolder(folder)}>Rename and color</ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
+            <PanelItem
+              key={folder.id}
+              label={folder.name}
+              selected={!activeBoard && folderId === folder.id}
+              icon={<span className="h-2.5 w-2.5 rounded-full" style={{ background: studyFolderColor(folder.color) }} />}
+              trailing={<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+              onClick={() => selectNotes(folder.id)}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                onEditFolder(folder);
+              }}
+              drag={studyDragProps({ kind: "folder", id: folder.id, label: folder.name }, beginDrag)}
+            />
           ))}
           <PanelItem
             label="New folder"
