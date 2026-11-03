@@ -199,13 +199,19 @@ export function useStudyMutations(userId: string | undefined) {
   });
 
   const renameFolder = useMutation({
-    mutationFn: async (input: { id: string; name: string }) => {
+    mutationFn: async (input: { id: string; name: string; color?: string | null }) => {
       if (!userId) throw new Error("Sign in to rename a folder.");
-      await supabase.from("study_folders").update({ name: input.name }).eq("id", input.id).eq("user_id", userId);
+      const patch = { name: input.name, color: input.color ?? null };
+      const withColor = await supabase.from("study_folders").update(patch).eq("id", input.id).eq("user_id", userId);
+      if (withColor.error) {
+        await supabase.from("study_folders").update({ name: input.name }).eq("id", input.id).eq("user_id", userId);
+      }
       const tree = currentTree(userId, queryClient);
       invalidate({
         ...tree,
-        folders: tree.folders.map((folder) => folder.id === input.id ? { ...folder, name: input.name, updated_at: nowIso() } : folder),
+        folders: tree.folders.map((folder) => folder.id === input.id
+          ? { ...folder, name: input.name, color: input.color ?? folder.color, updated_at: nowIso() }
+          : folder),
       });
     },
   });

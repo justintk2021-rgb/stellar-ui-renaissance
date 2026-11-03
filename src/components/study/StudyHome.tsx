@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { forwardRef, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Clock, FolderPlus, LayoutGrid, List, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { studyDocPlainText, studyFolderColor } from "@/lib/studyArea";
 import { studyDragProps, useStudyTrash } from "./StudyTrash";
 import type { StudyFolder, StudyNote } from "@/hooks/useStudyArea";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 
 const BOARDS_KEY = "nsync-study-boards";
 
@@ -53,23 +54,24 @@ function PanelSection({
   );
 }
 
-function PanelItem({
-  label,
-  selected,
-  icon,
-  trailing,
-  onClick,
-  drag,
-}: {
+const PanelItem = forwardRef<HTMLButtonElement, {
   label: string;
   selected?: boolean;
   icon?: ReactNode;
   trailing?: ReactNode;
   onClick: () => void;
   drag?: ReturnType<typeof studyDragProps>;
-}) {
+}>(function PanelItem({
+  label,
+  selected,
+  icon,
+  trailing,
+  onClick,
+  drag,
+}, ref) {
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onClick}
       {...drag}
@@ -83,7 +85,7 @@ function PanelItem({
       {trailing}
     </button>
   );
-}
+});
 
 export function StudyHome({
   displayName,
@@ -92,6 +94,7 @@ export function StudyHome({
   onOpenNote,
   onCreateNote,
   onCreateFolder,
+  onEditFolder,
 }: {
   displayName?: string;
   folders: StudyFolder[];
@@ -99,6 +102,7 @@ export function StudyHome({
   onOpenNote: (id: string) => void;
   onCreateNote: (folderId: string | null) => void;
   onCreateFolder: () => void;
+  onEditFolder: (folder: StudyFolder) => void;
 }) {
   const [query, setQuery] = useState("");
   const [folderId, setFolderId] = useState("all");
@@ -209,15 +213,21 @@ export function StudyHome({
         </PanelSection>
         <PanelSection title="Folders" open={openSections.folders} onToggle={() => toggleSection("folders")}>
           {orderedFolders.map((folder) => (
-            <PanelItem
-              key={folder.id}
-              label={folder.name}
-              selected={!activeBoard && folderId === folder.id}
-              icon={<span className="h-2.5 w-2.5 rounded-full" style={{ background: studyFolderColor(folder.color) }} />}
-              trailing={<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-              onClick={() => selectNotes(folder.id)}
-              drag={studyDragProps({ kind: "folder", id: folder.id, label: folder.name }, beginDrag)}
-            />
+            <ContextMenu key={folder.id}>
+              <ContextMenuTrigger asChild>
+                <PanelItem
+                  label={folder.name}
+                  selected={!activeBoard && folderId === folder.id}
+                  icon={<span className="h-2.5 w-2.5 rounded-full" style={{ background: studyFolderColor(folder.color) }} />}
+                  trailing={<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                  onClick={() => selectNotes(folder.id)}
+                  drag={studyDragProps({ kind: "folder", id: folder.id, label: folder.name }, beginDrag)}
+                />
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem onSelect={() => onEditFolder(folder)}>Rename and color</ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           ))}
           <PanelItem
             label="New folder"

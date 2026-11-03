@@ -88,6 +88,7 @@ export function StudyArea({
   const playbooks = useMemo(() => checklists.map((item) => ({ id: item.id, name: item.name })), [checklists]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [folderOpen, setFolderOpen] = useState(false);
+  const [folderEditId, setFolderEditId] = useState<string | null>(null);
   const [composerFolderId, setComposerFolderId] = useState<string | null | undefined>(undefined);
   const [folderName, setFolderName] = useState("");
   const [folderColor, setFolderColor] = useState("");
@@ -114,10 +115,14 @@ export function StudyArea({
       return;
     }
     const name = folderName.trim() || "Untitled folder";
-    void mutations.createFolder.mutateAsync({ name, parentId: null, category, color: folderColor || null })
-      .then(() => setFolderOpen(false))
+    const color = folderColor || null;
+    const request = folderEditId
+      ? mutations.renameFolder.mutateAsync({ id: folderEditId, name, color })
+      : mutations.createFolder.mutateAsync({ name, parentId: null, category, color });
+    void request
+      .then(() => { setFolderOpen(false); setFolderEditId(null); })
       .catch((error: unknown) => {
-        toast.error(error instanceof Error ? error.message : "Could not create the folder.");
+        toast.error(error instanceof Error ? error.message : "Could not save the folder.");
       });
   };
 
@@ -175,7 +180,8 @@ export function StudyArea({
                 }
                 setComposerFolderId(folderId);
               }}
-              onCreateFolder={() => { setFolderName("Untitled folder"); setFolderColor(""); setFolderOpen(true); }}
+              onCreateFolder={() => { setFolderEditId(null); setFolderName("Untitled folder"); setFolderColor(""); setFolderOpen(true); }}
+              onEditFolder={(folder) => { setFolderEditId(folder.id); setFolderName(folder.name); setFolderColor(folder.color ?? ""); setFolderOpen(true); }}
             />
           </motion.div>
         </AnimatePresence>
@@ -198,7 +204,7 @@ export function StudyArea({
       ) : null}
       <Dialog open={folderOpen} onOpenChange={setFolderOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>New folder</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{folderEditId ? "Edit folder" : "New folder"}</DialogTitle></DialogHeader>
           <Input
             value={folderName}
             onChange={(event) => setFolderName(event.target.value)}
