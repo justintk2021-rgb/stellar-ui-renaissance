@@ -1,3 +1,4 @@
+import type { DragEvent } from "react";
 import type { Trade } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { formatPnL, getTradeNetResult } from "@/lib/tradeFormat";
@@ -15,6 +16,7 @@ export function StudyTradeCard({
   onOpenJournal,
   onOpenPlaybook,
   onRemove,
+  onDragStart,
 }: {
   tradeId: string;
   trades: Trade[];
@@ -24,6 +26,7 @@ export function StudyTradeCard({
   onOpenJournal?: (tradeId: string) => void;
   onOpenPlaybook?: (playbookId: string | null) => void;
   onRemove?: (tradeId: string) => void;
+  onDragStart?: (event: DragEvent) => void;
 }) {
   const trade = trades.find((item) => item.id === tradeId);
   if (!trade) {
@@ -79,7 +82,11 @@ export function StudyTradeCard({
     );
   }
   return (
-    <div className="rounded-xl border border-border/50 bg-card/80 px-3 py-2.5">
+    <div
+      className="rounded-xl border border-border/50 bg-card/80 px-3 py-2.5"
+      draggable={!!onDragStart}
+      onDragStart={onDragStart}
+    >
       <div className="flex items-center gap-3">{body}</div>
       {onOpenJournal || onOpenPlaybook || onRemove ? (
         <div className="mt-2 flex gap-3 pl-9 text-[11px]">

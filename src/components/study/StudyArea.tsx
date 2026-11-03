@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { StudyEditor } from "./StudyEditor";
 import { StudyHome } from "./StudyHome";
 import { StudyNoteComposer } from "./StudyNoteComposer";
+import { StudyTrashProvider, type StudyTrashItem } from "./StudyTrash";
 import { AnimatePresence, motion } from "@/lib/motion";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -120,7 +121,20 @@ export function StudyArea({
       });
   };
 
+  const deleteResource = (item: StudyTrashItem) => {
+    if (!userId) {
+      toast.error("Sign in to delete.");
+      return;
+    }
+    if (item.kind === "note") {
+      if (selectedId === item.id) setSelectedId(null);
+      mutations.deleteNote.mutate(item.id);
+    }
+    if (item.kind === "folder") mutations.deleteFolder.mutate(item.id);
+  };
+
   return (
+    <StudyTrashProvider onDelete={deleteResource}>
     <div className="min-h-[calc(100vh-10rem)]">
       {selected ? (
         <section className="study-glass min-h-[520px] rounded-2xl p-5 sm:p-6">
@@ -225,5 +239,6 @@ export function StudyArea({
         </DialogContent>
       </Dialog>
     </div>
+    </StudyTrashProvider>
   );
 }

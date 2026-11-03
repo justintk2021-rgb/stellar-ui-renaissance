@@ -1061,6 +1061,22 @@
     inset 0 1px 0 hsl(0 0% 100% / 0.2);
 }
 
+.study-drag-ghost {
+  transform: translate(-50%, -50%) rotate(-8deg);
+  animation: study-drag-pop 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes study-drag-pop {
+  from {
+    transform: translate(-50%, -35%) rotate(0deg) scale(0.86);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(-8deg) scale(1);
+    opacity: 1;
+  }
+}
+
 .dark .study-glass {
   background: hsl(var(--card) / 0.28);
   box-shadow:

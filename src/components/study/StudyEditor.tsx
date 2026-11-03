@@ -12,6 +12,7 @@ import { matchSlashTrade, parseYouTubeId, splitStudyTrades } from "@/lib/studyAr
 import { StudyTradeCard } from "./StudyTradeCard";
 import { StudyEditorDataProvider, type StudyPlaybook } from "./studyEditorData";
 import { StudyTradeNode, StudyYoutubeNode } from "./studyNodes";
+import { useStudyTrash } from "./StudyTrash";
 import { Bold, ChevronDown, Heading2, Italic, List, ListOrdered, Plus } from "lucide-react";
 
 interface StudyEditorProps {
@@ -40,6 +41,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
   const dirtyRef = useRef(false);
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
+  const { beginDrag, registerDeleter } = useStudyTrash();
 
   const editor = useEditor({
     extensions: [
@@ -145,6 +147,8 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
     dirtyRef.current = true;
     setRevision((value) => value + 1);
   };
+
+  useEffect(() => registerDeleter("trade", forgetTrade), [forgetTrade, registerDeleter]);
 
   const journalTrades = useMemo(() => {
     const needle = tradeQuery.trim().toLowerCase();
@@ -295,6 +299,11 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
                   onOpenJournal={onOpenJournal}
                   onOpenPlaybook={onOpenPlaybook}
                   onRemove={forgetTrade}
+                  onDragStart={(event) => beginDrag(event, {
+                    kind: "trade",
+                    id: tradeId,
+                    label: trades.find((trade) => trade.id === tradeId)?.pair || "Trade",
+                  })}
                 />
               ))}
             </div>

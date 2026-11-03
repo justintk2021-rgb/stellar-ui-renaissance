@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Clock, FolderPlus, LayoutGrid, List, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { studyDocPlainText, studyFolderColor } from "@/lib/studyArea";
+import { studyDragProps, useStudyTrash } from "./StudyTrash";
 import type { StudyFolder, StudyNote } from "@/hooks/useStudyArea";
 
 const BOARDS_KEY = "nsync-study-boards";
@@ -58,17 +59,20 @@ function PanelItem({
   icon,
   trailing,
   onClick,
+  drag,
 }: {
   label: string;
   selected?: boolean;
   icon?: ReactNode;
   trailing?: ReactNode;
   onClick: () => void;
+  drag?: ReturnType<typeof studyDragProps>;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      {...drag}
       className={cn(
         "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm",
         selected ? "bg-muted/80 text-foreground" : "text-foreground/80 hover:bg-muted/40",
@@ -104,11 +108,17 @@ export function StudyHome({
   const [boardName, setBoardName] = useState("");
   const [addingBoard, setAddingBoard] = useState(false);
   const [openSections, setOpenSections] = useState({ study: true, folders: true, boards: true });
+  const { beginDrag, registerDeleter } = useStudyTrash();
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
   const orderedFolders = useMemo(
     () => [...folders].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
     [folders],
   );
+
+  useEffect(() => registerDeleter("board", (id) => {
+    setBoards((current) => current.filter((board) => board.id !== id));
+    setBoardId((current) => (current === id ? null : current));
+  }), [registerDeleter]);
 
   useEffect(() => {
     if (folderId === "all" || folderId === "recent") return;
@@ -206,6 +216,7 @@ export function StudyHome({
               icon={<span className="h-2.5 w-2.5 rounded-full" style={{ background: studyFolderColor(folder.color) }} />}
               trailing={<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
               onClick={() => selectNotes(folder.id)}
+              drag={studyDragProps({ kind: "folder", id: folder.id, label: folder.name }, beginDrag)}
             />
           ))}
           <PanelItem
@@ -223,6 +234,7 @@ export function StudyHome({
               icon={<LayoutGrid className="h-3.5 w-3.5" />}
               trailing={<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
               onClick={() => setBoardId(board.id)}
+              drag={studyDragProps({ kind: "board", id: board.id, label: board.name }, beginDrag)}
             />
           ))}
           {addingBoard ? (
@@ -344,6 +356,7 @@ export function StudyHome({
                     key={row.key}
                     type="button"
                     onClick={row.onClick}
+                    {...studyDragProps({ kind: "note", id: row.note.id, label: row.title }, beginDrag)}
                     className="flex items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-muted/40"
                   >
                     <span
@@ -374,7 +387,11 @@ export function StudyHome({
                     No notes in this category yet. Create one.
                   </button>
                 ) : rows.map((row) => (
-                  <article key={row.key} className="study-glass rounded-2xl p-3">
+                  <article
+                    key={row.key}
+                    className="study-glass rounded-2xl p-3"
+                    {...studyDragProps({ kind: "note", id: row.note.id, label: row.title }, beginDrag)}
+                  >
                     <div className="mb-2 flex items-center justify-between gap-2 px-1">
                       <h3 className="truncate text-sm font-semibold">{row.folderName || row.title}</h3>
                       <button
