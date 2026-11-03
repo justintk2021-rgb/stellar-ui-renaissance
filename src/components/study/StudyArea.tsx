@@ -182,6 +182,13 @@ export function StudyArea({
               }}
               onCreateFolder={() => { setFolderEditId(null); setFolderName("Untitled folder"); setFolderColor(""); setFolderOpen(true); }}
               onEditFolder={(folder) => { setFolderEditId(folder.id); setFolderName(folder.name); setFolderColor(folder.color ?? ""); setFolderOpen(true); }}
+              onDeleteFolder={(folder) => {
+                if (!userId) {
+                  toast.error("Sign in to delete a folder.");
+                  return;
+                }
+                mutations.deleteFolder.mutate(folder.id);
+              }}
             />
           </motion.div>
         </AnimatePresence>

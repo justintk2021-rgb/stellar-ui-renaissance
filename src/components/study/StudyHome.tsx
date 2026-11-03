@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, ChevronRight, Clock, FolderPlus, LayoutGrid, List, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { studyDocPlainText, studyFolderColor } from "@/lib/studyArea";
@@ -97,6 +98,7 @@ export function StudyHome({
   onCreateNote,
   onCreateFolder,
   onEditFolder,
+  onDeleteFolder,
 }: {
   displayName?: string;
   folders: StudyFolder[];
@@ -105,6 +107,7 @@ export function StudyHome({
   onCreateNote: (folderId: string | null) => void;
   onCreateFolder: () => void;
   onEditFolder: (folder: StudyFolder) => void;
+  onDeleteFolder: (folder: StudyFolder) => void;
 }) {
   const [query, setQuery] = useState("");
   const [folderId, setFolderId] = useState("all");
@@ -114,6 +117,7 @@ export function StudyHome({
   const [boardName, setBoardName] = useState("");
   const [addingBoard, setAddingBoard] = useState(false);
   const [openSections, setOpenSections] = useState({ study: true, folders: true, boards: true });
+  const [folderMenu, setFolderMenu] = useState<{ x: number; y: number; folder: StudyFolder } | null>(null);
   const { beginDrag, registerDeleter } = useStudyTrash();
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
   const orderedFolders = useMemo(
@@ -224,7 +228,7 @@ export function StudyHome({
               onClick={() => selectNotes(folder.id)}
               onContextMenu={(event) => {
                 event.preventDefault();
-                onEditFolder(folder);
+                setFolderMenu({ x: event.clientX, y: event.clientY, folder });
               }}
               drag={studyDragProps({ kind: "folder", id: folder.id, label: folder.name }, beginDrag)}
             />
@@ -435,6 +439,35 @@ export function StudyHome({
           </>
         )}
       </div>
+      {folderMenu ? createPortal(
+        <div
+          className="fixed inset-0 z-[200]"
+          onMouseDown={() => setFolderMenu(null)}
+          onContextMenu={(event) => { event.preventDefault(); setFolderMenu(null); }}
+        >
+          <div
+            className="glass-popup absolute min-w-[9.5rem] rounded-xl p-1"
+            style={{ left: Math.min(folderMenu.x, window.innerWidth - 180), top: Math.min(folderMenu.y, window.innerHeight - 96) }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/60"
+              onClick={() => { onEditFolder(folderMenu.folder); setFolderMenu(null); }}
+            >
+              Rename
+            </button>
+            <button
+              type="button"
+              className="block w-full rounded-lg px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
+              onClick={() => { onDeleteFolder(folderMenu.folder); setFolderMenu(null); }}
+            >
+              Delete
+            </button>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
     </div>
   );
 }
