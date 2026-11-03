@@ -12,7 +12,7 @@ import { matchSlashTrade, parseYouTubeId, splitStudyTrades } from "@/lib/studyAr
 import { StudyTradeCard } from "./StudyTradeCard";
 import { StudyEditorDataProvider, type StudyPlaybook } from "./studyEditorData";
 import { StudyTradeNode, StudyYoutubeNode } from "./studyNodes";
-import { Bold, Heading2, Italic, List, ListOrdered, Plus } from "lucide-react";
+import { Bold, ChevronDown, Heading2, Italic, List, ListOrdered, Plus } from "lucide-react";
 
 interface StudyEditorProps {
   noteId: string;
@@ -34,6 +34,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
   const [tradeIds, setTradeIds] = useState<string[]>(opened.current.tradeIds);
   const tradeIdsRef = useRef(opened.current.tradeIds);
   const [addingTrade, setAddingTrade] = useState(false);
+  const [tradesOpen, setTradesOpen] = useState(false);
   const [tradeQuery, setTradeQuery] = useState("");
   const [revision, setRevision] = useState(0);
   const dirtyRef = useRef(false);
@@ -152,6 +153,37 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
       .slice(0, 8);
   }, [playbooks, tradeIds, tradeQuery, trades]);
 
+  const tradePicker = (
+    <PopoverContent
+      align="end"
+      side="bottom"
+      sideOffset={10}
+      collisionPadding={16}
+      className="w-[min(24rem,calc(100vw-2rem))] p-4 liquid-glass projection-popover shadow-none data-[state=open]:animate-none data-[state=closed]:animate-none"
+    >
+      <p className="mb-3 text-sm font-medium text-muted-foreground">Journaled trades</p>
+      <input
+        value={tradeQuery}
+        onChange={(event) => setTradeQuery(event.target.value)}
+        placeholder="Search journal trades or playbooks"
+        className="mb-2 h-10 w-full rounded-xl border border-border/50 bg-background/70 px-3 text-sm outline-none focus:border-primary/40"
+      />
+      <div className="max-h-72 space-y-1 overflow-y-auto">
+        {journalTrades.length === 0 ? (
+          <p className="px-2 py-4 text-sm text-muted-foreground">No journaled trades match.</p>
+        ) : journalTrades.map((trade) => (
+          <StudyTradeCard
+            key={trade.id}
+            tradeId={trade.id}
+            trades={trades}
+            playbooks={playbooks}
+            onSelect={() => rememberTrade(trade.id)}
+          />
+        ))}
+      </div>
+    </PopoverContent>
+  );
+
   return (
     <StudyEditorDataProvider value={{ trades, playbooks, onOpenJournal, onOpenPlaybook }}>
       <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row lg:items-start">
@@ -200,48 +232,51 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
         />
         </div>
         <aside className="w-full shrink-0 lg:w-80">
-          <Popover open={addingTrade} onOpenChange={setAddingTrade}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-expanded={addingTrade}
-                className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-2 text-sm font-medium text-background"
-              >
-                <Plus className="h-4 w-4" />
-                Add trade
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              side="bottom"
-              sideOffset={10}
-              collisionPadding={16}
-              className="w-[min(24rem,calc(100vw-2rem))] p-4 liquid-glass projection-popover shadow-none data-[state=open]:animate-none data-[state=closed]:animate-none"
-            >
-              <p className="mb-3 text-sm font-medium text-muted-foreground">Journaled trades</p>
-              <input
-                value={tradeQuery}
-                onChange={(event) => setTradeQuery(event.target.value)}
-                placeholder="Search journal trades or playbooks"
-                className="mb-2 h-10 w-full rounded-xl border border-border/50 bg-background/70 px-3 text-sm outline-none focus:border-primary/40"
-              />
-              <div className="max-h-72 space-y-1 overflow-y-auto">
-                {journalTrades.length === 0 ? (
-                  <p className="px-2 py-4 text-sm text-muted-foreground">No journaled trades match.</p>
-                ) : journalTrades.map((trade) => (
-                  <StudyTradeCard
-                    key={trade.id}
-                    tradeId={trade.id}
-                    trades={trades}
-                    playbooks={playbooks}
-                    onSelect={() => rememberTrade(trade.id)}
-                  />
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-          {tradeIds.length > 0 ? (
-            <div className="mt-3 max-w-xl space-y-2">
+          <div className="flex items-center gap-2">
+            {tradeIds.length === 0 ? (
+              <Popover open={addingTrade} onOpenChange={setAddingTrade}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-expanded={addingTrade}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-2 text-sm font-medium text-background"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add trade
+                  </button>
+                </PopoverTrigger>
+                {tradePicker}
+              </Popover>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  aria-expanded={tradesOpen}
+                  onClick={() => setTradesOpen((open) => !open)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-2 text-sm font-medium text-background"
+                >
+                  Trades
+                  <ChevronDown className={`h-4 w-4 transition-transform ${tradesOpen ? "rotate-180" : ""}`} />
+                </button>
+                {tradesOpen ? (
+                  <Popover open={addingTrade} onOpenChange={setAddingTrade}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Add journaled trade"
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-border/50 text-foreground hover:bg-muted/50"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </PopoverTrigger>
+                    {tradePicker}
+                  </Popover>
+                ) : null}
+              </>
+            )}
+          </div>
+          {tradesOpen && tradeIds.length > 0 ? (
+            <div className="mt-3 space-y-2">
               {tradeIds.map((tradeId) => (
                 <StudyTradeCard
                   key={tradeId}
