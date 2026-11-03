@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, FolderPlus, LayoutGrid, List, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Clock, FolderPlus, LayoutGrid, List, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { studyDocPlainText, studyFolderColor } from "@/lib/studyArea";
 import type { StudyFolder, StudyNote } from "@/hooks/useStudyArea";
@@ -111,7 +111,7 @@ export function StudyHome({
   );
 
   useEffect(() => {
-    if (folderId === "all") return;
+    if (folderId === "all" || folderId === "recent") return;
     if (!folderById.has(folderId)) setFolderId("all");
   }, [folderById, folderId]);
 
@@ -124,6 +124,9 @@ export function StudyHome({
   }, [boards]);
 
   const scopedNotes = useMemo(() => {
+    if (folderId === "recent") {
+      return [...notes].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 12);
+    }
     if (folderId === "all") return notes;
     return notes.filter((note) => note.folder_id === folderId);
   }, [folderId, notes]);
@@ -132,7 +135,7 @@ export function StudyHome({
     () => [...scopedNotes].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ?? null,
     [scopedNotes],
   );
-  const createFolderId = folderId === "all" ? null : folderId;
+  const createFolderId = folderId === "all" || folderId === "recent" ? null : folderId;
   const activeBoard = boards.find((board) => board.id === boardId) ?? null;
 
   const rows = useMemo(() => {
@@ -186,6 +189,12 @@ export function StudyHome({
             selected={!activeBoard && folderId === "all"}
             icon={<List className="h-3.5 w-3.5" />}
             onClick={() => selectNotes("all")}
+          />
+          <PanelItem
+            label="Recent notes"
+            selected={!activeBoard && folderId === "recent"}
+            icon={<Clock className="h-3.5 w-3.5" />}
+            onClick={() => selectNotes("recent")}
           />
         </PanelSection>
         <PanelSection title="Folders" open={openSections.folders} onToggle={() => toggleSection("folders")}>
@@ -290,33 +299,35 @@ export function StudyHome({
               </div>
             </div>
 
-            <section className="relative flex min-h-[148px] items-center justify-between gap-4 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/30 via-primary/10 to-transparent px-5 py-5 sm:px-6">
-              <div className="flex min-w-0 items-center gap-4">
-                <span
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-background/70 text-lg font-semibold text-foreground shadow-sm"
-                  style={{ color: featured ? studyFolderColor(folderById.get(featured.folder_id ?? "")?.color) : undefined }}
-                >
-                  {(featured?.title || "N").slice(0, 1).toUpperCase()}
-                </span>
-                <div className="min-w-0">
-                  <h3 className="truncate text-lg font-semibold tracking-tight">
-                    {featured?.title || "Start a study note"}
-                  </h3>
-                  <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
-                    {featured
-                      ? [featuredFolder, featuredPreview].filter(Boolean).join(" · ") || "Empty note"
-                      : "Write a note, then keep it in a folder."}
-                  </p>
+            {folderId !== "all" && folderId !== "recent" ? (
+              <section className="relative flex min-h-[148px] items-center justify-between gap-4 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/30 via-primary/10 to-transparent px-5 py-5 sm:px-6">
+                <div className="flex min-w-0 items-center gap-4">
+                  <span
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-background/70 text-lg font-semibold text-foreground shadow-sm"
+                    style={{ color: featured ? studyFolderColor(folderById.get(featured.folder_id ?? "")?.color) : undefined }}
+                  >
+                    {(featured?.title || "N").slice(0, 1).toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="truncate text-lg font-semibold tracking-tight">
+                      {featured?.title || "Start a study note"}
+                    </h3>
+                    <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
+                      {featured
+                        ? [featuredFolder, featuredPreview].filter(Boolean).join(" · ") || "Empty note"
+                        : "Write a note, then keep it in a folder."}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => (featured ? onOpenNote(featured.id) : onCreateNote(createFolderId))}
-                className="shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
-              >
-                {featured ? "Open" : "New note"}
-              </button>
-            </section>
+                <button
+                  type="button"
+                  onClick={() => (featured ? onOpenNote(featured.id) : onCreateNote(createFolderId))}
+                  className="shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+                >
+                  {featured ? "Open" : "New note"}
+                </button>
+              </section>
+            ) : null}
 
             {noteView === "list" ? (
               <div className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
