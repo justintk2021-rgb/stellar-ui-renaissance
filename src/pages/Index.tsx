@@ -75,7 +75,7 @@ const PageFallback = () => (
 
 const pageInfo: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview of your trading performance' },
-  journal: { title: 'Journal', subtitle: 'Log and manage your trades' },
+  journal: { title: 'Log', subtitle: 'Log and manage your trades' },
   chart: { title: 'Chart', subtitle: 'Interactive chart with drawing tools' },
   calendar: { title: 'Economic Calendar', subtitle: 'Live economic news and events' },
   playbook: { title: 'Playbook', subtitle: 'Your trading checklists and rules' },

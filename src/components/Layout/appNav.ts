@@ -22,7 +22,7 @@ export interface AppNavItem {
 /** Signed-in pages. Prop Firm and Learning sit near the front so they stay on screen. */
 export const appNavItems: AppNavItem[] = [
   { id: "dashboard", label: "Dashboard", short: "Home", icon: LayoutDashboard },
-  { id: "journal", label: "Journal", short: "Journal", icon: BookOpen },
+  { id: "journal", label: "Log", short: "Log", icon: BookOpen },
   { id: "propfirm", label: "Prop Firm", short: "Prop Firm", icon: Landmark },
   { id: "learning", label: "Learning", short: "Learning", icon: GraduationCap },
   { id: "chart", label: "Chart", short: "Chart", icon: BarChart3 },
