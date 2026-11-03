@@ -79,7 +79,7 @@ const pageInfo: Record<string, { title: string; subtitle: string }> = {
   chart: { title: 'Chart', subtitle: 'Interactive chart with drawing tools' },
   calendar: { title: 'Economic Calendar', subtitle: 'Live economic news and events' },
   playbook: { title: 'Playbook', subtitle: 'Your trading checklists and rules' },
-  notebook: { title: 'Notebook', subtitle: 'Your personal trading notes and journal' },
+  notebook: { title: 'Journal', subtitle: 'Your personal trading notes and journal' },
   propfirm: { title: 'Prop Firm', subtitle: 'Challenge progress for the selected account' },
   learning: { title: 'Learning', subtitle: 'Short lessons on risk, execution, and journaling' },
   community: { title: 'Community', subtitle: 'Chat with other traders' },
@@ -895,7 +895,7 @@ const Index = () => {
                 trades={trades}
                 showRank={currentPage === 'dashboard'}
                 titleSwitch={currentPage === "notebook" ? {
-                  label: notebookView === "study" ? "Notebook" : "Study Area",
+                  label: notebookView === "study" ? "Journal" : "Study Area",
                   onSelect: (event) => {
                     const next = notebookView === "study" ? "notebook" : "study";
                     circularReveal(
