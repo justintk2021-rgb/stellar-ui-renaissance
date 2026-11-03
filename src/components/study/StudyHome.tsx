@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { ChevronDown, ChevronRight, Clock, FolderPlus, LayoutGrid, List, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { studyDocPlainText, studyFolderColor } from "@/lib/studyArea";
-import { studyDragProps, useStudyTrash } from "./StudyTrash";
+import { StudyTrashBin, studyDragProps, useStudyTrash } from "./StudyTrash";
 import type { StudyFolder, StudyNote } from "@/hooks/useStudyArea";
 
 const BOARDS_KEY = "nsync-study-boards";
@@ -285,6 +285,7 @@ export function StudyHome({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">{greetingLine(displayName)}</p>
               <div className="flex w-full items-center gap-2 sm:w-auto">
+                <StudyTrashBin />
                 <label className="relative block min-w-0 flex-1 sm:w-64">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input

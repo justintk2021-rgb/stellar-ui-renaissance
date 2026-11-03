@@ -15,6 +15,12 @@ type Deleter = (id: string) => void;
 type StudyTrashContextValue = {
   beginDrag: (event: ReactDragEvent, item: StudyTrashItem) => void;
   registerDeleter: (kind: StudyTrashKind, deleter: Deleter) => () => void;
+  binHot: boolean;
+  binHandlers: {
+    onDragOver: (event: ReactDragEvent) => void;
+    onDragLeave: () => void;
+    onDrop: (event: ReactDragEvent) => void;
+  };
 };
 
 const StudyTrashContext = createContext<StudyTrashContextValue | null>(null);
@@ -26,6 +32,23 @@ function emptyDragImage(): HTMLCanvasElement {
   canvas.width = 1;
   canvas.height = 1;
   return canvas;
+}
+
+export function StudyTrashBin({ className }: { className?: string }) {
+  const { binHot, binHandlers } = useStudyTrash();
+  return (
+    <div
+      aria-label="Trash"
+      {...binHandlers}
+      className={cn(
+        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-muted/40 text-muted-foreground transition-transform",
+        binHot && "scale-110 border-destructive/50 bg-destructive/15 text-destructive",
+        className,
+      )}
+    >
+      <Trash2 className={cn("h-4 w-4 transition-transform", binHot && "scale-110")} />
+    </div>
+  );
 }
 
 export function useStudyTrash() {
@@ -101,9 +124,7 @@ export function StudyTrashProvider({
     };
   }, []);
 
-  const value = useMemo(() => ({ beginDrag, registerDeleter }), [beginDrag, registerDeleter]);
-
-  const drop = (event: ReactDragEvent) => {
+  const drop = useCallback((event: ReactDragEvent) => {
     event.preventDefault();
     setHot(false);
     setGhost(null);
@@ -112,28 +133,28 @@ export function StudyTrashProvider({
     if (!item) return;
     if (item.kind === "note" || item.kind === "folder") onDelete(item);
     else deleters.current[item.kind]?.(item.id);
-  };
+  }, [onDelete]);
+
+  const binHandlers = useMemo(() => ({
+    onDragOver: (event: ReactDragEvent) => {
+      if (!dragging.current) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      setHot(true);
+    },
+    onDragLeave: () => setHot(false),
+    onDrop: drop,
+  }), [drop]);
+
+  const value = useMemo(
+    () => ({ beginDrag, registerDeleter, binHot: hot, binHandlers }),
+    [beginDrag, registerDeleter, hot, binHandlers],
+  );
 
   return (
     <StudyTrashContext.Provider value={value}>
       {children}
-      {visible ? <div
-        aria-label="Trash"
-        onDragOver={(event) => {
-          if (!dragging.current) return;
-          event.preventDefault();
-          event.dataTransfer.dropEffect = "move";
-          setHot(true);
-        }}
-        onDragLeave={() => setHot(false)}
-        onDrop={drop}
-        className={cn(
-          "fixed right-[7.25rem] top-4 z-[70] flex h-11 w-11 items-center justify-center rounded-full border border-border/50 bg-card/80 text-muted-foreground shadow-sm backdrop-blur-xl transition-transform",
-          hot && "scale-110 border-destructive/50 bg-destructive/15 text-destructive",
-        )}
-      >
-        <Trash2 className={cn("h-5 w-5 transition-transform", hot && "scale-110")} />
-      </div> : null}
+      {visible ? <StudyTrashBin className="fixed right-[7.25rem] top-4 z-[70] h-11 w-11" /> : null}
       {ghost ? (
         <div
           className="study-drag-ghost pointer-events-none fixed z-[80] rounded-full border border-border/50 bg-card/95 px-3 py-1.5 text-sm font-medium shadow-lg"
