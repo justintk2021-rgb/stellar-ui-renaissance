@@ -6,6 +6,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { isUnjournaledTrade } from "@/lib/notifications";
 import { matchSlashTrade, parseYouTubeId, tradeIdsInDoc } from "@/lib/studyArea";
 import { StudyTradeCard } from "./StudyTradeCard";
@@ -186,16 +187,25 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
           }}
         />
         <div className="mt-6 border-t border-border/40 pt-4">
-          <button
-            type="button"
-            onClick={() => setAddingTrade((open) => !open)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-2 text-sm font-medium text-background"
-          >
-            <Plus className="h-4 w-4" />
-            Add trade
-          </button>
-          {addingTrade ? (
-            <div className="mt-3 max-w-xl rounded-2xl border border-border/50 bg-background/50 p-3">
+          <Popover open={addingTrade} onOpenChange={setAddingTrade}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-expanded={addingTrade}
+                className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-2 text-sm font-medium text-background"
+              >
+                <Plus className="h-4 w-4" />
+                Add trade
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              side="top"
+              sideOffset={10}
+              collisionPadding={16}
+              className="w-[min(24rem,calc(100vw-2rem))] p-4 liquid-glass projection-popover shadow-none data-[state=open]:animate-none data-[state=closed]:animate-none"
+            >
+              <p className="mb-3 text-sm font-medium text-muted-foreground">Journaled trades</p>
               <input
                 value={tradeQuery}
                 onChange={(event) => setTradeQuery(event.target.value)}
@@ -215,8 +225,8 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
                   />
                 ))}
               </div>
-            </div>
-          ) : null}
+            </PopoverContent>
+          </Popover>
         </div>
         {slash && (
           <div
