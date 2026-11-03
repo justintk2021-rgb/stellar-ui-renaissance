@@ -153,7 +153,7 @@ export function StudyHome({
           title: note.title || "Untitled note",
           folderName: folder?.name,
           preview,
-          detail: [folder?.name, preview].filter(Boolean).join(" · ") || "Empty note",
+          detail: preview || "Empty note",
           color: studyFolderColor(folder?.color),
           onClick: () => onOpenNote(note.id),
         };
@@ -356,6 +356,9 @@ export function StudyHome({
                       <span className="block truncate text-sm font-medium">{row.title}</span>
                       <span className="block truncate text-xs text-muted-foreground">{row.detail}</span>
                     </span>
+                    {row.folderName ? (
+                      <span className="max-w-[40%] shrink-0 truncate text-xs font-medium text-muted-foreground">{row.folderName}</span>
+                    ) : null}
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                   </button>
                 ))}
