@@ -154,7 +154,8 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
 
   return (
     <StudyEditorDataProvider value={{ trades, playbooks, onOpenJournal, onOpenPlaybook }}>
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="min-w-0 flex-1">
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             {status === "saving" ? "Saving" : status === "saved" ? "Saved" : "Study note"}
@@ -197,7 +198,8 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
             }
           }}
         />
-        <div className="mt-6 border-t border-border/40 pt-4">
+        </div>
+        <aside className="w-full shrink-0 lg:w-80">
           <Popover open={addingTrade} onOpenChange={setAddingTrade}>
             <PopoverTrigger asChild>
               <button
@@ -210,8 +212,8 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
               </button>
             </PopoverTrigger>
             <PopoverContent
-              align="start"
-              side="top"
+              align="end"
+              side="bottom"
               sideOffset={10}
               collisionPadding={16}
               className="w-[min(24rem,calc(100vw-2rem))] p-4 liquid-glass projection-popover shadow-none data-[state=open]:animate-none data-[state=closed]:animate-none"
@@ -252,7 +254,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
               ))}
             </div>
           ) : null}
-        </div>
+        </aside>
         {slash && (
           <div
             className="fixed z-[80] w-[min(420px,calc(100vw-24px))] rounded-2xl border border-border/50 bg-popover/95 p-2 shadow-2xl backdrop-blur-md"
