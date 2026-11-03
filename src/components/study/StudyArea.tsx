@@ -134,7 +134,7 @@ export function StudyArea({
   };
 
   return (
-    <StudyTrashProvider onDelete={deleteResource}>
+    <StudyTrashProvider visible={!!selected} onDelete={deleteResource}>
     <div className="min-h-[calc(100vh-10rem)]">
       {selected ? (
         <section className="study-glass min-h-[520px] rounded-2xl p-5 sm:p-6">

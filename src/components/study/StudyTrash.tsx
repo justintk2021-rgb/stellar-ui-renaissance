@@ -44,9 +44,11 @@ export function studyDragProps(item: StudyTrashItem, beginDrag: (event: ReactDra
 export function StudyTrashProvider({
   children,
   onDelete,
+  visible = false,
 }: {
   children: ReactNode;
   onDelete: (item: StudyTrashItem) => void;
+  visible?: boolean;
 }) {
   const deleters = useRef<Partial<Record<StudyTrashKind, Deleter>>>({});
   const dragImage = useRef<HTMLCanvasElement | null>(null);
@@ -115,7 +117,7 @@ export function StudyTrashProvider({
   return (
     <StudyTrashContext.Provider value={value}>
       {children}
-      <div
+      {visible ? <div
         aria-label="Trash"
         onDragOver={(event) => {
           if (!dragging.current) return;
@@ -131,7 +133,7 @@ export function StudyTrashProvider({
         )}
       >
         <Trash2 className={cn("h-5 w-5 transition-transform", hot && "scale-110")} />
-      </div>
+      </div> : null}
       {ghost ? (
         <div
           className="study-drag-ghost pointer-events-none fixed z-[80] rounded-full border border-border/50 bg-card/95 px-3 py-1.5 text-sm font-medium shadow-lg"
