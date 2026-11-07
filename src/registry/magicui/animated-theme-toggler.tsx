@@ -151,9 +151,9 @@ export const AnimatedThemeToggler = forwardRef<HTMLButtonElement, AnimatedThemeT
   const shape = variant ?? "circle";
   const isControlled = theme !== undefined;
   const [internalIsDark, setInternalIsDark] = useState(
-    () => (typeof document === "undefined" ? true : getDocumentTheme() === "dark"),
+    () => (typeof document === "undefined" ? true : getDocumentTheme() !== "light"),
   );
-  const isDark = isControlled ? theme === "dark" : internalIsDark;
+  const isDark = isControlled ? theme !== "light" : internalIsDark;
   const buttonRef = useRef<HTMLButtonElement>(null);
   const isTransitioningRef = useRef(false);
   const activeAnimRef = useRef<Animation | null>(null);
@@ -178,7 +178,7 @@ export const AnimatedThemeToggler = forwardRef<HTMLButtonElement, AnimatedThemeT
     if (isControlled) return;
 
     const updateTheme = () => {
-      setInternalIsDark(getDocumentTheme() === "dark");
+      setInternalIsDark(getDocumentTheme() !== "light");
     };
 
     updateTheme();
@@ -223,12 +223,13 @@ export const AnimatedThemeToggler = forwardRef<HTMLButtonElement, AnimatedThemeT
 
     const applyTheme = () => {
       // Exclusive light/dark classes — do not classList.toggle("dark").
-      const newTheme: AppTheme = getDocumentTheme() === "dark" ? "light" : "dark";
+      // Liquid Glass counts as dark-based, so toggling from it goes to light.
+      const newTheme: AppTheme = getDocumentTheme() === "light" ? "dark" : "light";
       setDocumentTheme(newTheme);
       if (isControlled) {
         onThemeChange?.(newTheme);
       } else {
-        setInternalIsDark(newTheme === "dark");
+        setInternalIsDark(newTheme !== "light");
       }
     };
 

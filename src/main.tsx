@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import "./liquid-glass.css";
 
 const syncTabHidden = () => {
   document.documentElement.classList.toggle("tab-hidden", document.hidden);

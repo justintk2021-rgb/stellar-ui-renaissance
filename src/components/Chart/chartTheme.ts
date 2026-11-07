@@ -21,9 +21,11 @@ export interface ChartPalette {
 }
 
 export function getChartPalette(theme: AppTheme): ChartPalette {
-  const dark = theme === "dark";
+  // Liquid Glass is dark-based; keep the dark palette but let the aurora
+  // show through the chart background.
+  const dark = theme !== "light";
   return {
-    background: dark ? "#050505" : "#f5f6f8",
+    background: theme === "liquid-glass" ? "rgba(8, 10, 18, 0.45)" : dark ? "#050505" : "#f5f6f8",
     text: dark ? "#e8eaed" : "#1a1d21",
     grid: dark ? "rgba(255,255,255,0.05)" : "rgba(15,23,42,0.06)",
     border: dark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.1)",

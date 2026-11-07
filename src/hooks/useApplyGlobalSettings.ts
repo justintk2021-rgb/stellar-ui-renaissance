@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { setDocumentTheme, notifyAppearanceChange } from '@/lib/theme';
+import { setDocumentTheme, notifyAppearanceChange, type AppTheme } from '@/lib/theme';
 
 const ACCENT_CLASSES = [
   'accent-emerald', 'accent-blue', 'accent-purple', 'accent-pink',
@@ -29,7 +29,7 @@ const hexToHsl = (hex: string): string => {
 };
 
 interface AppliedSettings {
-  theme?: string;
+  theme?: AppTheme | string;
   accentColor?: string;
   customColor?: string | null;
   customGradient?: { from: string; to: string } | null;
@@ -52,7 +52,10 @@ export function applySettingsToDocument(s: AppliedSettings) {
   lastAppliedKey = key;
 
   const root = document.documentElement;
-  const theme = s.theme === 'light' ? 'light' : 'dark';
+  // Liquid Glass is a dark-based theme: setDocumentTheme adds `dark` + `liquid-glass`.
+  // Any unknown/legacy value falls back to dark.
+  const theme: AppTheme =
+    s.theme === 'light' ? 'light' : s.theme === 'liquid-glass' ? 'liquid-glass' : 'dark';
 
   setDocumentTheme(theme);
 

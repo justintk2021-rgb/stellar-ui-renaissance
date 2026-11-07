@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { loadGoogleFont } from '@/lib/fonts';
 import { acquireSharedPostgresChannel } from '@/lib/queries/realtimeChannel';
+import type { AppTheme } from '@/lib/theme';
 
 export type AccentColor = 'emerald' | 'blue' | 'purple' | 'pink' | 'red' | 'orange' | 'yellow' | 'cyan' | 'custom';
 
@@ -10,7 +11,7 @@ export interface CustomGradient {
 }
 
 export interface UserSettings {
-  theme: 'dark' | 'light';
+  theme: AppTheme;
   accentColor: AccentColor;
   customColor: string;
   customGradient: CustomGradient | null;
@@ -35,7 +36,7 @@ function readLocalSettings(): UserSettings {
   const localSidebar = localStorage.getItem('atp_sidebar_collapsed');
 
   return {
-    theme: (localTheme ? JSON.parse(localTheme) : 'dark') as 'dark' | 'light',
+    theme: (localTheme ? JSON.parse(localTheme) : 'dark') as AppTheme,
     accentColor: (localAccent ? JSON.parse(localAccent) : 'emerald') as AccentColor,
     customColor: localCustomColor ? JSON.parse(localCustomColor) : '#10b981',
     customGradient: localGradient ? JSON.parse(localGradient) : null,
@@ -54,7 +55,7 @@ function clearLocalSettingsCache() {
 
 function mapDbRow(data: Record<string, unknown>): UserSettings {
   return {
-    theme: data.theme as 'dark' | 'light',
+    theme: data.theme as AppTheme,
     accentColor: data.accent_color as AccentColor,
     customColor: (data.custom_color as string) || '#10b981',
     customGradient: data.custom_gradient as unknown as CustomGradient | null,
