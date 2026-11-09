@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { RankBadge } from "@/components/Dashboard/RankBadge";
 import { Greeting } from "@/components/Layout/Greeting";
@@ -17,12 +17,14 @@ interface TopBarProps {
   showGreeting?: boolean;
   rightSlot?: ReactNode;
   notificationsSlot?: ReactNode;
-  /** The title is the current view. Hover reveals this destination, and either click switches. */
+  /** Hover swaps the title text to this destination. Click switches views. */
   titleSwitch?: { label: string; onSelect: () => void } | null;
   centerSlot?: ReactNode;
 }
 
 export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank = false, greetingName, profileReady = true, showGreeting = false, rightSlot, notificationsSlot, titleSwitch, centerSlot }: TopBarProps) {
+  const [titleHovered, setTitleHovered] = useState(false);
+  const titleText = titleSwitch && titleHovered ? titleSwitch.label : title;
   return (
     <div className={cn(
       "flex flex-col gap-3 pb-3 sm:pb-4 mb-4 sm:mb-6 sm:gap-4",
@@ -30,26 +32,21 @@ export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank =
     )}>
       <div className="relative z-20 min-w-0 overflow-visible">
         {showGreeting && <Greeting name={greetingName} profileReady={profileReady} />}
-        <h2 className={cn("group/title relative inline-flex max-w-full items-baseline", showGreeting && "mt-4 sm:mt-5")}>
+        <h2 className={cn("inline-flex max-w-full items-baseline", showGreeting && "mt-4 sm:mt-5")}>
           {titleSwitch ? (
             <button
               type="button"
               onClick={titleSwitch.onSelect}
-              className="truncate border-0 bg-transparent p-0 text-lg font-semibold tracking-wide text-inherit sm:text-xl"
+              onMouseEnter={() => setTitleHovered(true)}
+              onMouseLeave={() => setTitleHovered(false)}
+              onFocus={() => setTitleHovered(true)}
+              onBlur={() => setTitleHovered(false)}
+              className="truncate border-0 bg-transparent p-0 text-lg font-semibold tracking-wide text-inherit hover:text-primary hover:underline sm:text-xl"
             >
-              {title}
+              {titleText}
             </button>
           ) : (
             <span className="truncate text-lg font-semibold tracking-wide sm:text-xl">{title}</span>
-          )}
-          {titleSwitch && (
-            <button
-              type="button"
-              onClick={titleSwitch.onSelect}
-              className="absolute left-0 top-full z-30 mt-1 whitespace-nowrap border-0 bg-transparent p-0 text-lg font-semibold tracking-wide text-primary opacity-0 transition-opacity duration-300 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:group-hover/title:pointer-events-auto [@media(hover:hover)]:group-hover/title:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100 focus-visible:outline-none sm:text-xl"
-            >
-              {titleSwitch.label}
-            </button>
           )}
         </h2>
         {!showGreeting && subtitle ? (
