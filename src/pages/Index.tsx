@@ -59,7 +59,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
-import { circularReveal } from "@/lib/circularReveal";
 import { StudyCategorySwitch } from "@/components/study/StudyCategorySwitch";
 import type { StudyCategory } from "@/lib/studyArea";
 import { AnimatePresence, motion } from "@/lib/motion";
@@ -850,15 +849,9 @@ const Index = () => {
                 onThemeChange={handleThemeChange}
                 trades={trades}
                 showRank={currentPage === 'dashboard'}
-                titleSwitch={currentPage === "notebook" ? {
-                  label: notebookView === "study" ? "Journal" : "Study Area",
-                  onSelect: (event) => {
-                    const next = notebookView === "study" ? "notebook" : "study";
-                    circularReveal(
-                      { x: event.clientX, y: event.clientY },
-                      () => setNotebookView(next),
-                    );
-                  },
+                viewSwitch={currentPage === "notebook" ? {
+                  value: notebookView,
+                  onChange: setNotebookView,
                 } : null}
                 centerSlot={currentPage === "notebook" && notebookView === "study" ? (
                   <StudyCategorySwitch value={studyCategory} onChange={setStudyCategory} />
@@ -1144,7 +1137,7 @@ const Index = () => {
 
               {/* Notebook Page */}
               {currentPage === 'notebook' && (
-                <PageTransition key="notebook">
+                <PageTransition key={`notebook-${notebookView}`}>
                   <Suspense fallback={<PageFallback />}>
                     <NotebookView
                       trades={trades}

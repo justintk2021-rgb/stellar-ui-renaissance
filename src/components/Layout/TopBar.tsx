@@ -1,4 +1,4 @@
-import { ReactNode, type MouseEvent } from "react";
+import { ReactNode } from "react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { RankBadge } from "@/components/Dashboard/RankBadge";
 import { Greeting } from "@/components/Layout/Greeting";
@@ -17,12 +17,20 @@ interface TopBarProps {
   showGreeting?: boolean;
   rightSlot?: ReactNode;
   notificationsSlot?: ReactNode;
-  /** Hidden until the title is hovered. Click switches the page. */
-  titleSwitch?: { label: string; onSelect: (event: MouseEvent<HTMLButtonElement>) => void } | null;
+  /** Journal and Study Area. The active segment is the current view. */
+  viewSwitch?: {
+    value: "notebook" | "study";
+    onChange: (value: "notebook" | "study") => void;
+  } | null;
   centerSlot?: ReactNode;
 }
 
-export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank = false, greetingName, profileReady = true, showGreeting = false, rightSlot, notificationsSlot, titleSwitch, centerSlot }: TopBarProps) {
+const VIEW_SWITCH = [
+  { id: "notebook" as const, label: "Journal" },
+  { id: "study" as const, label: "Study Area" },
+];
+
+export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank = false, greetingName, profileReady = true, showGreeting = false, rightSlot, notificationsSlot, viewSwitch, centerSlot }: TopBarProps) {
   return (
     <div className={cn(
       "flex flex-col gap-3 pb-3 sm:pb-4 mb-4 sm:mb-6 sm:gap-4",
@@ -30,18 +38,37 @@ export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank =
     )}>
       <div className="relative z-20 min-w-0 overflow-visible">
         {showGreeting && <Greeting name={greetingName} profileReady={profileReady} />}
-        <h2 className={cn("group/title relative inline-flex max-w-full items-baseline", showGreeting && "mt-4 sm:mt-5")}>
+        <h2 className={cn("relative inline-flex max-w-full items-baseline", showGreeting && "mt-4 sm:mt-5")}>
           <span className="text-lg sm:text-xl font-semibold tracking-wide truncate">{title}</span>
-          {titleSwitch && (
-            <button
-              type="button"
-              onClick={(event) => titleSwitch.onSelect(event)}
-              className="absolute left-0 top-full z-30 mt-1 whitespace-nowrap text-lg font-semibold tracking-wide text-primary opacity-0 translate-y-1 scale-90 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/title:translate-y-0 group-hover/title:scale-100 group-hover/title:opacity-100 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:scale-100 [@media(hover:none)]:opacity-100 focus-visible:translate-y-0 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none sm:text-xl"
-            >
-              {titleSwitch.label}
-            </button>
-          )}
         </h2>
+        {viewSwitch && (
+          <div
+            role="tablist"
+            aria-label="Journal or Study Area"
+            className="mt-2 inline-flex rounded-full bg-muted/50 p-1"
+          >
+            {VIEW_SWITCH.map((option) => {
+              const selected = viewSwitch.value === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => viewSwitch.onChange(option.id)}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-sm font-medium transition-colors",
+                    selected
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {!showGreeting && subtitle ? (
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">{subtitle}</p>
         ) : null}
