@@ -849,9 +849,9 @@ const Index = () => {
                 onThemeChange={handleThemeChange}
                 trades={trades}
                 showRank={currentPage === 'dashboard'}
-                viewSwitch={currentPage === "notebook" ? {
-                  value: notebookView,
-                  onChange: setNotebookView,
+                titleSwitch={currentPage === "notebook" ? {
+                  label: notebookView === "study" ? "Journal" : "Study Area",
+                  onSelect: () => setNotebookView(notebookView === "study" ? "notebook" : "study"),
                 } : null}
                 centerSlot={currentPage === "notebook" && notebookView === "study" ? (
                   <StudyCategorySwitch value={studyCategory} onChange={setStudyCategory} />
