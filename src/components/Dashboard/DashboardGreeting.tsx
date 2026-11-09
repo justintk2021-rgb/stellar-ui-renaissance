@@ -120,15 +120,24 @@ export function DashboardGreeting({
       className="fixed inset-0 z-[100] flex cursor-default flex-col items-center justify-center gap-8 bg-black/70 backdrop-blur-md"
     >
       <div className="px-6 text-center">
-        <h1 className="font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl">
-          {line}
-        </h1>
-      </div>
-      {canEnter && (
-        <motion.p
-          initial={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 6 }}
+        <motion.h1
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.35 }}
+          transition={{ duration: reduceMotion ? 0 : 0.6, ease: "easeOut" }}
+          className="font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl"
+        >
+          {line}
+        </motion.h1>
+      </div>
+      {(reduceMotion ? canEnter : !hold) && (
+        <motion.p
+          initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: reduceMotion ? 0 : 0.35,
+            delay: reduceMotion ? 0 : 0.85,
+            ease: "easeOut",
+          }}
           className="text-sm tracking-wide text-white/70"
         >
           Click anywhere to enter
