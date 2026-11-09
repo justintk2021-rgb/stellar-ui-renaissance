@@ -49,6 +49,7 @@ interface DashboardGreetingProps {
 export function DashboardGreeting({
   variant,
   name,
+  nameReady = false,
   dataReady,
   hold = false,
   onDismiss,
@@ -111,23 +112,25 @@ export function DashboardGreeting({
       initial={false}
       animate={
         leaving
-          ? { opacity: 0, y: -36, scale: 1.04, filter: "blur(10px)" }
-          : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
+          ? { opacity: 0, y: -36, scale: 1.04 }
+          : { opacity: 1, y: 0, scale: 1 }
       }
-      exit={{ opacity: 0, y: -36, filter: "blur(10px)" }}
+      exit={{ opacity: 0, y: -36 }}
       transition={{ duration: reduceMotion ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
       onClick={requestDismiss}
       className="fixed inset-0 z-[100] flex cursor-default flex-col items-center justify-center gap-8 bg-black/70 backdrop-blur-md"
     >
       <div className="px-6 text-center">
-        <motion.h1
-          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.6, ease: "easeOut" }}
-          className="font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl"
-        >
-          {line}
-        </motion.h1>
+        {nameReady && (
+          <motion.h1
+            initial={reduceMotion ? false : { clipPath: "inset(0 100% 0 0)", opacity: 0 }}
+            animate={{ clipPath: "inset(0 0 0 0)", opacity: 1 }}
+            transition={{ duration: reduceMotion ? 0 : 0.8, ease: [0.22, 1, 0.36, 1] }}
+            className="font-greeting inline-block text-3xl font-semibold text-primary md:text-4xl"
+          >
+            {line}
+          </motion.h1>
+        )}
       </div>
       {(reduceMotion ? canEnter : !hold) && (
         <motion.p
