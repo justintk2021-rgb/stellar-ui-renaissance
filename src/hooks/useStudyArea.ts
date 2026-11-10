@@ -254,7 +254,7 @@ export function useStudyMutations(userId: string | undefined) {
         content,
         updated_at: nowIso(),
       };
-      const inserted = await supabase.from("study_notes").insert({
+      let inserted = await supabase.from("study_notes").insert({
         id: note.id,
         user_id: userId,
         folder_id: input.folderId,
@@ -262,9 +262,20 @@ export function useStudyMutations(userId: string | undefined) {
         title,
         content: content as Json,
       }).select("id").single();
+      // Older schemas may not have category yet — retry without it.
+      if (inserted.error) {
+        inserted = await supabase.from("study_notes").insert({
+          id: note.id,
+          user_id: userId,
+          folder_id: input.folderId,
+          title,
+          content: content as Json,
+        }).select("id").single();
+      }
       if (!inserted.error && inserted.data?.id) note.id = inserted.data.id;
+      // Always keep a local copy so create/open still works if remote insert lags.
       const tree = currentTree(userId, queryClient);
-      invalidate({ ...tree, notes: [note, ...tree.notes] });
+      invalidate({ ...tree, notes: [note, ...tree.notes.filter((item) => item.id !== note.id)] });
       return note.id;
     },
   });

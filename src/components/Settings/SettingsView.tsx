@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Moon, Sun, User, Mail, Key, Calendar, LogOut, Palette, Save, Check, Trash2, Download, Link2, Pipette, RotateCcw, Settings, ChevronRight, FileText, Database, Sparkles } from "lucide-react";
+import { Moon, Sun, Droplets, User, Mail, Key, Calendar, LogOut, Palette, Save, Check, Trash2, Download, Link2, Pipette, RotateCcw, Settings, ChevronRight, FileText, Database, Sparkles } from "lucide-react";
+import type { AppTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -53,7 +54,7 @@ export type AccentColor = 'emerald' | 'red' | 'pink' | 'purple' | 'blue' | 'oran
 interface SettingsPreset {
   id: string;
   name: string;
-  theme: 'dark' | 'light';
+  theme: AppTheme;
   accentColor: AccentColor;
   customColor?: string;
   createdAt: string;
@@ -65,8 +66,8 @@ interface CustomGradient {
 }
 
 interface SettingsViewProps {
-  theme: 'dark' | 'light';
-  onThemeChange: (theme: 'dark' | 'light') => void;
+  theme: AppTheme;
+  onThemeChange: (theme: AppTheme) => void;
   accentColor: AccentColor;
   onAccentColorChange: (color: AccentColor) => void;
   userProfile: UserProfile | null;
@@ -665,7 +666,7 @@ export function SettingsView({
           </AnimatePresence>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Light Theme Card */}
           <motion.button
             variants={cardVariants}
@@ -782,6 +783,75 @@ export function SettingsView({
             </div>
             
             {theme === 'dark' && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 500 }}
+                className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/30"
+              >
+                <Check className="w-3.5 h-3.5 text-primary-foreground" />
+              </motion.div>
+            )}
+          </motion.button>
+
+          {/* Liquid Glass Theme Card */}
+          <motion.button
+            variants={cardVariants}
+            whileHover="hover"
+            whileTap="tap"
+            onClick={() => onThemeChange('liquid-glass')}
+            className={cn(
+              "relative p-5 rounded-2xl border-2 transition-all duration-300 group overflow-hidden",
+              theme === 'liquid-glass'
+                ? "border-primary bg-primary/5"
+                : "border-border/50 bg-card/30 hover:border-border"
+            )}
+          >
+            {theme === 'liquid-glass' && (
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-br from-cyan-400/20 via-primary/10 to-transparent"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              />
+            )}
+
+            <div className="relative flex flex-col items-center gap-4">
+              <div className={cn(
+                "w-full h-24 rounded-xl border overflow-hidden shadow-lg",
+                theme === 'liquid-glass' ? "border-primary/30 shadow-primary/10" : "border-white/20"
+              )}>
+                <div className="w-full h-full bg-gradient-to-br from-cyan-500/80 via-blue-600/70 to-purple-600/70 p-3">
+                  <div className="w-full h-5 rounded-lg bg-white/25 backdrop-blur-md border border-white/30 flex items-center gap-1.5 px-3">
+                    <div className="w-2 h-2 rounded-full bg-red-400/90" />
+                    <div className="w-2 h-2 rounded-full bg-yellow-400/90" />
+                    <div className="w-2 h-2 rounded-full bg-green-400/90" />
+                  </div>
+                  <div className="mt-2 p-2 rounded-lg bg-white/20 backdrop-blur-md border border-white/30">
+                    <div className="w-1/2 h-2 bg-white/70 rounded-full mb-1.5" />
+                    <div className="w-3/4 h-2 bg-white/40 rounded-full" />
+                  </div>
+                  <div className="mt-2 flex gap-1.5">
+                    <div className="flex-1 h-6 rounded-md bg-white/20 backdrop-blur-md border border-white/25" />
+                    <div className="flex-1 h-6 rounded-md bg-white/30 backdrop-blur-md border border-white/25" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Droplets className={cn(
+                  "w-4 h-4 transition-colors",
+                  theme === 'liquid-glass' ? "text-primary" : "text-muted-foreground"
+                )} />
+                <span className={cn(
+                  "text-sm font-semibold transition-colors",
+                  theme === 'liquid-glass' ? "text-foreground" : "text-muted-foreground"
+                )}>
+                  Liquid Glass
+                </span>
+              </div>
+            </div>
+
+            {theme === 'liquid-glass' && (
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -1145,7 +1215,7 @@ export function SettingsView({
                     <div>
                       <p className="text-sm font-semibold text-foreground">{preset.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {preset.theme === 'dark' ? '🌙 Dark' : '☀️ Light'} • {presetAccent?.label}
+                        {preset.theme === 'dark' ? '🌙 Dark' : preset.theme === 'liquid-glass' ? '💧 Liquid Glass' : '☀️ Light'} • {presetAccent?.label}
                       </p>
                     </div>
                   </div>

@@ -1,0 +1,117 @@
+/* ------------------------------------------------------------------ */
+/* Liquid Glass theme — html.liquid-glass (dark-based, see lib/theme.ts) */
+/* Frosted-glass panels: translucent surfaces, strong blur, a soft     */
+/* inset rim and an aurora backdrop that shows through everywhere.     */
+/* Plain CSS on purpose: keep this out of Tailwind's @layer utilities, */
+/* so selectors like .bg-card don't create a circular dependency.      */
+/* ------------------------------------------------------------------ */
+
+html.liquid-glass {
+  color-scheme: dark;
+  --glass-blur: 28px;
+  /* Slightly lift the dark palette so glass reads over the aurora. */
+  --background: 222 47% 7%;
+  --background-alt: 222 47% 5%;
+  --card: 222 47% 13%;
+  --card-glass: 222 47% 12%;
+  --popover: 222 47% 11%;
+  --muted: 222 47% 15%;
+  --border: 222 30% 28%;
+  --input: 222 30% 28%;
+  --sidebar-background: 222 47% 9%;
+  --sidebar-border: 222 30% 28%;
+}
+
+html.liquid-glass body {
+  background:
+    radial-gradient(1200px 800px at 85% -10%, hsl(189 94% 43% / 0.38), transparent 60%),
+    radial-gradient(900px 700px at 0% 0%, hsl(158 64% 52% / 0.24), transparent 55%),
+    radial-gradient(1000px 900px at 100% 100%, hsl(25 95% 53% / 0.2), transparent 55%),
+    radial-gradient(800px 600px at 50% 115%, hsl(271 81% 56% / 0.18), transparent 60%),
+    linear-gradient(180deg, hsl(222 47% 8%) 0%, hsl(222 47% 5%) 100%);
+  background-attachment: fixed;
+}
+
+/* Every main surface becomes frosted glass — cards, panels, sidebar, */
+/* popovers, dialogs, dropdowns, sheets, tables and inputs. */
+html.liquid-glass .bg-card,
+html.liquid-glass .bg-popover,
+html.liquid-glass .bg-muted,
+html.liquid-glass .bg-secondary,
+html.liquid-glass .bg-accent,
+html.liquid-glass .bg-sidebar,
+html.liquid-glass .glass,
+html.liquid-glass .glass-strong,
+html.liquid-glass .glass-popup,
+html.liquid-glass .glass-popup-panel,
+html.liquid-glass [role="dialog"],
+html.liquid-glass [data-radix-popper-content-wrapper] > *,
+html.liquid-glass [data-slot="popover-content"],
+html.liquid-glass [data-slot="dialog-content"],
+html.liquid-glass [data-slot="dropdown-menu-content"],
+html.liquid-glass [data-slot="sheet-content"],
+html.liquid-glass [data-slot="select-content"] {
+  background: linear-gradient(
+    180deg,
+    hsl(222 47% 16% / 0.55) 0%,
+    hsl(222 47% 10% / 0.48) 100%
+  );
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border-color: hsl(0 0% 100% / 0.12);
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.18),
+    inset 0 0 0 1px hsl(0 0% 100% / 0.03),
+    0 20px 50px -20px hsl(0 0% 0% / 0.55);
+}
+
+/* Page background containers stay translucent so the aurora shows through. */
+html.liquid-glass .bg-background {
+  background-color: hsl(222 47% 8% / 0.35);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+/* Inputs, selects and textareas stay readable on glass. */
+html.liquid-glass input,
+html.liquid-glass select,
+html.liquid-glass textarea {
+  background-color: hsl(222 47% 12% / 0.55);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border-color: hsl(0 0% 100% / 0.12);
+}
+
+/* Keep solid accents solid — primary buttons, active nav and badges. */
+html.liquid-glass .bg-primary,
+html.liquid-glass .bg-destructive {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.22),
+    0 10px 30px -10px hsl(var(--primary) / 0.55);
+}
+
+/* Ghost / outline buttons get the glass treatment too. */
+html.liquid-glass .border-border\/50,
+html.liquid-glass .border-border {
+  border-color: hsl(0 0% 100% / 0.12);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html.liquid-glass .bg-card,
+  html.liquid-glass .bg-popover,
+  html.liquid-glass .bg-muted,
+  html.liquid-glass .bg-secondary,
+  html.liquid-glass .bg-accent,
+  html.liquid-glass .bg-sidebar,
+  html.liquid-glass .glass,
+  html.liquid-glass .glass-strong,
+  html.liquid-glass .glass-popup,
+  html.liquid-glass .glass-popup-panel,
+  html.liquid-glass [role="dialog"] {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: hsl(var(--card) / 0.92);
+  }
+}

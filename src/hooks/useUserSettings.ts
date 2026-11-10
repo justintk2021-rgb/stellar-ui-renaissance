@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { applySettingsToDocument, writeSettingsCache } from './useApplyGlobalSettings';
 
 import { loadGoogleFont } from '@/lib/fonts';
+import type { AppTheme } from '@/lib/theme';
 
 import { queryKeys } from '@/lib/queries/keys';
 
@@ -280,7 +281,7 @@ export function useUserSettings(userId: string | undefined) {
 
     updateSetting,
 
-    setTheme: (theme: 'dark' | 'light') => updateSetting('theme', theme),
+    setTheme: (theme: AppTheme) => updateSetting('theme', theme),
 
     setAccentColor: (color: AccentColor) => updateSetting('accentColor', color),
 

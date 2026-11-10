@@ -19,7 +19,7 @@ const ThemeToggle = React.forwardRef<HTMLButtonElement, ThemeToggleProps>(
         theme={theme}
         onThemeChange={onThemeChange}
         duration={520}
-        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        aria-label={theme !== "light" ? "Switch to light mode" : "Switch to dark mode"}
         className={cn(
           "relative inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full",
           "border border-border/50 bg-muted/60 text-foreground",
