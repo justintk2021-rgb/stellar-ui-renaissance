@@ -1,4 +1,4 @@
-import { motion } from "@/lib/motion";
+import { motion, useReducedMotion } from "@/lib/motion";
 import { ReactNode } from "react";
 
 interface PageTransitionProps {
@@ -48,14 +48,16 @@ export const staggerItem = {
 };
 
 export function PageTransition({ children, className }: PageTransitionProps) {
+  const reduceMotion = useReducedMotion();
   return (
     <motion.div
       variants={pageVariants}
-      initial="initial"
+      initial={reduceMotion ? false : "initial"}
       animate="animate"
       exit="exit"
+      transition={reduceMotion ? { duration: 0 } : undefined}
       className={className}
-      style={{ willChange: "transform, opacity" }}
+      style={{ willChange: reduceMotion ? undefined : "transform, opacity" }}
     >
       {children}
     </motion.div>
