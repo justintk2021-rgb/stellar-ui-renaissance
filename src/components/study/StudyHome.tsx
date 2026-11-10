@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, Clock, FolderPlus, LayoutGrid, List, Plus, S
 import { cn } from "@/lib/utils";
 import { studyDocPlainText, studyFolderColor } from "@/lib/studyArea";
 import { StudyTrashBin, studyDragProps, useStudyTrash } from "./StudyTrash";
+import { BoardCanvas } from "./BoardCanvas";
 import type { StudyFolder, StudyNote } from "@/hooks/useStudyArea";
 
 const BOARDS_KEY = "nsync-study-boards";
@@ -276,10 +277,7 @@ export function StudyHome({
 
       <div className="min-w-0 flex-1 space-y-6">
         {activeBoard ? (
-          <section className="study-glass min-h-[320px] rounded-2xl p-6">
-            <h3 className="text-lg font-semibold tracking-tight">{activeBoard.name}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">This board is empty.</p>
-          </section>
+          <BoardCanvas boardId={activeBoard.id} boardName={activeBoard.name} />
         ) : (
           <>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
