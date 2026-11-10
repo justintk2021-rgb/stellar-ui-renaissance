@@ -37,6 +37,7 @@ export function NotebookSection({
     <StudyArea
       userId={notebookProps.userId}
       trades={notebookProps.trades}
+      notebookEntries={notebookProps.notebookEntries}
       focusNoteId={focusStudyNoteId}
       onFocusHandled={onStudyFocusHandled}
       category={category}

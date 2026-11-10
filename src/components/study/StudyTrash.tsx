@@ -14,6 +14,7 @@ type Deleter = (id: string) => void;
 
 type StudyTrashContextValue = {
   beginDrag: (event: ReactDragEvent, item: StudyTrashItem) => void;
+  getDragItem: () => StudyTrashItem | null;
   registerDeleter: (kind: StudyTrashKind, deleter: Deleter) => () => void;
   binHot: boolean;
   binHandlers: {
@@ -25,7 +26,19 @@ type StudyTrashContextValue = {
 
 const StudyTrashContext = createContext<StudyTrashContextValue | null>(null);
 
-const MIME = "application/x-study-trash";
+export const STUDY_DRAG_MIME = "application/x-study-trash";
+
+export function readStudyDragItem(event: { dataTransfer: DataTransfer }): StudyTrashItem | null {
+  try {
+    const raw = event.dataTransfer.getData(STUDY_DRAG_MIME);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StudyTrashItem;
+    if (!parsed?.kind || !parsed?.id) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 function emptyDragImage(): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
@@ -110,12 +123,14 @@ export function StudyTrashProvider({
   const beginDrag = useCallback((event: ReactDragEvent, item: StudyTrashItem) => {
     dragging.current = item;
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData(MIME, JSON.stringify(item));
+    event.dataTransfer.setData(STUDY_DRAG_MIME, JSON.stringify(item));
     event.dataTransfer.setData("text/plain", item.label);
     if (!dragImage.current) dragImage.current = emptyDragImage();
     event.dataTransfer.setDragImage(dragImage.current, 0, 0);
     setGhost({ x: event.clientX, y: event.clientY, label: item.label });
   }, []);
+
+  const getDragItem = useCallback(() => dragging.current, []);
 
   const registerDeleter = useCallback((kind: StudyTrashKind, deleter: Deleter) => {
     deleters.current[kind] = deleter;
@@ -147,8 +162,8 @@ export function StudyTrashProvider({
   }), [drop]);
 
   const value = useMemo(
-    () => ({ beginDrag, registerDeleter, binHot: hot, binHandlers }),
-    [beginDrag, registerDeleter, hot, binHandlers],
+    () => ({ beginDrag, getDragItem, registerDeleter, binHot: hot, binHandlers }),
+    [beginDrag, getDragItem, registerDeleter, hot, binHandlers],
   );
 
   return (

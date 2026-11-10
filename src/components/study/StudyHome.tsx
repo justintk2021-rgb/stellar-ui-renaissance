@@ -1,32 +1,14 @@
-import { forwardRef, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { forwardRef, useCallback, useEffect, useMemo, useState, type DragEvent, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronRight, Clock, FolderPlus, LayoutGrid, List, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Clock, LayoutGrid, List, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { studyDocPlainText, studyFolderColor } from "@/lib/studyArea";
-import { StudyTrashBin, studyDragProps, useStudyTrash } from "./StudyTrash";
+import { StudyTrashBin, readStudyDragItem, studyDragProps, useStudyTrash } from "./StudyTrash";
+import { BoardPreview } from "./BoardPreview";
+import { StudyFolderIcon, StudyFolderPlusIcon } from "./StudyFolderIcon";
+import type { StudyBoard } from "./studyBoards";
 import type { StudyFolder, StudyNote } from "@/hooks/useStudyArea";
-
-const BOARDS_KEY = "nsync-study-boards";
-
-type StudyBoard = { id: string; name: string };
-
-function greetingLine(name?: string): string {
-  const hour = new Date().getHours();
-  const greeting = hour >= 5 && hour < 12 ? "Good morning" : hour >= 12 && hour < 18 ? "Good afternoon" : "Good evening";
-  const first = name?.trim().split(" ")[0];
-  return first ? `${greeting}, ${first}` : greeting;
-}
-
-function readBoards(): StudyBoard[] {
-  try {
-    const raw = localStorage.getItem(BOARDS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as StudyBoard[];
-    return Array.isArray(parsed) ? parsed.filter((board) => board?.id && board?.name) : [];
-  } catch {
-    return [];
-  }
-}
+export type { StudyBoard };
 
 function PanelSection({
   title,
@@ -57,18 +39,26 @@ function PanelSection({
 const PanelItem = forwardRef<HTMLButtonElement, {
   label: string;
   selected?: boolean;
+  dropActive?: boolean;
   icon?: ReactNode;
   trailing?: ReactNode;
   onClick: () => void;
   onContextMenu?: (event: MouseEvent<HTMLButtonElement>) => void;
+  onDragOver?: (event: DragEvent<HTMLButtonElement>) => void;
+  onDragLeave?: (event: DragEvent<HTMLButtonElement>) => void;
+  onDrop?: (event: DragEvent<HTMLButtonElement>) => void;
   drag?: ReturnType<typeof studyDragProps>;
 }>(function PanelItem({
   label,
   selected,
+  dropActive,
   icon,
   trailing,
   onClick,
   onContextMenu,
+  onDragOver,
+  onDragLeave,
+  onDrop,
   drag,
 }, ref) {
   return (
@@ -77,10 +67,14 @@ const PanelItem = forwardRef<HTMLButtonElement, {
       type="button"
       onClick={onClick}
       onContextMenu={onContextMenu}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
       {...drag}
       className={cn(
-        "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm",
+        "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm",
         selected ? "bg-muted/80 text-foreground" : "text-foreground/80 hover:bg-muted/40",
+        dropActive && "bg-primary/15 ring-1 ring-primary/40",
       )}
     >
       <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground">{icon}</span>
@@ -91,34 +85,45 @@ const PanelItem = forwardRef<HTMLButtonElement, {
 });
 
 export function StudyHome({
-  displayName,
   folders,
   notes,
+  boards,
+  boardPreviewTick = 0,
+  onBoardsChange,
   onOpenNote,
+  onOpenBoard,
   onCreateNote,
+  onMoveNote,
+  onRegisterCreateBoard,
   onCreateFolder,
   onEditFolder,
   onDeleteFolder,
 }: {
-  displayName?: string;
   folders: StudyFolder[];
   notes: StudyNote[];
-  onOpenNote: (id: string) => void;
+  boards: StudyBoard[];
+  boardPreviewTick?: number;
+  onBoardsChange: (updater: (current: StudyBoard[]) => StudyBoard[]) => void;
+  onOpenNote: (id: string, title?: string) => void;
+  onOpenBoard: (board: StudyBoard) => void;
   onCreateNote: (folderId: string | null) => void;
+  onMoveNote: (noteId: string, folderId: string | null) => void;
+  onRegisterCreateBoard?: (createBoard: (name?: string) => void) => void;
   onCreateFolder: () => void;
   onEditFolder: (folder: StudyFolder) => void;
   onDeleteFolder: (folder: StudyFolder) => void;
 }) {
   const [query, setQuery] = useState("");
   const [folderId, setFolderId] = useState("all");
+  const [homeKind, setHomeKind] = useState<"notes" | "boards">("notes");
   const [noteView, setNoteView] = useState<"list" | "pages">("list");
-  const [boardId, setBoardId] = useState<string | null>(null);
-  const [boards, setBoards] = useState<StudyBoard[]>(readBoards);
-  const [boardName, setBoardName] = useState("");
-  const [addingBoard, setAddingBoard] = useState(false);
-  const [openSections, setOpenSections] = useState({ study: true, folders: true, boards: true });
+  const [openSections, setOpenSections] = useState({ study: true, folders: true });
   const [folderMenu, setFolderMenu] = useState<{ x: number; y: number; folder: StudyFolder } | null>(null);
-  const { beginDrag, registerDeleter } = useStudyTrash();
+  const [boardMenu, setBoardMenu] = useState<{ x: number; y: number; board: StudyBoard } | null>(null);
+  const [renamingBoardId, setRenamingBoardId] = useState<string | null>(null);
+  const [renameBoardDraft, setRenameBoardDraft] = useState("");
+  const [dropFolderId, setDropFolderId] = useState<string | null>(null);
+  const { beginDrag, getDragItem, registerDeleter } = useStudyTrash();
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
   const orderedFolders = useMemo(
     () => [...folders].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
@@ -126,22 +131,34 @@ export function StudyHome({
   );
 
   useEffect(() => registerDeleter("board", (id) => {
-    setBoards((current) => current.filter((board) => board.id !== id));
-    setBoardId((current) => (current === id ? null : current));
-  }), [registerDeleter]);
+    onBoardsChange((current) => current.filter((board) => board.id !== id));
+  }), [onBoardsChange, registerDeleter]);
+
+  useEffect(() => {
+    const clearDrop = () => setDropFolderId(null);
+    document.addEventListener("dragend", clearDrop);
+    return () => document.removeEventListener("dragend", clearDrop);
+  }, []);
+
+  useEffect(() => {
+    const alive = new Set(folders.map((folder) => folder.id));
+    onBoardsChange((current) => {
+      let changed = false;
+      const next = current.map((board) => {
+        if (board.folderId && !alive.has(board.folderId)) {
+          changed = true;
+          return { ...board, folderId: null };
+        }
+        return board;
+      });
+      return changed ? next : current;
+    });
+  }, [folders, onBoardsChange]);
 
   useEffect(() => {
     if (folderId === "all" || folderId === "recent") return;
     if (!folderById.has(folderId)) setFolderId("all");
   }, [folderById, folderId]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(BOARDS_KEY, JSON.stringify(boards));
-    } catch {
-      // Board names stay in memory if storage is blocked.
-    }
-  }, [boards]);
 
   const scopedNotes = useMemo(() => {
     if (folderId === "recent") {
@@ -156,7 +173,6 @@ export function StudyHome({
     [scopedNotes],
   );
   const createFolderId = folderId === "all" || folderId === "recent" ? null : folderId;
-  const activeBoard = boards.find((board) => board.id === boardId) ?? null;
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -175,28 +191,89 @@ export function StudyHome({
           preview,
           detail: preview || "Empty note",
           color: studyFolderColor(folder?.color),
-          onClick: () => onOpenNote(note.id),
+          onClick: () => onOpenNote(note.id, note.title || "Untitled note"),
         };
       });
     return noteRows;
   }, [folderById, onOpenNote, query, scopedNotes]);
 
   const featuredPreview = featured ? studyDocPlainText(featured.content) : "";
-  const featuredFolder = featured?.folder_id ? folderById.get(featured.folder_id)?.name : "All notes";
+  const featuredFolder = featured?.folder_id ? folderById.get(featured.folder_id)?.name : "WorkSpaces";
+  const boardRows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return boards.filter((board) => {
+      if (folderId !== "all" && folderId !== "recent" && board.folderId !== folderId) return false;
+      return !needle || board.name.toLowerCase().includes(needle);
+    });
+  }, [boards, folderId, query]);
   const selectNotes = (nextFolder: string) => {
-    setBoardId(null);
+    setHomeKind("notes");
     setFolderId(nextFolder);
   };
-  const saveBoard = () => {
-    const name = boardName.trim();
-    if (!name) return;
-    const board = { id: crypto.randomUUID(), name };
-    setBoards((current) => [...current, board]);
-    setBoardName("");
-    setAddingBoard(false);
-    setBoardId(board.id);
+  const createUntitledBoard = useCallback((name = "Untitled board") => {
+    const nextFolderId = folderId === "all" || folderId === "recent" ? null : folderId;
+    const board = {
+      id: crypto.randomUUID(),
+      name: name.trim() || "Untitled board",
+      folderId: nextFolderId,
+    };
+    onBoardsChange((current) => [...current, board]);
+    setHomeKind("boards");
+    onOpenBoard(board);
+  }, [folderId, onBoardsChange, onOpenBoard]);
+  const moveBoardToFolder = useCallback((id: string, nextFolderId: string | null) => {
+    onBoardsChange((current) =>
+      current.map((board) => (board.id === id ? { ...board, folderId: nextFolderId } : board)),
+    );
+  }, [onBoardsChange]);
+  const acceptFolderDrop = (event: DragEvent, targetFolderId: string | null) => {
+    const item = getDragItem() ?? readStudyDragItem(event);
+    if (!item || (item.kind !== "note" && item.kind !== "board")) return false;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    return true;
   };
-  const toggleSection = (key: "study" | "folders" | "boards") => {
+  const handleFolderDrop = (event: DragEvent, targetFolderId: string | null) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDropFolderId(null);
+    const item = getDragItem() ?? readStudyDragItem(event);
+    if (!item) return;
+    if (item.kind === "note") onMoveNote(item.id, targetFolderId);
+    if (item.kind === "board") moveBoardToFolder(item.id, targetFolderId);
+  };
+  const folderDropProps = (targetFolderId: string | null, key: string) => ({
+    dropActive: dropFolderId === key,
+    onDragOver: (event: DragEvent<HTMLButtonElement>) => {
+      if (!acceptFolderDrop(event, targetFolderId)) return;
+      setDropFolderId(key);
+    },
+    onDragLeave: (event: DragEvent<HTMLButtonElement>) => {
+      if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+      setDropFolderId((current) => (current === key ? null : current));
+    },
+    onDrop: (event: DragEvent<HTMLButtonElement>) => handleFolderDrop(event, targetFolderId),
+  });
+  useEffect(() => {
+    onRegisterCreateBoard?.(createUntitledBoard);
+  }, [createUntitledBoard, onRegisterCreateBoard]);
+  const renameBoard = (id: string, nextName: string) => {
+    const name = nextName.trim();
+    if (!name) return;
+    onBoardsChange((current) => current.map((board) => (board.id === id ? { ...board, name } : board)));
+  };
+  const commitSidebarBoardRename = () => {
+    if (!renamingBoardId) return;
+    const existing = boards.find((board) => board.id === renamingBoardId);
+    const next = renameBoardDraft.trim();
+    if (next && next !== existing?.name) renameBoard(renamingBoardId, next);
+    setRenamingBoardId(null);
+    setRenameBoardDraft("");
+  };
+  const deleteBoard = (id: string) => {
+    onBoardsChange((current) => current.filter((board) => board.id !== id));
+  };
+  const toggleSection = (key: "study" | "folders") => {
     setOpenSections((current) => ({ ...current, [key]: !current[key] }));
   };
 
@@ -205,93 +282,94 @@ export function StudyHome({
       <aside className="w-full shrink-0 lg:sticky lg:top-0 lg:w-56">
         <PanelSection title="Study" open={openSections.study} onToggle={() => toggleSection("study")}>
           <PanelItem
-            label="All notes"
-            selected={!activeBoard && folderId === "all"}
+            label="WorkSpaces"
+            selected={folderId === "all"}
             icon={<List className="h-3.5 w-3.5" />}
             onClick={() => selectNotes("all")}
+            {...folderDropProps(null, "all")}
           />
           <PanelItem
             label="Recent notes"
-            selected={!activeBoard && folderId === "recent"}
+            selected={folderId === "recent"}
             icon={<Clock className="h-3.5 w-3.5" />}
             onClick={() => selectNotes("recent")}
           />
         </PanelSection>
         <PanelSection title="Folders" open={openSections.folders} onToggle={() => toggleSection("folders")}>
-          {orderedFolders.map((folder) => (
-            <PanelItem
-              key={folder.id}
-              label={folder.name}
-              selected={!activeBoard && folderId === folder.id}
-              icon={<span className="h-2.5 w-2.5 rounded-full" style={{ background: studyFolderColor(folder.color) }} />}
-              trailing={<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-              onClick={() => selectNotes(folder.id)}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                setFolderMenu({ x: event.clientX, y: event.clientY, folder });
-              }}
-              drag={studyDragProps({ kind: "folder", id: folder.id, label: folder.name }, beginDrag)}
-            />
-          ))}
+          {orderedFolders.map((folder) => {
+            const selected = folderId === folder.id;
+            const dropping = dropFolderId === folder.id;
+            return (
+              <PanelItem
+                key={folder.id}
+                label={folder.name}
+                selected={selected}
+                icon={<StudyFolderIcon color={folder.color} open={selected || dropping} />}
+                trailing={<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                onClick={() => selectNotes(folder.id)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  setBoardMenu(null);
+                  setFolderMenu({ x: event.clientX, y: event.clientY, folder });
+                }}
+                drag={studyDragProps({ kind: "folder", id: folder.id, label: folder.name }, beginDrag)}
+                {...folderDropProps(folder.id, folder.id)}
+              />
+            );
+          })}
           <PanelItem
             label="New folder"
-            icon={<FolderPlus className="h-3.5 w-3.5" />}
+            icon={<StudyFolderPlusIcon />}
             onClick={onCreateFolder}
           />
         </PanelSection>
-        <PanelSection title="Boards" open={openSections.boards} onToggle={() => toggleSection("boards")}>
-          {boards.map((board) => (
-            <PanelItem
-              key={board.id}
-              label={board.name}
-              selected={boardId === board.id}
-              icon={<LayoutGrid className="h-3.5 w-3.5" />}
-              trailing={<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-              onClick={() => setBoardId(board.id)}
-              drag={studyDragProps({ kind: "board", id: board.id, label: board.name }, beginDrag)}
-            />
-          ))}
-          {addingBoard ? (
-            <form
-              className="px-2 py-1"
-              onSubmit={(event) => {
-                event.preventDefault();
-                saveBoard();
-              }}
-            >
-              <input
-                autoFocus
-                value={boardName}
-                onChange={(event) => setBoardName(event.target.value)}
-                onBlur={() => { if (!boardName.trim()) setAddingBoard(false); }}
-                placeholder="Board name"
-                className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2 text-sm outline-none focus:border-primary/40"
-              />
-            </form>
-          ) : (
-            <PanelItem label="New board" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setAddingBoard(true)} />
-          )}
-        </PanelSection>
       </aside>
 
-      <div className="min-w-0 flex-1 space-y-6">
-        {activeBoard ? (
-          <section className="study-glass min-h-[320px] rounded-2xl p-6">
-            <h3 className="text-lg font-semibold tracking-tight">{activeBoard.name}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">This board is empty.</p>
-          </section>
-        ) : (
+      <div className="min-w-0 flex-1 space-y-6 pt-10 sm:pt-14">
           <>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">{greetingLine(displayName)}</p>
-              <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_auto_1fr] sm:gap-4">
+              <div className="inline-flex h-10 items-center justify-self-start rounded-full border border-border/50 bg-muted/40 p-1" role="tablist" aria-label="Notes or Boards">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={homeKind === "notes"}
+                  onClick={() => setHomeKind("notes")}
+                  className={cn(
+                    "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
+                    homeKind === "notes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Notes
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={homeKind === "boards"}
+                  onClick={() => setHomeKind("boards")}
+                  className={cn(
+                    "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
+                    homeKind === "boards" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Boards
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => onCreateNote(createFolderId)}
+                className="inline-flex h-12 shrink-0 items-center justify-center gap-2 justify-self-center rounded-full bg-foreground px-6 text-base font-semibold text-background transition-opacity hover:opacity-90 sm:h-14 sm:px-8 sm:text-lg"
+              >
+                <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
+                Workspace
+              </button>
+              <div className="flex w-full items-center justify-end gap-2 justify-self-end sm:w-auto">
                 <StudyTrashBin />
                 <label className="relative block min-w-0 flex-1 sm:w-64">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search notes"
+                    placeholder={homeKind === "boards" ? "Search boards" : "Search notes"}
                     className="h-10 w-full rounded-full border border-border/50 bg-muted/40 pl-9 pr-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/40"
                   />
                 </label>
@@ -315,18 +393,10 @@ export function StudyHome({
                     <LayoutGrid className="h-4 w-4" />
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onCreateNote(createFolderId)}
-                  className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90"
-                >
-                  <Plus className="h-4 w-4" />
-                  Note
-                </button>
               </div>
             </div>
 
-            {folderId !== "all" && folderId !== "recent" ? (
+            {homeKind === "notes" && folderId !== "all" && folderId !== "recent" ? (
               <section className="relative flex min-h-[148px] items-center justify-between gap-4 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/30 via-primary/10 to-transparent px-5 py-5 sm:px-6">
                 <div className="flex min-w-0 items-center gap-4">
                   <span
@@ -356,7 +426,149 @@ export function StudyHome({
               </section>
             ) : null}
 
-            {noteView === "list" ? (
+            {homeKind === "boards" ? (
+              noteView === "list" ? (
+                <div className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
+                  {boardRows.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => onCreateNote(createFolderId)}
+                      className="col-span-full rounded-xl px-2 py-8 text-left text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      No boards yet. Create one.
+                    </button>
+                  ) : boardRows.map((board) => {
+                    const boardFolder = board.folderId ? folderById.get(board.folderId) : undefined;
+                    const boardColor = boardFolder ? studyFolderColor(boardFolder.color) : null;
+                    return renamingBoardId === board.id ? (
+                      <form
+                        key={board.id}
+                        className="flex items-center gap-3 rounded-xl px-2 py-3"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          commitSidebarBoardRename();
+                        }}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                            boardColor ? "text-background" : "bg-muted text-muted-foreground",
+                          )}
+                          style={boardColor ? { background: boardColor } : undefined}
+                        >
+                          <LayoutGrid className="h-4 w-4" />
+                        </span>
+                        <input
+                          autoFocus
+                          value={renameBoardDraft}
+                          onChange={(event) => setRenameBoardDraft(event.target.value)}
+                          onBlur={commitSidebarBoardRename}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              setRenamingBoardId(null);
+                              setRenameBoardDraft("");
+                            }
+                          }}
+                          aria-label="Rename board"
+                          className="h-9 min-w-0 flex-1 rounded-lg border border-border/50 bg-background/60 px-2 text-sm outline-none focus:border-primary/40"
+                        />
+                      </form>
+                    ) : (
+                      <button
+                        key={board.id}
+                        type="button"
+                        onClick={() => onOpenBoard(board)}
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          setFolderMenu(null);
+                          setBoardMenu({ x: event.clientX, y: event.clientY, board });
+                        }}
+                        {...studyDragProps({ kind: "board", id: board.id, label: board.name }, beginDrag)}
+                        className="flex items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-muted/40"
+                      >
+                        <span
+                          className={cn(
+                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                            boardColor ? "text-background" : "bg-muted text-muted-foreground",
+                          )}
+                          style={boardColor ? { background: boardColor } : undefined}
+                        >
+                          <LayoutGrid className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{board.name}</span>
+                          <span
+                            className={cn("block truncate text-xs font-medium", !boardColor && "text-muted-foreground")}
+                            style={boardColor ? { color: boardColor } : undefined}
+                          >
+                            {boardFolder?.name ?? "Board"}
+                          </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {boardRows.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => onCreateNote(createFolderId)}
+                      className="col-span-full rounded-2xl border border-dashed border-border/60 px-4 py-10 text-left text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      No boards yet. Create one.
+                    </button>
+                  ) : boardRows.map((board) => {
+                    const boardFolder = board.folderId ? folderById.get(board.folderId) : undefined;
+                    const boardColor = boardFolder ? studyFolderColor(boardFolder.color) : null;
+                    return (
+                      <article
+                        key={board.id}
+                        className="study-glass rounded-2xl p-3"
+                        {...studyDragProps({ kind: "board", id: board.id, label: board.name }, beginDrag)}
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          setFolderMenu(null);
+                          setBoardMenu({ x: event.clientX, y: event.clientY, board });
+                        }}
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                          <h3 className="truncate text-sm font-semibold">{boardFolder?.name || board.name}</h3>
+                          <button
+                            type="button"
+                            aria-label="Open board"
+                            onClick={() => onOpenBoard(board)}
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onOpenBoard(board)}
+                          className="relative block h-52 w-full overflow-hidden rounded-xl border border-border/40 bg-background/90 text-left shadow-sm"
+                        >
+                          <BoardPreview boardId={board.id} revision={boardPreviewTick} className="absolute inset-0" />
+                          <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/95 via-background/70 to-transparent px-3 pb-3 pt-8">
+                            {boardFolder ? (
+                              <span
+                                className="mb-1 inline-flex rounded-md bg-muted/80 px-1.5 py-0.5 text-[10px] font-medium"
+                                style={boardColor ? { color: boardColor } : undefined}
+                              >
+                                {boardFolder.name}
+                              </span>
+                            ) : null}
+                            <span className="block truncate text-sm font-semibold leading-snug">{board.name}</span>
+                          </span>
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+              )
+            ) : noteView === "list" ? (
               <div className="grid grid-cols-1 gap-x-10 sm:grid-cols-2">
                 {rows.length === 0 ? (
                   <button
@@ -438,7 +650,6 @@ export function StudyHome({
               </div>
             )}
           </>
-        )}
       </div>
       {folderMenu ? createPortal(
         <div
@@ -462,6 +673,43 @@ export function StudyHome({
               type="button"
               className="block w-full rounded-lg px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
               onClick={() => { onDeleteFolder(folderMenu.folder); setFolderMenu(null); }}
+            >
+              Delete
+            </button>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+      {boardMenu ? createPortal(
+        <div
+          className="fixed inset-0 z-[200]"
+          onMouseDown={() => setBoardMenu(null)}
+          onContextMenu={(event) => { event.preventDefault(); setBoardMenu(null); }}
+        >
+          <div
+            className="glass-popup absolute min-w-[9.5rem] rounded-xl p-1"
+            style={{ left: Math.min(boardMenu.x, window.innerWidth - 180), top: Math.min(boardMenu.y, window.innerHeight - 96) }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/60"
+              onClick={() => {
+                setHomeKind("boards");
+                setRenameBoardDraft(boardMenu.board.name);
+                setRenamingBoardId(boardMenu.board.id);
+                setBoardMenu(null);
+              }}
+            >
+              Rename
+            </button>
+            <button
+              type="button"
+              className="block w-full rounded-lg px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
+              onClick={() => {
+                deleteBoard(boardMenu.board.id);
+                setBoardMenu(null);
+              }}
             >
               Delete
             </button>

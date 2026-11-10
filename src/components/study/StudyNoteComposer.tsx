@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { JSONContent } from "@tiptap/core";
-import { BookOpen, Clapperboard, FileText, Link2, Upload } from "lucide-react";
+import { BookOpen, Clapperboard, FileText, LayoutGrid, Link2, Upload } from "lucide-react";
 import type { Trade } from "@/types/trade";
 import { isUnjournaledTrade } from "@/lib/notifications";
 import { EMPTY_STUDY_DOC, studyDocWith, videoBlockFromLink } from "@/lib/studyArea";
@@ -11,20 +11,27 @@ import { cn } from "@/lib/utils";
 
 const MAX_VIDEO_BYTES = 12 * 1024 * 1024;
 
-type Step = "choose" | "video" | "trade";
+type Step = "choose" | "video" | "trade" | "name";
+type Pending =
+  | { kind: "note"; content: JSONContent; suggestedTitle: string }
+  | { kind: "board"; suggestedTitle: string };
 
 export function StudyNoteComposer({
   trades,
   playbooks,
   onClose,
   onCreate,
+  onCreateBoard,
 }: {
   trades: Trade[];
   playbooks: StudyPlaybook[];
   onClose: () => void;
   onCreate: (input: { title: string; content: JSONContent }) => void;
+  onCreateBoard?: (name: string) => void;
 }) {
   const [step, setStep] = useState<Step>("choose");
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
   const [link, setLink] = useState("");
   const [linkError, setLinkError] = useState("");
   const [fileError, setFileError] = useState("");
@@ -58,13 +65,19 @@ export function StudyNoteComposer({
       });
   }, [playbooks, query, trades]);
 
+  const goToName = (next: Pending) => {
+    setPending(next);
+    setNameDraft(next.suggestedTitle);
+    setStep("name");
+  };
+
   const createVideoLink = () => {
     const block = videoBlockFromLink(link);
     if (!block) {
       setLinkError("Paste a video link, such as a YouTube URL.");
       return;
     }
-    onCreate({ title: "Video note", content: studyDocWith(block) });
+    goToName({ kind: "note", content: studyDocWith(block), suggestedTitle: "Video note" });
   };
 
   const createUploadedVideo = (file: File) => {
@@ -83,14 +96,43 @@ export function StudyNoteComposer({
         setFileError("Could not read that video.");
         return;
       }
-      onCreate({
-        title: file.name.replace(/\.[^.]+$/, "") || "Video note",
+      goToName({
+        kind: "note",
         content: studyDocWith({ type: "studyYoutube", attrs: { videoId: null, src } }),
+        suggestedTitle: file.name.replace(/\.[^.]+$/, "") || "Video note",
       });
     };
     reader.onerror = () => setFileError("Could not read that video.");
     reader.readAsDataURL(file);
   };
+
+  const commitName = () => {
+    if (!pending) return;
+    const title = nameDraft.trim() || pending.suggestedTitle;
+    if (pending.kind === "board") {
+      onCreateBoard?.(title);
+      return;
+    }
+    onCreate({ title, content: pending.content });
+  };
+
+  const title =
+    step === "choose"
+      ? "New Workspace"
+      : step === "video"
+        ? "Add a video"
+        : step === "trade"
+          ? "Journaled trade"
+          : "Name your workspace";
+
+  const subtitle =
+    step === "choose"
+      ? "Choose your workspace"
+      : step === "video"
+        ? "Paste a link or upload a video from this device."
+        : step === "trade"
+          ? "Pick a trade from your journal. Its playbook stays attached."
+          : "Give it a name, then we’ll open it right away.";
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-background/55 p-4 backdrop-blur-2xl" onMouseDown={onClose}>
@@ -102,21 +144,26 @@ export function StudyNoteComposer({
         onMouseDown={(event) => event.stopPropagation()}
       >
         <h2 id="study-note-composer-title" className="text-lg font-semibold tracking-tight">
-          {step === "choose" ? "New note" : step === "video" ? "Add a video" : "Journaled trade"}
+          {title}
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {step === "choose"
-            ? "Choose how this note starts."
-            : step === "video"
-              ? "Paste a link or upload a video from this device."
-              : "Pick a trade from your journal. Its playbook stays attached."}
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
 
         {step === "choose" ? (
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <OptionButton icon={<FileText className="h-5 w-5" />} title="Blank page" detail="Start with an empty note." onClick={() => onCreate({ title: "Untitled note", content: EMPTY_STUDY_DOC })} />
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <OptionButton
+              icon={<FileText className="h-5 w-5" />}
+              title="Blank page"
+              detail="Start with an empty note."
+              onClick={() => goToName({ kind: "note", content: EMPTY_STUDY_DOC, suggestedTitle: "Untitled note" })}
+            />
             <OptionButton icon={<Clapperboard className="h-5 w-5" />} title="Video" detail="Paste a link or upload one." onClick={() => setStep("video")} />
             <OptionButton icon={<BookOpen className="h-5 w-5" />} title="Journaled trade" detail="Linked to the journal and its playbook." onClick={() => setStep("trade")} />
+            <OptionButton
+              icon={<LayoutGrid className="h-5 w-5" />}
+              title="Board"
+              detail="Open a freeform study board."
+              onClick={() => goToName({ kind: "board", suggestedTitle: "Untitled board" })}
+            />
           </div>
         ) : null}
 
@@ -133,7 +180,7 @@ export function StudyNoteComposer({
             </label>
             {linkError ? <p className="text-xs text-destructive">{linkError}</p> : null}
             <button type="button" onClick={createVideoLink} className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background">
-              Use link
+              Continue
             </button>
             <div className="border-t border-border/40 pt-4">
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-border/60 px-4 py-4 text-sm hover:bg-muted/30">
@@ -183,21 +230,61 @@ export function StudyNoteComposer({
               onClick={() => {
                 if (!tradeId) return;
                 const trade = trades.find((item) => item.id === tradeId);
-                onCreate({
-                  title: trade?.pair ? `${trade.pair} review` : "Trade note",
+                goToName({
+                  kind: "note",
                   content: studyDocWith({ type: "studyTrade", attrs: { tradeId } }),
+                  suggestedTitle: trade?.pair ? `${trade.pair} review` : "Trade note",
                 });
               }}
               className="mt-4 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-40"
             >
-              Use this trade
+              Continue
             </button>
           </div>
         ) : null}
 
+        {step === "name" ? (
+          <form
+            className="mt-5 space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              commitName();
+            }}
+          >
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-muted-foreground">Name</span>
+              <input
+                autoFocus
+                value={nameDraft}
+                onChange={(event) => setNameDraft(event.target.value)}
+                placeholder={pending?.suggestedTitle || "Workspace name"}
+                className="h-11 w-full rounded-xl border border-border/50 bg-background/50 px-3 text-sm outline-none focus:border-primary/40"
+              />
+            </label>
+            <button type="submit" className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background">
+              Create & open
+            </button>
+          </form>
+        ) : null}
+
         <div className="mt-5 flex justify-end gap-2">
           {step !== "choose" ? (
-            <button type="button" onClick={() => setStep("choose")} className="rounded-full px-3 py-2 text-sm text-muted-foreground hover:text-foreground">
+            <button
+              type="button"
+              onClick={() => {
+                if (step === "name" && pending?.kind === "note" && pending.content.content?.some((node) => node.type === "studyYoutube")) {
+                  setStep("video");
+                  return;
+                }
+                if (step === "name" && pending?.kind === "note" && pending.content.content?.some((node) => node.type === "studyTrade")) {
+                  setStep("trade");
+                  return;
+                }
+                setPending(null);
+                setStep("choose");
+              }}
+              className="rounded-full px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+            >
               Back
             </button>
           ) : null}

@@ -53,7 +53,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
     content: opened.current.doc,
     editorProps: {
       attributes: {
-        class: "study-prose min-h-[280px] px-1 py-2 text-[15px] leading-7 outline-none",
+        class: "study-prose min-h-[calc(100dvh-22rem)] px-1 py-2 text-[15px] leading-7 outline-none",
       },
       handlePaste(view, event) {
         const text = event.clipboardData?.getData("text/plain")?.trim() ?? "";

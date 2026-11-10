@@ -25,8 +25,9 @@ interface TopBarProps {
 export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank = false, greetingName, profileReady = true, showGreeting = false, rightSlot, notificationsSlot, titleSwitch, centerSlot }: TopBarProps) {
   return (
     <div className={cn(
-      "flex flex-col gap-3 pb-3 sm:pb-4 mb-4 sm:mb-6 sm:gap-4",
-      centerSlot ? "sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center" : "sm:flex-row sm:items-end sm:justify-between",
+      "relative flex flex-col gap-3 pb-3 sm:pb-4 mb-4 sm:mb-6 sm:gap-4",
+      "sm:flex-row sm:items-center sm:justify-between",
+      !centerSlot && "sm:items-end",
     )}>
       <div className="relative z-20 min-w-0 overflow-visible">
         {showGreeting && <Greeting name={greetingName} profileReady={profileReady} />}
@@ -46,8 +47,12 @@ export function TopBar({ title, subtitle, onThemeChange, trades = [], showRank =
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">{subtitle}</p>
         ) : null}
       </div>
-      {centerSlot ? <div className="flex justify-center">{centerSlot}</div> : null}
-      <div className={cn("flex items-center gap-2 sm:gap-3 flex-wrap", centerSlot ? "sm:justify-end" : "sm:justify-end")}>
+      {centerSlot ? (
+        <div className="flex justify-center sm:absolute sm:left-1/2 sm:top-1/2 sm:z-10 sm:-translate-x-1/2 sm:-translate-y-1/2">
+          {centerSlot}
+        </div>
+      ) : null}
+      <div className="relative z-20 flex flex-wrap items-center justify-end gap-2 sm:ml-auto sm:gap-3">
         {rightSlot}
         {showRank && (
           <RankBadge trades={trades} />
