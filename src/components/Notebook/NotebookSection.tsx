@@ -15,6 +15,8 @@ export function NotebookSection({
   onStudyFocusHandled,
   onOpenStudyJournal,
   onOpenStudyPlaybook,
+  selectedCategory,
+  onSelectedCategoryChange,
   ...notebookProps
 }: NotebookProps & {
   view: "notebook" | "study";
@@ -24,11 +26,17 @@ export function NotebookSection({
   onStudyFocusHandled?: () => void;
   onOpenStudyJournal?: (tradeId: string) => void;
   onOpenStudyPlaybook?: (playbookId: string | null) => void;
+  selectedCategory?: string;
+  onSelectedCategoryChange?: (category: string) => void;
 }) {
   if (view === "notebook") {
     return (
       <div className="notebook-theme">
-        <NotebookView {...notebookProps} />
+        <NotebookView
+          {...notebookProps}
+          selectedCategory={selectedCategory}
+          onSelectedCategoryChange={onSelectedCategoryChange}
+        />
       </div>
     );
   }

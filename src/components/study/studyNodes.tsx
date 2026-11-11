@@ -20,11 +20,12 @@ function TradeNodeView({ node }: ReactNodeViewProps) {
   );
 }
 
+/** Kept as a schema node for persistence; chrome in StudyEditor owns the visible player. */
 function YoutubeNodeView({ node }: ReactNodeViewProps) {
   const videoId = String(node.attrs.videoId || "");
   const src = String(node.attrs.src || "");
   return (
-    <NodeViewWrapper className="my-3" data-study-youtube={videoId || src}>
+    <NodeViewWrapper className="my-3 hidden" data-study-youtube={videoId || src} aria-hidden>
       <div className="aspect-video overflow-hidden rounded-xl border border-border/50 bg-black/40">
         {src ? (
           <video className="h-full w-full" src={src} controls playsInline />
@@ -69,8 +70,19 @@ export const StudyYoutubeNode = Node.create({
   selectable: true,
   addAttributes() {
     return {
+      id: { default: null },
       videoId: { default: null },
       src: { default: null },
+      title: { default: null },
+      width: { default: 720 },
+      pip: { default: false },
+      pipCorner: { default: "br" },
+      locked: { default: false },
+      active: { default: false },
+      dual: { default: false },
+      shown: { default: true },
+      timestampsEnabled: { default: true },
+      startAt: { default: 0 },
     };
   },
   parseHTML() {

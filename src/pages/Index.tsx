@@ -60,6 +60,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
 import { StudyCategorySwitch } from "@/components/study/StudyCategorySwitch";
+import { JournalCategorySwitch } from "@/components/Notebook/JournalCategorySwitch";
 import type { StudyCategory } from "@/lib/studyArea";
 import { AnimatePresence, motion } from "@/lib/motion";
 import { RefreshCw } from "lucide-react";
@@ -462,6 +463,7 @@ const Index = () => {
       // Preference is optional if storage is blocked.
     }
   }, [studyCategory]);
+  const [journalCategory, setJournalCategory] = useState("all");
   const [journalFilter, setJournalFilter] = useState<JournalFilter>('all');
   const [journalDateRange, setJournalDateRange] = useState<{ start: Date; end: Date } | null>(null);
   const [journalFocusTradeId, setJournalFocusTradeId] = useState<string | null>(null);
@@ -853,9 +855,16 @@ const Index = () => {
                   label: notebookView === "study" ? "Journal" : "Study Area",
                   onSelect: () => setNotebookView(notebookView === "study" ? "notebook" : "study"),
                 } : null}
-                centerSlot={currentPage === "notebook" && notebookView === "study" ? (
-                  <StudyCategorySwitch value={studyCategory} onChange={setStudyCategory} />
-                ) : null}
+                centerSlot={
+                  currentPage === "notebook" && notebookView === "study" ? (
+                    <StudyCategorySwitch value={studyCategory} onChange={setStudyCategory} />
+                  ) : currentPage === "notebook" && notebookView === "notebook" ? (
+                    <JournalCategorySwitch
+                      value={journalCategory}
+                      onChange={(category) => setJournalCategory(category)}
+                    />
+                  ) : null
+                }
                 rightSlot={currentPage === 'dashboard' ? (
                   <div className="flex items-center gap-3">
                     <AccountSelector
@@ -1153,6 +1162,8 @@ const Index = () => {
                       }}
                       notebookFont={notebookFont}
                       onFontChange={setNotebookFont}
+                      selectedCategory={journalCategory}
+                      onSelectedCategoryChange={setJournalCategory}
                       focusStudyNoteId={focusStudyNoteId}
                       onStudyFocusHandled={() => setFocusStudyNoteId(null)}
                       view={notebookView}

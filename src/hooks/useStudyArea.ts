@@ -24,6 +24,9 @@ export interface StudyNote {
   category: string;
   content: JSONContent;
   updated_at: string;
+  /** Soft-deleted notes stay in the bin until recovered or permanently removed. */
+  isDeleted?: boolean;
+  deletedAt?: string | null;
 }
 
 export interface StudyMention {
@@ -60,6 +63,21 @@ function writeLocal(userId: string, tree: StudyTree) {
 function mergeById<T extends { id: string }>(remote: T[], local: T[]): T[] {
   const seen = new Set(remote.map((item) => item.id));
   return [...remote, ...local.filter((item) => !seen.has(item.id))];
+}
+
+/** Keep local soft-delete flags when remote rows omit them. */
+function mergeNotes(remote: StudyNote[], local: StudyNote[]): StudyNote[] {
+  const localById = new Map(local.map((note) => [note.id, note]));
+  return mergeById(remote, local).map((note) => {
+    if (note.isDeleted) return note;
+    const fromLocal = localById.get(note.id);
+    if (!fromLocal?.isDeleted) return note;
+    return {
+      ...note,
+      isDeleted: true,
+      deletedAt: fromLocal.deletedAt ?? null,
+    };
+  });
 }
 
 function nowIso() {
@@ -108,7 +126,7 @@ async function loadTree(userId: string): Promise<StudyTree> {
 
   const tree = {
     folders: mergeById(remoteFolders, local.folders),
-    notes: mergeById(remoteNotes, local.notes),
+    notes: mergeNotes(remoteNotes, local.notes),
   };
   writeLocal(userId, tree);
   return tree;
@@ -314,6 +332,36 @@ export function useStudyMutations(userId: string | undefined) {
     },
   });
 
+  const softDeleteNote = useMutation({
+    mutationFn: async (id: string) => {
+      if (!userId) throw new Error("Sign in to delete a note.");
+      const deletedAt = nowIso();
+      // Soft-delete is local-first so the bin works without a DB migration.
+      const tree = currentTree(userId, queryClient);
+      invalidate({
+        ...tree,
+        notes: tree.notes.map((note) =>
+          note.id === id ? { ...note, isDeleted: true, deletedAt, updated_at: deletedAt } : note,
+        ),
+      });
+    },
+  });
+
+  const restoreNote = useMutation({
+    mutationFn: async (id: string) => {
+      if (!userId) throw new Error("Sign in to restore a note.");
+      const tree = currentTree(userId, queryClient);
+      invalidate({
+        ...tree,
+        notes: tree.notes.map((note) =>
+          note.id === id
+            ? { ...note, isDeleted: false, deletedAt: null, updated_at: nowIso() }
+            : note,
+        ),
+      });
+    },
+  });
+
   const deleteNote = useMutation({
     mutationFn: async (id: string) => {
       if (!userId) throw new Error("Sign in to delete a note.");
@@ -323,5 +371,16 @@ export function useStudyMutations(userId: string | undefined) {
     },
   });
 
-  return { createFolder, renameFolder, moveFolder, deleteFolder, createNote, saveNote, moveNote, deleteNote };
+  return {
+    createFolder,
+    renameFolder,
+    moveFolder,
+    deleteFolder,
+    createNote,
+    saveNote,
+    moveNote,
+    softDeleteNote,
+    restoreNote,
+    deleteNote,
+  };
 }

@@ -3,7 +3,14 @@ import { createPortal } from "react-dom";
 import { ChevronDown, ChevronRight, Clock, LayoutGrid, List, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { studyDocPlainText, studyFolderColor } from "@/lib/studyArea";
-import { StudyTrashBin, readStudyDragItem, studyDragProps, useStudyTrash } from "./StudyTrash";
+import {
+  StudyTrashBin,
+  readStudyDragItems,
+  studyDragProps,
+  trashItemKey,
+  useStudyTrash,
+  type StudyTrashItem,
+} from "./StudyTrash";
 import { BoardPreview } from "./BoardPreview";
 import { StudyFolderIcon, StudyFolderPlusIcon } from "./StudyFolderIcon";
 import type { StudyBoard } from "./studyBoards";
@@ -42,7 +49,7 @@ const PanelItem = forwardRef<HTMLButtonElement, {
   dropActive?: boolean;
   icon?: ReactNode;
   trailing?: ReactNode;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   onContextMenu?: (event: MouseEvent<HTMLButtonElement>) => void;
   onDragOver?: (event: DragEvent<HTMLButtonElement>) => void;
   onDragLeave?: (event: DragEvent<HTMLButtonElement>) => void;
@@ -73,7 +80,7 @@ const PanelItem = forwardRef<HTMLButtonElement, {
       {...drag}
       className={cn(
         "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm",
-        selected ? "bg-muted/80 text-foreground" : "text-foreground/80 hover:bg-muted/40",
+        selected ? "bg-muted/80 text-foreground ring-1 ring-primary/35" : "text-foreground/80 hover:bg-muted/40",
         dropActive && "bg-primary/15 ring-1 ring-primary/40",
       )}
     >
@@ -123,11 +130,40 @@ export function StudyHome({
   const [renamingBoardId, setRenamingBoardId] = useState<string | null>(null);
   const [renameBoardDraft, setRenameBoardDraft] = useState("");
   const [dropFolderId, setDropFolderId] = useState<string | null>(null);
-  const { beginDrag, getDragItem, registerDeleter } = useStudyTrash();
+  const [selection, setSelection] = useState<StudyTrashItem[]>([]);
+  const { beginDrag, getDragItems, registerDeleter } = useStudyTrash();
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
   const orderedFolders = useMemo(
     () => [...folders].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
     [folders],
+  );
+  const selectionKeys = useMemo(() => new Set(selection.map(trashItemKey)), [selection]);
+  const isSelected = useCallback(
+    (item: Pick<StudyTrashItem, "kind" | "id">) => selectionKeys.has(trashItemKey(item)),
+    [selectionKeys],
+  );
+  const toggleSelected = useCallback((item: StudyTrashItem) => {
+    setSelection((current) => {
+      const key = trashItemKey(item);
+      if (current.some((entry) => trashItemKey(entry) === key)) {
+        return current.filter((entry) => trashItemKey(entry) !== key);
+      }
+      return [...current, item];
+    });
+  }, []);
+  const clearSelection = useCallback(() => setSelection([]), []);
+  const handleItemClick = useCallback(
+    (event: MouseEvent<Element>, item: StudyTrashItem, open: () => void) => {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleSelected(item);
+        return;
+      }
+      clearSelection();
+      open();
+    },
+    [clearSelection, toggleSelected],
   );
 
   useEffect(() => registerDeleter("board", (id) => {
@@ -135,10 +171,36 @@ export function StudyHome({
   }), [onBoardsChange, registerDeleter]);
 
   useEffect(() => {
-    const clearDrop = () => setDropFolderId(null);
+    const clearDrop = () => {
+      setDropFolderId(null);
+      clearSelection();
+    };
     document.addEventListener("dragend", clearDrop);
     return () => document.removeEventListener("dragend", clearDrop);
-  }, []);
+  }, [clearSelection]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") clearSelection();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [clearSelection]);
+
+  useEffect(() => {
+    const noteIds = new Set(notes.map((note) => note.id));
+    const folderIds = new Set(folders.map((folder) => folder.id));
+    const boardIds = new Set(boards.map((board) => board.id));
+    setSelection((current) => {
+      const next = current.filter((item) => {
+        if (item.kind === "note") return noteIds.has(item.id);
+        if (item.kind === "folder") return folderIds.has(item.id);
+        if (item.kind === "board") return boardIds.has(item.id);
+        return false;
+      });
+      return next.length === current.length ? current : next;
+    });
+  }, [boards, folders, notes]);
 
   useEffect(() => {
     const alive = new Set(folders.map((folder) => folder.id));
@@ -226,9 +288,9 @@ export function StudyHome({
       current.map((board) => (board.id === id ? { ...board, folderId: nextFolderId } : board)),
     );
   }, [onBoardsChange]);
-  const acceptFolderDrop = (event: DragEvent, targetFolderId: string | null) => {
-    const item = getDragItem() ?? readStudyDragItem(event);
-    if (!item || (item.kind !== "note" && item.kind !== "board")) return false;
+  const acceptFolderDrop = (event: DragEvent, _targetFolderId: string | null) => {
+    const items = getDragItems().length > 0 ? getDragItems() : readStudyDragItems(event);
+    if (!items.some((item) => item.kind === "note" || item.kind === "board")) return false;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     return true;
@@ -237,10 +299,12 @@ export function StudyHome({
     event.preventDefault();
     event.stopPropagation();
     setDropFolderId(null);
-    const item = getDragItem() ?? readStudyDragItem(event);
-    if (!item) return;
-    if (item.kind === "note") onMoveNote(item.id, targetFolderId);
-    if (item.kind === "board") moveBoardToFolder(item.id, targetFolderId);
+    const items = getDragItems().length > 0 ? getDragItems() : readStudyDragItems(event);
+    for (const item of items) {
+      if (item.kind === "note") onMoveNote(item.id, targetFolderId);
+      if (item.kind === "board") moveBoardToFolder(item.id, targetFolderId);
+    }
+    clearSelection();
   };
   const folderDropProps = (targetFolderId: string | null, key: string) => ({
     dropActive: dropFolderId === key,
@@ -298,21 +362,25 @@ export function StudyHome({
         <PanelSection title="Folders" open={openSections.folders} onToggle={() => toggleSection("folders")}>
           {orderedFolders.map((folder) => {
             const selected = folderId === folder.id;
+            const multiSelected = isSelected({ kind: "folder", id: folder.id });
             const dropping = dropFolderId === folder.id;
+            const trashItem = { kind: "folder" as const, id: folder.id, label: folder.name };
             return (
               <PanelItem
                 key={folder.id}
                 label={folder.name}
-                selected={selected}
+                selected={selected || multiSelected}
                 icon={<StudyFolderIcon color={folder.color} open={selected || dropping} />}
                 trailing={<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                onClick={() => selectNotes(folder.id)}
+                onClick={(event) =>
+                  handleItemClick(event, trashItem, () => selectNotes(folder.id))
+                }
                 onContextMenu={(event) => {
                   event.preventDefault();
                   setBoardMenu(null);
                   setFolderMenu({ x: event.clientX, y: event.clientY, folder });
                 }}
-                drag={studyDragProps({ kind: "folder", id: folder.id, label: folder.name }, beginDrag)}
+                drag={studyDragProps(trashItem, beginDrag, selection)}
                 {...folderDropProps(folder.id, folder.id)}
               />
             );
@@ -478,14 +546,23 @@ export function StudyHome({
                       <button
                         key={board.id}
                         type="button"
-                        onClick={() => onOpenBoard(board)}
+                        onClick={(event) =>
+                          handleItemClick(
+                            event,
+                            { kind: "board", id: board.id, label: board.name },
+                            () => onOpenBoard(board),
+                          )
+                        }
                         onContextMenu={(event) => {
                           event.preventDefault();
                           setFolderMenu(null);
                           setBoardMenu({ x: event.clientX, y: event.clientY, board });
                         }}
-                        {...studyDragProps({ kind: "board", id: board.id, label: board.name }, beginDrag)}
-                        className="flex items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-muted/40"
+                        {...studyDragProps({ kind: "board", id: board.id, label: board.name }, beginDrag, selection)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-muted/40",
+                          isSelected({ kind: "board", id: board.id }) && "bg-primary/10 ring-1 ring-primary/35",
+                        )}
                       >
                         <span
                           className={cn(
@@ -523,11 +600,21 @@ export function StudyHome({
                   ) : boardRows.map((board) => {
                     const boardFolder = board.folderId ? folderById.get(board.folderId) : undefined;
                     const boardColor = boardFolder ? studyFolderColor(boardFolder.color) : null;
+                    const trashItem = { kind: "board" as const, id: board.id, label: board.name };
                     return (
                       <article
                         key={board.id}
-                        className="study-glass rounded-2xl p-3"
-                        {...studyDragProps({ kind: "board", id: board.id, label: board.name }, beginDrag)}
+                        className={cn(
+                          "study-glass rounded-2xl p-3",
+                          isSelected(trashItem) && "ring-1 ring-primary/40",
+                        )}
+                        {...studyDragProps(trashItem, beginDrag, selection)}
+                        onClick={(event) => {
+                          if (event.ctrlKey || event.metaKey) {
+                            event.preventDefault();
+                            toggleSelected(trashItem);
+                          }
+                        }}
                         onContextMenu={(event) => {
                           event.preventDefault();
                           setFolderMenu(null);
@@ -539,7 +626,9 @@ export function StudyHome({
                           <button
                             type="button"
                             aria-label="Open board"
-                            onClick={() => onOpenBoard(board)}
+                            onClick={(event) =>
+                              handleItemClick(event, trashItem, () => onOpenBoard(board))
+                            }
                             className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                           >
                             <ChevronRight className="h-4 w-4" />
@@ -547,7 +636,9 @@ export function StudyHome({
                         </div>
                         <button
                           type="button"
-                          onClick={() => onOpenBoard(board)}
+                          onClick={(event) =>
+                            handleItemClick(event, trashItem, () => onOpenBoard(board))
+                          }
                           className="relative block h-52 w-full overflow-hidden rounded-xl border border-border/40 bg-background/90 text-left shadow-sm"
                         >
                           <BoardPreview boardId={board.id} revision={boardPreviewTick} className="absolute inset-0" />
@@ -578,13 +669,18 @@ export function StudyHome({
                   >
                     No notes in this category yet. Create one.
                   </button>
-                ) : rows.map((row) => (
+                ) : rows.map((row) => {
+                  const trashItem = { kind: "note" as const, id: row.note.id, label: row.title };
+                  return (
                   <button
                     key={row.key}
                     type="button"
-                    onClick={row.onClick}
-                    {...studyDragProps({ kind: "note", id: row.note.id, label: row.title }, beginDrag)}
-                    className="flex items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-muted/40"
+                    onClick={(event) => handleItemClick(event, trashItem, row.onClick)}
+                    {...studyDragProps(trashItem, beginDrag, selection)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-muted/40",
+                      isSelected(trashItem) && "bg-primary/10 ring-1 ring-primary/35",
+                    )}
                   >
                     <span
                       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-background"
@@ -601,7 +697,8 @@ export function StudyHome({
                     ) : null}
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                   </button>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -613,11 +710,22 @@ export function StudyHome({
                   >
                     No notes in this category yet. Create one.
                   </button>
-                ) : rows.map((row) => (
+                ) : rows.map((row) => {
+                  const trashItem = { kind: "note" as const, id: row.note.id, label: row.title };
+                  return (
                   <article
                     key={row.key}
-                    className="study-glass rounded-2xl p-3"
-                    {...studyDragProps({ kind: "note", id: row.note.id, label: row.title }, beginDrag)}
+                    className={cn(
+                      "study-glass rounded-2xl p-3",
+                      isSelected(trashItem) && "ring-1 ring-primary/40",
+                    )}
+                    {...studyDragProps(trashItem, beginDrag, selection)}
+                    onClick={(event) => {
+                      if (event.ctrlKey || event.metaKey) {
+                        event.preventDefault();
+                        toggleSelected(trashItem);
+                      }
+                    }}
                   >
                     <div className="mb-2 flex items-center justify-between gap-2 px-1">
                       <h3 className="truncate text-sm font-semibold">{row.folderName || row.title}</h3>
@@ -632,7 +740,7 @@ export function StudyHome({
                     </div>
                     <button
                       type="button"
-                      onClick={row.onClick}
+                      onClick={(event) => handleItemClick(event, trashItem, row.onClick)}
                       className="block h-52 w-full overflow-hidden rounded-xl border border-border/40 bg-background/90 p-4 text-left shadow-sm"
                     >
                       {row.folderName ? (
@@ -646,7 +754,8 @@ export function StudyHome({
                       </p>
                     </button>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
