@@ -98,7 +98,19 @@ export function StudyNoteComposer({
       }
       goToName({
         kind: "note",
-        content: studyDocWith({ type: "studyYoutube", attrs: { videoId: null, src } }),
+        content: studyDocWith({
+          type: "studyYoutube",
+          attrs: {
+            videoId: null,
+            src,
+            title: file.name.replace(/\.[^.]+$/, "") || "Video",
+            width: 720,
+            pip: false,
+            pipCorner: "br",
+            locked: false,
+            timestampsEnabled: true,
+          },
+        }),
         suggestedTitle: file.name.replace(/\.[^.]+$/, "") || "Video note",
       });
     };

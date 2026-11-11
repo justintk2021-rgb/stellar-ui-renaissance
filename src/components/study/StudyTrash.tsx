@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type StudyTrashKind = "note" | "folder" | "board" | "trade";
+export type StudyTrashKind = "note" | "folder" | "board" | "trade" | "video";
 
 export type StudyTrashItem = {
   kind: StudyTrashKind;
@@ -13,10 +13,13 @@ export type StudyTrashItem = {
 type Deleter = (id: string) => void;
 
 type StudyTrashContextValue = {
-  beginDrag: (event: ReactDragEvent, item: StudyTrashItem) => void;
+  beginDrag: (event: ReactDragEvent, itemOrItems: StudyTrashItem | StudyTrashItem[]) => void;
   getDragItem: () => StudyTrashItem | null;
+  getDragItems: () => StudyTrashItem[];
   registerDeleter: (kind: StudyTrashKind, deleter: Deleter) => () => void;
   binHot: boolean;
+  trashCount: number;
+  openBin: () => void;
   binHandlers: {
     onDragOver: (event: ReactDragEvent) => void;
     onDragLeave: () => void;
@@ -28,16 +31,40 @@ const StudyTrashContext = createContext<StudyTrashContextValue | null>(null);
 
 export const STUDY_DRAG_MIME = "application/x-study-trash";
 
-export function readStudyDragItem(event: { dataTransfer: DataTransfer }): StudyTrashItem | null {
+function normalizeItems(parsed: unknown): StudyTrashItem[] {
+  if (!parsed || typeof parsed !== "object") return [];
+  const record = parsed as { items?: unknown; kind?: unknown; id?: unknown; label?: unknown };
+  if (Array.isArray(record.items)) {
+    return record.items.filter(
+      (item): item is StudyTrashItem =>
+        !!item &&
+        typeof item === "object" &&
+        typeof (item as StudyTrashItem).kind === "string" &&
+        typeof (item as StudyTrashItem).id === "string",
+    );
+  }
+  if (typeof record.kind === "string" && typeof record.id === "string") {
+    return [{ kind: record.kind as StudyTrashKind, id: record.id, label: String(record.label ?? "") }];
+  }
+  return [];
+}
+
+export function readStudyDragItems(event: { dataTransfer: DataTransfer }): StudyTrashItem[] {
   try {
     const raw = event.dataTransfer.getData(STUDY_DRAG_MIME);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StudyTrashItem;
-    if (!parsed?.kind || !parsed?.id) return null;
-    return parsed;
+    if (!raw) return [];
+    return normalizeItems(JSON.parse(raw));
   } catch {
-    return null;
+    return [];
   }
+}
+
+export function readStudyDragItem(event: { dataTransfer: DataTransfer }): StudyTrashItem | null {
+  return readStudyDragItems(event)[0] ?? null;
+}
+
+export function trashItemKey(item: Pick<StudyTrashItem, "kind" | "id">) {
+  return `${item.kind}:${item.id}`;
 }
 
 function emptyDragImage(): HTMLCanvasElement {
@@ -47,20 +74,37 @@ function emptyDragImage(): HTMLCanvasElement {
   return canvas;
 }
 
+function ghostLabelFor(items: StudyTrashItem[]) {
+  if (items.length <= 1) return items[0]?.label || "Item";
+  return `${items.length} items`;
+}
+
 export function StudyTrashBin({ className }: { className?: string }) {
-  const { binHot, binHandlers } = useStudyTrash();
+  const { binHot, binHandlers, openBin, trashCount } = useStudyTrash();
   return (
-    <div
-      aria-label="Trash"
+    <button
+      type="button"
+      aria-label={trashCount > 0 ? `Bin, ${trashCount} items` : "Bin"}
+      title={
+        trashCount > 0
+          ? `Bin · ${trashCount} — click to manage, or drop items here`
+          : "Bin — click to open, or drop items here"
+      }
+      onClick={openBin}
       {...binHandlers}
       className={cn(
-        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-muted/40 text-muted-foreground transition-transform",
+        "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-muted/40 text-muted-foreground transition-transform",
         binHot && "scale-110 border-destructive/50 bg-destructive/15 text-destructive",
         className,
       )}
     >
       <Trash2 className={cn("h-4 w-4 transition-transform", binHot && "scale-110")} />
-    </div>
+      {trashCount > 0 ? (
+        <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground">
+          {trashCount > 99 ? "99+" : trashCount}
+        </span>
+      ) : null}
+    </button>
   );
 }
 
@@ -70,27 +114,38 @@ export function useStudyTrash() {
   return value;
 }
 
-export function studyDragProps(item: StudyTrashItem, beginDrag: (event: ReactDragEvent, item: StudyTrashItem) => void) {
+export function studyDragProps(
+  item: StudyTrashItem,
+  beginDrag: (event: ReactDragEvent, itemOrItems: StudyTrashItem | StudyTrashItem[]) => void,
+  selection: StudyTrashItem[] = [],
+) {
   return {
-    draggable: true,
-    onDragStart: (event: ReactDragEvent) => beginDrag(event, item),
+    draggable: true as const,
+    onDragStart: (event: ReactDragEvent) => {
+      const inSelection = selection.some((selected) => trashItemKey(selected) === trashItemKey(item));
+      beginDrag(event, inSelection && selection.length > 1 ? selection : [item]);
+    },
   };
 }
 
 export function StudyTrashProvider({
   children,
   onDelete,
+  openBin,
+  trashCount = 0,
   visible = false,
 }: {
   children: ReactNode;
-  onDelete: (item: StudyTrashItem) => void;
+  onDelete: (items: StudyTrashItem[]) => void;
+  openBin: () => void;
+  trashCount?: number;
   visible?: boolean;
 }) {
   const deleters = useRef<Partial<Record<StudyTrashKind, Deleter>>>({});
   const dragImage = useRef<HTMLCanvasElement | null>(null);
   const [ghost, setGhost] = useState<{ x: number; y: number; label: string } | null>(null);
   const [hot, setHot] = useState(false);
-  const dragging = useRef<StudyTrashItem | null>(null);
+  const dragging = useRef<StudyTrashItem[]>([]);
 
   useEffect(() => {
     if (!ghost) return;
@@ -103,11 +158,11 @@ export function StudyTrashProvider({
       if (frame) return;
       frame = window.requestAnimationFrame(() => {
         frame = 0;
-        setGhost((current) => current ? { ...current, x: point.x, y: point.y } : current);
+        setGhost((current) => (current ? { ...current, x: point.x, y: point.y } : current));
       });
     };
     const end = () => {
-      dragging.current = null;
+      dragging.current = [];
       setGhost(null);
       setHot(false);
     };
@@ -120,17 +175,22 @@ export function StudyTrashProvider({
     };
   }, [ghost?.label]);
 
-  const beginDrag = useCallback((event: ReactDragEvent, item: StudyTrashItem) => {
-    dragging.current = item;
+  const beginDrag = useCallback((event: ReactDragEvent, itemOrItems: StudyTrashItem | StudyTrashItem[]) => {
+    const items = (Array.isArray(itemOrItems) ? itemOrItems : [itemOrItems]).filter(
+      (item, index, list) => list.findIndex((other) => trashItemKey(other) === trashItemKey(item)) === index,
+    );
+    if (items.length === 0) return;
+    dragging.current = items;
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData(STUDY_DRAG_MIME, JSON.stringify(item));
-    event.dataTransfer.setData("text/plain", item.label);
+    event.dataTransfer.setData(STUDY_DRAG_MIME, JSON.stringify({ items }));
+    event.dataTransfer.setData("text/plain", ghostLabelFor(items));
     if (!dragImage.current) dragImage.current = emptyDragImage();
     event.dataTransfer.setDragImage(dragImage.current, 0, 0);
-    setGhost({ x: event.clientX, y: event.clientY, label: item.label });
+    setGhost({ x: event.clientX, y: event.clientY, label: ghostLabelFor(items) });
   }, []);
 
-  const getDragItem = useCallback(() => dragging.current, []);
+  const getDragItems = useCallback(() => dragging.current, []);
+  const getDragItem = useCallback(() => dragging.current[0] ?? null, []);
 
   const registerDeleter = useCallback((kind: StudyTrashKind, deleter: Deleter) => {
     deleters.current[kind] = deleter;
@@ -139,31 +199,52 @@ export function StudyTrashProvider({
     };
   }, []);
 
-  const drop = useCallback((event: ReactDragEvent) => {
-    event.preventDefault();
-    setHot(false);
-    setGhost(null);
-    const item = dragging.current;
-    dragging.current = null;
-    if (!item) return;
-    if (item.kind === "note" || item.kind === "folder") onDelete(item);
-    else deleters.current[item.kind]?.(item.id);
-  }, [onDelete]);
-
-  const binHandlers = useMemo(() => ({
-    onDragOver: (event: ReactDragEvent) => {
-      if (!dragging.current) return;
+  const drop = useCallback(
+    (event: ReactDragEvent) => {
       event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-      setHot(true);
+      setHot(false);
+      setGhost(null);
+      const items = dragging.current.length > 0 ? dragging.current : readStudyDragItems(event);
+      dragging.current = [];
+      if (items.length === 0) return;
+
+      const managed = items.filter((item) => item.kind === "note" || item.kind === "folder");
+      if (managed.length > 0) onDelete(managed);
+
+      for (const item of items) {
+        if (item.kind === "note" || item.kind === "folder") continue;
+        deleters.current[item.kind]?.(item.id);
+      }
     },
-    onDragLeave: () => setHot(false),
-    onDrop: drop,
-  }), [drop]);
+    [onDelete],
+  );
+
+  const binHandlers = useMemo(
+    () => ({
+      onDragOver: (event: ReactDragEvent) => {
+        if (dragging.current.length === 0) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        setHot(true);
+      },
+      onDragLeave: () => setHot(false),
+      onDrop: drop,
+    }),
+    [drop],
+  );
 
   const value = useMemo(
-    () => ({ beginDrag, getDragItem, registerDeleter, binHot: hot, binHandlers }),
-    [beginDrag, getDragItem, registerDeleter, hot, binHandlers],
+    () => ({
+      beginDrag,
+      getDragItem,
+      getDragItems,
+      registerDeleter,
+      binHot: hot,
+      trashCount,
+      openBin,
+      binHandlers,
+    }),
+    [beginDrag, getDragItem, getDragItems, registerDeleter, hot, trashCount, openBin, binHandlers],
   );
 
   return (

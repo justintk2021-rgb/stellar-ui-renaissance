@@ -13,6 +13,7 @@ import { StudyEditor } from "./StudyEditor";
 import { StudyHome } from "./StudyHome";
 import { StudyNoteComposer } from "./StudyNoteComposer";
 import { StudyTabStrip } from "./StudyTabStrip";
+import { StudyBinDialog } from "./StudyBinDialog";
 import { StudyTrashProvider, type StudyTrashItem } from "./StudyTrash";
 import { persistBoards, readBoards, type StudyBoard } from "./studyBoards";
 import {
@@ -115,14 +116,20 @@ export function StudyArea({
   const [composerFolderId, setComposerFolderId] = useState<string | null | undefined>(undefined);
   const [folderName, setFolderName] = useState("");
   const [folderColor, setFolderColor] = useState("");
+  const [binOpen, setBinOpen] = useState(false);
   const [optimisticNotes, setOptimisticNotes] = useState<StudyNote[]>([]);
   const createBoardRef = useRef<((name?: string) => void) | null>(null);
   const registerCreateBoard = useCallback((createBoard: (name?: string) => void) => {
     createBoardRef.current = createBoard;
   }, []);
   const liveFolders = (tree.data?.folders ?? []).filter((folder) => folder.category === category);
-  const liveNotes = (tree.data?.notes ?? []).filter((note) => note.category === category);
-  const preview = liveFolders.length === 0 && liveNotes.length === 0 ? marketingPreviewTree(category) : null;
+  const categoryNotes = (tree.data?.notes ?? []).filter((note) => note.category === category);
+  const liveNotes = categoryNotes.filter((note) => !note.isDeleted);
+  const trashedNotes = categoryNotes.filter((note) => Boolean(note.isDeleted));
+  const preview =
+    liveFolders.length === 0 && liveNotes.length === 0 && trashedNotes.length === 0
+      ? marketingPreviewTree(category)
+      : null;
   const folders = preview?.folders ?? liveFolders;
   const notes = useMemo(() => {
     const base = preview?.notes ?? liveNotes;
@@ -131,9 +138,10 @@ export function StudyArea({
     for (const note of optimisticNotes) {
       if (!byId.has(note.id)) byId.set(note.id, note);
     }
-    return Array.from(byId.values());
+    return Array.from(byId.values()).filter((note) => !note.isDeleted);
   }, [liveNotes, optimisticNotes, preview?.notes]);
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
+  const openBin = useCallback(() => setBinOpen(true), []);
 
   useEffect(() => {
     if (optimisticNotes.length === 0) return;
@@ -290,16 +298,58 @@ export function StudyArea({
       });
   };
 
-  const deleteResource = (item: StudyTrashItem) => {
+  const deleteResource = (items: StudyTrashItem[]) => {
     if (!userId) {
       toast.error("Sign in to delete.");
       return;
     }
-    if (item.kind === "note") {
+    const notes = items.filter((item) => item.kind === "note");
+    const folders = items.filter((item) => item.kind === "folder");
+    for (const item of notes) {
       closeTab(noteTabKey(item.id));
-      mutations.deleteNote.mutate(item.id);
+      mutations.softDeleteNote.mutate(item.id, {
+        onError: (error: unknown) =>
+          toast.error(error instanceof Error ? error.message : "Could not move note to bin."),
+      });
     }
-    if (item.kind === "folder") mutations.deleteFolder.mutate(item.id);
+    for (const item of folders) {
+      mutations.deleteFolder.mutate(item.id, {
+        onError: (error: unknown) =>
+          toast.error(error instanceof Error ? error.message : "Could not delete folder."),
+      });
+    }
+    if (notes.length > 0) {
+      toast.success(notes.length === 1 ? "Note moved to bin" : `${notes.length} notes moved to bin`);
+    }
+    if (folders.length > 0) {
+      toast.success(folders.length === 1 ? "Folder deleted" : `${folders.length} folders deleted`);
+    }
+  };
+
+  const restoreFromBin = (id: string) => {
+    mutations.restoreNote.mutate(id, {
+      onSuccess: () => toast.success("Note restored"),
+      onError: (error: unknown) =>
+        toast.error(error instanceof Error ? error.message : "Could not restore note."),
+    });
+  };
+
+  const deleteForeverFromBin = (id: string) => {
+    closeTab(noteTabKey(id));
+    mutations.deleteNote.mutate(id, {
+      onSuccess: () => toast.success("Note permanently deleted"),
+      onError: (error: unknown) =>
+        toast.error(error instanceof Error ? error.message : "Could not delete note."),
+    });
+  };
+
+  const emptyBin = () => {
+    for (const note of trashedNotes) {
+      closeTab(noteTabKey(note.id));
+      mutations.deleteNote.mutate(note.id);
+    }
+    setBinOpen(false);
+    toast.success("Bin emptied");
   };
 
   const goHome = () => {
@@ -326,9 +376,25 @@ export function StudyArea({
   );
 
   return (
-    <StudyTrashProvider visible={activeTab.kind === "note"} onDelete={deleteResource}>
+    <StudyTrashProvider
+      visible={activeTab.kind === "note"}
+      onDelete={deleteResource}
+      openBin={openBin}
+      trashCount={trashedNotes.length}
+    >
       <div className="min-h-[calc(100vh-10rem)]">
         {tabStrip}
+        <StudyBinDialog
+          open={binOpen}
+          onOpenChange={setBinOpen}
+          notes={trashedNotes}
+          folderNameFor={(folderId) =>
+            folderId ? folderById.get(folderId)?.name ?? "Folder" : "WorkSpaces"
+          }
+          onRestore={restoreFromBin}
+          onDeleteForever={deleteForeverFromBin}
+          onEmpty={emptyBin}
+        />
 
         {selectedNote ? (
           <div className="relative">
