@@ -13,6 +13,7 @@ import { isSupabaseConfigured } from "./integrations/supabase/client";
 // Lazy-load route pages so visitors only download the JS they actually need.
 // Landing visitors no longer pay for the entire authenticated dashboard bundle.
 const Index = lazy(() => import("./pages/Index"));
+const Welcome = lazy(() => import("./pages/Welcome"));
 const Landing = lazy(() => import("./pages/Landing"));
 const AuthPage = lazy(() => import("./pages/Auth").then((m) => ({ default: m.AuthPage })));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -76,6 +77,7 @@ const App = () => {
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/welcome" element={<Welcome />} />
               <Route path="/dashboard" element={<Index />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/reset-password" element={<ResetPassword />} />

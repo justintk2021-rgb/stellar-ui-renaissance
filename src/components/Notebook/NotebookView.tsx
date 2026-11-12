@@ -2546,16 +2546,6 @@ export function NotebookView({
               </motion.div>
             )}
 
-            {/* Floating Add Note Button — positioned bottom-right so it doesn't cover note text */}
-            {!isViewingTrash && (
-              <button
-                onClick={handleNewNote}
-                className="notebook-fab absolute bottom-6 right-6 w-12 h-12 group z-30"
-                title="New note"
-              >
-                <Plus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
-              </button>
-            )}
           </motion.div>
         ) : (
           <motion.div 

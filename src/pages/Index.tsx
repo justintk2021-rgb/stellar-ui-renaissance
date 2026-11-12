@@ -59,6 +59,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
+import { dashboardDisplayName } from "@/components/Dashboard/DashboardGreeting";
+import { circularReveal } from "@/lib/circularReveal";
 import { StudyCategorySwitch } from "@/components/study/StudyCategorySwitch";
 import { JournalCategorySwitch } from "@/components/Notebook/JournalCategorySwitch";
 import type { StudyCategory } from "@/lib/studyArea";
@@ -793,7 +795,7 @@ const Index = () => {
   const displayName = dashboardDisplayName(userProfile, user);
 
   if (!authReady || !session) {
-    return null;
+    return <PageFallback />;
   }
 
   // Chart page uses full-width layout
