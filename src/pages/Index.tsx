@@ -59,14 +59,13 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageTransition, staggerItem } from "@/components/Layout/PageTransition";
-import { DashboardGreeting, DASHBOARD_LOCK_KEY, dashboardDisplayName } from "@/components/Dashboard/DashboardGreeting";
+import { dashboardDisplayName } from "@/components/Dashboard/DashboardGreeting";
 import { circularReveal } from "@/lib/circularReveal";
 import { StudyCategorySwitch } from "@/components/study/StudyCategorySwitch";
 import { JournalCategorySwitch } from "@/components/Notebook/JournalCategorySwitch";
 import type { StudyCategory } from "@/lib/studyArea";
 import { AnimatePresence, motion } from "@/lib/motion";
-import { Lock, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
 
 const PageFallback = () => (
   <div className="flex items-center justify-center min-h-[40vh]">
@@ -117,15 +116,6 @@ const Index = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(isMarketingPreview);
   const [authReady, setAuthReady] = useState(isMarketingPreview);
-  const [locked, setLocked] = useState(() => {
-    if (isMarketingPreview) return false;
-    try {
-      return sessionStorage.getItem(DASHBOARD_LOCK_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
-  const [entryDismissed, setEntryDismissed] = useState(isMarketingPreview);
   const [currentPage, setCurrentPage] = useState(() => {
     if (isMarketingPreview) {
       const page = new URLSearchParams(window.location.search).get("page");
@@ -644,11 +634,6 @@ const Index = () => {
   }, [navigate, fetchProfile]);
 
   const handleLogout = async () => {
-    try {
-      sessionStorage.removeItem(DASHBOARD_LOCK_KEY);
-    } catch {
-      // Ignore storage failures and still sign out.
-    }
     const { error } = await supabase.auth.signOut();
     if (error) {
       toast.error(error.message);
@@ -791,41 +776,9 @@ const Index = () => {
     : undefined;
 
   const displayName = dashboardDisplayName(userProfile, user);
-  const showEntry = !entryDismissed && !locked;
-  const showGreetingOverlay = showEntry || locked;
-
-  const lockDashboard = useCallback(() => {
-    try {
-      sessionStorage.setItem(DASHBOARD_LOCK_KEY, "1");
-    } catch {
-      // The overlay still locks this view if storage is unavailable.
-    }
-    setLocked(true);
-  }, []);
-
-  const dismissGreeting = useCallback(() => {
-    if (locked) {
-      try {
-        sessionStorage.removeItem(DASHBOARD_LOCK_KEY);
-      } catch {
-        // Clearing storage is best-effort; the in-memory lock still lifts.
-      }
-      setLocked(false);
-    }
-    setEntryDismissed(true);
-  }, [locked]);
 
   if (!authReady || !session) {
-    return (
-      <DashboardGreeting
-        variant="entry"
-        name={displayName}
-        nameReady={profileLoaded}
-        dataReady={false}
-        hold
-        onDismiss={() => {}}
-      />
-    );
+    return <PageFallback />;
   }
 
   // Chart page uses full-width layout
@@ -837,19 +790,6 @@ const Index = () => {
         <title>NSYNC Journal - Trading Journal & Notebook</title>
         <meta name="description" content="Track your trades, analyze performance, and keep detailed notes with NSYNC Journal - your personal trading journal." />
       </Helmet>
-
-      {/* Greeting overlay — dashboard stays mounted underneath */}
-      <AnimatePresence>
-        {showGreetingOverlay && (
-          <DashboardGreeting
-            variant={locked ? "lock" : "entry"}
-            name={displayName}
-            nameReady={profileLoaded}
-            dataReady={!tradesLoading && !accountsLoading}
-            onDismiss={dismissGreeting}
-          />
-        )}
-      </AnimatePresence>
 
       {/* Global Sidebar - works for all pages */}
       <Sidebar 
@@ -918,16 +858,6 @@ const Index = () => {
                 }
                 rightSlot={currentPage === 'dashboard' ? (
                   <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={lockDashboard}
-                      aria-label="Lock dashboard"
-                      className="h-9 w-9 rounded-full"
-                    >
-                      <Lock className="h-4 w-4" />
-                    </Button>
                     <AccountSelector
                       accounts={accounts}
                       selectedAccount={selectedAccount}

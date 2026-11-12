@@ -147,7 +147,7 @@ export function AuthPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: `${window.location.origin}/welcome`,
         queryParams: { access_type: "offline", prompt: "consent" },
       },
     });
@@ -161,7 +161,7 @@ export function AuthPage() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session && !showLoaderRef.current) {
-        navigate("/dashboard");
+        navigate("/welcome");
       }
     };
     checkSession();
@@ -169,7 +169,7 @@ export function AuthPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // Don't auto-navigate while the cinematic loader is playing — it owns the redirect.
       if (session && !showLoaderRef.current) {
-        navigate("/dashboard");
+        navigate("/welcome");
       }
     });
 
@@ -228,7 +228,7 @@ export function AuthPage() {
           email: formData.email,
           password: formData.password,
           options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
+            emailRedirectTo: `${window.location.origin}/welcome`,
             data: {
               first_name: formData.firstName,
               last_name: formData.lastName,
@@ -258,7 +258,7 @@ export function AuthPage() {
         {showLoader && (
           <LoginLoader
             name={loaderName}
-            onComplete={() => navigate("/dashboard")}
+            onComplete={() => navigate("/welcome")}
           />
         )}
       </AnimatePresence>
