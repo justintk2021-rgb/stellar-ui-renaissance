@@ -881,14 +881,26 @@ const Index = () => {
                     </AnimatePresence>
                   </div>
                 ) : undefined}
-                notificationsSlot={currentPage !== 'dashboard' ? (
+                notificationsSlot={
                   <NotificationsMenu
+                    variant={currentPage === "dashboard" ? "avatar" : "full"}
                     trades={trades}
                     notebookEntries={notebookEntries}
                     isLoading={tradesLoading}
                     onOpenJournal={handleOpenJournal}
+                    onOpenHome={() => setCurrentPage("dashboard")}
+                    onOpenProfile={() => setCurrentPage("settings")}
+                    avatarUrl={userProfile?.avatar_url}
+                    profileInitials={
+                      [userProfile?.first_name?.[0], userProfile?.last_name?.[0]]
+                        .filter(Boolean)
+                        .join("")
+                        .toUpperCase() ||
+                      userProfile?.email?.[0]?.toUpperCase() ||
+                      "U"
+                    }
                   />
-                ) : undefined}
+                }
               />
             )}
 

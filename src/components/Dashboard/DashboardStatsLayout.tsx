@@ -30,6 +30,9 @@ const RecentTrades = lazy(() =>
 const TradingIntelligenceMap = lazy(() =>
   import("./TradingIntelligenceMap").then((m) => ({ default: m.TradingIntelligenceMap }))
 );
+const SpotifyPlayerCard = lazy(() =>
+  import("./SpotifyPlayerCard").then((m) => ({ default: m.SpotifyPlayerCard }))
+);
 
 const WidgetFallback = ({ minHeight = 200 }: { minHeight?: number }) => (
   <div
@@ -212,7 +215,7 @@ export const DashboardStatsLayout = memo(function DashboardStatsLayout({
         </DialogContent>
       </Dialog>
 
-      {/* Intelligence map + Recent trades */}
+      {/* Intelligence map + Recent trades + Spotify */}
       <div className="below-fold grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-5 items-stretch">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -227,8 +230,18 @@ export const DashboardStatsLayout = memo(function DashboardStatsLayout({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="min-h-[280px] lg:min-h-[520px] flex flex-col h-full"
+        >
+          <Suspense fallback={<WidgetFallback minHeight={280} />}>
+            <SpotifyPlayerCard />
+          </Suspense>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="lg:col-span-3 min-w-0 min-h-[280px] lg:min-h-[520px] h-full"
+          className="lg:col-span-2 min-w-0 min-h-[280px] lg:min-h-[520px] h-full"
         >
           <Suspense fallback={<WidgetFallback minHeight={280} />}>
             <RecentTrades trades={trades} brokerConnectionId={brokerConnectionId} />

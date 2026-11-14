@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Moon, Sun, Droplets, User, Mail, Key, Calendar, LogOut, Palette, Save, Check, Trash2, Download, Link2, Pipette, RotateCcw, Settings, ChevronRight, FileText, Database, Sparkles } from "lucide-react";
+import { Moon, Sun, Droplets, User, Mail, Key, Calendar, LogOut, Palette, Save, Check, Trash2, Download, Link2, Pipette, RotateCcw, Settings, ChevronRight, FileText, Database, Sparkles, Music2, Unplug } from "lucide-react";
 import type { AppTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,14 @@ import { CustomAccentColorPicker } from "./CustomAccentColorPicker";
 import { useTrades } from "@/hooks/useTrades";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "@/lib/motion";
+import {
+  beginSpotifyLogin,
+  clearSpotifyTokens,
+  getSpotifyProfile,
+  isSpotifyConfigured,
+  isSpotifyConnected,
+  type SpotifyProfile,
+} from "@/lib/spotify";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string {
@@ -194,6 +202,98 @@ const pulseVariants = {
     },
   },
 };
+
+function SpotifyAccountCard() {
+  const [connected, setConnected] = useState(() => isSpotifyConnected());
+  const [profile, setProfile] = useState<SpotifyProfile | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!connected) {
+      setProfile(null);
+      return;
+    }
+    let cancelled = false;
+    void getSpotifyProfile()
+      .then((me) => {
+        if (!cancelled) setProfile(me);
+      })
+      .catch(() => {
+        if (!cancelled) setProfile(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connected]);
+
+  return (
+    <motion.div
+      variants={itemVariants}
+      className="rounded-xl border border-border/30 bg-card/50 p-4 backdrop-blur-sm"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Music2 className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground">Spotify</p>
+            <p className="text-xs text-muted-foreground">
+              {connected
+                ? profile?.display_name || profile?.email || "Connected"
+                : "Not connected"}
+            </p>
+          </div>
+        </div>
+        {connected ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => {
+              clearSpotifyTokens();
+              setConnected(false);
+              setProfile(null);
+              toast.success("Spotify disconnected");
+            }}
+          >
+            <Unplug className="h-3.5 w-3.5" />
+            Disconnect
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            className="gap-1.5"
+            disabled={!isSpotifyConfigured() || loading}
+            onClick={async () => {
+              if (!isSpotifyConfigured()) {
+                toast.error("Add VITE_SPOTIFY_CLIENT_ID first");
+                return;
+              }
+              try {
+                setLoading(true);
+                await beginSpotifyLogin();
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Could not start Spotify login");
+                setLoading(false);
+              }
+            }}
+          >
+            <Link2 className="h-3.5 w-3.5" />
+            Connect Spotify
+          </Button>
+        )}
+      </div>
+      {!isSpotifyConfigured() ? (
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          Set <code>VITE_SPOTIFY_CLIENT_ID</code> in your environment to enable Spotify.
+        </p>
+      ) : null}
+    </motion.div>
+  );
+}
 
 // Wrapper component for CSV Import to use the trades hook
 function CSVImportWrapper({
@@ -582,6 +682,8 @@ export function SettingsView({
               )}
             </motion.div>
           ))}
+
+          <SpotifyAccountCard />
 
           {/* Logout Button */}
           <motion.div variants={itemVariants}>
