@@ -4,6 +4,8 @@ import { Bookmark } from "lucide-react";
 import bookLogo from "@/assets/book-logo.webp";
 import { supabase } from "@/integrations/supabase/client";
 import { appNavItems } from "@/components/Layout/appNav";
+import { LiquidGlassCard } from "@/components/ui/liquid-glass";
+import { useDocumentTheme } from "@/hooks/useDocumentTheme";
 
 interface SidebarProps {
   currentPage: string;
@@ -17,6 +19,8 @@ function isDesktopViewport() {
 }
 
 export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggleCollapse }: SidebarProps) {
+  const theme = useDocumentTheme();
+  const isLiquidGlass = theme === "liquid-glass";
   const [userName, setUserName] = useState<string>("NSYNC JOURNAL");
   const [isHovering, setIsHovering] = useState(false);
   const [isPinned, setIsPinned] = useState(!isCollapsed);
@@ -27,20 +31,19 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
     setIsPinned(!isCollapsed);
   }, [isCollapsed]);
 
-  // Fetch user name once; re-fetch only when the user actually changes
   useEffect(() => {
     let cancelled = false;
     let lastUserId: string | null = null;
 
     const fetchUserName = async (uid: string) => {
       const { data: profile } = await supabase
-        .from('profiles')
-        .select('first_name, last_name')
-        .eq('user_id', uid)
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("user_id", uid)
         .maybeSingle();
       if (cancelled) return;
       if (profile) {
-        const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
+        const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(" ");
         if (fullName.trim()) setUserName(`${fullName}'s Journal`);
       }
     };
@@ -51,7 +54,9 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
       fetchUserName(user.id);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       const uid = session?.user?.id ?? null;
       if (uid && uid !== lastUserId) {
         lastUserId = uid;
@@ -62,7 +67,10 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
       }
     });
 
-    return () => { cancelled = true; subscription.unsubscribe(); };
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const showSidebar = isPinned || isHovering;
@@ -95,7 +103,6 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
     }
   };
 
-  // Click-outside closes the drawer on mobile only. Pinned desktop stays open.
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (isDesktopViewport()) return;
@@ -110,18 +117,122 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isPinned, closeSidebar]);
+
+  const panelBody = (
+    <>
+      <div className="flex items-center gap-3">
+        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl">
+          <img
+            src={bookLogo}
+            alt="NSYNC Journal Logo"
+            width={48}
+            height={48}
+            loading="lazy"
+            decoding="async"
+            className="h-12 w-12 object-contain"
+            style={{
+              filter: isLiquidGlass
+                ? "drop-shadow(0 0 10px rgba(255,255,255,0.35))"
+                : "drop-shadow(0 0 8px hsl(var(--primary) / 0.5))",
+            }}
+          />
+        </div>
+        <div className="overflow-hidden">
+          <h1
+            className={cn(
+              "truncate text-lg font-bold tracking-wider",
+              isLiquidGlass ? "text-white" : "gradient-text",
+            )}
+          >
+            {userName}
+          </h1>
+          <p className={cn("text-xs", isLiquidGlass ? "text-white/65" : "text-muted-foreground")}>
+            Personal Journal
+          </p>
+        </div>
+      </div>
+
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto" aria-label="Main">
+        <span
+          className={cn(
+            "mb-2 px-3 text-[10px] uppercase tracking-widest",
+            isLiquidGlass ? "text-white/55" : "text-muted-foreground",
+          )}
+        >
+          Navigation
+        </span>
+        {appNavItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = currentPage === item.id;
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={isActive ? "page" : undefined}
+              onClick={() => {
+                onPageChange(item.id);
+                if (!isPinned || !isDesktopViewport()) closeSidebar();
+              }}
+              className={cn(
+                "group flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-300",
+                isLiquidGlass
+                  ? isActive
+                    ? "bg-white text-neutral-800 shadow-sm"
+                    : "border border-transparent text-white/90 hover:bg-white/20"
+                  : isActive
+                    ? "border border-primary/50 bg-gradient-to-r from-primary/20 to-secondary/10 text-foreground shadow-glow-sm"
+                    : "border border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+              )}
+            >
+              <Icon
+                aria-hidden
+                className={cn(
+                  "h-5 w-5 flex-shrink-0 transition-all duration-300",
+                  isLiquidGlass
+                    ? isActive
+                      ? "text-neutral-800"
+                      : "text-white/80 group-hover:scale-110"
+                    : isActive
+                      ? "text-primary"
+                      : "text-muted-foreground group-hover:rotate-6 group-hover:scale-110 group-hover:text-primary",
+                )}
+              />
+              <span className="truncate">{item.label}</span>
+              <span
+                className={cn(
+                  "ml-auto text-xs transition-all duration-300",
+                  isActive ? "translate-x-0 opacity-100" : "-translate-x-2 opacity-0",
+                )}
+              >
+                ›
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div
+        className={cn(
+          "px-2 text-[11px]",
+          isLiquidGlass ? "text-white/50" : "text-muted-foreground/70",
+        )}
+      >
+        Data stored locally in your browser
+      </div>
+    </>
+  );
 
   return (
     <>
-      {/* Sidebar panel — one bookmark tab peeks when closed and rides the edge when open */}
-      <aside 
+      <aside
         ref={sidebarRef}
         className={cn(
-          "fixed left-0 top-0 h-full z-50 overflow-visible transition-transform duration-300 ease-in-out",
-          showSidebar ? "translate-x-0" : "-translate-x-full"
+          "fixed left-0 top-0 z-50 h-full overflow-visible transition-transform duration-300 ease-in-out",
+          showSidebar ? "translate-x-0" : "-translate-x-full",
         )}
         onMouseLeave={handleSidebarLeave}
       >
@@ -132,86 +243,39 @@ export function Sidebar({ currentPage, onPageChange, isCollapsed = true, onToggl
           onMouseEnter={handleArrowHover}
           aria-label={isPinned ? "Unpin navigation" : "Open navigation"}
           aria-expanded={showSidebar}
-          className="absolute left-full top-1/2 z-10 flex h-11 w-6 -translate-y-1/2 items-center justify-center rounded-r-md border border-primary/25 bg-primary/10 text-primary backdrop-blur-md transition-colors hover:bg-primary/20"
+          className={cn(
+            "absolute left-full top-1/2 z-10 flex h-11 w-6 -translate-y-1/2 items-center justify-center rounded-r-md border backdrop-blur-md transition-colors",
+            isLiquidGlass
+              ? "border-white/25 bg-white/15 text-white hover:bg-white/25"
+              : "border-primary/25 bg-primary/10 text-primary hover:bg-primary/20",
+          )}
         >
           <Bookmark className="h-3.5 w-3.5" strokeWidth={1.15} />
         </button>
-        <div className="h-full p-4 lg:p-0">
-          <div className="glass-strong perf-contain rounded-2xl lg:rounded-none p-5 flex flex-col gap-6 shadow-card h-full w-64 lg:w-72 relative">
 
-            {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0">
-                <img 
-                  src={bookLogo} 
-                  alt="NSYNC Journal Logo"
-                  width={48}
-                  height={48}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-12 h-12 object-contain"
-                  style={{ filter: 'drop-shadow(0 0 8px hsl(var(--primary) / 0.5))' }}
-                />
-              </div>
-              <div className="overflow-hidden">
-                <h1 className="text-lg font-bold tracking-wider gradient-text truncate">{userName}</h1>
-                <p className="text-xs text-muted-foreground">Personal Journal</p>
-              </div>
+        <div className={cn("h-full", isLiquidGlass ? "p-3 lg:p-3" : "p-4 lg:p-0")}>
+          {isLiquidGlass ? (
+            <LiquidGlassCard
+              draggable={false}
+              glowIntensity="sm"
+              shadowIntensity="md"
+              blurIntensity="md"
+              borderRadius="24px"
+              className="perf-contain flex h-full w-64 flex-col gap-6 p-5 lg:w-72"
+            >
+              {panelBody}
+            </LiquidGlassCard>
+          ) : (
+            <div className="glass-strong perf-contain relative flex h-full w-64 flex-col gap-6 rounded-2xl p-5 shadow-card lg:w-72 lg:rounded-none">
+              {panelBody}
             </div>
-
-            {/* Navigation */}
-            <nav className="flex-1 flex flex-col gap-1 overflow-y-auto min-h-0">
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2 px-3">
-                Navigation
-              </span>
-              {appNavItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = currentPage === item.id;
-
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      onPageChange(item.id);
-                      if (!isPinned || !isDesktopViewport()) closeSidebar();
-                    }}
-                    className={cn(
-                      "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 group",
-                      isActive
-                        ? "bg-gradient-to-r from-primary/20 to-secondary/10 border border-primary/50 text-foreground shadow-glow-sm"
-                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
-                    )}
-                  >
-                    <Icon className={cn(
-                      "w-5 h-5 flex-shrink-0 transition-all duration-300",
-                      isActive
-                        ? "text-primary"
-                        : "text-muted-foreground group-hover:text-primary group-hover:scale-110 group-hover:rotate-6"
-                    )} />
-                    <span className="truncate">{item.label}</span>
-                    <span className={cn(
-                      "ml-auto text-xs transition-all duration-300",
-                      isActive ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"
-                    )}>
-                      ›
-                    </span>
-                  </button>
-                );
-              })}
-            </nav>
-
-            {/* Footer */}
-            <div className="text-[11px] text-muted-foreground/70 px-2">
-              Data stored locally in your browser
-            </div>
-          </div>
+          )}
         </div>
       </aside>
 
-      {/* Backdrop when sidebar is open on mobile */}
       {showSidebar && (
-        <div 
-          className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 lg:hidden"
+        <div
+          className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm lg:hidden"
           onClick={closeSidebar}
         />
       )}

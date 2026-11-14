@@ -661,7 +661,7 @@ export function NotebookView({
     
     if (isCreatingNew) {
       const newEntry: NotebookEntry = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         title,
         content,
         category: selectedCategory === "all" || selectedCategory === "trash" ? "general" : selectedCategory,
@@ -669,20 +669,22 @@ export function NotebookView({
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      onSaveEntry(newEntry);
-      setSelectedEntryId(newEntry.id);
-      setIsCreatingNew(false);
-      setLastSavedAt(new Date());
-      toast.success("Note created!");
+      void Promise.resolve(onSaveEntry(newEntry)).then(() => {
+        setSelectedEntryId(newEntry.id);
+        setIsCreatingNew(false);
+        setLastSavedAt(new Date());
+        toast.success("Note created!");
+      });
     } else if (selectedEntry) {
-      onSaveEntry({
+      void Promise.resolve(onSaveEntry({
         ...selectedEntry,
         title,
         content,
         updatedAt: new Date().toISOString(),
+      })).then(() => {
+        setLastSavedAt(new Date());
+        toast.success("Note saved!");
       });
-      setLastSavedAt(new Date());
-      toast.success("Note saved!");
     }
   };
 
@@ -778,7 +780,7 @@ export function NotebookView({
     if (!selectedEntry || !editorRef.current) return;
     
     const duplicatedEntry: NotebookEntry = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       title: `${selectedEntry.title} (Copy)`,
       content: editorRef.current.innerHTML,
       category: selectedEntry.category,
@@ -786,9 +788,10 @@ export function NotebookView({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    onSaveEntry(duplicatedEntry);
-    setSelectedEntryId(duplicatedEntry.id);
-    toast.success("Note duplicated!");
+    void Promise.resolve(onSaveEntry(duplicatedEntry)).then(() => {
+      setSelectedEntryId(duplicatedEntry.id);
+      toast.success("Note duplicated!");
+    });
   };
 
   const handleCopyContent = () => {
@@ -852,7 +855,7 @@ export function NotebookView({
   // Duplicate a specific entry
   const handleDuplicateEntry = (entry: NotebookEntry) => {
     const duplicatedEntry: NotebookEntry = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       title: `${entry.title} (Copy)`,
       content: entry.content,
       category: entry.category,
@@ -860,9 +863,10 @@ export function NotebookView({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    onSaveEntry(duplicatedEntry);
-    setSelectedEntryId(duplicatedEntry.id);
-    toast.success("Note duplicated!");
+    void Promise.resolve(onSaveEntry(duplicatedEntry)).then(() => {
+      setSelectedEntryId(duplicatedEntry.id);
+      toast.success("Note duplicated!");
+    });
   };
 
   // Move entry to a different category

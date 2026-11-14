@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { NotebookEntry, Trade } from "@/types/trade";
 import { TradeScreenshot } from "@/components/Journal/TradeScreenshot";
+import { QuickNotesEditor } from "@/components/Journal/QuickNotesEditor";
 import { StudyNoteMentions } from "@/components/study/StudyNoteMentions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { SymbolMark } from "@/components/ui/AssetIcon";
 import { useTradeDetail } from "@/hooks/useTrades";
 import { notebookPlainText } from "@/lib/notebookSync";
@@ -185,7 +185,7 @@ export function TradeInsightModal({
     }
   };
 
-  const showJournalLinks = notesDraft.trim().length > 0 || hasScreenshot;
+  const showJournalLinks = notebookPlainText(notesDraft).length > 0 || hasScreenshot;
 
   if (!trade) return null;
 
@@ -462,13 +462,11 @@ export function TradeInsightModal({
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Quick notes
                 </p>
-                <Textarea
+                <QuickNotesEditor
                   value={notesDraft}
-                  onChange={(e) => setNotesDraft(e.target.value)}
-                  placeholder="Add notes for this trade…"
-                  className="min-h-0 flex-1 resize-none bg-background/40"
-                  aria-label="Quick notes"
+                  onChange={setNotesDraft}
                   disabled={!onUpdateTrade}
+                  className="min-h-[6.5rem]"
                 />
                 {linkedNote ? (
                   <p className="mt-2 text-[11px] text-muted-foreground">

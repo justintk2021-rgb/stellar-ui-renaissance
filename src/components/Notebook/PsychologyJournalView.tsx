@@ -214,7 +214,7 @@ export function PsychologyJournalView({
     const now = new Date().toISOString();
     if (isCreating || !selectedEntry) {
       const entry: NotebookEntry = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         title: title.trim() || selectedPrompt?.title || "Psychology journal",
         content: `<p>${body.replace(/\n/g, "</p><p>")}</p>`,
         category: PSYCHOLOGY_JOURNAL_CATEGORY,
@@ -223,21 +223,23 @@ export function PsychologyJournalView({
         createdAt: now,
         updatedAt: now,
       };
-      onSaveEntry(entry);
-      setSelectedEntryId(entry.id);
-      setIsCreating(false);
-      toast.success("Psychology entry linked to trade");
+      void Promise.resolve(onSaveEntry(entry)).then(() => {
+        setSelectedEntryId(entry.id);
+        setIsCreating(false);
+        toast.success("Psychology entry linked to trade");
+      });
       return;
     }
 
-    onSaveEntry({
+    void Promise.resolve(onSaveEntry({
       ...selectedEntry,
       title: title.trim() || selectedEntry.title,
       content: `<p>${body.replace(/\n/g, "</p><p>")}</p>`,
       tradeId: selectedTradeId,
       updatedAt: now,
+    })).then(() => {
+      toast.success("Journal entry updated");
     });
-    toast.success("Journal entry updated");
   };
 
   const grade =

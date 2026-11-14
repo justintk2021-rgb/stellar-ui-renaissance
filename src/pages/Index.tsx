@@ -718,7 +718,8 @@ const Index = () => {
   }, [updateTrade]);
 
   const handleSaveEntry = useCallback(async (entry: NotebookEntry) => {
-    await saveNotebookEntry(entry);
+    const ok = await saveNotebookEntry(entry);
+    if (!ok) throw new Error("Failed to save note");
     if (entry.tradeId) {
       await updateTrade(entry.tradeId, { notes: notebookPlainText(entry.content) });
     }
@@ -736,12 +737,13 @@ const Index = () => {
         (e) => e.tradeId === id && !e.isDeleted && e.category !== "psychology" && e.category !== "journal",
       );
     const seed = (quickNotes ?? trade?.notes ?? "").trim();
-    if (!shouldWriteQuickNotesToNotebook(seed, existing?.content) && existing) {
-      if (seed) await updateTrade(id, { notes: seed });
+    const seedPlain = notebookPlainText(seed) || seed;
+    if (!shouldWriteQuickNotesToNotebook(seedPlain, existing?.content) && existing) {
+      if (seedPlain) await updateTrade(id, { notes: seedPlain });
       return existing;
     }
 
-    const html = plainTextToNotebookHtml(seed);
+    const html = /<[a-z][\s\S]*>/i.test(seed) ? seed : plainTextToNotebookHtml(seed);
     const now = new Date().toISOString();
     const entry: NotebookEntry = existing
       ? { ...existing, content: html || existing.content, updatedAt: now }
@@ -757,7 +759,7 @@ const Index = () => {
         };
 
     await saveNotebookEntry(entry);
-    if (seed) await updateTrade(id, { notes: seed });
+    if (seedPlain) await updateTrade(id, { notes: seed });
     return entry;
   }, [notebookEntries, trades, saveNotebookEntry, updateTrade]);
 
