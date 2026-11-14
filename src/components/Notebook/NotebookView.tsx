@@ -98,6 +98,7 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence, useMotionValue } from "@/lib/motion";
@@ -303,6 +304,47 @@ export function NotebookView({
   // Live writing stats (words / characters / reading time) + autosave indicator
   const [editorStats, setEditorStats] = useState({ words: 0, chars: 0 });
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [editorFontSize, setEditorFontSize] = useState("16px");
+  const [activeTextColor, setActiveTextColor] = useState("inherit");
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const FONT_SIZE_OPTIONS = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px"] as const;
+
+  const focusActiveEditor = () => {
+    const target = (isFullWidth ? fullscreenEditorRef : editorRef).current;
+    target?.focus();
+    return target;
+  };
+
+  const applyFontSize = (size: string) => {
+    setEditorFontSize(size);
+    const target = focusActiveEditor();
+    if (!target || isLocked) return;
+    document.execCommand("styleWithCSS", false, "true");
+    document.execCommand("fontSize", false, "7");
+    target.querySelectorAll('font[size="7"]').forEach((fontEl) => {
+      const span = document.createElement("span");
+      span.style.fontSize = size;
+      while (fontEl.firstChild) span.appendChild(fontEl.firstChild);
+      fontEl.parentNode?.replaceChild(span, fontEl);
+    });
+  };
+
+  const insertEditorImage = (file: File) => {
+    if (isLocked) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      focusActiveEditor();
+      const src = typeof reader.result === "string" ? reader.result : "";
+      if (!src) return;
+      document.execCommand(
+        "insertHTML",
+        false,
+        `<img src="${src}" alt="" style="max-width:100%;height:auto;border-radius:8px;margin:8px 0;" />`,
+      );
+    };
+    reader.readAsDataURL(file);
+  };
 
   const updateEditorStats = (el: HTMLElement | null) => {
     const text = el?.innerText || "";
@@ -1275,8 +1317,274 @@ export function NotebookView({
         || "Folder")
       : null;
 
+  const toolbarBtnClass =
+    "h-8 w-8 p-0 rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground";
+
+  const renderEditorToolbar = (disabled: boolean) => (
+    <div className="flex flex-wrap items-center gap-0.5 px-1 py-1.5">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2.5 rounded-md text-xs gap-1.5 min-w-[7.5rem] justify-between text-foreground hover:bg-muted/60"
+            disabled={disabled}
+          >
+            <span className="truncate" style={{ fontFamily: selectedFontFamily }}>
+              {NOTEBOOK_FONTS.find((f) => f.id === notebookFont)?.name || "Inter"}
+            </span>
+            <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto bg-background border border-border z-[80]">
+          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
+            Sans Serif
+          </div>
+          {NOTEBOOK_FONTS.filter((f) => f.category === "Sans Serif").map((font) => (
+            <DropdownMenuItem
+              key={font.id}
+              onClick={() => onFontChange?.(font.id)}
+              className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
+              style={{ fontFamily: font.family }}
+            >
+              {font.name}
+            </DropdownMenuItem>
+          ))}
+          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background mt-1">
+            Serif
+          </div>
+          {NOTEBOOK_FONTS.filter((f) => f.category === "Serif").map((font) => (
+            <DropdownMenuItem
+              key={font.id}
+              onClick={() => onFontChange?.(font.id)}
+              className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
+              style={{ fontFamily: font.family }}
+            >
+              {font.name}
+            </DropdownMenuItem>
+          ))}
+          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background mt-1">
+            Monospace
+          </div>
+          {NOTEBOOK_FONTS.filter((f) => f.category === "Monospace").map((font) => (
+            <DropdownMenuItem
+              key={font.id}
+              onClick={() => onFontChange?.(font.id)}
+              className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
+              style={{ fontFamily: font.family }}
+            >
+              {font.name}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2.5 rounded-md text-xs gap-1 min-w-[4.25rem] justify-between text-foreground hover:bg-muted/60"
+            disabled={disabled}
+          >
+            <span>{editorFontSize}</span>
+            <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-28 bg-background border border-border z-[80]">
+          {FONT_SIZE_OPTIONS.map((size) => (
+            <DropdownMenuItem
+              key={size}
+              onClick={() => applyFontSize(size)}
+              className={cn("text-xs cursor-pointer", editorFontSize === size && "bg-primary/10")}
+            >
+              {size}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <div className="mx-1.5 h-5 w-px bg-border/60" />
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => document.execCommand("bold")}
+        className={toolbarBtnClass}
+        disabled={disabled}
+        title="Bold"
+      >
+        <Bold className="w-3.5 h-3.5" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => document.execCommand("italic")}
+        className={toolbarBtnClass}
+        disabled={disabled}
+        title="Italic"
+      >
+        <Italic className="w-3.5 h-3.5" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => document.execCommand("underline")}
+        className={toolbarBtnClass}
+        disabled={disabled}
+        title="Underline"
+      >
+        <Underline className="w-3.5 h-3.5" />
+      </Button>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(toolbarBtnClass, "relative")}
+            disabled={disabled}
+            title="Text color"
+          >
+            <span
+              className="h-3.5 w-3.5 rounded-full border border-border/70"
+              style={{
+                background:
+                  activeTextColor === "inherit" ? "hsl(var(--foreground))" : activeTextColor,
+              }}
+            />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="p-2 bg-background border border-border z-[80]">
+          <div className="grid grid-cols-4 gap-1.5">
+            {TEXT_COLORS.map((color) => (
+              <button
+                key={color.id}
+                type="button"
+                title={color.label}
+                onClick={() => {
+                  setActiveTextColor(color.color);
+                  applyTextColor(color.color);
+                }}
+                className="h-6 w-6 rounded-full border border-border/60 hover:scale-110 transition-transform"
+                style={{
+                  background:
+                    color.color === "inherit" ? "hsl(var(--foreground))" : color.color,
+                }}
+              />
+            ))}
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <div className="mx-1.5 h-5 w-px bg-border/60" />
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => document.execCommand("justifyLeft")}
+        className={toolbarBtnClass}
+        disabled={disabled}
+        title="Align left"
+      >
+        <AlignLeft className="w-3.5 h-3.5" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => document.execCommand("justifyCenter")}
+        className={toolbarBtnClass}
+        disabled={disabled}
+        title="Align center"
+      >
+        <AlignCenter className="w-3.5 h-3.5" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => document.execCommand("justifyRight")}
+        className={toolbarBtnClass}
+        disabled={disabled}
+        title="Align right"
+      >
+        <AlignRight className="w-3.5 h-3.5" />
+      </Button>
+
+      <div className="mx-1.5 h-5 w-px bg-border/60" />
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => document.execCommand("insertUnorderedList")}
+        className={toolbarBtnClass}
+        disabled={disabled}
+        title="Bulleted list"
+      >
+        <List className="w-3.5 h-3.5" />
+      </Button>
+
+      <div className="mx-1.5 h-5 w-px bg-border/60" />
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          const url = prompt("Enter URL:");
+          if (url) document.execCommand("createLink", false, url);
+        }}
+        className={toolbarBtnClass}
+        disabled={disabled}
+        title="Insert link"
+      >
+        <Link className="w-3.5 h-3.5" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => imageInputRef.current?.click()}
+        className={toolbarBtnClass}
+        disabled={disabled}
+        title="Insert image"
+      >
+        <ImageIcon className="w-3.5 h-3.5" />
+      </Button>
+    </div>
+  );
+
+  const editorSurfaceClass = cn(
+    "min-h-0 flex-1 w-full overflow-y-auto outline-none focus:outline-none caret-primary rounded-[8px] border border-border/50 bg-background/40",
+    "px-6 py-5 leading-relaxed",
+    "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-3",
+    "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2",
+    "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2",
+    "[&_p]:mb-3 [&_p]:text-foreground/90",
+    "[&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-3 [&_ul]:space-y-1.5",
+    "[&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-3 [&_ol]:space-y-1.5",
+    "[&_li]:text-foreground/90 [&_li]:pl-1",
+    "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/60 [&_blockquote]:pl-4 [&_blockquote]:py-1 [&_blockquote]:italic [&_blockquote]:text-foreground/80 [&_blockquote]:my-4",
+    "[&_strong]:font-semibold [&_strong]:text-foreground",
+    "[&_em]:italic",
+    "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2",
+    "[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-2",
+    "[&_.notebook-table-wrapper]:relative",
+    "[&_.notebook-table]:rounded-xl [&_.notebook-table]:overflow-hidden",
+    "[&_.notebook-table_td]:bg-background/50 [&_.notebook-table_td]:hover:bg-muted/50",
+    "[&_.notebook-table_td:focus]:outline-none [&_.notebook-table_td:focus]:ring-2 [&_.notebook-table_td:focus]:ring-primary/30 [&_.notebook-table_td:focus]:ring-inset",
+  );
+
   return (
     <>
+    <input
+      ref={imageInputRef}
+      type="file"
+      accept="image/*"
+      className="hidden"
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) insertEditorImage(file);
+        e.target.value = "";
+      }}
+    />
     {/* Fullscreen Overlay */}
     {(isFullWidth || isFullWidthClosing) && selectedEntry && (
       <div 
@@ -1299,7 +1607,7 @@ export function NotebookView({
             ease: [0.25, 0.46, 0.45, 0.94],
             scale: { type: "spring", stiffness: 300, damping: 25 }
           }}
-          className="perf-contain w-full max-w-4xl h-[90vh] glass-strong rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+          className="perf-contain flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl glass-strong shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -1351,127 +1659,34 @@ export function NotebookView({
             </div>
           </motion.div>
 
-          {/* Formatting Toolbar */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.15, duration: 0.3 }}
-            className="flex items-center justify-center gap-1 px-6 py-3 border-b border-border/10"
-          >
-            <div className="flex items-center gap-1 bg-muted/30 rounded-xl p-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => document.execCommand('bold')}
-                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
-                disabled={isLocked}
-              >
-                <Bold className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => document.execCommand('italic')}
-                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
-                disabled={isLocked}
-              >
-                <Italic className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => document.execCommand('underline')}
-                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
-                disabled={isLocked}
-              >
-                <Underline className="w-4 h-4" />
-              </Button>
-              
-              <div className="w-px h-5 bg-border/50 mx-1" />
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => document.execCommand('justifyLeft')}
-                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
-                disabled={isLocked}
-              >
-                <AlignLeft className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => document.execCommand('justifyCenter')}
-                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
-                disabled={isLocked}
-              >
-                <AlignCenter className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => document.execCommand('justifyRight')}
-                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
-                disabled={isLocked}
-              >
-                <AlignRight className="w-4 h-4" />
-              </Button>
-              
-              <div className="w-px h-5 bg-border/50 mx-1" />
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  const url = prompt('Enter URL:');
-                  if (url) document.execCommand('createLink', false, url);
-                }}
-                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
-                disabled={isLocked}
-              >
-                <Link className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => document.execCommand('formatBlock', false, 'blockquote')}
-                className="h-8 w-8 p-0 rounded-lg hover:bg-muted"
-                disabled={isLocked}
-              >
-                <Quote className="w-4 h-4" />
-              </Button>
-            </div>
-          </motion.div>
+          <div className="shrink-0 border-b border-border/20 px-4">
+            {renderEditorToolbar(isLocked)}
+          </div>
 
           {/* Content Area */}
-          <ScrollArea
-            className="flex-1 cursor-text"
+          <div
+            className="flex min-h-0 flex-1 flex-col gap-3 p-4 cursor-text"
             onClick={(e) => handleEditorAreaClick(e, fullscreenEditorRef.current)}
           >
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.4 }}
               ref={fullscreenEditorContainerRef}
-              className="max-w-3xl mx-auto px-8 md:px-12 py-8"
+              className="relative flex min-h-0 flex-1 flex-col"
               onMouseMove={handleFullscreenEditorMouseMove}
               onMouseLeave={handleFullscreenEditorMouseLeave}
             >
-              {/* Title Section */}
-              <div className="mb-6">
-                <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium">
-                  Title
-                </span>
+              <div className="mb-3 shrink-0">
                 <Input
                   ref={fullscreenTitleRef}
                   defaultValue={selectedEntry?.title || ""}
                   placeholder="Untitled"
                   disabled={isLocked}
-                  className="text-xl font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0 mt-1"
+                  className="text-xl font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0"
                 />
               </div>
 
-              {/* Floating Block Button - Fullscreen */}
               {fullscreenShowBlockButton && !isLocked && (
                 <div
                   className="absolute z-20"
@@ -1488,7 +1703,6 @@ export function NotebookView({
                 </div>
               )}
 
-              {/* Block Format Menu - Fullscreen */}
               {fullscreenBlockMenuOpen && (
                 <div
                   className="absolute z-50 bg-background border border-border rounded-xl shadow-xl py-1 w-48 max-h-64 overflow-y-auto animate-scale-in"
@@ -1519,37 +1733,20 @@ export function NotebookView({
                 </div>
               )}
 
-              {/* Editor Content */}
               <div
                 ref={fullscreenEditorRef}
                 contentEditable={!isLocked}
-                style={{ fontFamily: selectedFontFamily }}
+                style={{ fontFamily: selectedFontFamily, fontSize: isSmallText ? "14px" : editorFontSize }}
                 onInput={(e) => updateEditorStats(e.currentTarget)}
                 data-placeholder="Start writing your notes..."
-                className={cn(
-                  "min-h-[calc(100vh-400px)] outline-none focus:outline-none caret-primary",
-                  isSmallText ? "text-sm leading-relaxed" : "text-base leading-loose",
-                  isLocked && "cursor-not-allowed opacity-70",
-                  "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-3",
-                  "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2",
-                  "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2",
-                  "[&_p]:mb-3 [&_p]:text-foreground/90",
-                  "[&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-3 [&_ul]:space-y-1",
-                  "[&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-3 [&_ol]:space-y-1",
-                  "[&_li]:text-foreground/90 [&_li]:pl-1",
-                  "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/60 [&_blockquote]:pl-4 [&_blockquote]:py-1 [&_blockquote]:italic [&_blockquote]:text-foreground/80 [&_blockquote]:my-4 [&_blockquote]:bg-primary/5 [&_blockquote]:rounded-r-lg",
-                  "[&_strong]:font-semibold [&_strong]:text-foreground",
-                  "[&_em]:italic",
-                  "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:hover:text-primary/80",
-                  "[&_.notebook-table-wrapper]:relative",
-                  "[&_.notebook-table]:rounded-xl [&_.notebook-table]:overflow-hidden",
-                  "[&_.notebook-table_td]:bg-background/50 [&_.notebook-table_td]:hover:bg-muted/50 [&_.notebook-table_td]:transition-colors",
-                  "[&_.notebook-table_td:focus]:outline-none [&_.notebook-table_td:focus]:ring-2 [&_.notebook-table_td:focus]:ring-primary/30 [&_.notebook-table_td:focus]:ring-inset"
-                )}
+                className={cn(editorSurfaceClass, isLocked && "cursor-not-allowed opacity-70")}
                 suppressContentEditableWarning
               />
+              <p className="mt-2 shrink-0 text-xs text-muted-foreground tabular-nums">
+                {editorStats.chars.toLocaleString()} characters
+              </p>
             </motion.div>
-          </ScrollArea>
+          </div>
         </motion.div>
       </div>
     )}
@@ -2222,329 +2419,87 @@ export function NotebookView({
               )}
             </motion.div>
 
-            {/* Formatting Toolbar - Word-style */}
             {!isSelectedEntryInTrash && (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.15, duration: 0.3 }}
-                className="flex items-center gap-1 px-4 py-2 mx-3 mt-2 rounded-xl border border-border/40 bg-card/60 backdrop-blur shadow-[0_4px_16px_-8px_hsl(var(--foreground)/0.15)]"
-              >
-                {/* Font Selector */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 rounded hover:bg-muted text-xs gap-1 min-w-[120px] justify-between"
-                      disabled={isLocked}
-                    >
-                      <span style={{ fontFamily: NOTEBOOK_FONTS.find(f => f.id === notebookFont)?.family }}>
-                        {NOTEBOOK_FONTS.find(f => f.id === notebookFont)?.name || 'Inter'}
-                      </span>
-                      <ChevronDown className="w-3 h-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto bg-background border border-border z-50">
-                    {/* Sans Serif */}
-                    <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
-                      Sans Serif
-                    </div>
-                    {NOTEBOOK_FONTS.filter(f => f.category === 'Sans Serif').map((font) => (
-                      <DropdownMenuItem 
-                        key={font.id}
-                        onClick={() => onFontChange?.(font.id)}
-                        className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
-                        style={{ fontFamily: font.family }}
-                      >
-                        {font.name}
-                      </DropdownMenuItem>
-                    ))}
-                    {/* Serif */}
-                    <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background mt-1">
-                      Serif
-                    </div>
-                    {NOTEBOOK_FONTS.filter(f => f.category === 'Serif').map((font) => (
-                      <DropdownMenuItem 
-                        key={font.id}
-                        onClick={() => onFontChange?.(font.id)}
-                        className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
-                        style={{ fontFamily: font.family }}
-                      >
-                        {font.name}
-                      </DropdownMenuItem>
-                    ))}
-                    {/* Monospace */}
-                    <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background mt-1">
-                      Monospace
-                    </div>
-                    {NOTEBOOK_FONTS.filter(f => f.category === 'Monospace').map((font) => (
-                      <DropdownMenuItem 
-                        key={font.id}
-                        onClick={() => onFontChange?.(font.id)}
-                        className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
-                        style={{ fontFamily: font.family }}
-                      >
-                        {font.name}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                
-                <div className="w-px h-5 bg-border/50 mx-1" />
-                
-                <div className="flex items-center gap-0.5">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => document.execCommand('bold')}
-                    className="h-7 w-7 p-0 rounded hover:bg-muted"
-                    disabled={isLocked}
-                    title="Bold (Ctrl+B)"
-                  >
-                    <Bold className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => document.execCommand('italic')}
-                    className="h-7 w-7 p-0 rounded hover:bg-muted"
-                    disabled={isLocked}
-                    title="Italic (Ctrl+I)"
-                  >
-                    <Italic className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => document.execCommand('underline')}
-                    className="h-7 w-7 p-0 rounded hover:bg-muted"
-                    disabled={isLocked}
-                    title="Underline (Ctrl+U)"
-                  >
-                    <Underline className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => document.execCommand('strikeThrough')}
-                    className="h-7 w-7 p-0 rounded hover:bg-muted"
-                    disabled={isLocked}
-                    title="Strikethrough"
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-                
-                <div className="w-px h-5 bg-border/50 mx-1" />
-                
-                <div className="flex items-center gap-0.5">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => document.execCommand('justifyLeft')}
-                    className="h-7 w-7 p-0 rounded hover:bg-muted"
-                    disabled={isLocked}
-                    title="Align Left"
-                  >
-                    <AlignLeft className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => document.execCommand('justifyCenter')}
-                    className="h-7 w-7 p-0 rounded hover:bg-muted"
-                    disabled={isLocked}
-                    title="Align Center"
-                  >
-                    <AlignCenter className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => document.execCommand('justifyRight')}
-                    className="h-7 w-7 p-0 rounded hover:bg-muted"
-                    disabled={isLocked}
-                    title="Align Right"
-                  >
-                    <AlignRight className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-                
-                <div className="w-px h-5 bg-border/50 mx-1" />
-                
-                <div className="flex items-center gap-0.5">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => document.execCommand('insertUnorderedList')}
-                    className="h-7 w-7 p-0 rounded hover:bg-muted"
-                    disabled={isLocked}
-                    title="Bullet List"
-                  >
-                    <List className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => document.execCommand('insertOrderedList')}
-                    className="h-7 w-7 p-0 rounded hover:bg-muted"
-                    disabled={isLocked}
-                    title="Numbered List"
-                  >
-                    <ListOrdered className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-                
-                <div className="w-px h-5 bg-border/50 mx-1" />
-                
-                <div className="flex items-center gap-0.5">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const url = prompt('Enter URL:');
-                      if (url) document.execCommand('createLink', false, url);
-                    }}
-                    className="h-7 w-7 p-0 rounded hover:bg-muted"
-                    disabled={isLocked}
-                    title="Insert Link"
-                  >
-                    <Link className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => document.execCommand('formatBlock', false, 'blockquote')}
-                    className="h-7 w-7 p-0 rounded hover:bg-muted"
-                    disabled={isLocked}
-                    title="Quote"
-                  >
-                    <Quote className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Editor with Block Menu */}
-            <ScrollArea className="flex-1">
-              <div 
-                ref={editorContainerRef}
-                className="relative min-h-full cursor-text"
-                onMouseMove={handleEditorMouseMove}
-                onMouseLeave={handleEditorMouseLeave}
-                onClick={(e) => handleEditorAreaClick(e, editorRef.current)}
-              >
-                {/* Floating Block Button */}
-                {showBlockButton && !isLocked && !isSelectedEntryInTrash && (
-                  <div
-                    className="absolute z-20"
-                    style={{ left: blockButtonPosition.x, top: blockButtonPosition.y }}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-6 h-6 p-0 opacity-30 hover:opacity-100 hover:bg-muted rounded transition-opacity duration-150"
-                      onClick={openBlockMenu}
-                    >
-                      <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                    </Button>
-                  </div>
-                )}
-
-                {/* Block Format Menu */}
-                {isBlockMenuOpen && (
-                  <div
-                    className="absolute z-50 bg-background border border-border rounded-lg shadow-xl py-1 w-48 max-h-64 overflow-y-auto animate-scale-in"
-                    style={{ left: blockMenuPosition.x, top: blockMenuPosition.y }}
-                    onMouseLeave={() => {
-                      setIsBlockMenuOpen(false);
-                      setShowBlockButton(false);
-                    }}
-                  >
-                    <div className="px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
-                      Basic blocks
-                    </div>
-                    {BLOCK_OPTIONS.map((option) => {
-                      const Icon = option.icon;
-                      return (
-                        <button
-                          key={option.id}
-                          onClick={() => handleBlockFormat(option)}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted/50 transition-colors text-left group"
-                        >
-                          <div className="w-6 h-6 flex items-center justify-center rounded border border-border/50 bg-background group-hover:border-primary/30 transition-colors">
-                            <Icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-                          </div>
-                          <span className="flex-1">{option.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div
-                  ref={editorRef}
-                  contentEditable={!isLocked && !isSelectedEntryInTrash}
-                  style={{ fontFamily: selectedFontFamily }}
-                  onContextMenu={handleContextMenu}
-                  onInput={(e) => updateEditorStats(e.currentTarget)}
-                  className={cn(
-                    "min-h-[calc(100vh-430px)] p-4 pl-12 pr-12 pb-16 outline-none focus:outline-none focus-visible:outline-none transition-all caret-primary",
-                    isSmallText ? "text-xs" : "text-sm",
-                    (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70",
-                    "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2",
-                    "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2",
-                    "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1",
-                    "[&_p]:mb-2",
-                    "[&_ul]:list-disc [&_ul]:ml-5 [&_ul]:mb-2",
-                    "[&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:mb-2",
-                    "[&_li]:text-foreground [&_li]:mb-1",
-                    "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2",
-                    "[&_strong]:font-semibold",
-                    "[&_em]:italic",
-                    "[&_.notebook-table-wrapper]:relative",
-                    "[&_.notebook-table]:rounded-xl [&_.notebook-table]:overflow-hidden",
-                    "[&_.notebook-table_td]:bg-background/50 [&_.notebook-table_td]:hover:bg-muted/50 [&_.notebook-table_td]:transition-colors",
-                    "[&_.notebook-table_td:focus]:outline-none [&_.notebook-table_td:focus]:ring-2 [&_.notebook-table_td:focus]:ring-primary/30 [&_.notebook-table_td:focus]:ring-inset"
-                  )}
-                  data-placeholder="Start writing your notes..."
-                />
+              <div className="shrink-0 border-b border-border/20 px-3">
+                {renderEditorToolbar(isLocked)}
               </div>
-            </ScrollArea>
-
-            {/* Writing status bar — live word/char count, reading time, autosave state */}
-            {!isSelectedEntryInTrash && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="shrink-0 mx-3 mb-2 px-4 py-1.5 rounded-xl border border-border/40 bg-card/60 backdrop-blur flex items-center gap-3 text-[11px] text-muted-foreground"
-              >
-                <span className="font-medium tabular-nums">{editorStats.words} {editorStats.words === 1 ? 'word' : 'words'}</span>
-                <span className="opacity-40">•</span>
-                <span className="tabular-nums">{editorStats.chars.toLocaleString()} characters</span>
-                <span className="opacity-40">•</span>
-                <span className="tabular-nums">~{Math.max(1, Math.ceil(editorStats.words / 200))} min read</span>
-                <span className="flex-1" />
-                {isLocked ? (
-                  <span className="flex items-center gap-1.5 text-yellow-600">
-                    <Lock className="w-3 h-3" />
-                    Locked
-                  </span>
-                ) : lastSavedAt ? (
-                  <span className="flex items-center gap-1.5 text-primary">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                    Saved {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="w-3 h-3" />
-                    Auto-saves every 5s
-                  </span>
-                )}
-              </motion.div>
             )}
+
+            <div
+              ref={editorContainerRef}
+              className="relative flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3 pt-2 cursor-text"
+              onMouseMove={handleEditorMouseMove}
+              onMouseLeave={handleEditorMouseLeave}
+              onClick={(e) => handleEditorAreaClick(e, editorRef.current)}
+            >
+              {showBlockButton && !isLocked && !isSelectedEntryInTrash && (
+                <div
+                  className="absolute z-20"
+                  style={{ left: blockButtonPosition.x, top: blockButtonPosition.y }}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-6 h-6 p-0 opacity-30 hover:opacity-100 hover:bg-muted rounded transition-opacity duration-150"
+                    onClick={openBlockMenu}
+                  >
+                    <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                  </Button>
+                </div>
+              )}
+
+              {isBlockMenuOpen && (
+                <div
+                  className="absolute z-50 bg-background border border-border rounded-lg shadow-xl py-1 w-48 max-h-64 overflow-y-auto animate-scale-in"
+                  style={{ left: blockMenuPosition.x, top: blockMenuPosition.y }}
+                  onMouseLeave={() => {
+                    setIsBlockMenuOpen(false);
+                    setShowBlockButton(false);
+                  }}
+                >
+                  <div className="px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
+                    Basic blocks
+                  </div>
+                  {BLOCK_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => handleBlockFormat(option)}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted/50 transition-colors text-left group"
+                      >
+                        <div className="w-6 h-6 flex items-center justify-center rounded border border-border/50 bg-background group-hover:border-primary/30 transition-colors">
+                          <Icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                        </div>
+                        <span className="flex-1">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div
+                ref={editorRef}
+                contentEditable={!isLocked && !isSelectedEntryInTrash}
+                style={{
+                  fontFamily: selectedFontFamily,
+                  fontSize: isSmallText ? "14px" : editorFontSize,
+                }}
+                onContextMenu={handleContextMenu}
+                onInput={(e) => updateEditorStats(e.currentTarget)}
+                className={cn(
+                  editorSurfaceClass,
+                  (isLocked || isSelectedEntryInTrash) && "cursor-not-allowed opacity-70",
+                )}
+                data-placeholder="Start writing your notes..."
+              />
+
+              {!isSelectedEntryInTrash && (
+                <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {editorStats.chars.toLocaleString()} characters
+                </p>
+              )}
+            </div>
 
           </motion.div>
         ) : (

@@ -77,6 +77,7 @@ interface SettingsViewProps {
   onCustomAccentChange?: (color: string) => void;
   customGradient?: CustomGradient | null;
   onCustomGradientChange?: (gradient: CustomGradient | null) => void;
+  selectedAccountId?: string | null;
 }
 
 const accentColors: { name: AccentColor; label: string; color: string; darkColor: string; hex: string }[] = [
@@ -195,8 +196,14 @@ const pulseVariants = {
 };
 
 // Wrapper component for CSV Import to use the trades hook
-function CSVImportWrapper({ userId }: { userId?: string }) {
-  const { importTrades } = useTrades(userId);
+function CSVImportWrapper({
+  userId,
+  selectedAccountId,
+}: {
+  userId?: string;
+  selectedAccountId?: string | null;
+}) {
+  const { importTrades } = useTrades(userId, selectedAccountId ?? null);
   
   const handleImport = async (trades: { date: string; pair: string; direction: string; result: number; session?: string; strategy?: string; notes?: string }[]) => {
     await importTrades(trades.map(t => ({
@@ -221,6 +228,7 @@ export function SettingsView({
   onCustomAccentChange,
   customGradient: propCustomGradient,
   onCustomGradientChange,
+  selectedAccountId = null,
 }: SettingsViewProps) {
   const [activeSection, setActiveSection] = useState<SettingsSection>('account');
   const [presets, setPresets] = useState<SettingsPreset[]>([]);
@@ -1318,7 +1326,7 @@ export function SettingsView({
         <p className="text-sm text-muted-foreground mt-2 ml-[52px]">Import trades from CSV files or export your data</p>
       </motion.div>
       <motion.div variants={itemVariants}>
-        <CSVImportWrapper userId={userProfile?.user_id} />
+        <CSVImportWrapper userId={userProfile?.user_id} selectedAccountId={selectedAccountId} />
       </motion.div>
     </motion.div>
   );

@@ -2,10 +2,22 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import Underline from "@tiptap/extension-underline";
+import Link from "@tiptap/extension-link";
+import TextAlign from "@tiptap/extension-text-align";
+import { TextStyle } from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
+import Image from "@tiptap/extension-image";
 import type { JSONContent } from "@tiptap/core";
 import type { Trade } from "@/types/trade";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { isUnjournaledTrade } from "@/lib/notifications";
@@ -42,22 +54,48 @@ import { StudyTradeNode, StudyYoutubeNode } from "./studyNodes";
 import { StudyVideoChrome, type StudyVideoHandle } from "./StudyVideoChrome";
 import { useStudyTrash } from "./StudyTrash";
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   ArrowLeftRight,
   Bold,
   ChevronDown,
   Columns2,
-  Heading2,
+  Image as ImageIcon,
   Italic,
   Link2,
   List,
-  ListOrdered,
   Plus,
   Square,
   Star,
+  Underline as UnderlineIcon,
   Upload,
 } from "lucide-react";
 
 const MAX_VIDEO_BYTES = 12 * 1024 * 1024;
+
+const STUDY_FONTS = [
+  { id: "inter", name: "Inter", family: "'Inter', sans-serif" },
+  { id: "roboto", name: "Roboto", family: "'Roboto', sans-serif" },
+  { id: "lato", name: "Lato", family: "'Lato', sans-serif" },
+  { id: "merriweather", name: "Merriweather", family: "'Merriweather', serif" },
+  { id: "lora", name: "Lora", family: "'Lora', serif" },
+  { id: "source-code", name: "Source Code Pro", family: "'Source Code Pro', monospace" },
+] as const;
+
+const STUDY_FONT_SIZES = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px"] as const;
+
+const STUDY_TEXT_COLORS = [
+  { id: "default", label: "Default", color: "inherit" },
+  { id: "red", label: "Red", color: "#ef4444" },
+  { id: "orange", label: "Orange", color: "#f97316" },
+  { id: "yellow", label: "Yellow", color: "#eab308" },
+  { id: "green", label: "Green", color: "#22c55e" },
+  { id: "blue", label: "Blue", color: "#3b82f6" },
+  { id: "purple", label: "Purple", color: "#a855f7" },
+  { id: "pink", label: "Pink", color: "#ec4899" },
+  { id: "gray", label: "Gray", color: "#6b7280" },
+] as const;
 
 interface StudyEditorProps {
   noteId: string;
@@ -113,11 +151,20 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
   const [dualDropSide, setDualDropSide] = useState<"left" | "right" | null>(null);
   const resourceFileRef = useRef<HTMLInputElement>(null);
   const [revision, setRevision] = useState(0);
+  const [charCount, setCharCount] = useState(0);
+  const [editorFontId, setEditorFontId] = useState<(typeof STUDY_FONTS)[number]["id"]>("inter");
+  const [editorFontSize, setEditorFontSize] = useState<(typeof STUDY_FONT_SIZES)[number]>("16px");
+  const [activeTextColor, setActiveTextColor] = useState("inherit");
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const dirtyRef = useRef(false);
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
   const pendingTimestampRef = useRef<number | null>(null);
   const videoHandleRef = useRef<StudyVideoHandle | null>(null);
+  const selectedFontFamily =
+    STUDY_FONTS.find((font) => font.id === editorFontId)?.family ?? "'Inter', sans-serif";
+  const toolbarBtnClass =
+    "h-8 w-8 p-0 rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground";
   const notesRef = useRef<HTMLDivElement>(null);
   const { beginDrag, registerDeleter } = useStudyTrash();
 
@@ -305,6 +352,12 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
   const editor = useEditor({
     extensions: [
       StarterKit,
+      Underline,
+      TextStyle,
+      Color,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      Link.configure({ openOnClick: false, HTMLAttributes: { class: "text-primary underline underline-offset-2" } }),
+      Image.configure({ allowBase64: true, HTMLAttributes: { class: "rounded-lg max-w-full h-auto my-2" } }),
       Placeholder.configure({ placeholder: "Write your study note. Type /trade to insert a journal trade." }),
       StudyTradeNode,
       StudyYoutubeNode,
@@ -312,7 +365,8 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
     content: opened.current.doc,
     editorProps: {
       attributes: {
-        class: "study-prose min-h-[calc(100dvh-22rem)] px-1 py-2 text-[15px] leading-7 outline-none",
+        class:
+          "study-prose min-h-0 flex-1 w-full px-6 py-5 leading-relaxed outline-none focus:outline-none",
       },
       handlePaste(_view, event) {
         const text = event.clipboardData?.getData("text/plain")?.trim() ?? "";
@@ -334,6 +388,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
     onUpdate: ({ editor: current }) => {
       dirtyRef.current = true;
       setRevision((value) => value + 1);
+      setCharCount(current.getText().trim().length);
 
       if (pendingTimestampRef.current != null) {
         const seconds = pendingTimestampRef.current;
@@ -361,6 +416,11 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
       });
     },
   }, [noteId]);
+
+  useEffect(() => {
+    if (!editor) return;
+    setCharCount(editor.getText().trim().length);
+  }, [editor, noteId]);
 
   useEffect(() => {
     dirtyRef.current = false;
@@ -892,9 +952,19 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
     )
   ) : null;
 
+  const insertStudyImage = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = typeof reader.result === "string" ? reader.result : "";
+      if (!src || !editor) return;
+      editor.chain().focus().setImage({ src }).run();
+    };
+    reader.readAsDataURL(file);
+  };
+
   const noteBody = (
-    <>
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-2 flex items-center justify-between gap-3">
         <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
           {status === "saving" ? "Saving" : status === "saved" ? "Saved" : "Study note"}
         </p>
@@ -906,11 +976,11 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
           setRevision((value) => value + 1);
           setDraftTitle(event.target.value);
         }}
-        className="h-12 border-0 bg-transparent px-1 text-2xl font-semibold shadow-none focus-visible:ring-0"
+        className="mb-2 h-11 border-0 bg-transparent px-1 text-xl font-semibold shadow-none focus-visible:ring-0"
         aria-label="Note title"
       />
       {video ? (
-        <div className="mb-3 mt-1 flex flex-wrap items-center gap-3">
+        <div className="mb-2 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-[12px] font-medium text-foreground">Timestamps</span>
             <Switch
@@ -923,33 +993,248 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
           <p className="text-[11px] text-muted-foreground">Lines you start while the video plays get its time.</p>
         </div>
       ) : null}
-      <div className="mb-3 mt-2 flex flex-wrap gap-1.5">
-        <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => editor?.chain().focus().toggleBold().run()}><Bold className="h-4 w-4" /></Button>
-        <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => editor?.chain().focus().toggleItalic().run()}><Italic className="h-4 w-4" /></Button>
-        <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}><Heading2 className="h-4 w-4" /></Button>
-        <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => editor?.chain().focus().toggleBulletList().run()}><List className="h-4 w-4" /></Button>
-        <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => editor?.chain().focus().toggleOrderedList().run()}><ListOrdered className="h-4 w-4" /></Button>
+
+      <div className="shrink-0 border-b border-border/20 pb-1">
+        <div className="flex flex-wrap items-center gap-0.5 px-1 py-1.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 min-w-[7.5rem] justify-between gap-1.5 rounded-md px-2.5 text-xs text-foreground hover:bg-muted/60"
+              >
+                <span className="truncate" style={{ fontFamily: selectedFontFamily }}>
+                  {STUDY_FONTS.find((font) => font.id === editorFontId)?.name ?? "Inter"}
+                </span>
+                <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="z-[80] w-48 border-border bg-background">
+              {STUDY_FONTS.map((font) => (
+                <DropdownMenuItem
+                  key={font.id}
+                  className={cn("cursor-pointer text-xs", editorFontId === font.id && "bg-primary/10")}
+                  style={{ fontFamily: font.family }}
+                  onClick={() => setEditorFontId(font.id)}
+                >
+                  {font.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 min-w-[4.25rem] justify-between gap-1 rounded-md px-2.5 text-xs text-foreground hover:bg-muted/60"
+              >
+                <span>{editorFontSize}</span>
+                <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="z-[80] w-28 border-border bg-background">
+              {STUDY_FONT_SIZES.map((size) => (
+                <DropdownMenuItem
+                  key={size}
+                  className={cn("cursor-pointer text-xs", editorFontSize === size && "bg-primary/10")}
+                  onClick={() => setEditorFontSize(size)}
+                >
+                  {size}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="mx-1.5 h-5 w-px bg-border/60" />
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={toolbarBtnClass}
+            title="Bold"
+            onClick={() => editor?.chain().focus().toggleBold().run()}
+          >
+            <Bold className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={toolbarBtnClass}
+            title="Italic"
+            onClick={() => editor?.chain().focus().toggleItalic().run()}
+          >
+            <Italic className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={toolbarBtnClass}
+            title="Underline"
+            onClick={() => editor?.chain().focus().toggleUnderline().run()}
+          >
+            <UnderlineIcon className="h-3.5 w-3.5" />
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" className={cn(toolbarBtnClass, "relative")} title="Text color">
+                <span
+                  className="h-3.5 w-3.5 rounded-full border border-border/70"
+                  style={{
+                    background:
+                      activeTextColor === "inherit" ? "hsl(var(--foreground))" : activeTextColor,
+                  }}
+                />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="z-[80] border-border bg-background p-2">
+              <div className="grid grid-cols-4 gap-1.5">
+                {STUDY_TEXT_COLORS.map((color) => (
+                  <button
+                    key={color.id}
+                    type="button"
+                    title={color.label}
+                    className="h-6 w-6 rounded-full border border-border/60 transition-transform hover:scale-110"
+                    style={{
+                      background:
+                        color.color === "inherit" ? "hsl(var(--foreground))" : color.color,
+                    }}
+                    onClick={() => {
+                      setActiveTextColor(color.color);
+                      if (color.color === "inherit") {
+                        editor?.chain().focus().unsetColor().run();
+                      } else {
+                        editor?.chain().focus().setColor(color.color).run();
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="mx-1.5 h-5 w-px bg-border/60" />
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={toolbarBtnClass}
+            title="Align left"
+            onClick={() => editor?.chain().focus().setTextAlign("left").run()}
+          >
+            <AlignLeft className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={toolbarBtnClass}
+            title="Align center"
+            onClick={() => editor?.chain().focus().setTextAlign("center").run()}
+          >
+            <AlignCenter className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={toolbarBtnClass}
+            title="Align right"
+            onClick={() => editor?.chain().focus().setTextAlign("right").run()}
+          >
+            <AlignRight className="h-3.5 w-3.5" />
+          </Button>
+
+          <div className="mx-1.5 h-5 w-px bg-border/60" />
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={toolbarBtnClass}
+            title="Bulleted list"
+            onClick={() => editor?.chain().focus().toggleBulletList().run()}
+          >
+            <List className="h-3.5 w-3.5" />
+          </Button>
+
+          <div className="mx-1.5 h-5 w-px bg-border/60" />
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={toolbarBtnClass}
+            title="Insert link"
+            onClick={() => {
+              const url = prompt("Enter URL:");
+              if (!url) return;
+              editor?.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+            }}
+          >
+            <Link2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={toolbarBtnClass}
+            title="Insert image"
+            onClick={() => imageInputRef.current?.click()}
+          >
+            <ImageIcon className="h-3.5 w-3.5" />
+          </Button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) insertStudyImage(file);
+              event.target.value = "";
+            }}
+          />
+        </div>
       </div>
-      <EditorContent
-        editor={editor}
-        onKeyDown={(event) => {
-          if (!slash) return;
-          if (event.key === "Escape") {
-            event.preventDefault();
-            setSlash(null);
-          } else if (event.key === "ArrowDown") {
-            event.preventDefault();
-            setSlashIndex((index) => Math.min(index + 1, Math.max(results.length - 1, 0)));
-          } else if (event.key === "ArrowUp") {
-            event.preventDefault();
-            setSlashIndex((index) => Math.max(index - 1, 0));
-          } else if (event.key === "Enter" && results[slashIndex]) {
-            event.preventDefault();
-            rememberTrade(results[slashIndex].id);
-          }
-        }}
-      />
-    </>
+
+      <div
+        className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[8px] border border-border/50 bg-background/40"
+        style={{ fontFamily: selectedFontFamily, fontSize: editorFontSize }}
+      >
+        <EditorContent
+          editor={editor}
+          className="flex min-h-[18rem] flex-1 flex-col overflow-y-auto [&_.ProseMirror]:min-h-[18rem] [&_.ProseMirror]:flex-1"
+          onKeyDown={(event) => {
+            if (!slash) return;
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setSlash(null);
+            } else if (event.key === "ArrowDown") {
+              event.preventDefault();
+              setSlashIndex((index) => Math.min(index + 1, Math.max(results.length - 1, 0)));
+            } else if (event.key === "ArrowUp") {
+              event.preventDefault();
+              setSlashIndex((index) => Math.max(index - 1, 0));
+            } else if (event.key === "Enter" && results[slashIndex]) {
+              event.preventDefault();
+              rememberTrade(results[slashIndex].id);
+            }
+          }}
+        />
+      </div>
+      <p className="mt-2 shrink-0 text-xs tabular-nums text-muted-foreground">
+        {charCount.toLocaleString()} characters
+      </p>
+    </div>
   );
 
   const dockLocked = Boolean(video?.locked && !video?.pip);
@@ -969,8 +1254,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
         <div
           ref={notesRef}
           className={cn(
-            "relative min-w-0 flex-1",
-            splitScroll && "flex min-h-0 flex-col",
+            "relative flex min-h-0 min-w-0 flex-1 flex-col",
             pipLocked && "min-h-[calc(100dvh-14rem)]",
           )}
         >
@@ -992,8 +1276,8 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
 
           <div
             className={cn(
-              "relative",
-              splitScroll && "min-h-0 flex-1 overflow-y-auto pr-1",
+              "relative flex min-h-0 flex-1 flex-col",
+              splitScroll && "overflow-y-auto pr-1",
               pipForNotes && "transition-[padding] duration-200",
             )}
             style={

@@ -412,7 +412,7 @@ export function CSVImport({ onImport }: CSVImportProps) {
                           <SelectValue placeholder="Select column" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="none">None</SelectItem>
                           {headers.map((h, i) => (
                             <SelectItem key={i} value={i.toString()}>{h}</SelectItem>
                           ))}
@@ -426,7 +426,7 @@ export function CSVImport({ onImport }: CSVImportProps) {
                           <SelectValue placeholder="Select column" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="none">None</SelectItem>
                           {headers.map((h, i) => (
                             <SelectItem key={i} value={i.toString()}>{h}</SelectItem>
                           ))}

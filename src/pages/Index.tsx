@@ -86,27 +86,6 @@ const pageInfo: Record<string, { title: string; subtitle: string }> = {
   settings: { title: 'Settings', subtitle: 'Customize your preferences' },
 };
 
-function dashboardDisplayName(
-  profile: { first_name?: string | null; last_name?: string | null; email?: string | null } | null,
-  user: User | null,
-): string {
-  const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim();
-  if (fullName) return fullName;
-
-  const meta = user?.user_metadata ?? {};
-  const metaName = [meta.full_name, meta.name]
-    .find((value) => typeof value === "string" && value.trim() && !value.includes("@"));
-  if (typeof metaName === "string") return metaName.trim();
-
-  const username = [meta.username, meta.user_name, meta.preferred_username]
-    .find((value) => typeof value === "string" && value.trim());
-  if (typeof username === "string" && username.trim()) return username.trim();
-
-  const email = profile?.email || user?.email || "";
-  const handle = email.split("@")[0]?.trim();
-  return handle || "";
-}
-
 interface UserProfile {
   id: string;
   user_id: string;
@@ -1215,6 +1194,7 @@ const Index = () => {
                       onCustomAccentChange={setCustomAccent}
                       customGradient={customGradient}
                       onCustomGradientChange={setCustomGradient}
+                      selectedAccountId={selectedAccountId}
                     />
                   </Suspense>
                 </PageTransition>
