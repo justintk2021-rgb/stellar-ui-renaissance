@@ -1,5 +1,6 @@
 import type { ComponentProps } from "react";
 import { NotebookView } from "@/components/Notebook/NotebookView";
+import { PsychologyJournalView } from "@/components/Notebook/PsychologyJournalView";
 import { StudyArea } from "@/components/study/StudyArea";
 import type { StudyCategory } from "@/lib/studyArea";
 
@@ -30,11 +31,26 @@ export function NotebookSection({
   onSelectedCategoryChange?: (category: string) => void;
 }) {
   if (view === "notebook") {
+    if (selectedCategory === "journal") {
+      return (
+        <div className="notebook-theme">
+          <PsychologyJournalView
+            trades={notebookProps.trades}
+            userId={notebookProps.userId}
+            notebookEntries={notebookProps.notebookEntries}
+            onSaveEntry={notebookProps.onSaveEntry}
+            focusTradeId={notebookProps.selectedTradeId}
+            onFocusHandled={() => notebookProps.onSelectTrade?.(null)}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="notebook-theme">
         <NotebookView
           {...notebookProps}
-          selectedCategory={selectedCategory}
+          selectedCategory={selectedCategory === "journal" ? "all" : selectedCategory}
           onSelectedCategoryChange={onSelectedCategoryChange}
         />
       </div>

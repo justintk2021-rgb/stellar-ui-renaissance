@@ -730,7 +730,11 @@ const Index = () => {
 
   const upsertNotebookFromQuickNotes = useCallback(async (id: string, quickNotes?: string) => {
     const trade = trades.find((t) => t.id === id);
-    const existing = notebookEntries.find((e) => e.tradeId === id && !e.isDeleted);
+    const existing =
+      notebookEntries.find((e) => e.tradeId === id && !e.isDeleted && e.category === "trade-notes") ||
+      notebookEntries.find(
+        (e) => e.tradeId === id && !e.isDeleted && e.category !== "psychology" && e.category !== "journal",
+      );
     const seed = (quickNotes ?? trade?.notes ?? "").trim();
     if (!shouldWriteQuickNotesToNotebook(seed, existing?.content) && existing) {
       if (seed) await updateTrade(id, { notes: seed });
@@ -759,8 +763,10 @@ const Index = () => {
 
   const handleSelectForNotebook = useCallback(async (id: string, quickNotes?: string) => {
     await upsertNotebookFromQuickNotes(id, quickNotes);
+    setJournalCategory("all");
     setSelectedTradeId(id);
-    setCurrentPage('notebook');
+    setNotebookView("notebook");
+    setCurrentPage("notebook");
   }, [upsertNotebookFromQuickNotes]);
 
   const { title, subtitle } = currentPage === "notebook" && notebookView === "study"
@@ -841,7 +847,7 @@ const Index = () => {
                     <StudyCategorySwitch value={studyCategory} onChange={setStudyCategory} />
                   ) : currentPage === "notebook" && notebookView === "notebook" ? (
                     <JournalCategorySwitch
-                      value={journalCategory}
+                      value={journalCategory === "journal" ? "journal" : "all"}
                       onChange={(category) => setJournalCategory(category)}
                     />
                   ) : null
@@ -1058,6 +1064,7 @@ const Index = () => {
                               onOpenPlaybook={() => setCurrentPage('playbook')}
                               onOpenPsychology={(tradeId) => {
                                 setSelectedTradeId(tradeId);
+                                setJournalCategory("journal");
                                 setNotebookView("notebook");
                                 setCurrentPage("notebook");
                               }}
