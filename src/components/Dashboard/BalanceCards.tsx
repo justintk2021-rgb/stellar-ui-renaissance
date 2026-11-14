@@ -122,20 +122,6 @@ const cardVariants = {
       delay: i * 0.1,
     },
   }),
-  hover: {
-    y: -6,
-    scale: 1.02,
-    transition: {
-      type: "spring" as const,
-      stiffness: 400,
-      damping: 20,
-    },
-  },
-};
-
-const iconVariants = {
-  initial: { rotate: 0 },
-  hover: { rotate: 15, scale: 1.1 },
 };
 
 // Removed animated glow variants to reduce visual interference
@@ -255,7 +241,6 @@ export function BalanceCards({
         variants={cardVariants}
         initial="hidden"
         animate="visible"
-        whileHover="hover"
         custom={0}
         className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
       >
@@ -263,17 +248,14 @@ export function BalanceCards({
         <div className="relative">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
-              <motion.div
-                variants={iconVariants}
-                initial="initial"
-                whileHover="hover"
+              <div
                 className={cn(
                   "w-10 h-10 rounded-xl flex items-center justify-center",
                   isPositive ? "bg-primary/15" : "bg-destructive/15"
                 )}
               >
                 <Wallet className={cn("w-5 h-5", isPositive ? "text-primary" : "text-destructive")} />
-              </motion.div>
+              </div>
               <span className="text-sm font-medium text-muted-foreground">Balance</span>
             </div>
             <Sparkline data={sparklineData} isPositive={isPositive} />
@@ -299,26 +281,22 @@ export function BalanceCards({
                       onKeyDown={handleKeyDown}
                       className="w-36 h-10 text-2xl font-bold font-mono px-2 py-0 bg-background/50 border-primary/50"
                     />
-                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-primary hover:bg-primary/20"
-                        onClick={handleConfirm}
-                      >
-                        <Check className="w-4 h-4" />
-                      </Button>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
-                        onClick={handleCancel}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </motion.div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-primary hover:bg-primary/20"
+                      onClick={handleConfirm}
+                    >
+                      <Check className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
+                      onClick={handleCancel}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
                   </motion.div>
                 ) : (
                   <motion.div
@@ -386,24 +364,20 @@ export function BalanceCards({
             variants={cardVariants}
             initial="hidden"
             animate="visible"
-            whileHover="hover"
             custom={1}
             className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
           >
             <div className="relative">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
-                  <motion.div
-                    variants={iconVariants}
-                    initial="initial"
-                    whileHover="hover"
+                  <div
                     className={cn(
                       "w-10 h-10 rounded-xl flex items-center justify-center",
                       equityPositive ? "bg-primary/15" : "bg-destructive/15"
                     )}
                   >
                     <Activity className={cn("w-5 h-5", equityPositive ? "text-primary" : "text-destructive")} />
-                  </motion.div>
+                  </div>
                   <div className="flex flex-col">
                     <span className="text-sm font-medium text-muted-foreground">Equity</span>
                     {isLive && (
@@ -516,7 +490,6 @@ export function BalanceCards({
         variants={cardVariants}
         initial="hidden"
         animate="visible"
-        whileHover="hover"
         custom={2}
         className="relative group rounded-2xl p-6 overflow-hidden bg-card/40 backdrop-blur-xl border border-border/30 shadow-xl"
       >

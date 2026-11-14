@@ -13,11 +13,6 @@ import type { UnjournaledTradePayload } from "@/types/notification";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AssetIcon } from "@/components/ui/AssetIcon";
 
-const iconVariants = {
-  initial: { rotate: 0 },
-  hover: { rotate: 15, scale: 1.1 },
-};
-
 export interface OpenJournalTarget {
   filter?: JournalFilter;
   tradeId?: string;
@@ -245,14 +240,9 @@ export function NotificationsCard({
     <div className="relative h-full">
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
-          <motion.div
-            variants={iconVariants}
-            initial="initial"
-            whileHover="hover"
-            className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/15"
-          >
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/15">
             <Bell className="w-5 h-5 text-primary" />
-          </motion.div>
+          </div>
           <span className="text-sm font-medium text-muted-foreground">Notifications</span>
         </div>
         <span

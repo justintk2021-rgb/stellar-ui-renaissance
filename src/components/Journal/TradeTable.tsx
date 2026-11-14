@@ -4,7 +4,7 @@ import { Trade, NotebookEntry } from "@/types/trade";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, ClipboardCheck, ArrowLeft, Clock, LogIn, LogOut, Timer, Check, History, BookMarked } from "lucide-react";
+import { Pencil, Trash2, ChevronRight, FileText, TrendingUp, TrendingDown, ClipboardCheck, ArrowLeft, Clock, Check, History, BookMarked } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,6 +36,7 @@ import {
   type HistoryPeriod,
 } from "@/lib/tradeHistoryPeriod";
 import { TradeScreenshot } from "./TradeScreenshot";
+import { TradeInsightModal } from "./TradeInsightModal";
 import { AssetIcon, SymbolMark } from "@/components/ui/AssetIcon";
 import { StudyNoteMentions } from "@/components/study/StudyNoteMentions";
 
@@ -56,6 +57,7 @@ interface TradeTableProps {
   onSelectForNotebook: (id: string, quickNotes?: string) => void | Promise<void>;
   onOpenStudyNote?: (noteId: string) => void;
   onOpenPlaybook?: () => void;
+  onOpenPsychology?: (tradeId: string) => void;
   onUpdateTrade?: (id: string, updates: Partial<Trade>) => void | Promise<void>;
   onClearAll?: () => void;
   focusTradeId?: string | null;
@@ -109,90 +111,23 @@ const sortTradesChronologically = (trades: Trade[]): Trade[] => {
 const sortTradesNewestFirst = (trades: Trade[]): Trade[] =>
   sortTradesChronologically(trades).reverse();
 
-// Format a timestamp into a short HH:MM (date) string
-const formatTimestamp = (iso?: string | null) => {
-  if (!iso) return null;
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return null;
-    return d.toLocaleString('en-US', {
-      month: 'short',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-  } catch {
-    return null;
-  }
-};
-
-// Format a duration in ms into "1d 2h 15m" / "2h 15m" / "45m 12s" / "12s"
-const formatDuration = (ms: number) => {
-  if (!isFinite(ms) || ms < 0) return '—';
-  const totalSeconds = Math.floor(ms / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
-};
-
-// (Broker open/close times now live directly on the trade row, populated by
-// the TradeLocker sync function — no separate fetch needed.)
-
-// Isolated live duration cell — only this component re-renders on the 1s ticker
-function OpenTradeDuration({ openTime, closeTime }: { openTime?: string; closeTime?: string }) {
-  const isOpen = !closeTime;
-  const openMs = openTime ? new Date(openTime).getTime() : NaN;
-  const closeMs = closeTime ? new Date(closeTime).getTime() : null;
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!isOpen || !isFinite(openMs)) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [isOpen, openMs]);
-
-  const durationMs = isOpen
-    ? (isFinite(openMs) ? now - openMs : NaN)
-    : (isFinite(openMs) && closeMs ? closeMs - openMs : NaN);
-
-  return (
-    <span className={cn(
-      "font-mono text-xs font-semibold tabular-nums",
-      isOpen ? "text-primary" : "text-foreground"
-    )}>
-      {formatDuration(durationMs)}
-    </span>
-  );
-}
-
 interface TradeEntryProps {
   trade: Trade;
   checklists: Checklist[];
-  userId?: string;
   onEdit: (trade: Trade) => void;
   onDelete: (id: string) => void;
   onViewNotes: (trade: Trade) => void;
-  onUpdateTrade?: (id: string, updates: Partial<Trade>) => void | Promise<void>;
+  onOpenInsight: (trade: Trade) => void;
   index: number;
-  isExpanded: boolean;
-  onToggle: () => void;
 }
 
-function TradeEntry({ trade, checklists, userId, onEdit, onDelete, onViewNotes, onUpdateTrade, index, isExpanded, onToggle }: TradeEntryProps) {
+function TradeEntry({ trade, checklists, onEdit, onDelete, onViewNotes, onOpenInsight, index }: TradeEntryProps) {
   const pl = getTradeNetResult(trade);
   const tradeIsProfit = pl >= 0;
   const dateKey = getTradeLocalDateKey(trade) || trade.date || "Unknown";
   const checklist = trade.checklistId
     ? checklists.find((c) => c.id === trade.checklistId)
     : null;
-  const closeMs = trade.closeTime ? new Date(trade.closeTime).getTime() : null;
-  const isOpen = !closeMs;
 
   return (
     <motion.div
@@ -202,27 +137,22 @@ function TradeEntry({ trade, checklists, userId, onEdit, onDelete, onViewNotes, 
       className="border-b border-border/20 last:border-b-0"
     >
       <motion.div
-        onClick={(e) => { e.stopPropagation(); onToggle(); }}
+        onClick={(e) => { e.stopPropagation(); onOpenInsight(trade); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpenInsight(trade);
+          }
+        }}
+        role="button"
+        tabIndex={0}
         whileHover={{ backgroundColor: "hsl(var(--primary) / 0.05)" }}
         whileTap={{ scale: 0.995 }}
-        className={cn(
-          "flex items-center gap-3 px-5 py-3.5 cursor-pointer transition-all duration-300",
-          isExpanded && "bg-muted/30"
-        )}
+        className="flex items-center gap-3 px-5 py-3.5 cursor-pointer transition-all duration-300"
       >
-        <motion.div
-          animate={{ rotate: isExpanded ? 90 : 0 }}
-          transition={{ duration: 0.2, type: "spring", stiffness: 200 }}
-          className={cn(
-            "p-1.5 rounded-lg transition-colors duration-200 shrink-0",
-            isExpanded ? "bg-primary/10" : "bg-muted/50"
-          )}
-        >
-          <ChevronRight className={cn(
-            "w-4 h-4 transition-colors duration-200",
-            isExpanded ? "text-primary" : "text-muted-foreground"
-          )} />
-        </motion.div>
+        <div className="p-1.5 rounded-lg bg-muted/50 shrink-0">
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </div>
 
         <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
           <span className="text-xs text-muted-foreground min-w-[132px] tabular-nums">
@@ -312,133 +242,16 @@ function TradeEntry({ trade, checklists, userId, onEdit, onDelete, onViewNotes, 
           />
         </div>
       </motion.div>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-            className="overflow-hidden"
-          >
-            <div className="px-5 pb-4 pl-14 bg-card/20 border-t border-border/10">
-              {trade.importedFromBroker && (trade.openTime || trade.closeTime) && (
-                <div className="flex justify-center mt-3 mb-1.5">
-                  <div className="inline-flex items-stretch gap-0 rounded-full bg-muted/40 backdrop-blur-sm px-1 py-0.5 shadow-sm">
-                    {trade.openTime && (
-                      <div className="flex items-center gap-1.5 px-3 py-1">
-                        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-background/60">
-                          <LogIn className="w-3 h-3 text-muted-foreground" />
-                        </div>
-                        <div className="flex flex-col leading-tight">
-                          <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 font-medium">Open</span>
-                          <span className="font-mono text-xs font-semibold text-foreground">{formatTimestamp(trade.openTime)}</span>
-                        </div>
-                      </div>
-                    )}
-                    <div className="w-px bg-border/50 my-1.5" />
-                    <div className="flex items-center gap-1.5 px-3 py-1">
-                      <div className={cn(
-                        "flex items-center justify-center w-5 h-5 rounded-full",
-                        isOpen ? "bg-primary/15" : "bg-background/60"
-                      )}>
-                        <LogOut className={cn(
-                          "w-3 h-3",
-                          isOpen ? "text-primary" : "text-muted-foreground"
-                        )} />
-                      </div>
-                      <div className="flex flex-col leading-tight">
-                        <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 font-medium">Close</span>
-                        {trade.closeTime ? (
-                          <span className="font-mono text-xs font-semibold text-foreground">{formatTimestamp(trade.closeTime)}</span>
-                        ) : (
-                          <span className="font-mono text-xs font-semibold text-primary">Still open</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="w-px bg-border/50 my-1.5" />
-                    <div className="flex items-center gap-1.5 px-3 py-1">
-                      <div className={cn(
-                        "flex items-center justify-center w-5 h-5 rounded-full",
-                        isOpen ? "bg-primary/15" : "bg-background/60"
-                      )}>
-                        <Timer className={cn(
-                          "w-3 h-3",
-                          isOpen ? "text-primary" : "text-muted-foreground"
-                        )} />
-                      </div>
-                      <div className="flex flex-col leading-tight">
-                        <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 font-medium">Duration</span>
-                        <OpenTradeDuration openTime={trade.openTime} closeTime={trade.closeTime} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {(userId || onUpdateTrade) && (
-                <div className="mt-3 max-w-md">
-                  <TradeScreenshot
-                    tradeId={trade.id}
-                    userId={userId}
-                    compact
-                    editable={!!onUpdateTrade}
-                    onUpdate={
-                      onUpdateTrade
-                        ? (chartImage) => onUpdateTrade(trade.id, { chartImage })
-                        : undefined
-                    }
-                  />
-                </div>
-              )}
-
-              {trade.importedFromBroker && (trade.openPrice || trade.closePrice || trade.swap || trade.commission) && (
-                <div className="flex items-center gap-4 mt-2 flex-wrap">
-                  {trade.openPrice != null && (
-                    <span className="text-[11px] text-muted-foreground">
-                      <span className="opacity-60">Open:</span>{" "}
-                      <span className="font-mono font-medium text-foreground">{trade.openPrice.toFixed(trade.openPrice > 100 ? 2 : 5)}</span>
-                    </span>
-                  )}
-                  {trade.closePrice != null && (
-                    <span className="text-[11px] text-muted-foreground">
-                      <span className="opacity-60">Close:</span>{" "}
-                      <span className="font-mono font-medium text-foreground">{trade.closePrice.toFixed(trade.closePrice > 100 ? 2 : 5)}</span>
-                    </span>
-                  )}
-                  {(trade.swap != null && trade.swap !== 0) && (
-                    <span className="text-[11px] text-muted-foreground">
-                      <span className="opacity-60">Swap:</span>{" "}
-                      <span className={cn("font-mono font-medium", trade.swap < 0 ? "text-destructive" : "text-primary")}>
-                        {trade.swap < 0 ? "" : "+"}{trade.swap.toFixed(2)}
-                      </span>
-                    </span>
-                  )}
-                  {(trade.commission != null && trade.commission !== 0) && (
-                    <span className="text-[11px] text-muted-foreground">
-                      <span className="opacity-60">Commission:</span>{" "}
-                      <span className={cn("font-mono font-medium", trade.commission < 0 ? "text-destructive" : "text-foreground")}>
-                        {trade.commission.toFixed(2)}
-                      </span>
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }
 
-export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onOpenStudyNote, onOpenPlaybook, onUpdateTrade, focusTradeId, openNotesOnFocus = false, onFocusHandled }: TradeTableProps) {
+export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [], checklists = [], userId, onEdit, onDelete, onSelectForNotebook, onOpenStudyNote, onOpenPlaybook, onOpenPsychology, onUpdateTrade, focusTradeId, openNotesOnFocus = false, onFocusHandled }: TradeTableProps) {
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [dayTrades, setDayTrades] = useState<Trade[] | null>(null);
   const [notesView, setNotesView] = useState<'list' | 'note'>('list');
-  const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
+  const [insightTrade, setInsightTrade] = useState<Trade | null>(null);
   const [notesDraft, setNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriod>("all");
@@ -471,33 +284,10 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
   const rowVirtualizer = useVirtualizer({
     count: filteredTrades.length,
     getScrollElement: () => scrollContainerRef.current,
-    estimateSize: (index) => {
-      const trade = filteredTrades[index];
-      return trade && expandedTradeId === trade.id ? 260 : 72;
-    },
+    estimateSize: () => 72,
     overscan: 10,
     getItemKey: (index) => filteredTrades[index]?.id ?? index,
   });
-
-  useEffect(() => {
-    rowVirtualizer.measure();
-  }, [expandedTradeId, rowVirtualizer]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setExpandedTradeId(null);
-      }
-    };
-
-    if (expandedTradeId) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [expandedTradeId]);
 
   const seedQuickNotes = (trade: Trade) => {
     if (trade.notes?.trim()) return trade.notes;
@@ -528,7 +318,6 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
     }
     const trade = filteredTrades[index];
     rowVirtualizer.scrollToIndex(index, { align: "center" });
-    setExpandedTradeId(trade.id);
     if (openNotesOnFocus) {
       setDayTrades(null);
       setSelectedTrade(trade);
@@ -536,6 +325,7 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
       setNotesView("note");
       setNotesModalOpen(true);
     } else {
+      setInsightTrade(trade);
       requestAnimationFrame(() => {
         document.getElementById(`trade-row-${trade.id}`)?.scrollIntoView({
           block: "center",
@@ -781,14 +571,11 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
                       <TradeEntry
                         trade={trade}
                         checklists={checklists}
-                        userId={userId}
                         onEdit={onEdit}
                         onDelete={onDelete}
                         onViewNotes={handleViewNotes}
-                        onUpdateTrade={onUpdateTrade}
+                        onOpenInsight={setInsightTrade}
                         index={virtualRow.index}
-                        isExpanded={expandedTradeId === trade.id}
-                        onToggle={() => setExpandedTradeId(expandedTradeId === trade.id ? null : trade.id)}
                       />
                     </div>
                   );
@@ -1074,6 +861,27 @@ export const TradeTable = memo(function TradeTable({ trades, notebookEntries = [
           </AnimatePresence>
         </DialogContent>
       </Dialog>
+
+      <TradeInsightModal
+        trade={insightTrade}
+        open={!!insightTrade}
+        onOpenChange={(open) => {
+          if (!open) setInsightTrade(null);
+        }}
+        userId={userId}
+        checklists={checklists}
+        notebookEntries={notebookEntries}
+        onUpdateTrade={onUpdateTrade}
+        onTradeChange={setInsightTrade}
+        onOpenPlaybook={onOpenPlaybook}
+        onOpenPsychology={onOpenPsychology}
+        onSelectForNotebook={onSelectForNotebook}
+        onOpenStudyNote={onOpenStudyNote}
+        onEdit={(trade) => {
+          setInsightTrade(null);
+          onEdit(trade);
+        }}
+      />
     </>
   );
 });

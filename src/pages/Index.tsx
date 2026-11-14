@@ -1056,6 +1056,11 @@ const Index = () => {
                                 setCurrentPage("notebook");
                               }}
                               onOpenPlaybook={() => setCurrentPage('playbook')}
+                              onOpenPsychology={(tradeId) => {
+                                setSelectedTradeId(tradeId);
+                                setNotebookView("notebook");
+                                setCurrentPage("notebook");
+                              }}
                               onUpdateTrade={async (id, updates) => {
                                 await updateTrade(id, updates);
                                 if (typeof updates.notes === "string") {
