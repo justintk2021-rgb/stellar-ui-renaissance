@@ -1,10 +1,9 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { Trade, DailyStats, NotebookEntry } from "@/types/trade";
 import { useChecklists } from "@/hooks/useChecklists";
 import { cn, truncateNum } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, Clock, MoreVertical, FileText, StickyNote, Settings, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Link2, Quote, Plus, ArrowDownLeft } from "lucide-react";
 import { TradeFormModal } from "@/components/Journal/TradeFormModal";
-import { TradeScreenshot } from "@/components/Journal/TradeScreenshot";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -92,6 +91,59 @@ export function PnLCalendar({
   // Trade form modal state
   const [tradeFormOpen, setTradeFormOpen] = useState(false);
   const [tradeFormDate, setTradeFormDate] = useState<string | null>(null);
+  const daySummaryScrollRef = useRef<HTMLDivElement>(null);
+
+  // Keep page scroll locked while the daily summary popup is open.
+  useEffect(() => {
+    if (!selectedDate) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyPaddingRight = body.style.paddingRight;
+    const scrollbarGap = window.innerWidth - html.clientWidth;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    if (scrollbarGap > 0) {
+      body.style.paddingRight = `${scrollbarGap}px`;
+    }
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.paddingRight = prevBodyPaddingRight;
+    };
+  }, [selectedDate]);
+
+  // Trap wheel/trackpad scrolling inside the popup (prevents page scroll chaining).
+  useEffect(() => {
+    if (!selectedDate) return;
+
+    const onWheel = (event: WheelEvent) => {
+      const el = daySummaryScrollRef.current;
+      const target = event.target as Node | null;
+      const insidePopup = !!(el && target && el.contains(target));
+
+      if (!insidePopup) {
+        event.preventDefault();
+        return;
+      }
+
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const atTop = scrollTop <= 0;
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
+      const canScroll = scrollHeight > clientHeight + 1;
+
+      if (!canScroll || (event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom)) {
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener("wheel", onWheel, { passive: false });
+    return () => document.removeEventListener("wheel", onWheel);
+  }, [selectedDate]);
 
   // Text formatting function
   const applyFormat = useCallback((command: string, value?: string) => {
@@ -781,13 +833,15 @@ export function PnLCalendar({
 
       {/* Trade Details Modal */}
       <Dialog open={!!selectedDate} onOpenChange={() => setSelectedDate(null)}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0 data-[state=open]:animate-none data-[state=closed]:animate-none">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden p-0 gap-0 flex flex-col data-[state=open]:animate-none data-[state=closed]:animate-none">
           <motion.div
+            ref={daySummaryScrollRef}
             initial={{ opacity: 0, scale: 0.92, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: "spring", stiffness: 350, damping: 30 }}
-            className="p-6 space-y-0"
+            className="p-6 space-y-0 flex-1 min-h-0 overflow-y-auto overscroll-contain"
+            data-lenis-prevent
           >
           <DialogHeader className="pb-4 border-b border-border/30">
             <div className="flex items-center justify-between">
@@ -801,28 +855,6 @@ export function PnLCalendar({
                 </DialogTitle>
                 <p className="text-xs text-muted-foreground mt-1">Daily Trade Summary</p>
               </motion.div>
-            {selectedDate && selectedTrades.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.15, type: "spring", stiffness: 300, damping: 25 }}
-              >
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (selectedTrades.length > 0) {
-                    openTradeNoteDialog(selectedTrades[0], e);
-                  }
-                }}
-                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <FileText className="w-3.5 h-3.5 mr-1" />
-                View Notes
-              </Button>
-              </motion.div>
-            )}
             </div>
           </DialogHeader>
 
@@ -1052,19 +1084,6 @@ export function PnLCalendar({
                               {tradeChecklist.name}
                             </Badge>
                           </div>
-                        )}
-                        {userId && (
-                          <TradeScreenshot
-                            tradeId={trade.id}
-                            userId={userId}
-                            compact
-                            editable={!!onUpdateTrade}
-                            onUpdate={
-                              onUpdateTrade
-                                ? (chartImage) => onUpdateTrade(trade.id, { chartImage })
-                                : undefined
-                            }
-                          />
                         )}
                       </motion.div>
                     );

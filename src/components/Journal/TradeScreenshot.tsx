@@ -80,29 +80,29 @@ export function TradeScreenshot({
             <button
               type="button"
               className={cn(
-                "relative w-full rounded-lg overflow-hidden border border-border/40 bg-muted/20 text-left",
+                "relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden rounded-lg border border-border/40 bg-background/40 text-left",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                compact ? "h-24" : !className?.includes("h-") && "h-56",
               )}
             >
               <img
                 src={chartImage}
                 alt="Trade screenshot"
                 loading="lazy"
-                className={cn(
-                  "w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]",
-                  compact ? "h-24" : "max-h-56 object-contain bg-muted/10",
-                )}
+                className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
               />
-              <span className="absolute inset-0 flex items-center justify-center bg-background/0 group-hover:bg-background/30 transition-colors">
-                <ZoomIn className="w-5 h-5 text-foreground opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
+              <span className="absolute inset-0 flex items-center justify-center bg-background/0 transition-colors group-hover:bg-background/20">
+                <ZoomIn className="h-5 w-5 text-foreground opacity-0 drop-shadow transition-opacity group-hover:opacity-100" />
               </span>
             </button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl p-2 bg-card/95 border-border/50">
+          <DialogContent className="w-[min(96vw,72rem)] max-w-[96vw] p-2 sm:p-3 bg-card/95 border-border/50">
             <img
               src={chartImage}
               alt="Trade screenshot full size"
-              className="w-full max-h-[80vh] object-contain rounded-md"
+              decoding="sync"
+              className="mx-auto block h-auto max-h-[85vh] w-auto max-w-full rounded-md object-contain"
+              style={{ imageRendering: "auto" }}
             />
           </DialogContent>
         </Dialog>

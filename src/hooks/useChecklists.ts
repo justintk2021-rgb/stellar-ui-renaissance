@@ -31,6 +31,7 @@ async function fetchChecklists(userId: string): Promise<Checklist[]> {
 
 export function useChecklists() {
   const [userId, setUserId] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -38,22 +39,26 @@ export function useChecklists() {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUserId(user?.id || null);
+      setAuthReady(true);
     };
     getUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUserId(session?.user?.id || null);
+      setAuthReady(true);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const { data: checklists = [], isLoading: loading } = useQuery({
+  const { data: checklists = [], isLoading: queryLoading } = useQuery({
     queryKey: queryKeys.checklists.list(userId ?? ''),
     queryFn: () => fetchChecklists(userId!),
     enabled: !!userId,
     staleTime: 60_000,
   });
+
+  const loading = !authReady || (!!userId && queryLoading);
 
   useEffect(() => {
     if (!userId) return;

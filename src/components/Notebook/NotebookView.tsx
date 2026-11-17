@@ -102,6 +102,28 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence, useMotionValue } from "@/lib/motion";
+import {
+  NOTEBOOK_FONTS,
+  TEXT_COLORS,
+  EDITOR_SURFACE_CLASS,
+  NotebookEditorToolbar,
+  notebookImageHtml,
+  enhanceNotebookMedia,
+} from "@/components/Notebook/RichTextEditor";
+import { StudyTabStrip } from "@/components/study/StudyTabStrip";
+import {
+  HOME_TAB,
+  HOME_TAB_KEY,
+  ensureHomeFirst,
+  neighborAfterClose,
+  noteTabKey,
+  removeTab,
+  syncNoteTabTitle,
+  upsertNoteTab,
+  type StudyTab,
+} from "@/components/study/studyTabs";
+
+const NOTEBOOK_DRAFT_ID = "__draft__";
 
 interface NotebookViewProps {
   trades: Trade[];
@@ -144,59 +166,6 @@ const CATEGORIES = [
 ];
 
 // 50 Fonts organized by category
-const NOTEBOOK_FONTS = [
-  // Sans Serif - Modern
-  { id: 'inter', name: 'Inter', family: "'Inter', sans-serif", category: 'Sans Serif' },
-  { id: 'roboto', name: 'Roboto', family: "'Roboto', sans-serif", category: 'Sans Serif' },
-  { id: 'open-sans', name: 'Open Sans', family: "'Open Sans', sans-serif", category: 'Sans Serif' },
-  { id: 'lato', name: 'Lato', family: "'Lato', sans-serif", category: 'Sans Serif' },
-  { id: 'montserrat', name: 'Montserrat', family: "'Montserrat', sans-serif", category: 'Sans Serif' },
-  { id: 'poppins', name: 'Poppins', family: "'Poppins', sans-serif", category: 'Sans Serif' },
-  { id: 'raleway', name: 'Raleway', family: "'Raleway', sans-serif", category: 'Sans Serif' },
-  { id: 'nunito', name: 'Nunito', family: "'Nunito', sans-serif", category: 'Sans Serif' },
-  { id: 'ubuntu', name: 'Ubuntu', family: "'Ubuntu', sans-serif", category: 'Sans Serif' },
-  { id: 'rubik', name: 'Rubik', family: "'Rubik', sans-serif", category: 'Sans Serif' },
-  { id: 'oswald', name: 'Oswald', family: "'Oswald', sans-serif", category: 'Sans Serif' },
-  { id: 'dm-sans', name: 'DM Sans', family: "'DM Sans', sans-serif", category: 'Sans Serif' },
-  { id: 'space-grotesk', name: 'Space Grotesk', family: "'Space Grotesk', sans-serif", category: 'Sans Serif' },
-  { id: 'outfit', name: 'Outfit', family: "'Outfit', sans-serif", category: 'Sans Serif' },
-  { id: 'work-sans', name: 'Work Sans', family: "'Work Sans', sans-serif", category: 'Sans Serif' },
-  { id: 'plus-jakarta', name: 'Plus Jakarta Sans', family: "'Plus Jakarta Sans', sans-serif", category: 'Sans Serif' },
-  { id: 'manrope', name: 'Manrope', family: "'Manrope', sans-serif", category: 'Sans Serif' },
-  { id: 'sora', name: 'Sora', family: "'Sora', sans-serif", category: 'Sans Serif' },
-  { id: 'lexend', name: 'Lexend', family: "'Lexend', sans-serif", category: 'Sans Serif' },
-  { id: 'urbanist', name: 'Urbanist', family: "'Urbanist', sans-serif", category: 'Sans Serif' },
-  { id: 'figtree', name: 'Figtree', family: "'Figtree', sans-serif", category: 'Sans Serif' },
-  { id: 'archivo', name: 'Archivo', family: "'Archivo', sans-serif", category: 'Sans Serif' },
-  { id: 'barlow', name: 'Barlow', family: "'Barlow', sans-serif", category: 'Sans Serif' },
-  { id: 'karla', name: 'Karla', family: "'Karla', sans-serif", category: 'Sans Serif' },
-  { id: 'quicksand', name: 'Quicksand', family: "'Quicksand', sans-serif", category: 'Sans Serif' },
-  { id: 'comfortaa', name: 'Comfortaa', family: "'Comfortaa', sans-serif", category: 'Sans Serif' },
-  { id: 'varela-round', name: 'Varela Round', family: "'Varela Round', sans-serif", category: 'Sans Serif' },
-  // Serif - Classic
-  { id: 'merriweather', name: 'Merriweather', family: "'Merriweather', serif", category: 'Serif' },
-  { id: 'playfair', name: 'Playfair Display', family: "'Playfair Display', serif", category: 'Serif' },
-  { id: 'libre-baskerville', name: 'Libre Baskerville', family: "'Libre Baskerville', serif", category: 'Serif' },
-  { id: 'crimson', name: 'Crimson Text', family: "'Crimson Text', serif", category: 'Serif' },
-  { id: 'source-serif', name: 'Source Serif 4', family: "'Source Serif 4', serif", category: 'Serif' },
-  { id: 'cormorant', name: 'Cormorant Garamond', family: "'Cormorant Garamond', serif", category: 'Serif' },
-  { id: 'eb-garamond', name: 'EB Garamond', family: "'EB Garamond', serif", category: 'Serif' },
-  { id: 'spectral', name: 'Spectral', family: "'Spectral', serif", category: 'Serif' },
-  { id: 'bitter', name: 'Bitter', family: "'Bitter', serif", category: 'Serif' },
-  { id: 'lora', name: 'Lora', family: "'Lora', serif", category: 'Serif' },
-  // Monospace - Code
-  { id: 'source-code', name: 'Source Code Pro', family: "'Source Code Pro', monospace", category: 'Monospace' },
-  { id: 'fira-code', name: 'Fira Code', family: "'Fira Code', monospace", category: 'Monospace' },
-  { id: 'jetbrains', name: 'JetBrains Mono', family: "'JetBrains Mono', monospace", category: 'Monospace' },
-  { id: 'ibm-plex', name: 'IBM Plex Mono', family: "'IBM Plex Mono', monospace", category: 'Monospace' },
-  { id: 'space-mono', name: 'Space Mono', family: "'Space Mono', monospace", category: 'Monospace' },
-  { id: 'roboto-mono', name: 'Roboto Mono', family: "'Roboto Mono', monospace", category: 'Monospace' },
-  { id: 'cousine', name: 'Cousine', family: "'Cousine', monospace", category: 'Monospace' },
-  { id: 'anonymous', name: 'Anonymous Pro', family: "'Anonymous Pro', monospace", category: 'Monospace' },
-  { id: 'overpass-mono', name: 'Overpass Mono', family: "'Overpass Mono', monospace", category: 'Monospace' },
-  { id: 'inconsolata', name: 'Inconsolata', family: "'Inconsolata', monospace", category: 'Monospace' },
-];
-
 type FontStyle = string;
 
 export function NotebookView({
@@ -230,6 +199,8 @@ export function NotebookView({
     [onSelectedCategoryChange],
   );
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<StudyTab[]>([HOME_TAB]);
+  const [activeTabKey, setActiveTabKey] = useState<string>(HOME_TAB_KEY);
   const [searchQuery, setSearchQuery] = useState("");
   const deferredSearch = useDebouncedValue(searchQuery, 160);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -239,7 +210,71 @@ export function NotebookView({
     categorySyncRef.current = selectedCategory;
     setSelectedEntryId(null);
     setIsCreatingNew(false);
+    setTabs([HOME_TAB]);
+    setActiveTabKey(HOME_TAB_KEY);
   }, [selectedCategory]);
+
+  const openNoteTab = useCallback((id: string, title?: string) => {
+    const entry = notebookEntries.find((item) => item.id === id);
+    const nextTitle = title?.trim() || entry?.title?.trim() || "Untitled";
+    setTabs((current) => upsertNoteTab(current, id, nextTitle));
+    setActiveTabKey(noteTabKey(id));
+    setSelectedEntryId(id);
+    setIsCreatingNew(false);
+  }, [notebookEntries]);
+
+  const activateNotebookTab = useCallback((key: string) => {
+    setActiveTabKey(key);
+    if (key === HOME_TAB_KEY) {
+      setSelectedEntryId(null);
+      setIsCreatingNew(false);
+      return;
+    }
+    if (key === noteTabKey(NOTEBOOK_DRAFT_ID)) {
+      setSelectedEntryId(null);
+      setIsCreatingNew(true);
+      return;
+    }
+    if (key.startsWith("note:")) {
+      const id = key.slice(5);
+      setSelectedEntryId(id);
+      setIsCreatingNew(false);
+    }
+  }, []);
+
+  const closeNotebookTab = useCallback((key: string) => {
+    if (key === HOME_TAB_KEY) return;
+    setTabs((current) => {
+      const nextActive = neighborAfterClose(current, key, activeTabKey);
+      const next = removeTab(current, key);
+      setActiveTabKey(nextActive);
+      if (nextActive === HOME_TAB_KEY) {
+        setSelectedEntryId(null);
+        setIsCreatingNew(false);
+      } else if (nextActive === noteTabKey(NOTEBOOK_DRAFT_ID)) {
+        setSelectedEntryId(null);
+        setIsCreatingNew(true);
+      } else if (nextActive.startsWith("note:")) {
+        setSelectedEntryId(nextActive.slice(5));
+        setIsCreatingNew(false);
+      }
+      return next;
+    });
+  }, [activeTabKey]);
+
+  // Keep open tab titles in sync with note data
+  useEffect(() => {
+    setTabs((current) =>
+      current.map((tab) => {
+        if (tab.kind !== "note" || tab.id === NOTEBOOK_DRAFT_ID) return tab;
+        const entry = notebookEntries.find((item) => item.id === tab.id);
+        if (!entry) return tab;
+        const title = entry.title?.trim() || "Untitled";
+        if (title === tab.title) return tab;
+        return { ...tab, title };
+      }),
+    );
+  }, [notebookEntries]);
   const [isSmallText, setIsSmallText] = useState(false);
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isFullWidthClosing, setIsFullWidthClosing] = useState(false);
@@ -308,8 +343,6 @@ export function NotebookView({
   const [activeTextColor, setActiveTextColor] = useState("inherit");
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const FONT_SIZE_OPTIONS = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px"] as const;
-
   const focusActiveEditor = () => {
     const target = (isFullWidth ? fullscreenEditorRef : editorRef).current;
     target?.focus();
@@ -337,11 +370,8 @@ export function NotebookView({
       focusActiveEditor();
       const src = typeof reader.result === "string" ? reader.result : "";
       if (!src) return;
-      document.execCommand(
-        "insertHTML",
-        false,
-        `<img src="${src}" alt="" style="max-width:100%;height:auto;border-radius:8px;margin:8px 0;" />`,
-      );
+      document.execCommand("insertHTML", false, notebookImageHtml(src));
+      enhanceNotebookMedia(focusActiveEditor());
     };
     reader.readAsDataURL(file);
   };
@@ -486,7 +516,10 @@ export function NotebookView({
         const editorIsFocused = document.activeElement === editorRef.current;
         if (!editorIsFocused || !editorRef.current.innerHTML.trim()) {
           editorRef.current.innerHTML = incoming;
+          enhanceNotebookMedia(editorRef.current);
         }
+      } else {
+        enhanceNotebookMedia(editorRef.current);
       }
     } else if (editorRef.current && isCreatingNew) {
       editorRef.current.innerHTML = "";
@@ -503,6 +536,7 @@ export function NotebookView({
   useEffect(() => {
     if (isFullWidth && editorRef.current && fullscreenEditorRef.current) {
       fullscreenEditorRef.current.innerHTML = editorRef.current.innerHTML;
+      enhanceNotebookMedia(fullscreenEditorRef.current);
       if (titleRef.current && fullscreenTitleRef.current) {
         fullscreenTitleRef.current.value = titleRef.current.value;
       }
@@ -514,6 +548,7 @@ export function NotebookView({
     // Sync content back to main editor before closing
     if (fullscreenEditorRef.current && editorRef.current) {
       editorRef.current.innerHTML = fullscreenEditorRef.current.innerHTML;
+      enhanceNotebookMedia(editorRef.current);
     }
     if (fullscreenTitleRef.current && titleRef.current) {
       titleRef.current.value = fullscreenTitleRef.current.value;
@@ -531,12 +566,11 @@ export function NotebookView({
       // Find the notebook entry linked to this trade
       const linkedEntry = notebookEntries.find(e => e.tradeId === selectedTradeId && !e.isDeleted);
       if (linkedEntry) {
-        setSelectedEntryId(linkedEntry.id);
         setSelectedCategory(linkedEntry.category || 'trade-notes');
-        setIsCreatingNew(false);
+        openNoteTab(linkedEntry.id, linkedEntry.title);
       }
     }
-  }, [selectedTradeId, notebookEntries]);
+  }, [selectedTradeId, notebookEntries, openNoteTab, setSelectedCategory]);
 
   // Handle Escape key to exit fullscreen
   useEffect(() => {
@@ -670,6 +704,11 @@ export function NotebookView({
         updatedAt: new Date().toISOString(),
       };
       void Promise.resolve(onSaveEntry(newEntry)).then(() => {
+        setTabs((current) => {
+          const withoutDraft = removeTab(current, noteTabKey(NOTEBOOK_DRAFT_ID));
+          return upsertNoteTab(withoutDraft, newEntry.id, newEntry.title);
+        });
+        setActiveTabKey(noteTabKey(newEntry.id));
         setSelectedEntryId(newEntry.id);
         setIsCreatingNew(false);
         setLastSavedAt(new Date());
@@ -682,6 +721,7 @@ export function NotebookView({
         content,
         updatedAt: new Date().toISOString(),
       })).then(() => {
+        setTabs((current) => syncNoteTabTitle(current, selectedEntry.id, title));
         setLastSavedAt(new Date());
         toast.success("Note saved!");
       });
@@ -695,6 +735,8 @@ export function NotebookView({
     setIsCreatingNew(true);
     setSelectedEntryId(null);
     setIsLocked(false);
+    setTabs((current) => upsertNoteTab(current, NOTEBOOK_DRAFT_ID, "Untitled"));
+    setActiveTabKey(noteTabKey(NOTEBOOK_DRAFT_ID));
     if (titleRef.current) titleRef.current.value = "";
     if (editorRef.current) editorRef.current.innerHTML = "";
   };
@@ -718,18 +760,20 @@ export function NotebookView({
     }
     setSelectedEntryId(null);
     setIsCreatingNew(false);
+    setActiveTabKey(HOME_TAB_KEY);
   };
 
   // Soft delete - move to trash
   const handleMoveToTrash = () => {
     if (selectedEntry) {
+      const id = selectedEntry.id;
       onSaveEntry({
         ...selectedEntry,
         isDeleted: true,
         deletedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-      setSelectedEntryId(null);
+      closeNotebookTab(noteTabKey(id));
       toast.success("Note moved to trash!");
     }
   };
@@ -761,17 +805,28 @@ export function NotebookView({
     const id = entryId ?? selectedEntry?.id;
     if (!id) return;
     onDeleteEntry(id);
-    if (selectedEntryId === id) setSelectedEntryId(null);
+    closeNotebookTab(noteTabKey(id));
     toast.success("Note permanently deleted!");
   };
 
   // Empty trash
   const handleEmptyTrash = () => {
     const trashedEntries = notebookEntries.filter((e) => e.isDeleted);
+    const trashedIds = new Set(trashedEntries.map((entry) => entry.id));
     trashedEntries.forEach((entry) => {
       onDeleteEntry(entry.id);
     });
-    if (selectedEntry?.isDeleted) setSelectedEntryId(null);
+    setTabs((current) =>
+      ensureHomeFirst(current.filter((tab) => tab.kind !== "note" || !trashedIds.has(tab.id))),
+    );
+    setActiveTabKey((current) => {
+      if (current.startsWith("note:") && trashedIds.has(current.slice(5))) return HOME_TAB_KEY;
+      return current;
+    });
+    if (selectedEntry?.isDeleted) {
+      setSelectedEntryId(null);
+      setIsCreatingNew(false);
+    }
     setIsTrashDialogOpen(false);
     toast.success("Trash emptied!");
   };
@@ -789,7 +844,7 @@ export function NotebookView({
       updatedAt: new Date().toISOString(),
     };
     void Promise.resolve(onSaveEntry(duplicatedEntry)).then(() => {
-      setSelectedEntryId(duplicatedEntry.id);
+      openNoteTab(duplicatedEntry.id, duplicatedEntry.title);
       toast.success("Note duplicated!");
     });
   };
@@ -864,7 +919,7 @@ export function NotebookView({
       updatedAt: new Date().toISOString(),
     };
     void Promise.resolve(onSaveEntry(duplicatedEntry)).then(() => {
-      setSelectedEntryId(duplicatedEntry.id);
+      openNoteTab(duplicatedEntry.id, duplicatedEntry.title);
       toast.success("Note duplicated!");
     });
   };
@@ -951,7 +1006,7 @@ export function NotebookView({
         deletedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-      if (selectedEntryId === entry.id) setSelectedEntryId(null);
+      closeNotebookTab(noteTabKey(entry.id));
       toast.success("Note moved to trash!");
       return;
     }
@@ -1195,18 +1250,6 @@ export function NotebookView({
   };
 
   // Text and highlight colors
-  const TEXT_COLORS = [
-    { id: 'default', label: 'Default', color: 'inherit' },
-    { id: 'red', label: 'Red', color: '#ef4444' },
-    { id: 'orange', label: 'Orange', color: '#f97316' },
-    { id: 'yellow', label: 'Yellow', color: '#eab308' },
-    { id: 'green', label: 'Green', color: '#22c55e' },
-    { id: 'blue', label: 'Blue', color: '#3b82f6' },
-    { id: 'purple', label: 'Purple', color: '#a855f7' },
-    { id: 'pink', label: 'Pink', color: '#ec4899' },
-    { id: 'gray', label: 'Gray', color: '#6b7280' },
-  ];
-
   const HIGHLIGHT_COLORS = [
     { id: 'none', label: 'None', color: 'transparent' },
     { id: 'yellow', label: 'Yellow', color: 'rgba(234, 179, 8, 0.3)' },
@@ -1325,256 +1368,24 @@ export function NotebookView({
     "h-8 w-8 p-0 rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground";
 
   const renderEditorToolbar = (disabled: boolean) => (
-    <div className="flex flex-wrap items-center gap-0.5 px-1 py-1.5">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2.5 rounded-md text-xs gap-1.5 min-w-[7.5rem] justify-between text-foreground hover:bg-muted/60"
-            disabled={disabled}
-          >
-            <span className="truncate" style={{ fontFamily: selectedFontFamily }}>
-              {NOTEBOOK_FONTS.find((f) => f.id === notebookFont)?.name || "Inter"}
-            </span>
-            <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto bg-background border border-border z-[80]">
-          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background">
-            Sans Serif
-          </div>
-          {NOTEBOOK_FONTS.filter((f) => f.category === "Sans Serif").map((font) => (
-            <DropdownMenuItem
-              key={font.id}
-              onClick={() => onFontChange?.(font.id)}
-              className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
-              style={{ fontFamily: font.family }}
-            >
-              {font.name}
-            </DropdownMenuItem>
-          ))}
-          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background mt-1">
-            Serif
-          </div>
-          {NOTEBOOK_FONTS.filter((f) => f.category === "Serif").map((font) => (
-            <DropdownMenuItem
-              key={font.id}
-              onClick={() => onFontChange?.(font.id)}
-              className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
-              style={{ fontFamily: font.family }}
-            >
-              {font.name}
-            </DropdownMenuItem>
-          ))}
-          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground sticky top-0 bg-background mt-1">
-            Monospace
-          </div>
-          {NOTEBOOK_FONTS.filter((f) => f.category === "Monospace").map((font) => (
-            <DropdownMenuItem
-              key={font.id}
-              onClick={() => onFontChange?.(font.id)}
-              className={cn("text-xs cursor-pointer", notebookFont === font.id && "bg-primary/10")}
-              style={{ fontFamily: font.family }}
-            >
-              {font.name}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2.5 rounded-md text-xs gap-1 min-w-[4.25rem] justify-between text-foreground hover:bg-muted/60"
-            disabled={disabled}
-          >
-            <span>{editorFontSize}</span>
-            <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-28 bg-background border border-border z-[80]">
-          {FONT_SIZE_OPTIONS.map((size) => (
-            <DropdownMenuItem
-              key={size}
-              onClick={() => applyFontSize(size)}
-              className={cn("text-xs cursor-pointer", editorFontSize === size && "bg-primary/10")}
-            >
-              {size}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <div className="mx-1.5 h-5 w-px bg-border/60" />
-
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => document.execCommand("bold")}
-        className={toolbarBtnClass}
-        disabled={disabled}
-        title="Bold"
-      >
-        <Bold className="w-3.5 h-3.5" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => document.execCommand("italic")}
-        className={toolbarBtnClass}
-        disabled={disabled}
-        title="Italic"
-      >
-        <Italic className="w-3.5 h-3.5" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => document.execCommand("underline")}
-        className={toolbarBtnClass}
-        disabled={disabled}
-        title="Underline"
-      >
-        <Underline className="w-3.5 h-3.5" />
-      </Button>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(toolbarBtnClass, "relative")}
-            disabled={disabled}
-            title="Text color"
-          >
-            <span
-              className="h-3.5 w-3.5 rounded-full border border-border/70"
-              style={{
-                background:
-                  activeTextColor === "inherit" ? "hsl(var(--foreground))" : activeTextColor,
-              }}
-            />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="p-2 bg-background border border-border z-[80]">
-          <div className="grid grid-cols-4 gap-1.5">
-            {TEXT_COLORS.map((color) => (
-              <button
-                key={color.id}
-                type="button"
-                title={color.label}
-                onClick={() => {
-                  setActiveTextColor(color.color);
-                  applyTextColor(color.color);
-                }}
-                className="h-6 w-6 rounded-full border border-border/60 hover:scale-110 transition-transform"
-                style={{
-                  background:
-                    color.color === "inherit" ? "hsl(var(--foreground))" : color.color,
-                }}
-              />
-            ))}
-          </div>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <div className="mx-1.5 h-5 w-px bg-border/60" />
-
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => document.execCommand("justifyLeft")}
-        className={toolbarBtnClass}
-        disabled={disabled}
-        title="Align left"
-      >
-        <AlignLeft className="w-3.5 h-3.5" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => document.execCommand("justifyCenter")}
-        className={toolbarBtnClass}
-        disabled={disabled}
-        title="Align center"
-      >
-        <AlignCenter className="w-3.5 h-3.5" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => document.execCommand("justifyRight")}
-        className={toolbarBtnClass}
-        disabled={disabled}
-        title="Align right"
-      >
-        <AlignRight className="w-3.5 h-3.5" />
-      </Button>
-
-      <div className="mx-1.5 h-5 w-px bg-border/60" />
-
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => document.execCommand("insertUnorderedList")}
-        className={toolbarBtnClass}
-        disabled={disabled}
-        title="Bulleted list"
-      >
-        <List className="w-3.5 h-3.5" />
-      </Button>
-
-      <div className="mx-1.5 h-5 w-px bg-border/60" />
-
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => {
-          const url = prompt("Enter URL:");
-          if (url) document.execCommand("createLink", false, url);
-        }}
-        className={toolbarBtnClass}
-        disabled={disabled}
-        title="Insert link"
-      >
-        <Link className="w-3.5 h-3.5" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => imageInputRef.current?.click()}
-        className={toolbarBtnClass}
-        disabled={disabled}
-        title="Insert image"
-      >
-        <ImageIcon className="w-3.5 h-3.5" />
-      </Button>
-    </div>
+    <NotebookEditorToolbar
+      disabled={disabled}
+      notebookFont={notebookFont}
+      onFontChange={onFontChange}
+      fontSize={editorFontSize}
+      onFontSizeChange={applyFontSize}
+      activeTextColor={activeTextColor}
+      onTextColorChange={(color) => {
+        setActiveTextColor(color);
+        applyTextColor(color);
+      }}
+      onInsertImage={() => imageInputRef.current?.click()}
+    />
   );
 
-  const editorSurfaceClass = cn(
-    "min-h-0 flex-1 w-full overflow-y-auto outline-none focus:outline-none caret-primary rounded-[8px] border border-border/50 bg-background/40",
-    "px-6 py-5 leading-relaxed",
-    "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-3",
-    "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2",
-    "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2",
-    "[&_p]:mb-3 [&_p]:text-foreground/90",
-    "[&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-3 [&_ul]:space-y-1.5",
-    "[&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-3 [&_ol]:space-y-1.5",
-    "[&_li]:text-foreground/90 [&_li]:pl-1",
-    "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/60 [&_blockquote]:pl-4 [&_blockquote]:py-1 [&_blockquote]:italic [&_blockquote]:text-foreground/80 [&_blockquote]:my-4",
-    "[&_strong]:font-semibold [&_strong]:text-foreground",
-    "[&_em]:italic",
-    "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2",
-    "[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-2",
-    "[&_.notebook-table-wrapper]:relative",
-    "[&_.notebook-table]:rounded-xl [&_.notebook-table]:overflow-hidden",
-    "[&_.notebook-table_td]:bg-background/50 [&_.notebook-table_td]:hover:bg-muted/50",
-    "[&_.notebook-table_td:focus]:outline-none [&_.notebook-table_td:focus]:ring-2 [&_.notebook-table_td:focus]:ring-primary/30 [&_.notebook-table_td:focus]:ring-inset",
-  );
+  const editorSurfaceClass = EDITOR_SURFACE_CLASS;
+
+
 
   return (
     <>
@@ -1756,9 +1567,17 @@ export function NotebookView({
     )}
     
     <div className={cn(
-      "h-[calc(100vh-200px)] flex gap-4 transition-all duration-300 relative",
+      "relative flex h-[calc(100dvh-8.5rem)] flex-col transition-all duration-300",
       isFullWidth && "invisible"
     )}>
+      <StudyTabStrip
+        tabs={tabs}
+        activeKey={activeTabKey}
+        onActivate={activateNotebookTab}
+        onClose={closeNotebookTab}
+        onNewWorkspace={handleNewNote}
+      />
+      <div className="relative mt-0 flex min-h-0 flex-1 gap-4">
       {/* Main layout — folders sidebar stays open (Study Area style) */}
       <div className="relative flex flex-1 gap-3 overflow-hidden">
         {/* Folders Panel — Study Area sidebar format */}
@@ -1810,6 +1629,7 @@ export function NotebookView({
                             setSelectedCategory(cat.id);
                             setSelectedEntryId(null);
                             setIsCreatingNew(false);
+                            setActiveTabKey(HOME_TAB_KEY);
                             if (isEntriesPanelOpen) closeEntriesPanel();
                           }}
                           onDragOver={cat.id === "all" ? undefined : (event) => handleFolderDragOver(event, cat.id)}
@@ -1901,6 +1721,7 @@ export function NotebookView({
                                   setSelectedCategory(folder.id);
                                   setSelectedEntryId(null);
                                   setIsCreatingNew(false);
+                                  setActiveTabKey(HOME_TAB_KEY);
                                   if (isEntriesPanelOpen) closeEntriesPanel();
                                 }}
                                 onDragOver={(event) => handleFolderDragOver(event, folder.id)}
@@ -2120,7 +1941,7 @@ export function NotebookView({
                             draggable={!entry.isDeleted}
                             onDragStart={(event) => handleNoteDragStart(event, entry.id)}
                             onDragEnd={() => setDropTargetId(null)}
-                            onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
+                            onClick={() => openNoteTab(entry.id, entry.title)}
                             className={cn(
                               "mb-1 w-full cursor-grab rounded-lg border-0 p-2 text-left transition-colors duration-200 active:cursor-grabbing",
                               selectedEntryId === entry.id
@@ -2634,7 +2455,7 @@ export function NotebookView({
                           animate={{ opacity: 1, y: 0 }}
                           whileHover={{ x: 4 }}
                           whileTap={{ scale: 0.99 }}
-                          onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
+                          onClick={() => openNoteTab(entry.id, entry.title)}
                           className="note-card w-full text-left rounded-xl overflow-hidden group relative flex items-center gap-3 p-4"
                           style={{ ["--note-accent" as string]: colors.accent }}
                         >
@@ -2699,7 +2520,7 @@ export function NotebookView({
                               transition: { type: "spring", stiffness: 500, damping: 25 } 
                             }}
                             whileTap={{ scale: 0.99 }}
-                            onClick={() => { setSelectedEntryId(entry.id); setIsCreatingNew(false); }}
+                            onClick={() => openNoteTab(entry.id, entry.title)}
                             className={cn(
                               "note-card w-full text-left rounded-2xl overflow-hidden group relative",
                               viewMode === 'grid' 
@@ -3303,6 +3124,7 @@ export function NotebookView({
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
     <AnimatePresence>
       {draggedNote && (

@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginSpotifyLogin,
   clearSpotifyTokens,
+  getDevices,
+  getPlaybackState,
   getPlaylists,
+  getPlaylistTracks,
   getSpotifyProfile,
   getStoredTokens,
   getValidAccessToken,
@@ -14,8 +17,13 @@ import {
   previousTrack,
   seekPlayback,
   setPlayerVolume,
+  setRepeat as setRepeatApi,
+  setShuffle as setShuffleApi,
+  supportsSpotifyWebPlayback,
   transferPlayback,
+  type SpotifyPlaybackState,
   type SpotifyPlaylist,
+  type SpotifyPlaylistTrack,
   type SpotifyProfile,
 } from "@/lib/spotify";
 
@@ -28,6 +36,8 @@ export type SpotifyTrackInfo = {
   durationMs: number;
   positionMs: number;
 };
+
+export type SpotifyRepeatMode = "off" | "track" | "context";
 
 type SpotifyPlayerInstance = {
   connect: () => Promise<boolean>;
@@ -79,6 +89,12 @@ function loadSpotifySdk() {
   return sdkLoader;
 }
 
+function repeatFromMode(mode: number | undefined): SpotifyRepeatMode {
+  if (mode === 2) return "track";
+  if (mode === 1) return "context";
+  return "off";
+}
+
 export function useSpotifyPlayer() {
   const [isConnected, setIsConnected] = useState(() => isSpotifyConnected());
   const [isReady, setIsReady] = useState(false);
@@ -89,13 +105,114 @@ export function useSpotifyPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolumeState] = useState(0.7);
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
+  const [playlistTracks, setPlaylistTracks] = useState<SpotifyPlaylistTrack[]>([]);
+  const [shuffle, setShuffleState] = useState(false);
+  const [repeat, setRepeatState] = useState<SpotifyRepeatMode>("off");
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [playbackMode, setPlaybackMode] = useState<"sdk" | "connect" | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const playerRef = useRef<SpotifyPlayerInstance | null>(null);
   const deviceIdRef = useRef<string | null>(null);
+  const selectedPlaylistIdRef = useRef<string | null>(null);
+  const playlistsRef = useRef<SpotifyPlaylist[]>([]);
+  const connectPollRef = useRef<number | null>(null);
+  const playbackModeRef = useRef<"sdk" | "connect" | null>(null);
+
+  useEffect(() => {
+    selectedPlaylistIdRef.current = selectedPlaylistId;
+  }, [selectedPlaylistId]);
+
+  useEffect(() => {
+    playlistsRef.current = playlists;
+  }, [playlists]);
+
+  useEffect(() => {
+    playbackModeRef.current = playbackMode;
+  }, [playbackMode]);
+
+  const stopConnectPoll = useCallback(() => {
+    if (connectPollRef.current != null) {
+      window.clearInterval(connectPollRef.current);
+      connectPollRef.current = null;
+    }
+  }, []);
+
+  const applyRemotePlaybackState = useCallback((state: SpotifyPlaybackState | undefined) => {
+    if (!state) {
+      setIsPlaying(false);
+      return;
+    }
+    if (state.device?.id) {
+      deviceIdRef.current = state.device.id;
+      setDeviceId(state.device.id);
+    }
+    const item = state.item;
+    if (item) {
+      setCurrentTrack({
+        id: item.id,
+        name: item.name,
+        artists: (item.artists || []).map((a) => a.name).join(", "),
+        albumArt: item.album?.images?.[0]?.url ?? null,
+        uri: item.uri,
+        durationMs: item.duration_ms ?? 0,
+        positionMs: state.progress_ms ?? 0,
+      });
+    }
+    setIsPlaying(Boolean(state.is_playing));
+    if (typeof state.shuffle_state === "boolean") setShuffleState(state.shuffle_state);
+    if (state.repeat_state) setRepeatState(state.repeat_state);
+  }, []);
+
+  const syncRemotePlayback = useCallback(async () => {
+    try {
+      const state = await getPlaybackState();
+      applyRemotePlaybackState(state);
+      if (!state?.device) {
+        const devices = await getDevices();
+        const active = devices.find((device) => device.is_active && device.id) ?? devices.find((device) => device.id);
+        if (active?.id) {
+          deviceIdRef.current = active.id;
+          setDeviceId(active.id);
+          setStatusMessage(`Controlling ${active.name}`);
+        } else {
+          setStatusMessage("Open Spotify on your phone or desktop, then press play.");
+        }
+      } else if (state.device.name) {
+        setStatusMessage(`Playing on ${state.device.name}`);
+      }
+    } catch {
+      // Keep last known state; next poll retries.
+    }
+  }, [applyRemotePlaybackState]);
+
+  const inBrowserHint = useCallback(() => {
+    const origin = window.location.origin;
+    return `Open ${origin} in Chrome or Edge for in-browser playback (no phone needed). This preview can’t create a Spotify player device.`;
+  }, []);
+
+  const isNoActiveDeviceError = useCallback((message: string) => {
+    return /no active device|NO_ACTIVE_DEVICE|Device not found|404/i.test(message);
+  }, []);
+
+  const startConnectMode = useCallback(async () => {
+    stopConnectPoll();
+    playerRef.current?.disconnect();
+    playerRef.current = null;
+    setPlaybackMode("connect");
+    setError(null);
+    setIsReady(true);
+    setStatusMessage(inBrowserHint());
+    await syncRemotePlayback();
+    connectPollRef.current = window.setInterval(() => {
+      void syncRemotePlayback();
+    }, 2500);
+  }, [inBrowserHint, stopConnectPoll, syncRemotePlayback]);
 
   const disconnect = useCallback(() => {
+    stopConnectPoll();
     playerRef.current?.disconnect();
     playerRef.current = null;
     deviceIdRef.current = null;
@@ -108,9 +225,15 @@ export function useSpotifyPlayer() {
     setCurrentTrack(null);
     setIsPlaying(false);
     setPlaylists([]);
+    setSelectedPlaylistId(null);
+    setPlaylistTracks([]);
+    setShuffleState(false);
+    setRepeatState("off");
     setDeviceId(null);
     setError(null);
-  }, []);
+    setPlaybackMode(null);
+    setStatusMessage(null);
+  }, [stopConnectPoll]);
 
   const connect = useCallback(async () => {
     if (!isSpotifyConfigured()) {
@@ -134,6 +257,28 @@ export function useSpotifyPlayer() {
     return { me, premium };
   }, []);
 
+  const applyPlayerState = useCallback((state: any) => {
+    if (!state) {
+      setIsPlaying(false);
+      return;
+    }
+    const track = state.track_window?.current_track;
+    if (track) {
+      setCurrentTrack({
+        id: track.id,
+        name: track.name,
+        artists: (track.artists || []).map((a: { name: string }) => a.name).join(", "),
+        albumArt: track.album?.images?.[0]?.url ?? null,
+        uri: track.uri,
+        durationMs: track.duration_ms ?? 0,
+        positionMs: state.position ?? 0,
+      });
+    }
+    setIsPlaying(!state.paused);
+    if (typeof state.shuffle === "boolean") setShuffleState(state.shuffle);
+    if (state.repeat_mode != null) setRepeatState(repeatFromMode(state.repeat_mode));
+  }, []);
+
   const initPlayer = useCallback(async () => {
     if (!getStoredTokens()) {
       setIsConnected(false);
@@ -141,6 +286,7 @@ export function useSpotifyPlayer() {
     }
     setIsConnected(true);
     setError(null);
+    setStatusMessage(null);
 
     try {
       const { premium } = await refreshProfileAndPlaylists();
@@ -149,9 +295,21 @@ export function useSpotifyPlayer() {
         return;
       }
 
-      await loadSpotifySdk();
-      if (!window.Spotify) throw new Error("Spotify SDK unavailable");
+      // Prefer the Web Playback SDK so this tab is the device (no phone needed).
+      // Cursor / Electron previews lack Widevine — SDK init fails and we fall back.
+      const canUseSdk = await supportsSpotifyWebPlayback();
+      if (!canUseSdk) {
+        await startConnectMode();
+        return;
+      }
 
+      await loadSpotifySdk();
+      if (!window.Spotify) {
+        await startConnectMode();
+        return;
+      }
+
+      stopConnectPoll();
       playerRef.current?.disconnect();
       const player = new window.Spotify.Player({
         name: "NSYNC Journal",
@@ -168,9 +326,13 @@ export function useSpotifyPlayer() {
         deviceIdRef.current = device_id;
         setDeviceId(device_id);
         setIsReady(true);
-        void transferPlayback(device_id, false).catch(() => {
+        setPlaybackMode("sdk");
+        setStatusMessage(null);
+        setError(null);
+        void transferPlayback(device_id, true).catch(() => {
           // Device transfer can 404 briefly before Spotify registers the device.
         });
+        void player.getCurrentState().then((state) => applyPlayerState(state)).catch(() => undefined);
       });
 
       player.addListener("not_ready", () => {
@@ -183,8 +345,8 @@ export function useSpotifyPlayer() {
         setIsReady(false);
       });
 
-      player.addListener("initialization_error", ({ message }: { message: string }) => {
-        setError(message || "Could not initialize Spotify player");
+      player.addListener("initialization_error", () => {
+        void startConnectMode();
       });
 
       player.addListener("authentication_error", ({ message }: { message: string }) => {
@@ -192,36 +354,25 @@ export function useSpotifyPlayer() {
       });
 
       player.addListener("player_state_changed", (state: any) => {
-        if (!state) {
-          setIsPlaying(false);
-          return;
-        }
-        const track = state.track_window?.current_track;
-        if (track) {
-          setCurrentTrack({
-            id: track.id,
-            name: track.name,
-            artists: (track.artists || []).map((a: { name: string }) => a.name).join(", "),
-            albumArt: track.album?.images?.[0]?.url ?? null,
-            uri: track.uri,
-            durationMs: track.duration_ms ?? 0,
-            positionMs: state.position ?? 0,
-          });
-        }
-        setIsPlaying(!state.paused);
+        applyPlayerState(state);
       });
 
       const ok = await player.connect();
-      if (!ok) setError("Could not connect Spotify player");
+      if (!ok) await startConnectMode();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Spotify connection failed");
+      try {
+        await startConnectMode();
+      } catch {
+        setError(err instanceof Error ? err.message : "Spotify connection failed");
+      }
     }
-  }, [refreshProfileAndPlaylists, volume]);
+  }, [applyPlayerState, refreshProfileAndPlaylists, startConnectMode, stopConnectPoll, volume]);
 
   useEffect(() => {
     if (!isSpotifyConnected()) return;
     void initPlayer();
     return () => {
+      stopConnectPoll();
       playerRef.current?.disconnect();
       playerRef.current = null;
     };
@@ -239,38 +390,95 @@ export function useSpotifyPlayer() {
     return () => window.clearInterval(id);
   }, [isConnected]);
 
+  useEffect(() => {
+    if (!selectedPlaylistId || !isConnected) {
+      setPlaylistTracks([]);
+      return;
+    }
+    let cancelled = false;
+    setPlaylistTracks([]);
+    void getPlaylistTracks(selectedPlaylistId)
+      .then((tracks) => {
+        if (cancelled) return;
+        setPlaylistTracks(tracks);
+        setError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPlaylistTracks([]);
+        const raw = err instanceof Error ? err.message : "Could not load playlist songs";
+        const message =
+          /403|forbidden/i.test(raw)
+            ? "Spotify blocked song list for this playlist. Try one you own or created."
+            : raw;
+        setError(message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPlaylistId, isConnected]);
+
+  const ensureActiveDevice = useCallback(async () => {
+    if (deviceIdRef.current && playbackModeRef.current === "sdk") return deviceIdRef.current;
+    const devices = await getDevices();
+    const active =
+      devices.find((device) => device.is_active && device.id) ?? devices.find((device) => device.id);
+    if (active?.id) {
+      deviceIdRef.current = active.id;
+      setDeviceId(active.id);
+      await transferPlayback(active.id, false).catch(() => undefined);
+      return active.id;
+    }
+    return null;
+  }, []);
+
   const play = useCallback(async () => {
-    const id = deviceIdRef.current;
-    if (playerRef.current) {
+    if (playerRef.current && playbackModeRef.current === "sdk") {
       await playerRef.current.resume();
       return;
     }
-    await playUri({ deviceId: id || undefined });
-  }, []);
+    const id = (await ensureActiveDevice()) || deviceIdRef.current;
+    try {
+      await playUri({ deviceId: id || undefined });
+      setError(null);
+      if (playbackModeRef.current === "connect") void syncRemotePlayback();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not resume playback";
+      if (isNoActiveDeviceError(message)) {
+        setError(null);
+        setStatusMessage(inBrowserHint());
+      } else {
+        setError(message);
+      }
+    }
+  }, [ensureActiveDevice, inBrowserHint, isNoActiveDeviceError, syncRemotePlayback]);
 
   const pause = useCallback(async () => {
-    if (playerRef.current) {
+    if (playerRef.current && playbackModeRef.current === "sdk") {
       await playerRef.current.pause();
       return;
     }
-    await pausePlayback(deviceIdRef.current || undefined);
-  }, []);
+    await pausePlayback(deviceIdRef.current || undefined).catch(() => undefined);
+    if (playbackModeRef.current === "connect") void syncRemotePlayback();
+  }, [syncRemotePlayback]);
 
   const next = useCallback(async () => {
-    if (playerRef.current) {
+    if (playerRef.current && playbackModeRef.current === "sdk") {
       await playerRef.current.nextTrack();
       return;
     }
-    await nextTrack(deviceIdRef.current || undefined);
-  }, []);
+    await nextTrack(deviceIdRef.current || undefined).catch(() => undefined);
+    if (playbackModeRef.current === "connect") void syncRemotePlayback();
+  }, [syncRemotePlayback]);
 
   const previous = useCallback(async () => {
-    if (playerRef.current) {
+    if (playerRef.current && playbackModeRef.current === "sdk") {
       await playerRef.current.previousTrack();
       return;
     }
-    await previousTrack(deviceIdRef.current || undefined);
-  }, []);
+    await previousTrack(deviceIdRef.current || undefined).catch(() => undefined);
+    if (playbackModeRef.current === "connect") void syncRemotePlayback();
+  }, [syncRemotePlayback]);
 
   const setVolume = useCallback(async (nextVolume: number) => {
     const clamped = Math.max(0, Math.min(1, nextVolume));
@@ -290,12 +498,79 @@ export function useSpotifyPlayer() {
   }, []);
 
   const playPlaylist = useCallback(async (playlistUri: string) => {
-    const id = deviceIdRef.current;
-    if (id) {
-      await transferPlayback(id, false).catch(() => undefined);
+    const id = (await ensureActiveDevice()) || deviceIdRef.current;
+    if (id && playbackModeRef.current === "sdk") {
+      await transferPlayback(id, true).catch(() => undefined);
     }
-    await playUri({ deviceId: id || undefined, context_uri: playlistUri });
-  }, []);
+    try {
+      await playUri({ deviceId: id || undefined, context_uri: playlistUri });
+      setError(null);
+      if (playbackModeRef.current === "connect") void syncRemotePlayback();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not start playback";
+      if (isNoActiveDeviceError(message)) {
+        setError(null);
+        setStatusMessage(inBrowserHint());
+      } else {
+        setError(message);
+      }
+    }
+  }, [ensureActiveDevice, inBrowserHint, isNoActiveDeviceError, syncRemotePlayback]);
+
+  const selectPlaylist = useCallback(
+    async (playlistId: string) => {
+      setSelectedPlaylistId(playlistId);
+      const playlist = playlistsRef.current.find((item) => item.id === playlistId);
+      if (playlist?.uri) await playPlaylist(playlist.uri);
+    },
+    [playPlaylist],
+  );
+
+  const playTrack = useCallback(async (uri: string) => {
+    const id = (await ensureActiveDevice()) || deviceIdRef.current;
+    const playlist = playlistsRef.current.find((item) => item.id === selectedPlaylistIdRef.current);
+    if (id && playbackModeRef.current === "sdk") {
+      await transferPlayback(id, true).catch(() => undefined);
+    }
+    try {
+      if (playlist?.uri) {
+        await playUri({
+          deviceId: id || undefined,
+          context_uri: playlist.uri,
+          offset: { uri },
+        });
+      } else {
+        await playUri({ deviceId: id || undefined, uris: [uri] });
+      }
+      setError(null);
+      if (playbackModeRef.current === "connect") void syncRemotePlayback();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not start playback";
+      if (isNoActiveDeviceError(message)) {
+        setError(null);
+        setStatusMessage(inBrowserHint());
+      } else {
+        setError(message);
+      }
+    }
+  }, [ensureActiveDevice, inBrowserHint, isNoActiveDeviceError, syncRemotePlayback]);
+
+  const toggleShuffle = useCallback(async () => {
+    const nextState = !shuffle;
+    setShuffleState(nextState);
+    await setShuffleApi(nextState, deviceIdRef.current || undefined).catch(() => {
+      setShuffleState(shuffle);
+    });
+  }, [shuffle]);
+
+  const cycleRepeat = useCallback(async () => {
+    const nextMode: SpotifyRepeatMode =
+      repeat === "off" ? "context" : repeat === "context" ? "track" : "off";
+    setRepeatState(nextMode);
+    await setRepeatApi(nextMode, deviceIdRef.current || undefined).catch(() => {
+      setRepeatState(repeat);
+    });
+  }, [repeat]);
 
   return {
     isConfigured: isSpotifyConfigured(),
@@ -308,8 +583,14 @@ export function useSpotifyPlayer() {
     isPlaying,
     volume,
     playlists,
+    selectedPlaylistId,
+    playlistTracks,
+    shuffle,
+    repeat,
     deviceId,
     error,
+    playbackMode,
+    statusMessage,
     connect,
     disconnect,
     play,
@@ -319,6 +600,10 @@ export function useSpotifyPlayer() {
     setVolume,
     seek,
     playPlaylist,
+    selectPlaylist,
+    playTrack,
+    toggleShuffle,
+    cycleRepeat,
     refresh: initPlayer,
   };
 }

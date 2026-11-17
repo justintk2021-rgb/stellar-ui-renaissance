@@ -1,16 +1,13 @@
 import { Trade } from "@/types/trade";
 import { motion, AnimatePresence } from "@/lib/motion";
 import { format, parseISO } from "date-fns";
-import { Filter, TrendingUp, TrendingDown, Activity, CircleDot, ClipboardList } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, CircleDot } from "lucide-react";
 import { cn, truncateNum } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useEffect, useState, useMemo, memo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo, memo } from "react";
 import { useBrokerPositions } from "@/hooks/useBrokerPositions";
-import { subscribeBrokerOrdersRealtime } from "@/lib/queries/broker";
 import { dedupeTradesForPnL, getTradeNetResult } from "@/lib/tradeFormat";
 import { AssetIcon, SymbolMark } from "@/components/ui/AssetIcon";
 
@@ -32,35 +29,9 @@ interface OpenPosition {
   take_profit: number | null;
 }
 
-interface PendingOrder {
-  id: string;
-  symbol: string;
-  side: string;
-  size: number;
-  order_type: string;
-  entry_price: number | null;
-  stop_loss: number | null;
-  take_profit: number | null;
-  status: string;
-  created_broker_at: string | null;
-}
-
-const rowVariants = {
-  hidden: { opacity: 0, x: -20 },
-  visible: (i: number) => ({
-    opacity: 1,
-    x: 0,
-    transition: { type: "spring" as const, stiffness: 300, damping: 24, delay: i * 0.05 },
-  }),
-  hover: {
-    x: 4,
-    transition: { type: "spring" as const, stiffness: 400, damping: 25 },
-  },
-};
 
 export const RecentTrades = memo(function RecentTrades({ trades, brokerConnectionId = null }: RecentTradesProps) {
   const { positions: brokerPositions } = useBrokerPositions(brokerConnectionId);
-  const [orders, setOrders] = useState<PendingOrder[]>([]);
 
   const positions: OpenPosition[] = useMemo(() => brokerPositions.map(p => ({
     id: p.id,
@@ -74,37 +45,6 @@ export const RecentTrades = memo(function RecentTrades({ trades, brokerConnectio
     stop_loss: p.stop_loss,
     take_profit: p.take_profit,
   })), [brokerPositions]);
-
-  useEffect(() => {
-    if (!brokerConnectionId) {
-      setOrders([]);
-      return;
-    }
-
-    const fetchOrders = async () => {
-      const { data } = await supabase
-        .from('broker_orders')
-        .select('*')
-        .eq('broker_connection_id', brokerConnectionId)
-        .eq('status', 'pending');
-
-      if (data) {
-        setOrders(data.map(o => ({
-          id: o.id, symbol: o.symbol, side: o.side, size: Number(o.size),
-          order_type: o.order_type, entry_price: o.entry_price ? Number(o.entry_price) : null,
-          stop_loss: o.stop_loss ? Number(o.stop_loss) : null,
-          take_profit: o.take_profit ? Number(o.take_profit) : null,
-          status: o.status || 'pending', created_broker_at: o.created_broker_at,
-        })));
-      } else {
-        setOrders([]);
-      }
-    };
-
-    fetchOrders();
-
-    return subscribeBrokerOrdersRealtime(brokerConnectionId, fetchOrders);
-  }, [brokerConnectionId]);
 
   const recentTrades = useMemo(() =>
     dedupeTradesForPnL(trades)
@@ -135,10 +75,6 @@ export const RecentTrades = memo(function RecentTrades({ trades, brokerConnectio
                 <CircleDot className="w-3 h-3" />
                 Open ({positions.length})
               </TabsTrigger>
-              <TabsTrigger value="orders" className="text-xs px-3 py-1 h-6 gap-1.5">
-                <ClipboardList className="w-3 h-3" />
-                Orders ({orders.length})
-              </TabsTrigger>
             </TabsList>
           </div>
         </div>
@@ -161,19 +97,14 @@ export const RecentTrades = memo(function RecentTrades({ trades, brokerConnectio
                     </tr>
                   </thead>
                   <tbody>
-                    {recentTrades.map((trade, index) => {
+                    {recentTrades.map((trade) => {
                       const net = getTradeNetResult(trade);
                       const isProfit = net > 0;
                       const isLoss = net < 0;
                       return (
-                        <motion.tr
+                        <tr
                           key={trade.id}
-                          variants={rowVariants}
-                          initial="hidden"
-                          animate="visible"
-                          whileHover="hover"
-                          custom={index}
-                          className="border-b border-border/20 cursor-pointer rounded-lg hover:bg-muted/30 transition-colors"
+                          className="border-b border-border/20 cursor-pointer rounded-lg hover:bg-muted/40 transition-colors"
                         >
                           <td className="py-3 pl-2">
                             <div className="flex items-center gap-2">
@@ -229,7 +160,7 @@ export const RecentTrades = memo(function RecentTrades({ trades, brokerConnectio
                               {isProfit ? 'Win' : isLoss ? 'Loss' : 'BE'}
                             </Badge>
                           </td>
-                        </motion.tr>
+                        </tr>
                       );
                     })}
                   </tbody>
@@ -259,20 +190,15 @@ export const RecentTrades = memo(function RecentTrades({ trades, brokerConnectio
                   </tr>
                 </thead>
                 <tbody>
-                  {positions.map((pos, index) => {
+                  {positions.map((pos) => {
                     const isBuy = pos.side === 'buy';
                     const isProfit = pos.floating_pl > 0;
                     const isLoss = pos.floating_pl < 0;
                     const decimals = pos.open_price < 10 ? 5 : 2;
                     return (
-                      <motion.tr
+                      <tr
                         key={pos.id}
-                        variants={rowVariants}
-                        initial="hidden"
-                        animate="visible"
-                        whileHover="hover"
-                        custom={index}
-                        className="border-b border-border/20 hover:bg-muted/30 transition-colors"
+                        className="border-b border-border/20 hover:bg-muted/40 transition-colors"
                       >
                         <td className="py-3 pl-2">
                           <SymbolMark symbol={pos.symbol} size="sm" textClassName="text-sm font-semibold" />
@@ -298,72 +224,13 @@ export const RecentTrades = memo(function RecentTrades({ trades, brokerConnectio
                             {isProfit ? '+' : ''}{truncateNum(pos.floating_pl)}
                           </span>
                         </td>
-                      </motion.tr>
+                      </tr>
                     );
                   })}
                 </tbody>
               </table>
             ) : (
               <EmptyState icon={CircleDot} title="No open positions" subtitle="Open positions from your broker will appear here" />
-            )}
-          </ScrollArea>
-        </TabsContent>
-
-        {/* Orders Tab */}
-        <TabsContent value="orders" className="flex-1 mt-0">
-          <ScrollArea className="h-[420px] -mx-2 px-2">
-            {orders.length > 0 ? (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border/30">
-                    <th className="text-left text-xs font-medium text-muted-foreground pb-3 pl-2">Symbol</th>
-                    <th className="text-left text-xs font-medium text-muted-foreground pb-3">Side</th>
-                    <th className="text-left text-xs font-medium text-muted-foreground pb-3">Type</th>
-                    <th className="text-right text-xs font-medium text-muted-foreground pb-3">Size</th>
-                    <th className="text-right text-xs font-medium text-muted-foreground pb-3">Price</th>
-                    <th className="text-right text-xs font-medium text-muted-foreground pb-3">SL</th>
-                    <th className="text-right text-xs font-medium text-muted-foreground pb-3 pr-2">TP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((ord, index) => {
-                    const isBuy = ord.side === 'buy';
-                    const decimals = (ord.entry_price ?? 0) < 10 ? 5 : 2;
-                    return (
-                      <motion.tr
-                        key={ord.id}
-                        variants={rowVariants}
-                        initial="hidden"
-                        animate="visible"
-                        whileHover="hover"
-                        custom={index}
-                        className="border-b border-border/20 hover:bg-muted/30 transition-colors"
-                      >
-                        <td className="py-3 pl-2">
-                          <SymbolMark symbol={ord.symbol} size="sm" textClassName="text-sm font-semibold" />
-                        </td>
-                        <td className="py-3">
-                          <div className="flex items-center gap-1">
-                            {isBuy ? <TrendingUp className="w-3.5 h-3.5 text-primary" /> : <TrendingDown className="w-3.5 h-3.5 text-destructive" />}
-                            <span className={cn("text-xs font-medium", isBuy ? "text-primary" : "text-destructive")}>
-                              {isBuy ? 'BUY' : 'SELL'}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-3">
-                          <Badge variant="outline" className="text-[10px] border-border/50">{ord.order_type}</Badge>
-                        </td>
-                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{ord.size}</td>
-                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{(ord.entry_price != null ? truncateNum(ord.entry_price, decimals) : null) ?? '—'}</td>
-                        <td className="py-3 text-right text-xs font-mono text-muted-foreground">{(ord.stop_loss != null ? truncateNum(ord.stop_loss, decimals) : null) ?? '—'}</td>
-                        <td className="py-3 text-right pr-2 text-xs font-mono text-muted-foreground">{(ord.take_profit != null ? truncateNum(ord.take_profit, decimals) : null) ?? '—'}</td>
-                      </motion.tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            ) : (
-              <EmptyState icon={ClipboardList} title="No pending orders" subtitle="Pending orders from your broker will appear here" />
             )}
           </ScrollArea>
         </TabsContent>

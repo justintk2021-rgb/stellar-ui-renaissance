@@ -10,6 +10,8 @@ import { useUserSettings, AccentColor } from "@/hooks/useUserSettings";
 import { useChecklists } from "@/hooks/useChecklists";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { TopBar } from "@/components/Layout/TopBar";
+import { SpotifyPlayerProvider } from "@/hooks/SpotifyPlayerContext";
+import { SpotifySidePanel } from "@/components/Dashboard/SpotifySidePanel";
 import { BalanceCards } from "@/components/Dashboard/BalanceCards";
 import { NotificationsMenu } from "@/components/Dashboard/NotificationsCard";
 import { useAccountProjection } from "@/hooks/useAccountProjection";
@@ -409,7 +411,15 @@ const Index = () => {
   
   const handleThemeChange = useThemeChange(setTheme);
   const { theme, accentColor, customColor, customGradient, sidebarCollapsed, notebookFont } = settings;
-  
+
+  const [sidebarIconsOnly, setSidebarIconsOnly] = useState(() => {
+    try {
+      return localStorage.getItem("atp_sidebar_icons_only") === "true";
+    } catch {
+      return false;
+    }
+  });
+
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [isTradeFormOpen, setIsTradeFormOpen] = useState(false);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
@@ -789,7 +799,7 @@ const Index = () => {
   const isChartPage = currentPage === 'chart';
 
   return (
-    <>
+    <SpotifyPlayerProvider>
       <Helmet>
         <title>NSYNC Journal - Trading Journal & Notebook</title>
         <meta name="description" content="Track your trades, analyze performance, and keep detailed notes with NSYNC Journal - your personal trading journal." />
@@ -801,6 +811,16 @@ const Index = () => {
         onPageChange={handlePageChange} 
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        iconsOnly={sidebarIconsOnly}
+        onToggleIconsOnly={() => setSidebarIconsOnly((prev) => {
+          const next = !prev;
+          try {
+            localStorage.setItem("atp_sidebar_icons_only", String(next));
+          } catch {
+            /* ignore */
+          }
+          return next;
+        })}
       />
 
       <div className="relative z-10 min-h-screen flex flex-col w-full pb-20 lg:pb-0">
@@ -828,8 +848,10 @@ const Index = () => {
         )}
 
         <main className={cn(
-          "flex-1 transition-[margin-left] duration-300 min-w-0",
-          !sidebarCollapsed && "lg:ml-72 lg:w-[calc(100%-18rem)]"
+          "flex-1 transition-[margin-left,width] duration-300 min-w-0",
+          sidebarIconsOnly
+            ? "lg:ml-[4.5rem] lg:w-[calc(100%-4.5rem)]"
+            : !sidebarCollapsed && "lg:ml-72 lg:w-[calc(100%-18rem)]"
         )}>
           <div className="glass-strong min-h-screen p-3 sm:p-4 lg:p-6">
             <div className="w-full">
@@ -1273,7 +1295,8 @@ const Index = () => {
         </main>
 
       </div>
-    </>
+      <SpotifySidePanel />
+    </SpotifyPlayerProvider>
   );
 };
 

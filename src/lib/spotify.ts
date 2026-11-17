@@ -39,8 +39,18 @@ export type SpotifyPlaylist = {
   uri: string;
 };
 
+const CONNECT_RESUME_PARAM = "spotify_connect";
+
+function isLocalhostOrigin(origin = window.location.origin) {
+  return /^http:\/\/localhost(?=:\d+|\/|$)/i.test(origin);
+}
+
 function redirectUri() {
-  return `${window.location.origin}/spotify-callback`;
+  // Spotify disallows "localhost" — loopback must use an explicit IP (127.0.0.1 / ::1).
+  const origin = isLocalhostOrigin()
+    ? window.location.origin.replace(/^http:\/\/localhost/i, "http://127.0.0.1")
+    : window.location.origin;
+  return `${origin}/spotify-callback`;
 }
 
 function randomString(length = 64) {
@@ -88,10 +98,25 @@ export function isSpotifyConnected() {
   return Boolean(getStoredTokens()?.refreshToken);
 }
 
+/**
+ * Spotify forbids localhost redirect URIs, so we rewrite to 127.0.0.1.
+ * PKCE state/verifier live in localStorage, which is origin-scoped — starting
+ * OAuth on localhost and landing on 127.0.0.1 causes "Invalid OAuth state".
+ * Hop to 127.0.0.1 first (same path + ?spotify_connect=1), then resume.
+ */
 export async function beginSpotifyLogin() {
   if (!CLIENT_ID?.trim()) {
     throw new Error("Missing VITE_SPOTIFY_CLIENT_ID");
   }
+
+  if (isLocalhostOrigin()) {
+    const url = new URL(window.location.href);
+    url.hostname = "127.0.0.1";
+    url.searchParams.set(CONNECT_RESUME_PARAM, "1");
+    window.location.replace(url.toString());
+    return;
+  }
+
   const verifier = randomString(64);
   const state = randomString(32);
   const challenge = await sha256Base64Url(verifier);
@@ -109,6 +134,16 @@ export async function beginSpotifyLogin() {
   });
 
   window.location.assign(`https://accounts.spotify.com/authorize?${params.toString()}`);
+}
+
+/** Call once on app boot to finish a localhost → 127.0.0.1 connect hop. */
+export async function resumePendingSpotifyLogin() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get(CONNECT_RESUME_PARAM) !== "1") return;
+  params.delete(CONNECT_RESUME_PARAM);
+  const cleaned = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash}`;
+  window.history.replaceState({}, "", cleaned);
+  await beginSpotifyLogin();
 }
 
 async function tokenRequest(body: URLSearchParams) {
@@ -208,6 +243,56 @@ export async function getPlaylists(limit = 50) {
   return data.items ?? [];
 }
 
+/** Web Playback SDK needs Widevine EME — missing in Electron / some embedded browsers. */
+export async function supportsSpotifyWebPlayback(): Promise<boolean> {
+  if (typeof window === "undefined" || !window.isSecureContext) return false;
+  if (typeof navigator.requestMediaKeySystemAccess !== "function") return false;
+  try {
+    await navigator.requestMediaKeySystemAccess("com.widevine.alpha", [
+      {
+        initDataTypes: ["cenc"],
+        audioCapabilities: [{ contentType: 'audio/mp4; codecs="mp4a.40.2"' }],
+      },
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export type SpotifyDevice = {
+  id: string | null;
+  is_active: boolean;
+  name: string;
+  type: string;
+};
+
+export async function getDevices() {
+  const data = await spotifyFetch<{ devices: SpotifyDevice[] }>("/me/player/devices");
+  return data.devices ?? [];
+}
+
+export type SpotifyPlaybackState = {
+  device?: SpotifyDevice;
+  is_playing?: boolean;
+  progress_ms?: number;
+  shuffle_state?: boolean;
+  repeat_state?: "off" | "track" | "context";
+  item?: {
+    id: string;
+    name: string;
+    artists: { name: string }[];
+    album?: { images?: { url: string }[] };
+    uri: string;
+    duration_ms: number;
+  } | null;
+  context?: { uri?: string } | null;
+};
+
+export async function getPlaybackState() {
+  return spotifyFetch<SpotifyPlaybackState | undefined>("/me/player");
+}
+
 export async function transferPlayback(deviceId: string, play = false) {
   await spotifyFetch("/me/player", {
     method: "PUT",
@@ -260,4 +345,70 @@ export async function seekPlayback(positionMs: number, deviceId?: string) {
   const params = new URLSearchParams({ position_ms: String(Math.max(0, Math.round(positionMs))) });
   if (deviceId) params.set("device_id", deviceId);
   await spotifyFetch(`/me/player/seek?${params.toString()}`, { method: "PUT" });
+}
+
+export type SpotifyPlaylistTrack = {
+  id: string;
+  name: string;
+  artists: string;
+  albumArt: string | null;
+  uri: string;
+  durationMs: number;
+};
+
+export async function getPlaylistTracks(playlistId: string, limit = 50): Promise<SpotifyPlaylistTrack[]> {
+  // Spotify deprecated /tracks for many apps (403). Use /items; payload field is `item`.
+  const data = await spotifyFetch<{
+    items: Array<{
+      track?: {
+        id?: string | null;
+        name?: string;
+        type?: string;
+        artists?: { name: string }[];
+        album?: { images?: { url: string }[] };
+        uri?: string;
+        duration_ms?: number;
+      } | null;
+      item?: {
+        id?: string | null;
+        name?: string;
+        type?: string;
+        artists?: { name: string }[];
+        album?: { images?: { url: string }[] };
+        uri?: string;
+        duration_ms?: number;
+      } | null;
+    }>;
+  }>(`/playlists/${encodeURIComponent(playlistId)}/items?limit=${limit}`);
+
+  return (data.items ?? [])
+    .map((row) => row.item ?? row.track ?? null)
+    .filter(
+      (track): track is NonNullable<typeof track> & { uri: string; name: string } =>
+        Boolean(track?.uri && track?.name && track.type !== "episode"),
+    )
+    .map((track) => {
+      const images = track.album?.images ?? [];
+      const albumArt = images[0]?.url ?? images[images.length - 1]?.url ?? null;
+      return {
+        id: track.id || track.uri,
+        name: track.name,
+        artists: (track.artists || []).map((artist) => artist.name).join(", "),
+        albumArt,
+        uri: track.uri,
+        durationMs: track.duration_ms ?? 0,
+      };
+    });
+}
+
+export async function setShuffle(state: boolean, deviceId?: string) {
+  const params = new URLSearchParams({ state: state ? "true" : "false" });
+  if (deviceId) params.set("device_id", deviceId);
+  await spotifyFetch(`/me/player/shuffle?${params.toString()}`, { method: "PUT" });
+}
+
+export async function setRepeat(state: "off" | "track" | "context", deviceId?: string) {
+  const params = new URLSearchParams({ state });
+  if (deviceId) params.set("device_id", deviceId);
+  await spotifyFetch(`/me/player/repeat?${params.toString()}`, { method: "PUT" });
 }

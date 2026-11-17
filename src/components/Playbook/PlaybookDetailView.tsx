@@ -6,7 +6,7 @@ import {
   AlertCircle, DollarSign, BarChart3, Percent, Activity, Scale,
   ChevronRight, Info, Settings, ChevronLeft, Filter, Calendar, Search,
   Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, 
-  Quote, Link, Lightbulb, BookOpen, FileText, CheckCircle2
+  Quote, Lightbulb, BookOpen, Plus, Trash2, X
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,13 +30,25 @@ import { toast } from "sonner";
 import { dedupeTradesForPnL, getTradeNetResult, journalTradeStats } from "@/lib/tradeFormat";
 import { tradeRoiPercent } from "@/lib/tradePnl";
 import { useSelectedAccountBalance } from "@/hooks/useSelectedAccountBalance";
+import { PlaybookRulesEditor, type ChecklistMetrics as RulesEditorMetrics } from "./PlaybookRulesEditor";
+import { PlaybookNotesGallery } from "./PlaybookNotesGallery";
+import {
+  PlaybookBacktesting,
+  filterBacktestPlaybookTrades,
+  filterLivePlaybookTrades,
+} from "./PlaybookBacktesting";
+import { type Checklist } from "@/hooks/useChecklists";
 
 interface Trade {
   id: string;
   date: string;
   pair: string;
+  direction?: "Long" | "Short";
   result: number;
   checklist_id?: string;
+  accountId?: string;
+  brokerAccountId?: string;
+  session?: string;
   swap?: number | null;
   commission?: number | null;
   importedFromBroker?: boolean | null;
@@ -44,29 +56,20 @@ interface Trade {
   lastBrokerSyncAt?: string | null;
 }
 
-interface ChecklistMetrics {
-  checklistId: string;
-  checklistName: string;
-  totalTrades: number;
-  winningTrades: number;
-  losingTrades: number;
-  totalPnL: number;
-  winRate: number;
-}
+type ChecklistMetrics = RulesEditorMetrics;
 
 interface PlaybookDetailViewProps {
-  checklist: {
-    id: string;
-    name: string;
-    type: string;
-    items: any[];
-    notes?: string;
-  };
+  checklist: Checklist;
   metrics: ChecklistMetrics | undefined;
   trades: Trade[];
   onBack: () => void;
-  onOpenRules: () => void;
   onUpdateNotes?: (notes: string) => void;
+  onUpdateChecklist: (
+    id: string,
+    updates: Partial<Pick<Checklist, "name" | "items" | "notes">>,
+  ) => Promise<void> | void;
+  onDeleteChecklist: (id: string) => Promise<void> | void;
+  onTradesChanged?: () => void;
 }
 
 // Animated number component
@@ -119,13 +122,14 @@ function InfoTooltip({ content }: { content: string }) {
   );
 }
 
-type TabType = "overview" | "rules" | "executed" | "notes";
+type TabType = "overview" | "rules" | "executed" | "backtesting" | "notes";
 type FilterType = "all" | "wins" | "losses";
 
 const tabs: { id: TabType; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "rules", label: "Playbook Rules" },
   { id: "executed", label: "Executed Trades" },
+  { id: "backtesting", label: "Backtesting" },
   { id: "notes", label: "Notes" },
 ];
 
@@ -207,11 +211,32 @@ function NotesTab({
   };
 
   const noteTemplates = [
-    { icon: Lightbulb, label: "Key Insight", template: "<h3>💡 Key Insight</h3><p>What worked well in this strategy...</p>" },
-    { icon: BookOpen, label: "Lesson Learned", template: "<h3>📖 Lesson Learned</h3><p>What I learned from this playbook...</p>" },
-    { icon: FileText, label: "Market Condition", template: "<h3>📊 Best Market Conditions</h3><p>This strategy works best when...</p>" },
-    { icon: CheckCircle2, label: "Rules Summary", template: "<h3>✅ Rules Summary</h3><ul><li>Rule 1</li><li>Rule 2</li><li>Rule 3</li></ul>" },
+    {
+      icon: Lightbulb,
+      label: "Key Insight",
+      template: "<h3>Key Insight</h3><p>What worked well in this strategy...</p>",
+    },
+    {
+      icon: BookOpen,
+      label: "Lesson Learned",
+      template: "<h3>Lesson Learned</h3><p>What I learned from this playbook...</p>",
+    },
+    {
+      icon: BarChart3,
+      label: "Market Condition",
+      template: "<h3>Market Condition</h3><p>This strategy works best when...</p>",
+    },
+    {
+      icon: Target,
+      label: "Rules Summary",
+      template: "<h3>Rules Summary</h3><ul><li>Rule 1</li><li>Rule 2</li><li>Rule 3</li></ul>",
+    },
   ];
+
+  const isEmptyNotes = !notes.replace(/<[^>]*>/g, "").trim();
+
+  const toolbarBtn =
+    "h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-transparent";
 
   return (
     <motion.div
@@ -219,176 +244,144 @@ function NotesTab({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="glass rounded-xl border border-border/30 overflow-hidden"
+      className="flex min-h-[min(70vh,36rem)] flex-col overflow-hidden rounded-xl border border-border/30 bg-[#0b1220] text-white shadow-card"
     >
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-2 p-3 border-b border-border/30 bg-muted/20">
-        <div className="flex items-center gap-1">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('bold')}>
-                  <Bold className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Bold</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('italic')}>
-                  <Italic className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Italic</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('underline')}>
-                  <Underline className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Underline</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+      <div className="flex items-center gap-0.5 px-3 pt-3 pb-1">
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className={toolbarBtn} onClick={() => execCommand("bold")}>
+                <Bold className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Bold</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className={toolbarBtn} onClick={() => execCommand("italic")}>
+                <Italic className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Italic</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className={toolbarBtn} onClick={() => execCommand("underline")}>
+                <Underline className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Underline</TooltipContent>
+          </Tooltip>
 
-          <div className="w-px h-5 bg-border/50 mx-1" />
+          <div className="mx-1.5 h-4 w-px bg-white/10" />
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('justifyLeft')}>
-                  <AlignLeft className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Align Left</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('justifyCenter')}>
-                  <AlignCenter className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Align Center</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('justifyRight')}>
-                  <AlignRight className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Align Right</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className={toolbarBtn} onClick={() => execCommand("justifyLeft")}>
+                <AlignLeft className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Align left</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className={toolbarBtn} onClick={() => execCommand("justifyCenter")}>
+                <AlignCenter className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Align center</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className={toolbarBtn} onClick={() => execCommand("justifyRight")}>
+                <AlignRight className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Align right</TooltipContent>
+          </Tooltip>
 
-          <div className="w-px h-5 bg-border/50 mx-1" />
+          <div className="mx-1.5 h-4 w-px bg-white/10" />
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('insertUnorderedList')}>
-                  <List className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Bullet List</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('insertOrderedList')}>
-                  <ListOrdered className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Numbered List</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => execCommand('formatBlock', 'blockquote')}>
-                  <Quote className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Quote</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className={toolbarBtn} onClick={() => execCommand("insertUnorderedList")}>
+                <List className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Bullet list</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className={toolbarBtn} onClick={() => execCommand("insertOrderedList")}>
+                <ListOrdered className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Numbered list</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className={toolbarBtn} onClick={() => execCommand("formatBlock", "blockquote")}>
+                <Quote className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Quote</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {isSaving && (
-            <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex items-center gap-1"
-            >
-              <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              Saving...
-            </motion.span>
-          )}
-          {!isSaving && lastSaved && (
-            <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex items-center gap-1"
-            >
-              <CheckCircle2 className="w-3 h-3 text-primary" />
-              Saved {formatTime(lastSaved)}
-            </motion.span>
-          )}
+        <div className="ml-auto pr-1 text-[11px] text-white/40">
+          {isSaving ? "Saving…" : lastSaved ? `Saved ${formatTime(lastSaved)}` : null}
         </div>
       </div>
 
-      {/* Quick Templates */}
-      {!notes && (
-        <motion.div 
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          className="p-4 border-b border-border/30 bg-muted/10"
-        >
-          <p className="text-xs text-muted-foreground mb-3">Quick templates to get started:</p>
+      {/* Quick templates */}
+      {isEmptyNotes ? (
+        <div className="px-5 pb-3 pt-2">
+          <p className="mb-2.5 text-xs text-white/45">Quick templates to get started:</p>
           <div className="flex flex-wrap gap-2">
-            {noteTemplates.map((template, index) => (
-              <motion.button
-                key={index}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.05 }}
+            {noteTemplates.map((template) => (
+              <button
+                key={template.label}
+                type="button"
                 onClick={() => {
-                  if (editorRef.current) {
-                    editorRef.current.innerHTML = template.template;
-                    handleInput();
-                  }
+                  if (!editorRef.current) return;
+                  editorRef.current.innerHTML = template.template;
+                  handleInput();
+                  editorRef.current.focus();
                 }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/40 hover:bg-muted/60 text-xs transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg bg-violet-500/15 px-3 py-1.5 text-xs font-medium text-white/90 ring-1 ring-violet-400/20 transition-colors hover:bg-violet-500/25"
               >
-                <template.icon className="w-3.5 h-3.5 text-primary" />
+                <template.icon className="h-3.5 w-3.5 text-violet-300" />
                 {template.label}
-              </motion.button>
+              </button>
             ))}
           </div>
-        </motion.div>
-      )}
+        </div>
+      ) : null}
 
       {/* Editor */}
       <div
         ref={editorRef}
         contentEditable
+        suppressContentEditableWarning
         onInput={handleInput}
         dangerouslySetInnerHTML={{ __html: initialNotes }}
         className={cn(
-          "min-h-[400px] p-6 outline-none",
-          "prose prose-sm dark:prose-invert max-w-none",
-          "[&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 first:[&_h3]:mt-0",
-          "[&_p]:text-muted-foreground [&_p]:mb-3",
-          "[&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-3",
-          "[&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-3",
-          "[&_li]:text-muted-foreground [&_li]:mb-1",
-          "[&_blockquote]:border-l-2 [&_blockquote]:border-primary/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground"
+          "min-h-0 flex-1 px-5 py-4 outline-none",
+          "text-sm leading-relaxed text-white/90",
+          "[&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-white first:[&_h3]:mt-0",
+          "[&_p]:mb-3 [&_p]:text-white/70",
+          "[&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-6",
+          "[&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-6",
+          "[&_li]:mb-1 [&_li]:text-white/70",
+          "[&_blockquote]:border-l-2 [&_blockquote]:border-violet-400/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-white/60",
+          "empty:before:pointer-events-none empty:before:text-white/30 empty:before:content-[attr(data-placeholder)]",
         )}
         data-placeholder="Start documenting your strategy observations, lessons learned, and key insights..."
       />
 
-      {/* Footer hint */}
-      <div className="px-4 py-2 border-t border-border/30 bg-muted/10">
-        <p className="text-xs text-muted-foreground/60">
-          Your notes auto-save as you type
-        </p>
+      <div className="px-5 py-3">
+        <p className="text-xs text-white/35">Your notes auto-save as you type</p>
       </div>
     </motion.div>
   );
@@ -622,29 +615,100 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
   );
 }
 
+
 export function PlaybookDetailView({ 
   checklist, 
   metrics, 
   trades,
   onBack,
-  onOpenRules,
-  onUpdateNotes
+  onUpdateNotes,
+  onUpdateChecklist,
+  onDeleteChecklist,
+  onTradesChanged,
 }: PlaybookDetailViewProps) {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [currentNotes, setCurrentNotes] = useState(checklist.notes || '');
+  const [activeManualIds, setActiveManualIds] = useState<Set<string>>(new Set());
+  const [activeBrokerIds, setActiveBrokerIds] = useState<Set<string>>(new Set());
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
 
-  // Filter trades for this checklist
-  const checklistTrades = useMemo(() =>
-    dedupeTradesForPnL(trades.filter(t => t.checklist_id === checklist.id)),
-    [trades, checklist.id]
+  // Keep playbook stats in sync with accounts that still exist on the site.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) {
+        if (!cancelled) setAccountsLoaded(true);
+        return;
+      }
+
+      const [{ data: manuals }, { data: connections }] = await Promise.all([
+        supabase.from("trading_accounts").select("id").eq("user_id", user.id),
+        supabase
+          .from("broker_connections")
+          .select("id, connection_status")
+          .eq("user_id", user.id)
+          .neq("connection_status", "disconnected"),
+      ]);
+
+      const manualIds = new Set((manuals || []).map((row) => String(row.id)));
+      const brokerIds = new Set<string>();
+      for (const conn of connections || []) {
+        if (
+          conn.connection_status !== "connected" &&
+          conn.connection_status !== "expired" &&
+          conn.connection_status !== "connecting" &&
+          conn.connection_status !== "pending"
+        ) {
+          continue;
+        }
+        const { data: accounts } = await supabase
+          .from("broker_accounts")
+          .select("account_id_external")
+          .eq("broker_connection_id", conn.id);
+        for (const account of accounts || []) {
+          if (account.account_id_external) brokerIds.add(String(account.account_id_external));
+        }
+      }
+
+      if (!cancelled) {
+        setActiveManualIds(manualIds);
+        setActiveBrokerIds(brokerIds);
+        setAccountsLoaded(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Filter trades for this checklist — only from accounts that still exist.
+  const checklistTrades = useMemo(() => {
+    if (!accountsLoaded) return [];
+    return dedupeTradesForPnL(
+      trades.filter((t) => {
+        if (t.checklist_id !== checklist.id) return false;
+        if (t.brokerAccountId) return activeBrokerIds.has(t.brokerAccountId);
+        if (t.accountId) return activeManualIds.has(t.accountId);
+        return false;
+      }),
+    );
+  }, [trades, checklist.id, accountsLoaded, activeManualIds, activeBrokerIds]);
+
+  // Live overview / executed exclude backtests; backtesting tab uses only those.
+  const liveTrades = useMemo(() => filterLivePlaybookTrades(checklistTrades), [checklistTrades]);
+  const backtestTrades = useMemo(
+    () => filterBacktestPlaybookTrades(checklistTrades),
+    [checklistTrades],
   );
 
   // Calculate extended metrics
   const extendedMetrics = useMemo(() => {
-    if (!metrics || checklistTrades.length === 0) return null;
+    if (!metrics || liveTrades.length === 0) return null;
 
-    const stats = journalTradeStats(checklistTrades);
-    const nets = checklistTrades.map((t) => getTradeNetResult(t));
+    const stats = journalTradeStats(liveTrades);
+    const nets = liveTrades.map((t) => getTradeNetResult(t));
     const winningNets = nets.filter((n) => n > 0);
     const losingNets = nets.filter((n) => n < 0);
     const largestProfit = winningNets.length > 0 ? Math.max(...winningNets) : 0;
@@ -668,13 +732,13 @@ export function PlaybookDetailView({
       rulesFollowed: 100, // Placeholder - could be calculated from checklist completion
       missedTrades: 0, // Placeholder
     };
-  }, [metrics, checklistTrades]);
+  }, [metrics, liveTrades]);
 
   // Generate cumulative P&L data for chart
   const cumulativePnLData = useMemo(() => {
-    if (checklistTrades.length === 0) return [];
+    if (liveTrades.length === 0) return [];
     
-    const sortedTrades = [...checklistTrades].sort((a, b) => 
+    const sortedTrades = [...liveTrades].sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
     
@@ -687,14 +751,10 @@ export function PlaybookDetailView({
         trade: index + 1,
       };
     });
-  }, [checklistTrades]);
+  }, [liveTrades]);
 
   const handleTabClick = (tab: TabType) => {
-    if (tab === "rules") {
-      onOpenRules();
-    } else {
-      setActiveTab(tab);
-    }
+    setActiveTab(tab);
   };
 
   const handleBack = () => {
@@ -1117,19 +1177,65 @@ export function PlaybookDetailView({
           </motion.div>
         )}
 
+        {activeTab === "rules" && (
+          <motion.div
+            key="rules"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            <PlaybookRulesEditor
+              checklist={checklist}
+              metrics={metrics}
+              onUpdateChecklist={onUpdateChecklist}
+              onDeleteChecklist={async (id) => {
+                await onDeleteChecklist(id);
+                onBack();
+              }}
+            />
+          </motion.div>
+        )}
+
         {activeTab === "executed" && (
-          <ExecutedTradesTab trades={checklistTrades} />
+          <ExecutedTradesTab trades={liveTrades} />
+        )}
+
+        {activeTab === "backtesting" && (
+          <PlaybookBacktesting
+            checklist={checklist}
+            trades={backtestTrades}
+            onTradeLogged={onTradesChanged}
+          />
         )}
 
         {activeTab === "notes" && (
-          <NotesTab 
-            checklistId={checklist.id} 
-            initialNotes={currentNotes}
-            onSave={(notes) => {
-              setCurrentNotes(notes);
-              onUpdateNotes?.(notes);
-            }}
-          />
+          <motion.div
+            key="notes"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            <PlaybookNotesGallery
+              checklistId={checklist.id}
+              checklistName={checklist.name}
+              trades={liveTrades}
+              onNewNote={() => {
+                /* focus stays on live notes editor */
+              }}
+              liveContent={
+                <NotesTab
+                  checklistId={checklist.id}
+                  initialNotes={currentNotes}
+                  onSave={(notes) => {
+                    setCurrentNotes(notes);
+                    onUpdateNotes?.(notes);
+                  }}
+                />
+              }
+            />
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

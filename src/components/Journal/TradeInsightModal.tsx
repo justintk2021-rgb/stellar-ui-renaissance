@@ -8,10 +8,11 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import type { NotebookEntry, Trade } from "@/types/trade";
+import type { ChecklistItemState, NotebookEntry, Trade } from "@/types/trade";
 import { TradeScreenshot } from "@/components/Journal/TradeScreenshot";
 import { QuickNotesEditor } from "@/components/Journal/QuickNotesEditor";
 import { StudyNoteMentions } from "@/components/study/StudyNoteMentions";
+import { ChecklistPopup } from "@/components/Journal/ChecklistPopup";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { SymbolMark } from "@/components/ui/AssetIcon";
 import { useTradeDetail } from "@/hooks/useTrades";
+import type { ChecklistItem, ChecklistType } from "@/hooks/useChecklists";
 import { notebookPlainText } from "@/lib/notebookSync";
 import {
   formatPnL,
@@ -38,6 +40,8 @@ type InsightTab = "stats" | "executions";
 interface ChecklistSummary {
   id: string;
   name: string;
+  type?: ChecklistType;
+  items?: ChecklistItem[];
 }
 
 interface TradeInsightModalProps {
@@ -119,6 +123,9 @@ export function TradeInsightModal({
 }: TradeInsightModalProps) {
   const [insightTab, setInsightTab] = useState<InsightTab>("stats");
   const [selectedChecklistId, setSelectedChecklistId] = useState(trade?.checklistId || "none");
+  const [pendingChecklistId, setPendingChecklistId] = useState<string | null>(null);
+  const [showChecklistPopup, setShowChecklistPopup] = useState(false);
+  const [localChecklistState, setLocalChecklistState] = useState<ChecklistItemState[] | undefined>();
   const [notesDraft, setNotesDraft] = useState(() =>
     trade ? seedQuickNotes(trade, notebookEntries) : "",
   );
@@ -127,6 +134,8 @@ export function TradeInsightModal({
 
   useEffect(() => {
     setSelectedChecklistId(trade?.checklistId || "none");
+    setPendingChecklistId(null);
+    setShowChecklistPopup(false);
   }, [trade?.id, trade?.checklistId]);
 
   useEffect(() => {
@@ -148,16 +157,29 @@ export function TradeInsightModal({
     }
     setHasScreenshot(Boolean(tradeDetail?.chartImage ?? trade.chartImage));
   }, [open, trade, tradeDetail?.chartImage]);
+
+  useEffect(() => {
+    if (!open || !trade) {
+      setLocalChecklistState(undefined);
+      return;
+    }
+    setLocalChecklistState(tradeDetail?.checklistState ?? trade.checklistState);
+  }, [open, trade?.id, tradeDetail?.checklistState, trade?.checklistState]);
+
   const net = trade ? getTradeNetResult(trade) : 0;
   const fees = (trade?.commission ?? 0) + (trade?.swap ?? 0);
   const gross = net - fees;
   const isProfit = net >= 0;
   const dateKey = trade ? getTradeLocalDateKey(trade) || trade.date : "";
-  const checklistState = tradeDetail?.checklistState ?? trade?.checklistState ?? [];
+  const checklistState = localChecklistState ?? [];
   const checklist =
     selectedChecklistId !== "none"
       ? checklists.find((item) => item.id === selectedChecklistId)
       : null;
+  const popupChecklistId = pendingChecklistId || (selectedChecklistId !== "none" ? selectedChecklistId : null);
+  const popupChecklist = popupChecklistId
+    ? checklists.find((item) => item.id === popupChecklistId)
+    : null;
   const linkedNote = useMemo(
     () => (trade ? notebookEntries.find((entry) => entry.tradeId === trade.id && !entry.isDeleted) : null),
     [notebookEntries, trade],
@@ -165,13 +187,49 @@ export function TradeInsightModal({
   const grade =
     checklistState.length > 0 ? checklistGrade(checklistPercentage(checklistState)) : null;
 
+  const openChecklistForPlaybook = (checklistId: string) => {
+    setPendingChecklistId(checklistId);
+    setShowChecklistPopup(true);
+  };
+
   const handlePlaybookChange = (value: string) => {
     if (!trade || !onUpdateTrade) return;
-    const nextId = value === "none" ? undefined : value;
-    setSelectedChecklistId(value);
-    const nextTrade = { ...trade, checklistId: nextId };
+    if (value === "none") {
+      setSelectedChecklistId("none");
+      setPendingChecklistId(null);
+      setShowChecklistPopup(false);
+      setLocalChecklistState(undefined);
+      const nextTrade = { ...trade, checklistId: undefined, checklistState: undefined };
+      onTradeChange?.(nextTrade);
+      void onUpdateTrade(trade.id, { checklistId: undefined, checklistState: undefined });
+      return;
+    }
+
+    // Keep Select on the previous value until the checklist is confirmed.
+    openChecklistForPlaybook(value);
+  };
+
+  const handleChecklistConfirm = (items: ChecklistItemState[]) => {
+    if (!trade || !onUpdateTrade || !pendingChecklistId) return;
+    setSelectedChecklistId(pendingChecklistId);
+    setLocalChecklistState(items);
+    const nextTrade = {
+      ...trade,
+      checklistId: pendingChecklistId,
+      checklistState: items,
+    };
     onTradeChange?.(nextTrade);
-    void onUpdateTrade(trade.id, { checklistId: nextId });
+    void onUpdateTrade(trade.id, {
+      checklistId: pendingChecklistId,
+      checklistState: items,
+    });
+    setPendingChecklistId(null);
+    setShowChecklistPopup(false);
+  };
+
+  const handleChecklistClose = () => {
+    setShowChecklistPopup(false);
+    setPendingChecklistId(null);
   };
 
   const handleSaveNotes = async () => {
@@ -190,12 +248,30 @@ export function TradeInsightModal({
   if (!trade) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog
+      open={open}
+      // Modal mode marks the rest of the document inert — including ChecklistPopup's body portal.
+      modal={!showChecklistPopup}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && showChecklistPopup) return;
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent
         className={cn(
           "flex h-[min(92vh,56rem)] w-[min(98vw,88rem)] max-w-none flex-col gap-0 overflow-hidden rounded-3xl p-0 liquid-glass shadow-none",
           "[&>button]:right-5 [&>button]:top-5",
         )}
+        onPointerDownOutside={(event) => {
+          if (showChecklistPopup) event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          if (showChecklistPopup) event.preventDefault();
+        }}
+        onFocusOutside={(event) => {
+          if (showChecklistPopup) event.preventDefault();
+        }}
       >
         <DialogTitle className="sr-only">
           {trade.pair} {trade.direction} trade insights
@@ -355,6 +431,15 @@ export function TradeInsightModal({
                         {grade.grade}
                       </Badge>
                     ) : null}
+                    {selectedChecklistId !== "none" && onUpdateTrade ? (
+                      <button
+                        type="button"
+                        onClick={() => openChecklistForPlaybook(selectedChecklistId)}
+                        className="mt-2 block text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
+                      >
+                        Use checklist
+                      </button>
+                    ) : null}
                     {onOpenPlaybook ? (
                       <button
                         type="button"
@@ -362,7 +447,7 @@ export function TradeInsightModal({
                           onOpenChange(false);
                           onOpenPlaybook();
                         }}
-                        className="mt-2 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
+                        className="mt-2 block text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
                       >
                         {checklists.length === 0 ? "Create a playbook" : "Open playbook page"}
                       </button>
@@ -371,10 +456,29 @@ export function TradeInsightModal({
 
                   {checklistState.length > 0 ? (
                     <div className="border-t border-border/30 pt-3">
-                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Checklist
-                      </p>
-                      <div className="max-h-40 space-y-1.5 overflow-y-auto">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Checklist
+                        </p>
+                        {onUpdateTrade && selectedChecklistId !== "none" ? (
+                          <button
+                            type="button"
+                            onClick={() => openChecklistForPlaybook(selectedChecklistId)}
+                            className="text-[10px] font-medium text-primary hover:text-primary/80"
+                          >
+                            Edit
+                          </button>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onUpdateTrade && selectedChecklistId !== "none") {
+                            openChecklistForPlaybook(selectedChecklistId);
+                          }
+                        }}
+                        className="max-h-40 w-full space-y-1.5 overflow-y-auto text-left"
+                      >
                         {checklistState.map((item, index) => (
                           <div
                             key={item.id || index}
@@ -396,7 +500,7 @@ export function TradeInsightModal({
                             <span className={cn(item.checked && "line-through")}>{item.text}</span>
                           </div>
                         ))}
-                      </div>
+                      </button>
                     </div>
                   ) : null}
 
@@ -530,5 +634,25 @@ export function TradeInsightModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    {popupChecklist ? (
+      <ChecklistPopup
+        isOpen={showChecklistPopup}
+        onClose={handleChecklistClose}
+        checklist={{
+          id: popupChecklist.id,
+          name: popupChecklist.name,
+          type: popupChecklist.type ?? "fixed",
+          items: popupChecklist.items ?? [],
+        }}
+        initialState={
+          pendingChecklistId && pendingChecklistId === selectedChecklistId
+            ? localChecklistState
+            : undefined
+        }
+        onConfirm={handleChecklistConfirm}
+      />
+    ) : null}
+    </>
   );
 }

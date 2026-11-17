@@ -43,6 +43,7 @@ import { StudyNoteMentions } from "@/components/study/StudyNoteMentions";
 interface Checklist {
   id: string;
   name: string;
+  type?: "fixed" | "conditional";
   items: { id: string; text: string; checked: boolean; percentage?: number }[];
   createdAt: string;
 }

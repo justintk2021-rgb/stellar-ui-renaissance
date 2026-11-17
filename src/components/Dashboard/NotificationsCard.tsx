@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Bell, Check, ChevronRight, Home, Music2, User } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, Check, ChevronRight, Home, Music2, Settings, User } from "lucide-react";
 import { AnimatePresence, motion } from "@/lib/motion";
 import { NotebookEntry, Trade } from "@/types/trade";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -13,8 +13,7 @@ import type { UnjournaledTradePayload } from "@/types/notification";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { ExpandableTabs } from "@/components/ui/expandable-tabs";
 import { AssetIcon } from "@/components/ui/AssetIcon";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { SpotifyPlayerCard } from "@/components/Dashboard/SpotifyPlayerCard";
+import { useSharedSpotifyPlayer } from "@/hooks/SpotifyPlayerContext";
 
 export interface OpenJournalTarget {
   filter?: JournalFilter;
@@ -282,17 +281,22 @@ export function NotificationsMenu({
   /** `avatar` = profile control only (dashboard). `full` = notifications + home + profile. */
   variant?: "full" | "avatar";
 }) {
-  const [open, setOpen] = useState(false);
-  const [spotifyOpen, setSpotifyOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  /** Kept while closing so content doesn't flash the other panel. */
+  const [panel, setPanel] = useState<"notifications" | "profile">("profile");
+  const { openSpotifyPanel } = useSharedSpotifyPlayer();
   const [selectedTab, setSelectedTab] = useState<number | null>(null);
   const avatarOnly = variant === "avatar";
+  const profileTabIndex = avatarOnly ? 0 : 4;
+  const showProfilePanel = panel === "profile";
   const { count, loading, body } = useNotificationsPanel({
     trades,
     notebookEntries,
     isLoading,
     onOpenJournal,
     onNavigate: () => {
-      setOpen(false);
+      setNotificationsOpen(false);
       setSelectedTab(null);
     },
     listClassName: "max-h-[16rem]",
@@ -307,124 +311,146 @@ export function NotificationsMenu({
     imageFallback: avatarUrl ? undefined : profileInitials,
   };
 
-  if (avatarOnly) {
-    return (
-      <>
-        <ExpandableTabs
-          selected={selectedTab}
-          closeOnOutsideClick={false}
-          onChange={(index) => {
-            setSelectedTab(index);
-            if (index === 0) {
-              setSpotifyOpen(true);
-              setSelectedTab(null);
-              return;
-            }
-            if (index === 2) {
-              onOpenProfile?.();
-              setSelectedTab(null);
-            }
-          }}
-          className="border-border/40 bg-foreground/[0.04] p-0.5 shadow-none"
-          tabs={[
-            { title: "Spotify", icon: Music2 },
-            { type: "separator" },
-            profileTab,
-          ]}
-        />
-        <Sheet open={spotifyOpen} onOpenChange={setSpotifyOpen}>
-          <SheetContent
-            side="right"
-            className="w-full border-border/40 p-0 sm:max-w-[50vw] liquid-glass"
-          >
-            <SheetHeader className="border-b border-border/30 px-5 py-4 text-left">
-              <SheetTitle className="flex items-center gap-2 text-base">
-                <Music2 className="h-4 w-4 text-primary" />
-                Spotify
-              </SheetTitle>
-            </SheetHeader>
-            <div className="h-[calc(100%-3.5rem)] overflow-y-auto p-4">
-              <SpotifyPlayerCard className="min-h-[min(70vh,36rem)]" />
-            </div>
-          </SheetContent>
-        </Sheet>
-      </>
-    );
-  }
+  const openProfileMenu = () => {
+    setPanel("profile");
+    setNotificationsOpen(false);
+    setProfileMenuOpen(true);
+    setSelectedTab(profileTabIndex);
+  };
+
+  const closeMenus = () => {
+    setNotificationsOpen(false);
+    setProfileMenuOpen(false);
+    setSelectedTab(null);
+  };
+
+  const tabs = avatarOnly
+    ? [profileTab]
+    : [
+        {
+          title: "Notifications",
+          icon: Bell,
+          badge,
+        },
+        { type: "separator" as const },
+        {
+          title: "Home",
+          icon: Home,
+        },
+        { type: "separator" as const },
+        profileTab,
+      ];
+
+  const handleTabChange = (index: number | null) => {
+    setSelectedTab(index);
+    if (index === null) {
+      setNotificationsOpen(false);
+      setProfileMenuOpen(false);
+      return;
+    }
+    if (!avatarOnly && index === 0) {
+      setPanel("notifications");
+      setProfileMenuOpen(false);
+      setNotificationsOpen(true);
+      return;
+    }
+    if (!avatarOnly && index === 2) {
+      setNotificationsOpen(false);
+      setProfileMenuOpen(false);
+      onOpenHome?.();
+      setSelectedTab(null);
+      return;
+    }
+    if (index === profileTabIndex) {
+      openProfileMenu();
+    }
+  };
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next && selectedTab === 0) setSelectedTab(null);
-      }}
-      modal={false}
-    >
-      <PopoverAnchor asChild>
-        <div>
-          <ExpandableTabs
-            selected={selectedTab}
-            closeOnOutsideClick={false}
-            onChange={(index) => {
-              setSelectedTab(index);
-              if (index === 0) {
-                setOpen(true);
-                return;
-              }
-              setOpen(false);
-              if (index === 2) {
-                onOpenHome?.();
-                setSelectedTab(null);
-                return;
-              }
-              if (index === 4) {
-                onOpenProfile?.();
-                setSelectedTab(null);
-              }
-            }}
-            className="border-border/40 bg-foreground/[0.04] p-0.5 shadow-none"
-            tabs={[
-              {
-                title: "Notifications",
-                icon: Bell,
-                badge,
-              },
-              { type: "separator" },
-              {
-                title: "Home",
-                icon: Home,
-              },
-              { type: "separator" },
-              profileTab,
-            ]}
-          />
-        </div>
-      </PopoverAnchor>
-      <PopoverContent
-        align="end"
-        side="bottom"
-        sideOffset={10}
-        collisionPadding={16}
-        className="w-[min(24rem,calc(100vw-2rem))] p-4 liquid-glass projection-popover shadow-none data-[state=open]:animate-none data-[state=closed]:animate-none"
+    <>
+      <Popover
+        open={notificationsOpen || profileMenuOpen}
+        onOpenChange={(next) => {
+          if (next) return;
+          setNotificationsOpen(false);
+          setProfileMenuOpen(false);
+          if (selectedTab === 0 || selectedTab === profileTabIndex) {
+            setSelectedTab(null);
+          }
+        }}
+        modal={false}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Bell className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-muted-foreground">Notifications</span>
+        <PopoverAnchor asChild>
+          <div>
+            <ExpandableTabs
+              selected={selectedTab}
+              closeOnOutsideClick={false}
+              onChange={handleTabChange}
+              className="border-border/40 bg-foreground/[0.04] p-0.5 shadow-none"
+              tabs={tabs}
+            />
           </div>
-          <span
-            className={cn(
-              "flex h-5 min-w-5 items-center justify-center rounded-full px-1 font-mono text-[10px] font-semibold tabular-nums",
-              count > 0 ? "bg-primary/15 text-primary" : "bg-muted/60 text-muted-foreground",
-            )}
-          >
-            {loading ? "—" : count}
-          </span>
-        </div>
-        {body}
-      </PopoverContent>
-    </Popover>
+        </PopoverAnchor>
+
+        <PopoverContent
+          align="end"
+          side="bottom"
+          sideOffset={10}
+          collisionPadding={16}
+          className={cn(
+            "liquid-glass projection-popover shadow-none data-[state=open]:animate-none data-[state=closed]:animate-none",
+            showProfilePanel
+              ? "w-44 p-1.5"
+              : "w-[min(24rem,calc(100vw-2rem))] p-4",
+          )}
+        >
+          {showProfilePanel ? (
+            <div className="flex flex-col gap-0.5">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-muted/60"
+                onClick={() => {
+                  closeMenus();
+                  onOpenProfile?.();
+                }}
+              >
+                <Settings className="h-4 w-4 text-muted-foreground" />
+                Settings
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-muted/60"
+                onClick={() => {
+                  closeMenus();
+                  openSpotifyPanel();
+                }}
+              >
+                <Music2 className="h-4 w-4 text-muted-foreground" />
+                Spotify
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-muted-foreground">Notifications</span>
+                </div>
+                <span
+                  className={cn(
+                    "flex h-5 min-w-5 items-center justify-center rounded-full px-1 font-mono text-[10px] font-semibold tabular-nums",
+                    count > 0 ? "bg-primary/15 text-primary" : "bg-muted/60 text-muted-foreground",
+                  )}
+                >
+                  {loading ? "—" : count}
+                </span>
+              </div>
+              {body}
+            </>
+          )}
+        </PopoverContent>
+      </Popover>
+    </>
   );
 }
 

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,6 +9,7 @@ import { useApplyGlobalSettings } from "./hooks/useApplyGlobalSettings";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { FpsMeter } from "./components/dev/FpsMeter";
 import { isSupabaseConfigured } from "./integrations/supabase/client";
+import { resumePendingSpotifyLogin } from "./lib/spotify";
 
 // Lazy-load route pages so visitors only download the JS they actually need.
 // Landing visitors no longer pay for the entire authenticated dashboard bundle.
@@ -37,6 +38,13 @@ const queryClient = new QueryClient({
 
 const GlobalSettingsApplier = () => {
   useApplyGlobalSettings();
+  return null;
+};
+
+const SpotifyConnectResume = () => {
+  useEffect(() => {
+    void resumePendingSpotifyLogin();
+  }, []);
   return null;
 };
 
@@ -74,6 +82,7 @@ const App = () => {
       <Sonner />
       {import.meta.env.DEV && <FpsMeter />}
       <BrowserRouter>
+        <SpotifyConnectResume />
         <ErrorBoundary>
           <Suspense fallback={<RouteFallback />}>
             <Routes>
