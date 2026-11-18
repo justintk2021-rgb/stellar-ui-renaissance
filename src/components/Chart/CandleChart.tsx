@@ -12,6 +12,8 @@ import {
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
+  type MouseEventHandler,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { useDocumentTheme } from "@/hooks/useDocumentTheme";
@@ -29,6 +31,15 @@ export interface ChartApi {
   timeToX: (time: number) => number | null;
   xToTime: (x: number) => number | null;
   subscribeViewChange: (cb: () => void) => () => void;
+  updateBar: (bar: Candle) => void;
+  getChart: () => IChartApi | null;
+  getCandleSeries: () => ISeriesApi<"Candlestick"> | null;
+  subscribeCrosshairMove: (handler: MouseEventHandler<Time>) => () => void;
+  subscribeClick: (handler: MouseEventHandler<Time>) => () => void;
+}
+
+function toUtcTimestamp(time: number): UTCTimestamp {
+  return (time > 1e12 ? Math.floor(time / 1000) : Math.floor(time)) as UTCTimestamp;
 }
 
 export interface CandleChartProps {
@@ -40,13 +51,16 @@ export interface CandleChartProps {
   showRsi: boolean;
   draggingId: string | null;
   onNeedMoreHistory?: () => void;
+  onReady?: () => void;
 }
 
 export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function CandleChart(
-  { candles, symbol, positions, showEma20, showEma50, showRsi, draggingId, onNeedMoreHistory },
+  { candles, symbol, positions, showEma20, showEma50, showRsi, draggingId, onNeedMoreHistory, onReady },
   ref,
 ) {
   const theme = useDocumentTheme();
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -56,11 +70,18 @@ export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function Candl
   const rsiRef = useRef<ISeriesApi<"Line"> | null>(null);
   const linesRef = useRef<IPriceLine[]>([]);
   const fitOnceRef = useRef(true);
+  const fittedCountRef = useRef(0);
+  const dataKeyRef = useRef<{ symbol: string; len: number; lastTime: number | null; firstTime: number | null }>({
+    symbol: "",
+    len: 0,
+    lastTime: null,
+    firstTime: null,
+  });
 
   useImperativeHandle(ref, () => ({
     priceToY: (price) => candleSeriesRef.current?.priceToCoordinate(price) ?? null,
     yToPrice: (y) => candleSeriesRef.current?.coordinateToPrice(y) ?? null,
-    timeToX: (time) => chartRef.current?.timeScale().timeToCoordinate(asUtc(time)) ?? null,
+    timeToX: (time) => chartRef.current?.timeScale().timeToCoordinate(asUtc(toUtcTimestamp(time))) ?? null,
     xToTime: (x) => {
       const time = chartRef.current?.timeScale().coordinateToTime(x);
       return typeof time === "number" ? time : null;
@@ -77,7 +98,40 @@ export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function Candl
         window.removeEventListener("resize", cb);
       };
     },
-  }), []);
+    updateBar: (bar) => {
+      const candleSeries = candleSeriesRef.current;
+      const volumeSeries = volumeSeriesRef.current;
+      if (!candleSeries || !volumeSeries) return;
+      const palette = getChartPalette(theme);
+      const time = toUtcTimestamp(bar.time);
+      candleSeries.update({
+        time,
+        open: bar.open,
+        high: bar.high,
+        low: bar.low,
+        close: bar.close,
+      });
+      volumeSeries.update({
+        time,
+        value: bar.volume,
+        color: bar.close >= bar.open ? palette.volumeUp : palette.volumeDown,
+      });
+    },
+    getChart: () => chartRef.current,
+    getCandleSeries: () => candleSeriesRef.current,
+    subscribeCrosshairMove: (handler) => {
+      const chart = chartRef.current;
+      if (!chart) return () => undefined;
+      chart.subscribeCrosshairMove(handler);
+      return () => chart.unsubscribeCrosshairMove(handler);
+    },
+    subscribeClick: (handler) => {
+      const chart = chartRef.current;
+      if (!chart) return () => undefined;
+      chart.subscribeClick(handler);
+      return () => chart.unsubscribeClick(handler);
+    },
+  }), [theme]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -88,10 +142,13 @@ export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function Candl
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: palette.up,
       downColor: palette.down,
+      borderVisible: true,
       borderUpColor: palette.up,
-      borderDownColor: palette.down,
+      borderDownColor: "#9ca3af",
       wickUpColor: palette.up,
-      wickDownColor: palette.down,
+      wickDownColor: "#9ca3af",
+      lastValueVisible: true,
+      priceLineVisible: true,
     });
     const volumeSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: "volume" },
@@ -105,6 +162,9 @@ export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function Candl
     candleSeriesRef.current = candleSeries;
     volumeSeriesRef.current = volumeSeries;
     fitOnceRef.current = true;
+    fittedCountRef.current = 0;
+    dataKeyRef.current = { symbol: "", len: 0, lastTime: null, firstTime: null };
+    onReadyRef.current?.();
 
     return () => {
       linesRef.current = [];
@@ -126,13 +186,35 @@ export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function Candl
 
     const palette = getChartPalette(theme);
     const spec = getSymbolSpec(symbol);
+    const last = candles[candles.length - 1];
+    const lastUp = last ? last.close >= last.open : true;
     candleSeries.applyOptions({
       priceFormat: { type: "price", precision: spec.precision, minMove: spec.minMove },
+      upColor: palette.up,
+      downColor: palette.down,
+      borderUpColor: palette.up,
+      borderDownColor: "#9ca3af",
+      wickUpColor: palette.up,
+      wickDownColor: "#9ca3af",
+      lastValueVisible: true,
+      priceLineVisible: true,
+      priceLineColor: lastUp ? palette.up : "#000000",
     });
+
+    const prev = dataKeyRef.current;
+    const firstTime = candles[0]?.time ?? null;
+    const prepended =
+      prev.symbol === symbol &&
+      firstTime != null &&
+      prev.firstTime != null &&
+      firstTime < prev.firstTime &&
+      candles.length > prev.len;
+    const added = prepended ? candles.length - prev.len : 0;
+    const savedRange = prepended ? chart.timeScale().getVisibleLogicalRange() : null;
 
     candleSeries.setData(
       candles.map((c) => ({
-        time: c.time as UTCTimestamp,
+        time: toUtcTimestamp(c.time),
         open: c.open,
         high: c.high,
         low: c.low,
@@ -141,7 +223,7 @@ export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function Candl
     );
     volumeSeries.setData(
       candles.map((c) => ({
-        time: c.time as UTCTimestamp,
+        time: toUtcTimestamp(c.time),
         value: c.volume,
         color: c.close >= c.open ? palette.volumeUp : palette.volumeDown,
       })),
@@ -157,7 +239,7 @@ export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function Candl
         });
       }
       ema20Ref.current.setData(
-        computeEma(candles, 20).map((p) => ({ time: p.time as UTCTimestamp, value: p.value })),
+        computeEma(candles, 20).map((p) => ({ time: toUtcTimestamp(p.time), value: p.value })),
       );
     } else if (ema20Ref.current) {
       chart.removeSeries(ema20Ref.current);
@@ -174,7 +256,7 @@ export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function Candl
         });
       }
       ema50Ref.current.setData(
-        computeEma(candles, 50).map((p) => ({ time: p.time as UTCTimestamp, value: p.value })),
+        computeEma(candles, 50).map((p) => ({ time: toUtcTimestamp(p.time), value: p.value })),
       );
     } else if (ema50Ref.current) {
       chart.removeSeries(ema50Ref.current);
@@ -199,7 +281,7 @@ export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function Candl
         });
       }
       rsiRef.current.setData(
-        computeRsi(candles, 14).map((p) => ({ time: p.time as UTCTimestamp, value: p.value })),
+        computeRsi(candles, 14).map((p) => ({ time: toUtcTimestamp(p.time), value: p.value })),
       );
     } else if (rsiRef.current) {
       chart.removeSeries(rsiRef.current);
@@ -209,14 +291,39 @@ export const CandleChart = forwardRef<ChartApi, CandleChartProps>(function Candl
       }
     }
 
-    if (fitOnceRef.current && candles.length) {
+    dataKeyRef.current = {
+      symbol,
+      len: candles.length,
+      lastTime: last?.time ?? null,
+      firstTime,
+    };
+
+    if (!candles.length) {
+      fitOnceRef.current = true;
+      fittedCountRef.current = 0;
+      return;
+    }
+
+    if (prepended && savedRange) {
+      chart.timeScale().setVisibleLogicalRange({
+        from: savedRange.from + added,
+        to: savedRange.to + added,
+      });
+      return;
+    }
+
+    const shouldFit =
+      fitOnceRef.current || candles.length >= Math.max(fittedCountRef.current * 2, fittedCountRef.current + 50);
+    if (shouldFit) {
       chart.timeScale().fitContent();
       fitOnceRef.current = false;
+      fittedCountRef.current = candles.length;
     }
   }, [candles, symbol, showEma20, showEma50, showRsi, theme]);
 
   useEffect(() => {
     fitOnceRef.current = true;
+    fittedCountRef.current = 0;
   }, [symbol]);
 
   useEffect(() => {

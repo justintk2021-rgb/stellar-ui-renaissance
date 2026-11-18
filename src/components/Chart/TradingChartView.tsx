@@ -32,19 +32,28 @@ import {
 } from "@/lib/chartTrading/types";
 import { ChartBottomPanel } from "./ChartBottomPanel";
 import { ChartTopBar } from "./ChartTopBar";
-import { TradingViewAdvancedChart } from "./TradingViewAdvancedChart";
+import { LightweightChartView } from "./LightweightChartView";
 import { TradingPanel, type TradeTicket } from "./TradingPanel";
 
 function defaultTicket(symbol: string, last: number | null): TradeTicket {
   const spec = getSymbolSpec(symbol);
-  const mark = last ?? spec.basePrice ?? 0;
+  if (last == null || !Number.isFinite(last) || last <= 0) {
+    return {
+      side: "buy",
+      type: "market",
+      lots: 0.1,
+      entryPrice: "",
+      stopLoss: "",
+      takeProfit: "",
+    };
+  }
   return {
     side: "buy",
     type: "market",
     lots: 0.1,
-    entryPrice: formatPrice(mark, symbol),
-    stopLoss: formatPrice(mark - spec.pipSize * 20, symbol),
-    takeProfit: formatPrice(mark + spec.pipSize * 35, symbol),
+    entryPrice: formatPrice(last, symbol),
+    stopLoss: formatPrice(last - spec.pipSize * 20, symbol),
+    takeProfit: formatPrice(last + spec.pipSize * 35, symbol),
   };
 }
 
@@ -73,16 +82,20 @@ export function TradingChartView() {
   const [ticket, setTicket] = useState<TradeTicket>(() => defaultTicket("EURUSD", null));
   const [sheetOpen, setSheetOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [feedLastPrice, setFeedLastPrice] = useState<number | null>(null);
+  const ticketTouchedRef = useRef(false);
+  const pricedSymbolRef = useRef<string | null>(null);
 
   const account = useMemo(
     () => accounts.find((item) => item.id === accountId) ?? accounts[0] ?? null,
     [accounts, accountId],
   );
 
-  const lastPrice = useMemo(() => {
+  const positionLastPrice = useMemo(() => {
     const match = positions.find((item) => item.symbol.toUpperCase() === symbol.toUpperCase());
     return match?.currentPrice ?? null;
   }, [positions, symbol]);
+  const lastPrice = feedLastPrice ?? positionLastPrice;
 
   const tvSymbol = toTradingViewSymbol(symbol);
   const tvInterval = toTradingViewInterval(timeframe);
@@ -197,6 +210,9 @@ export function TradingChartView() {
 
   const handleSymbolChange = (next: string) => {
     setSymbol(next);
+    ticketTouchedRef.current = false;
+    pricedSymbolRef.current = null;
+    setFeedLastPrice(null);
     setTicket((prev) => ({
       ...defaultTicket(next, null),
       side: prev.side,
@@ -207,8 +223,31 @@ export function TradingChartView() {
   };
 
   const handleTicketChange = (patch: Partial<TradeTicket>) => {
+    ticketTouchedRef.current = true;
     setTicket((prev) => ({ ...prev, ...patch }));
   };
+
+  const handleLastPrice = useCallback((price: number, fromSymbol?: string) => {
+    if (fromSymbol && fromSymbol !== symbol) return;
+    if (!Number.isFinite(price) || price <= 0) return;
+    setFeedLastPrice((prev) => (prev === price ? prev : price));
+    if (ticketTouchedRef.current) return;
+    setTicket((prev) => {
+      const mark = Number(prev.entryPrice);
+      const alreadyPriced = pricedSymbolRef.current === symbol
+        && Number.isFinite(mark)
+        && mark > 0
+        && Math.abs(mark - price) / price < 0.15;
+      if (alreadyPriced) return prev;
+      pricedSymbolRef.current = symbol;
+      return {
+        ...defaultTicket(symbol, price),
+        side: prev.side,
+        type: prev.type,
+        lots: prev.lots,
+      };
+    });
+  }, [symbol]);
 
   const panel = (
     <TradingPanel
@@ -242,12 +281,12 @@ export function TradingChartView() {
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 lg:flex-row">
         <div className="perf-contain relative min-h-[20rem] min-w-0 w-full flex-1 overflow-hidden rounded-2xl border border-foreground/10 bg-background/40">
-          <TradingViewAdvancedChart
-            key={`${theme}-${tvSymbol}-${tvInterval}-${timezone}`}
-            symbol={tvSymbol}
+          <LightweightChartView
+            key={symbol}
+            symbol={symbol}
             interval={tvInterval}
-            theme={theme}
-            timezone={timezone}
+            positions={positions}
+            onLastPrice={handleLastPrice}
           />
         </div>
 

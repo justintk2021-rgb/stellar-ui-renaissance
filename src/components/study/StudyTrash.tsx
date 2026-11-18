@@ -250,7 +250,6 @@ export function StudyTrashProvider({
   return (
     <StudyTrashContext.Provider value={value}>
       {children}
-      {visible ? <StudyTrashBin className="fixed right-[7.25rem] top-4 z-[70] h-11 w-11" /> : null}
       {ghost ? (
         <div
           className="study-drag-ghost pointer-events-none fixed z-[80] rounded-full border border-border/50 bg-card/95 px-3 py-1.5 text-sm font-medium shadow-lg"

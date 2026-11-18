@@ -20,26 +20,23 @@ export interface ChartPalette {
   tp: string;
 }
 
-export function getChartPalette(theme: AppTheme): ChartPalette {
-  // Liquid Glass is dark-based; keep the dark palette but let the aurora
-  // show through the chart background.
-  const dark = theme !== "light";
+export function getChartPalette(_theme: AppTheme): ChartPalette {
   return {
-    background: theme === "liquid-glass" ? "rgba(8, 10, 18, 0.45)" : dark ? "#050505" : "#f5f6f8",
-    text: dark ? "#e8eaed" : "#1a1d21",
-    grid: dark ? "rgba(255,255,255,0.05)" : "rgba(15,23,42,0.06)",
-    border: dark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.1)",
-    crosshair: dark ? "rgba(255,255,255,0.38)" : "rgba(15,23,42,0.35)",
-    up: dark ? "#34d399" : "#059669",
-    down: dark ? "#f87171" : "#dc2626",
-    volumeUp: dark ? "rgba(52,211,153,0.38)" : "rgba(5,150,105,0.38)",
-    volumeDown: dark ? "rgba(248,113,113,0.38)" : "rgba(220,38,38,0.38)",
-    ema20: dark ? "#38bdf8" : "#0284c7",
-    ema50: dark ? "#c084fc" : "#7c3aed",
-    rsi: dark ? "#fbbf24" : "#d97706",
-    entry: dark ? "#e5e7eb" : "#334155",
-    sl: dark ? "#f87171" : "#dc2626",
-    tp: dark ? "#34d399" : "#059669",
+    background: "#131722",
+    text: "#d1d4dc",
+    grid: "rgba(42, 46, 57, 0.7)",
+    border: "#2a2e39",
+    crosshair: "rgba(255,255,255,0.28)",
+    up: "#2962FF",
+    down: "#000000",
+    volumeUp: "rgba(41, 98, 255, 0.32)",
+    volumeDown: "rgba(156, 163, 175, 0.38)",
+    ema20: "#38bdf8",
+    ema50: "#c084fc",
+    rsi: "#fbbf24",
+    entry: "#e5e7eb",
+    sl: "#f87171",
+    tp: "#34d399",
   };
 }
 
@@ -49,7 +46,6 @@ export function buildChartOptions(palette: ChartPalette): DeepPartial<ChartOptio
     layout: {
       background: { type: ColorType.Solid, color: palette.background },
       textColor: palette.text,
-      attributionLogo: false,
       panes: {
         separatorColor: palette.border,
         separatorHoverColor: palette.crosshair,

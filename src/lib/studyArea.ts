@@ -8,7 +8,6 @@ export type StudyCategory = "individual" | "collaborative" | "case";
 export const STUDY_CATEGORIES: { id: StudyCategory; label: string }[] = [
   { id: "individual", label: "Individual" },
   { id: "collaborative", label: "Collaborative" },
-  { id: "case", label: "Case" },
 ];
 
 export const STUDY_FOLDER_COLORS = [

@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useMemo, useCallback, type DragEvent } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback, type DragEvent } from "react";
+import { createPortal } from "react-dom";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Trade, NotebookEntry } from "@/types/trade";
@@ -114,10 +115,13 @@ import { StudyTabStrip } from "@/components/study/StudyTabStrip";
 import {
   HOME_TAB,
   HOME_TAB_KEY,
+  NOTEBOOK_TAB_STORAGE_KEY,
   ensureHomeFirst,
+  loadTabSession,
   neighborAfterClose,
   noteTabKey,
   removeTab,
+  saveTabSession,
   syncNoteTabTitle,
   upsertNoteTab,
   type StudyTab,
@@ -153,6 +157,20 @@ const MARKER_COLORS = [
   { id: 'pink', label: 'Pink', color: 'hsl(330, 81%, 60%)' },
   { id: 'cyan', label: 'Cyan', color: 'hsl(186, 94%, 41%)' },
 ];
+
+function notebookFolderAccent(
+  category: string | undefined | null,
+  markers: Record<string, string>,
+  folders: Array<{ id: string; color?: string }>,
+): string | null {
+  if (!category) return null;
+  const markerId = markers[category];
+  if (markerId) {
+    const marker = MARKER_COLORS.find((item) => item.id === markerId);
+    if (marker?.color && marker.color !== "transparent") return marker.color;
+  }
+  return folders.find((folder) => folder.id === category)?.color ?? null;
+}
 
 const CATEGORIES = [
   { id: "all", label: "All Notes", icon: FileText },
@@ -199,29 +217,71 @@ export function NotebookView({
     [onSelectedCategoryChange],
   );
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
-  const [tabs, setTabs] = useState<StudyTab[]>([HOME_TAB]);
-  const [activeTabKey, setActiveTabKey] = useState<string>(HOME_TAB_KEY);
+  const notebookTabScope = selectedCategory || "all";
+  const [customFolders, setCustomFolders] = useState<Array<{ id: string; label: string; color?: string }>>(() => {
+    const saved = localStorage.getItem("notebook-custom-folders");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [folderMarkers, setFolderMarkers] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem("notebook-folder-markers");
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [tabs, setTabs] = useState<StudyTab[]>(
+    () => loadTabSession(NOTEBOOK_TAB_STORAGE_KEY, selectedCategory || "all").tabs,
+  );
+  const [activeTabKey, setActiveTabKey] = useState<string>(
+    () => loadTabSession(NOTEBOOK_TAB_STORAGE_KEY, selectedCategory || "all").activeKey,
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const deferredSearch = useDebouncedValue(searchQuery, 160);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
-  const categorySyncRef = useRef(selectedCategory);
+  const categorySyncRef = useRef(notebookTabScope);
+
   useEffect(() => {
-    if (categorySyncRef.current === selectedCategory) return;
-    categorySyncRef.current = selectedCategory;
-    setSelectedEntryId(null);
-    setIsCreatingNew(false);
-    setTabs([HOME_TAB]);
-    setActiveTabKey(HOME_TAB_KEY);
-  }, [selectedCategory]);
+    if (categorySyncRef.current !== notebookTabScope) {
+      categorySyncRef.current = notebookTabScope;
+      const saved = loadTabSession(NOTEBOOK_TAB_STORAGE_KEY, notebookTabScope);
+      setTabs(saved.tabs);
+      setActiveTabKey(saved.activeKey);
+      const active = saved.tabs.find((tab) => tab.key === saved.activeKey);
+      if (active?.kind === "note" && active.id === NOTEBOOK_DRAFT_ID) {
+        setSelectedEntryId(null);
+        setIsCreatingNew(true);
+      } else if (active?.kind === "note") {
+        setSelectedEntryId(active.id);
+        setIsCreatingNew(false);
+      } else {
+        setSelectedEntryId(null);
+        setIsCreatingNew(false);
+      }
+      return;
+    }
+    saveTabSession(NOTEBOOK_TAB_STORAGE_KEY, notebookTabScope, { tabs, activeKey: activeTabKey });
+  }, [activeTabKey, notebookTabScope, tabs]);
+
+  // Restore selected note / draft from persisted active tab on first mount
+  useEffect(() => {
+    const active = tabs.find((tab) => tab.key === activeTabKey);
+    if (active?.kind === "note" && active.id === NOTEBOOK_DRAFT_ID) {
+      setSelectedEntryId(null);
+      setIsCreatingNew(true);
+    } else if (active?.kind === "note") {
+      setSelectedEntryId(active.id);
+      setIsCreatingNew(false);
+    }
+    // intentionally once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openNoteTab = useCallback((id: string, title?: string) => {
     const entry = notebookEntries.find((item) => item.id === id);
     const nextTitle = title?.trim() || entry?.title?.trim() || "Untitled";
-    setTabs((current) => upsertNoteTab(current, id, nextTitle));
+    const color = notebookFolderAccent(entry?.category, folderMarkers, customFolders);
+    setTabs((current) => upsertNoteTab(current, id, nextTitle, color));
     setActiveTabKey(noteTabKey(id));
     setSelectedEntryId(id);
     setIsCreatingNew(false);
-  }, [notebookEntries]);
+  }, [customFolders, folderMarkers, notebookEntries]);
 
   const activateNotebookTab = useCallback((key: string) => {
     setActiveTabKey(key);
@@ -262,7 +322,7 @@ export function NotebookView({
     });
   }, [activeTabKey]);
 
-  // Keep open tab titles in sync with note data
+  // Keep open tab titles / folder colors in sync with note + folder data
   useEffect(() => {
     setTabs((current) =>
       current.map((tab) => {
@@ -270,11 +330,12 @@ export function NotebookView({
         const entry = notebookEntries.find((item) => item.id === tab.id);
         if (!entry) return tab;
         const title = entry.title?.trim() || "Untitled";
-        if (title === tab.title) return tab;
-        return { ...tab, title };
+        const color = notebookFolderAccent(entry.category, folderMarkers, customFolders);
+        if (title === tab.title && color === tab.color) return tab;
+        return { ...tab, title, color };
       }),
     );
-  }, [notebookEntries]);
+  }, [customFolders, folderMarkers, notebookEntries]);
   const [isSmallText, setIsSmallText] = useState(false);
   const [isFullWidth, setIsFullWidth] = useState(false);
   const [isFullWidthClosing, setIsFullWidthClosing] = useState(false);
@@ -293,15 +354,6 @@ export function NotebookView({
   const emptyDragImageRef = useRef<HTMLCanvasElement | null>(null);
   const [folderSearchQuery, setFolderSearchQuery] = useState("");
   const deferredFolderSearch = useDebouncedValue(folderSearchQuery, 160);
-  const [customFolders, setCustomFolders] = useState<Array<{ id: string; label: string; color?: string }>>(() => {
-    const saved = localStorage.getItem('notebook-custom-folders');
-    console.log('Loading custom folders:', saved);
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [folderMarkers, setFolderMarkers] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('notebook-folder-markers');
-    return saved ? JSON.parse(saved) : {};
-  });
   const [isBlockMenuOpen, setIsBlockMenuOpen] = useState(false);
   const [blockMenuPosition, setBlockMenuPosition] = useState({ x: 0, y: 0 });
   const [showBlockButton, setShowBlockButton] = useState(false);
@@ -704,9 +756,10 @@ export function NotebookView({
         updatedAt: new Date().toISOString(),
       };
       void Promise.resolve(onSaveEntry(newEntry)).then(() => {
+        const color = notebookFolderAccent(newEntry.category, folderMarkers, customFolders);
         setTabs((current) => {
           const withoutDraft = removeTab(current, noteTabKey(NOTEBOOK_DRAFT_ID));
-          return upsertNoteTab(withoutDraft, newEntry.id, newEntry.title);
+          return upsertNoteTab(withoutDraft, newEntry.id, newEntry.title, color);
         });
         setActiveTabKey(noteTabKey(newEntry.id));
         setSelectedEntryId(newEntry.id);
@@ -721,7 +774,8 @@ export function NotebookView({
         content,
         updatedAt: new Date().toISOString(),
       })).then(() => {
-        setTabs((current) => syncNoteTabTitle(current, selectedEntry.id, title));
+        const color = notebookFolderAccent(selectedEntry.category, folderMarkers, customFolders);
+        setTabs((current) => syncNoteTabTitle(current, selectedEntry.id, title, color));
         setLastSavedAt(new Date());
         toast.success("Note saved!");
       });
@@ -735,7 +789,10 @@ export function NotebookView({
     setIsCreatingNew(true);
     setSelectedEntryId(null);
     setIsLocked(false);
-    setTabs((current) => upsertNoteTab(current, NOTEBOOK_DRAFT_ID, "Untitled"));
+    const draftCategory =
+      selectedCategory === "all" || selectedCategory === "trash" ? "general" : selectedCategory;
+    const color = notebookFolderAccent(draftCategory, folderMarkers, customFolders);
+    setTabs((current) => upsertNoteTab(current, NOTEBOOK_DRAFT_ID, "Untitled", color));
     setActiveTabKey(noteTabKey(NOTEBOOK_DRAFT_ID));
     if (titleRef.current) titleRef.current.value = "";
     if (editorRef.current) editorRef.current.innerHTML = "";
@@ -1385,7 +1442,20 @@ export function NotebookView({
 
   const editorSurfaceClass = EDITOR_SURFACE_CLASS;
 
+  const notebookTabStrip = (
+    <StudyTabStrip
+      tabs={tabs}
+      activeKey={activeTabKey}
+      onActivate={activateNotebookTab}
+      onClose={closeNotebookTab}
+      onNewWorkspace={handleNewNote}
+    />
+  );
 
+  const [tabStripHost, setTabStripHost] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    setTabStripHost(document.getElementById("study-tab-strip-root"));
+  }, []);
 
   return (
     <>
@@ -1570,13 +1640,7 @@ export function NotebookView({
       "relative flex h-[calc(100dvh-8.5rem)] flex-col transition-all duration-300",
       isFullWidth && "invisible"
     )}>
-      <StudyTabStrip
-        tabs={tabs}
-        activeKey={activeTabKey}
-        onActivate={activateNotebookTab}
-        onClose={closeNotebookTab}
-        onNewWorkspace={handleNewNote}
-      />
+      {tabStripHost ? createPortal(notebookTabStrip, tabStripHost) : notebookTabStrip}
       <div className="relative mt-0 flex min-h-0 flex-1 gap-4">
       {/* Main layout — folders sidebar stays open (Study Area style) */}
       <div className="relative flex flex-1 gap-3 overflow-hidden">

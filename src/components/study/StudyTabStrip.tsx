@@ -10,6 +10,7 @@ export function StudyTabStrip({
   onActivate,
   onClose,
   onNewWorkspace,
+  endSlot,
   className,
 }: {
   tabs: StudyTab[];
@@ -17,6 +18,7 @@ export function StudyTabStrip({
   onActivate: (key: string) => void;
   onClose: (key: string) => void;
   onNewWorkspace?: () => void;
+  endSlot?: ReactNode;
   className?: string;
 }) {
   return (
@@ -92,6 +94,9 @@ export function StudyTabStrip({
         >
           <Plus className="h-4 w-4" />
         </button>
+      ) : null}
+      {endSlot ? (
+        <div className="ml-auto flex shrink-0 items-center self-center pb-1.5 pr-1">{endSlot}</div>
       ) : null}
     </div>
   );

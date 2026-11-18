@@ -17,7 +17,7 @@ const TOOLS: Array<{ id: DrawingTool; label: string; icon: typeof Minus }> = [
 
 export function ChartToolbar({ tool, onToolChange, onDeleteAll }: ChartToolbarProps) {
   return (
-    <div className="liquid-glass flex shrink-0 flex-row items-center gap-1 rounded-2xl p-1.5 lg:flex-col">
+    <div className="flex shrink-0 flex-row items-center gap-0 border-b border-[#2a2e39] bg-[#131722] lg:flex-col lg:border-b-0 lg:border-r">
       {TOOLS.map((item) => {
         const Icon = item.icon;
         return (
@@ -28,13 +28,13 @@ export function ChartToolbar({ tool, onToolChange, onDeleteAll }: ChartToolbarPr
             aria-label={item.label}
             onClick={() => onToolChange(item.id)}
             className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
+              "flex h-8 w-8 items-center justify-center transition-colors",
               tool === item.id
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                ? "bg-[#2962FF] text-white"
+                : "text-[#787b86] hover:bg-white/5 hover:text-[#d1d4dc]",
             )}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-3.5 w-3.5" strokeWidth={1.5} />
           </button>
         );
       })}
@@ -44,24 +44,24 @@ export function ChartToolbar({ tool, onToolChange, onDeleteAll }: ChartToolbarPr
         disabled
         title="Fibonacci — soon"
         aria-label="Fibonacci coming soon"
-        className="relative flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground/50"
+        className="relative flex h-8 w-8 items-center justify-center text-[#4c525e]"
       >
-        <Sigma className="h-4 w-4" />
-        <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] font-bold uppercase tracking-wide text-amber-500">
+        <Sigma className="h-3.5 w-3.5" strokeWidth={1.5} />
+        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 text-[7px] font-semibold uppercase leading-none tracking-wide text-amber-500">
           soon
         </span>
       </button>
 
-      <div className="mx-1 hidden h-px w-6 bg-foreground/10 lg:block" />
+      <div className="mx-1 hidden h-px w-5 bg-[#2a2e39] lg:block" />
 
       <button
         type="button"
         title="Delete all drawings"
         aria-label="Delete all drawings"
         onClick={onDeleteAll}
-        className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        className="flex h-8 w-8 items-center justify-center text-[#787b86] hover:bg-white/5 hover:text-[#f23645]"
       >
-        <Trash2 className="h-4 w-4" />
+        <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
       </button>
     </div>
   );

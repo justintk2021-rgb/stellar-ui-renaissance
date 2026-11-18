@@ -52,7 +52,7 @@ import { StudyTradeCard } from "./StudyTradeCard";
 import { StudyEditorDataProvider, type StudyPlaybook } from "./studyEditorData";
 import { StudyTradeNode, StudyYoutubeNode } from "./studyNodes";
 import { StudyVideoChrome, type StudyVideoHandle } from "./StudyVideoChrome";
-import { useStudyTrash } from "./StudyTrash";
+import { StudyTrashBin, useStudyTrash } from "./StudyTrash";
 import {
   AlignCenter,
   AlignLeft,
@@ -1400,6 +1400,7 @@ export function StudyEditor({ noteId, title, content, trades, playbooks, onSave,
                 ) : null}
               </>
             )}
+            <StudyTrashBin className="h-9 w-9" />
           </div>
           {tradesOpen && tradeIds.length > 0 ? (
             <div className="mt-3 space-y-2">

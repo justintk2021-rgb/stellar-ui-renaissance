@@ -183,7 +183,7 @@ export const SYMBOL_SPECS: Record<ChartSymbol, SymbolSpec> = {
     minMove: 0.01,
     pipSize: 0.1,
     contractSize: 100,
-    basePrice: 2384.5,
+    basePrice: 3850,
     volatility: 1.85,
     spread: 0.18,
   },

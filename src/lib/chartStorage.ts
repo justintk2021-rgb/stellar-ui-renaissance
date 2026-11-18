@@ -16,6 +16,9 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
+import type { ChartDrawing } from "@/components/Chart/drawings";
+
+const LIGHTWEIGHT_LAYOUT_ID = "lightweight";
 
 /* ----- Structural types (mirror Charting Library shapes) ----- */
 
@@ -278,3 +281,48 @@ export function createChartStorageAdapter(userId: string) {
 }
 
 export type ChartStorageAdapter = ReturnType<typeof createChartStorageAdapter>;
+
+/** Load Lightweight Charts drawings for a symbol (empty when none saved). */
+export async function loadLightweightDrawings(symbol: string): Promise<ChartDrawing[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("chart_drawings")
+    .select("state")
+    .eq("user_id", user.id)
+    .eq("layout_id", LIGHTWEIGHT_LAYOUT_ID)
+    .eq("chart_id", symbol)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.state || typeof data.state !== "object") return [];
+
+  const state = data.state as { drawings?: unknown };
+  if (!Array.isArray(state.drawings)) return [];
+  return state.drawings as ChartDrawing[];
+}
+
+/** Persist Lightweight Charts drawings for a symbol. */
+export async function saveLightweightDrawings(
+  symbol: string,
+  drawings: ChartDrawing[],
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase.from("chart_drawings").upsert(
+    {
+      user_id: user.id,
+      layout_id: LIGHTWEIGHT_LAYOUT_ID,
+      chart_id: symbol,
+      state: { drawings } as unknown as Json,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,layout_id,chart_id" },
+  );
+  if (error) throw error;
+}

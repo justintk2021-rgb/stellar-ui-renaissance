@@ -7,6 +7,73 @@ export type StudyTab =
 
 export const HOME_TAB: StudyTab = { key: HOME_TAB_KEY, kind: "home", title: "Home" };
 
+export type PersistedTabSession = {
+  tabs: StudyTab[];
+  activeKey: string;
+};
+
+const EMPTY_SESSION: PersistedTabSession = {
+  tabs: [HOME_TAB],
+  activeKey: HOME_TAB_KEY,
+};
+
+function isStudyTab(value: unknown): value is StudyTab {
+  if (!value || typeof value !== "object") return false;
+  const tab = value as Record<string, unknown>;
+  if (tab.kind === "home" && tab.key === HOME_TAB_KEY) return true;
+  if (tab.kind === "note" && typeof tab.id === "string" && typeof tab.title === "string") {
+    return tab.key === noteTabKey(tab.id);
+  }
+  if (tab.kind === "board" && typeof tab.id === "string" && typeof tab.title === "string") {
+    return tab.key === boardTabKey(tab.id);
+  }
+  return false;
+}
+
+function normalizeSession(raw: unknown): PersistedTabSession {
+  if (!raw || typeof raw !== "object") return EMPTY_SESSION;
+  const data = raw as { tabs?: unknown; activeKey?: unknown };
+  const tabs = Array.isArray(data.tabs) ? data.tabs.filter(isStudyTab) : [];
+  const ensured = ensureHomeFirst(tabs.length ? tabs : [HOME_TAB]);
+  const activeKey =
+    typeof data.activeKey === "string" && ensured.some((tab) => tab.key === data.activeKey)
+      ? data.activeKey
+      : HOME_TAB_KEY;
+  return { tabs: ensured, activeKey };
+}
+
+/** Load open tabs for a scoped session (survives leaving the page). */
+export function loadTabSession(storageKey: string, scope: string): PersistedTabSession {
+  if (typeof window === "undefined") return EMPTY_SESSION;
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return EMPTY_SESSION;
+    const all = JSON.parse(raw) as Record<string, unknown>;
+    return normalizeSession(all[scope]);
+  } catch {
+    return EMPTY_SESSION;
+  }
+}
+
+/** Persist open tabs for a scoped session. */
+export function saveTabSession(storageKey: string, scope: string, session: PersistedTabSession): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(storageKey);
+    const all = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    all[scope] = {
+      tabs: ensureHomeFirst(session.tabs),
+      activeKey: session.activeKey || HOME_TAB_KEY,
+    };
+    localStorage.setItem(storageKey, JSON.stringify(all));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+export const STUDY_TAB_STORAGE_KEY = "nsync-study-open-tabs";
+export const NOTEBOOK_TAB_STORAGE_KEY = "nsync-notebook-open-tabs";
+
 export function noteTabKey(id: string): `note:${string}` {
   return `note:${id}`;
 }

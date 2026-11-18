@@ -441,7 +441,7 @@ const Index = () => {
   const [studyCategory, setStudyCategory] = useState<StudyCategory>(() => {
     try {
       const saved = localStorage.getItem("nsync-study-category");
-      if (saved === "collaborative" || saved === "case" || saved === "individual") return saved;
+      if (saved === "collaborative" || saved === "individual") return saved;
     } catch {
       // Fall through to the default category.
     }
@@ -855,6 +855,9 @@ const Index = () => {
         )}>
           <div className="glass-strong min-h-screen p-3 sm:p-4 lg:p-6">
             <div className="w-full">
+            {currentPage === "notebook" ? (
+              <div id="study-tab-strip-root" className="-mx-3 sm:-mx-4 lg:-mx-6 mb-3" />
+            ) : null}
             {!isChartPage && (
               <TopBar
                 title={title}

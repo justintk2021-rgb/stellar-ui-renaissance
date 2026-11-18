@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { JSONContent } from "@tiptap/core";
 import type { NotebookEntry, Trade } from "@/types/trade";
@@ -19,12 +19,14 @@ import { persistBoards, readBoards, type StudyBoard } from "./studyBoards";
 import {
   HOME_TAB,
   HOME_TAB_KEY,
+  STUDY_TAB_STORAGE_KEY,
   boardTabKey,
   ensureHomeFirst,
+  loadTabSession,
   neighborAfterClose,
   noteTabKey,
   removeTab,
-  stripNoteTabs,
+  saveTabSession,
   syncBoardTabTitle,
   syncNoteTabTitle,
   upsertBoardTab,
@@ -107,8 +109,11 @@ export function StudyArea({
   const mutations = useStudyMutations(userId);
   const { checklists } = useChecklists();
   const playbooks = useMemo(() => checklists.map((item) => ({ id: item.id, name: item.name })), [checklists]);
-  const [tabs, setTabs] = useState<StudyTab[]>([HOME_TAB]);
-  const [activeKey, setActiveKey] = useState<string>(HOME_TAB_KEY);
+  const [tabs, setTabs] = useState<StudyTab[]>(() => loadTabSession(STUDY_TAB_STORAGE_KEY, category).tabs);
+  const [activeKey, setActiveKey] = useState<string>(
+    () => loadTabSession(STUDY_TAB_STORAGE_KEY, category).activeKey,
+  );
+  const tabScopeRef = useRef(category);
   const [boards, setBoards] = useState<StudyBoard[]>(readBoards);
   const [boardPreviewTick, setBoardPreviewTick] = useState(0);
   const [folderOpen, setFolderOpen] = useState(false);
@@ -227,12 +232,15 @@ export function StudyArea({
   }, [boards]);
 
   useEffect(() => {
-    setTabs((current) => {
-      const stripped = stripNoteTabs(current);
-      return ensureHomeFirst(stripped);
-    });
-    setActiveKey((current) => (current.startsWith("note:") ? HOME_TAB_KEY : current));
-  }, [category]);
+    if (tabScopeRef.current !== category) {
+      tabScopeRef.current = category;
+      const saved = loadTabSession(STUDY_TAB_STORAGE_KEY, category);
+      setTabs(saved.tabs);
+      setActiveKey(saved.activeKey);
+      return;
+    }
+    saveTabSession(STUDY_TAB_STORAGE_KEY, category, { tabs, activeKey });
+  }, [activeKey, category, tabs]);
 
   useEffect(() => {
     if (!focusNoteId) return;
@@ -375,6 +383,11 @@ export function StudyArea({
     />
   );
 
+  const [tabStripHost, setTabStripHost] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    setTabStripHost(document.getElementById("study-tab-strip-root"));
+  }, []);
+
   return (
     <StudyTrashProvider
       visible={activeTab.kind === "note"}
@@ -383,7 +396,7 @@ export function StudyArea({
       trashCount={trashedNotes.length}
     >
       <div className="min-h-[calc(100vh-10rem)]">
-        {tabStrip}
+        {tabStripHost ? createPortal(tabStrip, tabStripHost) : tabStrip}
         <StudyBinDialog
           open={binOpen}
           onOpenChange={setBinOpen}
