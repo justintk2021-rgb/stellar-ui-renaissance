@@ -9,16 +9,17 @@ import {
 } from "@/lib/accountProjection";
 
 describe("parseStartingBalance", () => {
-  it("returns the number the user typed, including zero", () => {
+  it("returns the number the user typed, including zero and negatives", () => {
     expect(parseStartingBalance("25000")).toBe(25000);
     expect(parseStartingBalance("0")).toBe(0);
     expect(parseStartingBalance(" 5000.50 ")).toBe(5000.5);
+    expect(parseStartingBalance("-1")).toBe(-1);
+    expect(parseStartingBalance("-2500.75")).toBe(-2500.75);
   });
 
   it("does not invent a 10000 default for empty or invalid input", () => {
     expect(parseStartingBalance("")).toBeNull();
     expect(parseStartingBalance("abc")).toBeNull();
-    expect(parseStartingBalance("-1")).toBeNull();
   });
 });
 
@@ -26,6 +27,11 @@ describe("deriveStartBalance", () => {
   it("uses the stored starting balance the user set", () => {
     expect(deriveStartBalance(25000, 27000, 2000)).toBe(25000);
     expect(deriveStartBalance(0, null, 0)).toBe(0);
+  });
+
+  it("keeps a negative starting balance so it subtracts from current balance", () => {
+    expect(deriveStartBalance(-500, null, 1000)).toBe(-500);
+    expect(deriveStartBalance(-500, null, 1000) + 1000).toBe(500);
   });
 
   it("a 25000 broker account starts at 25000 even after trades", () => {

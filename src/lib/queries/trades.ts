@@ -1,6 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Trade } from '@/types/trade';
 import { acquireSharedPostgresChannel } from '@/lib/queries/realtimeChannel';
+import {
+  fetchActiveAccountIdSets,
+  filterTradesToActiveAccounts,
+  tradeBelongsToActiveAccount,
+} from '@/lib/activeAccounts';
 
 export const TRADES_FETCH_LIMIT = 1000;
 
@@ -67,7 +72,19 @@ export async function fetchTradesList(
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data || []).map((t) => mapDbToTrade(t as Record<string, unknown>));
+
+  const mapped = (data || []).map((t) => mapDbToTrade(t as Record<string, unknown>));
+  const activeSets = await fetchActiveAccountIdSets(userId);
+
+  // Stale selected account after delete/disconnect must not keep orphan trades visible.
+  if (brokerAccountId && !activeSets.brokerExternalIds.has(brokerAccountId)) {
+    return [];
+  }
+  if (!brokerAccountId && accountId && !activeSets.manualIds.has(accountId)) {
+    return [];
+  }
+
+  return filterTradesToActiveAccounts(mapped, activeSets);
 }
 
 export async function fetchTradeDetail(tradeId: string, userId: string): Promise<Trade | null> {
@@ -80,7 +97,13 @@ export async function fetchTradeDetail(tradeId: string, userId: string): Promise
 
   if (error) throw error;
   if (!data) return null;
-  return mapDbToTrade(data as Record<string, unknown>, true);
+
+  const trade = mapDbToTrade(data as Record<string, unknown>, true);
+  const activeSets = await fetchActiveAccountIdSets(userId);
+  if (!tradeBelongsToActiveAccount(trade, activeSets.manualIds, activeSets.brokerExternalIds)) {
+    return null;
+  }
+  return trade;
 }
 
 export function subscribeTradesRealtime(

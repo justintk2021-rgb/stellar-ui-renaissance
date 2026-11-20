@@ -79,6 +79,7 @@ export async function activateBrokerAccount(params: {
 
 export function clearBrokerSelectionStorage() {
   localStorage.removeItem(BROKER_STORAGE_KEYS.selectedBroker);
+  localStorage.removeItem("selectedBrokerAccountId");
   writeTradeLockerConnectionId(null);
   writeMt5ConnectionId(null);
 }

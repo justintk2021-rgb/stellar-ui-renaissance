@@ -13,6 +13,7 @@ import {
   ChecklistType,
   PercentageType,
 } from "@/hooks/useChecklists";
+import { BREAK_AND_RETEST_DEFAULTS } from "@/lib/playbookChecklist";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
 
 export interface ChecklistMetrics {
@@ -23,6 +24,10 @@ export interface ChecklistMetrics {
   losingTrades: number;
   totalPnL: number;
   winRate: number;
+  profitFactor: number;
+  avgR: number | null;
+  avgWin: number;
+  avgLoss: number;
 }
 
 export interface PlaybookRulesEditorProps {
@@ -30,7 +35,7 @@ export interface PlaybookRulesEditorProps {
   metrics?: ChecklistMetrics;
   onUpdateChecklist: (
     id: string,
-    updates: Partial<Pick<Checklist, "name" | "items" | "notes">>,
+    updates: Partial<Pick<Checklist, "name" | "items" | "notes" | "idealImage">>,
   ) => Promise<void> | void;
   onDeleteChecklist: (id: string) => Promise<void> | void;
 }
@@ -72,6 +77,23 @@ export function PlaybookRulesEditor({
     setEditingChecklistId(null);
     setEditingChecklistName("");
   };
+  const toggleConfluence = async (itemId: string) => {
+    const updatedItems = checklist.items.map((item) =>
+      item.id === itemId ? { ...item, isConfluence: !item.isConfluence } : item,
+    );
+    await onUpdateChecklist(checklist.id, { items: updatedItems });
+  };
+
+  const seedBreakAndRetestDefaults = async () => {
+    if (checklist.items.length > 0) return;
+    const items: ChecklistItem[] = BREAK_AND_RETEST_DEFAULTS.map((item, index) => ({
+      ...item,
+      id: `confluence-${Date.now()}-${index}`,
+      percentage: Math.round(100 / BREAK_AND_RETEST_DEFAULTS.length),
+    }));
+    await onUpdateChecklist(checklist.id, { items });
+  };
+
   const addItem = async (checklistId: string) => {
     const text = newItemTexts[checklist.id]?.trim();
     if (!text) return;
@@ -896,6 +918,22 @@ export function PlaybookRulesEditor({
                                       {item.percentageType === "fixed" ? "Fixed %" : "Sum %"}
                                     </button>
                                   )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void toggleConfluence(item.id);
+                                    }}
+                                    className={cn(
+                                      "px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors",
+                                      item.isConfluence
+                                        ? "bg-primary/15 text-primary"
+                                        : "bg-muted text-muted-foreground hover:bg-muted/80",
+                                    )}
+                                    title="Count this rule toward confluence scoring"
+                                  >
+                                    Confluence
+                                  </button>
                                 </div>
                                 {hasSubItems && (
                                   <div className="flex items-center gap-2 mt-1">
@@ -1263,6 +1301,20 @@ export function PlaybookRulesEditor({
                                   <span>{item.percentage ?? Math.round(100 / checklist.items.length)}%</span>
                                 </button>
                               )}
+
+                              <button
+                                type="button"
+                                onClick={() => void toggleConfluence(item.id)}
+                                className={cn(
+                                  "px-2 py-1 rounded text-[10px] font-medium transition-colors",
+                                  item.isConfluence
+                                    ? "bg-primary/15 text-primary"
+                                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                                )}
+                                title="Count this rule toward confluence scoring"
+                              >
+                                Confluence
+                              </button>
                               
                               <motion.button
                                 whileHover={{ scale: 1.1 }}
@@ -1326,15 +1378,28 @@ export function PlaybookRulesEditor({
                       </Button>
                     </div>
                   ) : (
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => setAddingItemToChecklist(checklist.id)}
-                      className="w-full justify-center gap-2 text-muted-foreground hover:text-foreground border border-dashed border-border/50 hover:border-primary/50 transition-all"
-                    >
-                      <Plus className="w-4 h-4" />
-                      {checklist.type === "conditional" ? "Add Category" : "Add Item"}
-                    </Button>
+                    <div className="space-y-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setAddingItemToChecklist(checklist.id)}
+                        className="w-full justify-center gap-2 text-muted-foreground hover:text-foreground border border-dashed border-border/50 hover:border-primary/50 transition-all"
+                      >
+                        <Plus className="w-4 h-4" />
+                        {checklist.type === "conditional" ? "Add Category" : "Add Item"}
+                      </Button>
+                      {checklist.items.length === 0 ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void seedBreakAndRetestDefaults()}
+                          className="w-full justify-center gap-2"
+                        >
+                          Use break-and-retest defaults
+                        </Button>
+                      ) : null}
+                    </div>
                   )}
                 </div>
               </div>

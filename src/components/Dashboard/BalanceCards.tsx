@@ -164,7 +164,7 @@ export function BalanceCards({
 
   const handleConfirm = () => {
     const value = parseFloat(editValue);
-    if (!isNaN(value) && value >= 0) {
+    if (!isNaN(value) && Number.isFinite(value)) {
       onSetBalance(value);
     }
     setIsEditing(false);
@@ -276,6 +276,7 @@ export function BalanceCards({
                     <Input
                       ref={inputRef}
                       type="number"
+                      step="any"
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
                       onKeyDown={handleKeyDown}

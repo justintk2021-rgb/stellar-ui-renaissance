@@ -222,9 +222,6 @@ export function PlaybookNotesGallery({
               importedFromBroker: Boolean(row.imported_from_broker),
               brokerPositionId: (row.broker_position_id as string | null) ?? null,
               lastBrokerSyncAt: (row.last_broker_sync_at as string | null) ?? null,
-              date: "",
-              pair: "",
-              direction: "Long",
             }),
           );
           const wins = nets.filter((n) => n > 0).length;
@@ -250,9 +247,6 @@ export function PlaybookNotesGallery({
             importedFromBroker: Boolean(row.imported_from_broker),
             brokerPositionId: (row.broker_position_id as string | null) ?? null,
             lastBrokerSyncAt: (row.last_broker_sync_at as string | null) ?? null,
-            date: "",
-            pair: "",
-            direction: "Long",
           }),
         );
         const pnl = nets.reduce((sum, n) => sum + n, 0);

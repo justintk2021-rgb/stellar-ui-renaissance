@@ -177,6 +177,45 @@ export const computeWinLossStats = (trades: readonly PnlTrade[]): WinLossStats =
   };
 };
 
+export type DayWinLossStats = {
+  winningDays: number;
+  losingDays: number;
+  breakevenDays: number;
+  /** Days with at least one trade (or broker day fill). */
+  tradingDays: number;
+  /** Winning days / trading days as a percentage 0–100. */
+  dayWinRate: number;
+};
+
+/**
+ * Win ratio by calendar day: each close-date's net P&L is one win, loss, or
+ * breakeven day. Uses the same daily map as the PnL calendar.
+ */
+export const computeDayWinLossStats = (
+  trades: Trade[],
+  brokerDayTotals?: Map<string, number> | null,
+): DayWinLossStats => {
+  const daily = buildDailyPnLMap(trades, brokerDayTotals);
+  let winningDays = 0;
+  let losingDays = 0;
+  let breakevenDays = 0;
+
+  for (const pnl of daily.values()) {
+    if (pnl > 0) winningDays += 1;
+    else if (pnl < 0) losingDays += 1;
+    else breakevenDays += 1;
+  }
+
+  const tradingDays = winningDays + losingDays + breakevenDays;
+  return {
+    winningDays,
+    losingDays,
+    breakevenDays,
+    tradingDays,
+    dayWinRate: tradingDays > 0 ? (winningDays / tradingDays) * 100 : 0,
+  };
+};
+
 /**
  * Filter deduped trades whose close local date (fallback: open date) falls
  * within [start, end]. Uses local date keys to match the PnL calendar.

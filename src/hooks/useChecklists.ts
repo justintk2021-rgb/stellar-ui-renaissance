@@ -99,12 +99,16 @@ export function useChecklists() {
     }
   };
 
-  const updateChecklist = async (id: string, updates: Partial<Pick<Checklist, 'name' | 'items' | 'notes'>>) => {
+  const updateChecklist = async (
+    id: string,
+    updates: Partial<Pick<Checklist, 'name' | 'items' | 'notes' | 'idealImage'>>,
+  ) => {
     try {
       const checklist = checklists.find(c => c.id === id);
-      const dbUpdates: { name?: string; items?: Json; notes?: string } = {};
+      const dbUpdates: { name?: string; items?: Json; notes?: string; ideal_image?: string | null } = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
       if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+      if (updates.idealImage !== undefined) dbUpdates.ideal_image = updates.idealImage;
       if (updates.items !== undefined) {
         dbUpdates.items = {
           type: checklist?.type || 'fixed',
@@ -112,7 +116,10 @@ export function useChecklists() {
         } as unknown as Json;
       }
 
-      const { error } = await supabase.from('checklists').update(dbUpdates).eq('id', id);
+      const { error } = await supabase
+        .from('checklists')
+        .update(dbUpdates as Record<string, unknown> as never)
+        .eq('id', id);
       if (error) throw error;
       invalidate();
     } catch (error) {

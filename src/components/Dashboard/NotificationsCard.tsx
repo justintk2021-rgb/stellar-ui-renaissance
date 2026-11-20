@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { ArrowDown, ArrowUp, Bell, Check, ChevronRight, Home, Music2, Settings, User } from "lucide-react";
 import { AnimatePresence, motion } from "@/lib/motion";
 import { NotebookEntry, Trade } from "@/types/trade";
@@ -387,7 +387,7 @@ export function NotificationsMenu({
               closeOnOutsideClick={false}
               onChange={handleTabChange}
               className="border-border/40 bg-foreground/[0.04] p-0.5 shadow-none"
-              tabs={tabs}
+              tabs={tabs as ComponentProps<typeof ExpandableTabs>["tabs"]}
             />
           </div>
         </PopoverAnchor>

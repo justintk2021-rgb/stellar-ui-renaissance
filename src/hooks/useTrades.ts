@@ -72,7 +72,13 @@ export function useTrades(userId: string | undefined, accountId: string | null =
   });
 
   const updateTradeMutation = useMutation({
-    mutationFn: async ({ id, tradeData }: { id: string; tradeData: Partial<Trade> }) => {
+    mutationFn: async ({
+      id,
+      tradeData,
+    }: {
+      id: string;
+      tradeData: Partial<Trade> & { grade?: string | null; marketType?: string | null };
+    }) => {
       const updateData: {
         date?: string;
         pair?: string;
@@ -84,6 +90,8 @@ export function useTrades(userId: string | undefined, accountId: string | null =
         chart_image?: string | null;
         checklist_id?: string | null;
         checklist_state?: Json | null;
+        grade?: string | null;
+        market_type?: string | null;
       } = {};
       if (tradeData.date !== undefined) updateData.date = tradeData.date;
       if (tradeData.pair !== undefined) updateData.pair = tradeData.pair;
@@ -95,10 +103,12 @@ export function useTrades(userId: string | undefined, accountId: string | null =
       if (tradeData.chartImage !== undefined) updateData.chart_image = tradeData.chartImage || null;
       if (tradeData.checklistId !== undefined) updateData.checklist_id = tradeData.checklistId || null;
       if (tradeData.checklistState !== undefined) updateData.checklist_state = (tradeData.checklistState || null) as unknown as Json;
+      if (tradeData.grade !== undefined) updateData.grade = tradeData.grade || null;
+      if (tradeData.marketType !== undefined) updateData.market_type = tradeData.marketType || null;
 
       const { error } = await supabase
         .from('trades')
-        .update(updateData)
+        .update(updateData as never)
         .eq('id', id)
         .eq('user_id', userId!);
       if (error) throw error;
@@ -133,7 +143,10 @@ export function useTrades(userId: string | undefined, accountId: string | null =
     }
   }, [userId, addTradeMutation]);
 
-  const updateTrade = useCallback(async (id: string, tradeData: Partial<Trade>) => {
+  const updateTrade = useCallback(async (
+    id: string,
+    tradeData: Partial<Trade> & { grade?: string | null; marketType?: string | null },
+  ) => {
     if (!userId) return false;
     try {
       await updateTradeMutation.mutateAsync({ id, tradeData });

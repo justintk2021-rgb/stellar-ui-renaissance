@@ -1778,6 +1778,23 @@ serve(async (req) => {
         return jsonResponse({ error: 'Connection not found' }, 404);
       }
 
+      const { data: brokerAccounts } = await supabase
+        .from('broker_accounts')
+        .select('account_id_external')
+        .eq('broker_connection_id', connectionId);
+      const brokerExternalIds = (brokerAccounts || [])
+        .map((row) => row.account_id_external)
+        .filter((id): id is string => !!id);
+
+      // Remove journal trades for this account so they stop showing anywhere after disconnect.
+      if (brokerExternalIds.length > 0) {
+        await supabase
+          .from('trades')
+          .delete()
+          .eq('user_id', user.id)
+          .in('broker_account_id', brokerExternalIds);
+      }
+
       await supabase.from('broker_positions').delete().eq('broker_connection_id', connectionId);
       await supabase.from('broker_orders').delete().eq('broker_connection_id', connectionId);
       await supabase.from('broker_trade_history').delete().eq('broker_connection_id', connectionId);

@@ -247,16 +247,27 @@ export function PnLCalendar({
   const monthlyStats = useMemo(() => {
     let totalPnL = 0;
     let tradingDays = 0;
+    let winningDays = 0;
+    let losingDays = 0;
     const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
 
     Object.keys(dailyStats).forEach((dateStr) => {
       if (dateStr.startsWith(monthPrefix)) {
-        totalPnL += dailyStats[dateStr].pnl;
+        const pnl = dailyStats[dateStr].pnl;
+        totalPnL += pnl;
         tradingDays += 1;
+        if (pnl > 0) winningDays += 1;
+        else if (pnl < 0) losingDays += 1;
       }
     });
 
-    return { totalPnL, tradingDays };
+    return {
+      totalPnL,
+      tradingDays,
+      winningDays,
+      losingDays,
+      dayWinRate: tradingDays > 0 ? (winningDays / tradingDays) * 100 : 0,
+    };
   }, [dailyStats, year, month]);
 
   const prevMonth = () => {
@@ -516,6 +527,23 @@ export function PnLCalendar({
               </span>
               <span className="text-sm text-muted-foreground ml-2">
                 {monthlyStats.tradingDays} days
+                {monthlyStats.tradingDays > 0 ? (
+                  <>
+                    {" · "}
+                    <span
+                      className={cn(
+                        "font-medium",
+                        monthlyStats.dayWinRate >= 50 ? "text-primary" : "text-destructive",
+                      )}
+                    >
+                      {monthlyStats.dayWinRate.toFixed(0)}% day WR
+                    </span>
+                    {" · "}
+                    <span className="text-primary">{monthlyStats.winningDays}W</span>
+                    {"/"}
+                    <span className="text-destructive">{monthlyStats.losingDays}L</span>
+                  </>
+                ) : null}
               </span>
             </div>
             <div className="flex items-center gap-1">

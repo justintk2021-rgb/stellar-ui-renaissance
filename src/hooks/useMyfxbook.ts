@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { clearBrokerSelectionStorage } from "@/lib/brokerAccountSwitch";
 import { toast } from "sonner";
 
 export interface MyfxbookAccount {
@@ -164,6 +165,7 @@ export function useMyfxbook() {
       return;
     }
     toast.success("Disconnected");
+    clearBrokerSelectionStorage();
     setConnection(null);
     setAccounts([]);
     await refresh();

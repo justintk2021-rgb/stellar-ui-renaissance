@@ -743,6 +743,23 @@ serve(async (req) => {
         await mfxLogout(conn.myfxbook_session);
       }
 
+      const { data: brokerAccounts } = await adminClient
+        .from("broker_accounts")
+        .select("account_id_external")
+        .eq("broker_connection_id", connectionId);
+      const brokerExternalIds = (brokerAccounts || [])
+        .map((row) => row.account_id_external)
+        .filter((id): id is string => !!id);
+
+      // Remove journal trades for this account so they stop showing anywhere after disconnect.
+      if (brokerExternalIds.length > 0) {
+        await adminClient
+          .from("trades")
+          .delete()
+          .eq("user_id", userId)
+          .in("broker_account_id", brokerExternalIds);
+      }
+
       await adminClient.from("broker_positions").delete().eq("broker_connection_id", connectionId);
       await adminClient.from("broker_orders").delete().eq("broker_connection_id", connectionId);
       await adminClient.from("broker_trade_history").delete().eq("broker_connection_id", connectionId);

@@ -29,6 +29,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { dedupeTradesForPnL, getTradeNetResult, journalTradeStats } from "@/lib/tradeFormat";
 import { tradeRoiPercent } from "@/lib/tradePnl";
+import {
+  fetchActiveAccountIdSets,
+  tradeBelongsToActiveAccount,
+} from "@/lib/activeAccounts";
 import { useSelectedAccountBalance } from "@/hooks/useSelectedAccountBalance";
 import { PlaybookRulesEditor, type ChecklistMetrics as RulesEditorMetrics } from "./PlaybookRulesEditor";
 import { PlaybookNotesGallery } from "./PlaybookNotesGallery";
@@ -37,7 +41,13 @@ import {
   filterBacktestPlaybookTrades,
   filterLivePlaybookTrades,
 } from "./PlaybookBacktesting";
+import { PlaybookConfluenceScore, formatConfluenceChip } from "./PlaybookConfluenceScore";
+import { PlaybookIdealSetupCard } from "./PlaybookIdealSetupCard";
+import { PlaybookDeviationLog } from "./PlaybookDeviationLog";
+import { PlaybookSessionMatrix } from "./PlaybookSessionMatrix";
 import { type Checklist } from "@/hooks/useChecklists";
+import { useTrades } from "@/hooks/useTrades";
+import type { ChecklistItemState } from "@/types/trade";
 
 interface Trade {
   id: string;
@@ -54,19 +64,24 @@ interface Trade {
   importedFromBroker?: boolean | null;
   brokerPositionId?: string | null;
   lastBrokerSyncAt?: string | null;
+  checklistState?: ChecklistItemState[];
+  grade?: string | null;
+  marketType?: string | null;
 }
 
 type ChecklistMetrics = RulesEditorMetrics;
+type GradeFilter = "all" | "A+" | "A" | "B" | "C" | "ungraded";
 
 interface PlaybookDetailViewProps {
   checklist: Checklist;
   metrics: ChecklistMetrics | undefined;
   trades: Trade[];
+  unlinkedTrades?: Trade[];
   onBack: () => void;
   onUpdateNotes?: (notes: string) => void;
   onUpdateChecklist: (
     id: string,
-    updates: Partial<Pick<Checklist, "name" | "items" | "notes">>,
+    updates: Partial<Pick<Checklist, "name" | "items" | "notes" | "idealImage">>,
   ) => Promise<void> | void;
   onDeleteChecklist: (id: string) => Promise<void> | void;
   onTradesChanged?: () => void;
@@ -388,7 +403,24 @@ function NotesTab({
 }
 
 // Executed Trades Tab Component with pagination and filtering
-function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
+function ExecutedTradesTab({
+  trades,
+  checklist,
+  unlinkedTrades,
+  gradeFilter,
+  onGradeFilterChange,
+  onTradePatch,
+}: {
+  trades: Trade[];
+  checklist: Checklist;
+  unlinkedTrades: Trade[];
+  gradeFilter: GradeFilter;
+  onGradeFilterChange: (value: GradeFilter) => void;
+  onTradePatch: (
+    id: string,
+    patch: { grade?: string | null; marketType?: string | null },
+  ) => Promise<void>;
+}) {
   const { balance, ready } = useSelectedAccountBalance();
   const [currentPage, setCurrentPage] = useState(1);
   const [filter, setFilter] = useState<FilterType>("all");
@@ -399,6 +431,12 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
   // Filter and sort trades
   const filteredTrades = useMemo(() => {
     let result = [...trades];
+
+    if (gradeFilter === "ungraded") {
+      result = result.filter((t) => !t.grade);
+    } else if (gradeFilter !== "all") {
+      result = result.filter((t) => t.grade === gradeFilter);
+    }
     
     // Apply result filter
     if (filter === "wins") {
@@ -424,7 +462,7 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
     });
     
     return result;
-  }, [trades, filter, deferredSearch, sortOrder]);
+  }, [trades, filter, deferredSearch, sortOrder, gradeFilter]);
 
   // Pagination
   const totalPages = Math.ceil(filteredTrades.length / TRADES_PER_PAGE);
@@ -436,12 +474,14 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
   // Reset page when filter changes
   useMemo(() => {
     setCurrentPage(1);
-  }, [filter, deferredSearch]);
+  }, [filter, deferredSearch, gradeFilter]);
 
   const winCount = trades.filter(t => getTradeNetResult(t) > 0).length;
   const lossCount = trades.filter(t => getTradeNetResult(t) < 0).length;
+  const gradeChips: GradeFilter[] = ["all", "A+", "A", "B", "C", "ungraded"];
 
   return (
+    <div>
     <motion.div
       key="executed"
       initial={{ opacity: 0, y: 10 }}
@@ -450,7 +490,7 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
       className="glass rounded-xl p-6 border border-border/30"
     >
       {/* Header with filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <h3 className="text-lg font-semibold">Executed Trades</h3>
         
         <div className="flex items-center gap-3">
@@ -492,12 +532,33 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-1.5 mb-6">
+        {gradeChips.map((chip) => (
+          <button
+            key={chip}
+            type="button"
+            onClick={() => onGradeFilterChange(chip)}
+            className={cn(
+              "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+              gradeFilter === chip
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted/40 text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {chip === "all" ? "All" : chip === "ungraded" ? "Ungraded" : chip}
+          </button>
+        ))}
+      </div>
+
       {/* Table Header */}
-      <div className="grid grid-cols-4 gap-4 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/30">
+      <div className="grid grid-cols-7 gap-3 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/30">
         <div>Open Date</div>
         <div>Symbol</div>
         <div className="text-right">Net P&L</div>
         <div className="text-right">Net ROI</div>
+        <div className="text-center">Score</div>
+        <div className="text-center">Grade</div>
+        <div className="text-center">Market</div>
       </div>
 
       {/* Trades Table */}
@@ -507,6 +568,7 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
             {paginatedTrades.map((trade, index) => {
               const net = getTradeNetResult(trade);
               const roi = tradeRoiPercent(net, balance);
+              const scoreChip = formatConfluenceChip(checklist, trade.checklistState);
               
               return (
                 <motion.div
@@ -515,7 +577,7 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
                   transition={{ delay: index * 0.02 }}
-                  className="grid grid-cols-4 gap-4 px-4 py-3 hover:bg-muted/30 transition-colors"
+                  className="grid grid-cols-7 gap-3 px-4 py-3 hover:bg-muted/30 transition-colors items-center"
                 >
                   <div className="text-sm text-muted-foreground">{trade.date}</div>
                   <div className="text-sm font-medium"><SymbolMark symbol={trade.pair} size="sm" /></div>
@@ -530,6 +592,49 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
                     roi >= 0 ? "text-primary" : "text-destructive"
                   )}>
                     {ready ? `${roi >= 0 ? "+" : ""}${roi.toFixed(2)}%` : "—"}
+                  </div>
+                  <div className="text-center">
+                    <span className="inline-flex rounded-full bg-muted/50 px-2 py-0.5 text-[11px] font-mono">
+                      {scoreChip}
+                    </span>
+                  </div>
+                  <div className="flex justify-center">
+                    <Select
+                      value={trade.grade || "none"}
+                      onValueChange={(value) => {
+                        void onTradePatch(trade.id, { grade: value === "none" ? null : value });
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[72px] text-xs bg-muted/30 border-border/30">
+                        <SelectValue placeholder="—" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">—</SelectItem>
+                        <SelectItem value="A+">A+</SelectItem>
+                        <SelectItem value="A">A</SelectItem>
+                        <SelectItem value="B">B</SelectItem>
+                        <SelectItem value="C">C</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex justify-center">
+                    <Select
+                      value={trade.marketType || "none"}
+                      onValueChange={(value) => {
+                        void onTradePatch(trade.id, {
+                          marketType: value === "none" ? null : value,
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[96px] text-xs bg-muted/30 border-border/30">
+                        <SelectValue placeholder="—" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">—</SelectItem>
+                        <SelectItem value="trending">Trending</SelectItem>
+                        <SelectItem value="ranging">Ranging</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </motion.div>
               );
@@ -612,6 +717,12 @@ function ExecutedTradesTab({ trades }: { trades: Trade[] }) {
         </motion.div>
       )}
     </motion.div>
+    <PlaybookDeviationLog
+      checklist={checklist}
+      linkedTrades={trades}
+      unlinkedTrades={unlinkedTrades}
+    />
+    </div>
   );
 }
 
@@ -620,13 +731,22 @@ export function PlaybookDetailView({
   checklist, 
   metrics, 
   trades,
+  unlinkedTrades = [],
   onBack,
   onUpdateNotes,
   onUpdateChecklist,
   onDeleteChecklist,
   onTradesChanged,
 }: PlaybookDetailViewProps) {
+  const [authUserId, setAuthUserId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    void supabase.auth.getUser().then(({ data }) => {
+      setAuthUserId(data.user?.id);
+    });
+  }, []);
+  const { updateTrade } = useTrades(authUserId);
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [gradeFilter, setGradeFilter] = useState<GradeFilter>("all");
   const [currentNotes, setCurrentNotes] = useState(checklist.notes || '');
   const [activeManualIds, setActiveManualIds] = useState<Set<string>>(new Set());
   const [activeBrokerIds, setActiveBrokerIds] = useState<Set<string>>(new Set());
@@ -642,38 +762,11 @@ export function PlaybookDetailView({
         return;
       }
 
-      const [{ data: manuals }, { data: connections }] = await Promise.all([
-        supabase.from("trading_accounts").select("id").eq("user_id", user.id),
-        supabase
-          .from("broker_connections")
-          .select("id, connection_status")
-          .eq("user_id", user.id)
-          .neq("connection_status", "disconnected"),
-      ]);
-
-      const manualIds = new Set((manuals || []).map((row) => String(row.id)));
-      const brokerIds = new Set<string>();
-      for (const conn of connections || []) {
-        if (
-          conn.connection_status !== "connected" &&
-          conn.connection_status !== "expired" &&
-          conn.connection_status !== "connecting" &&
-          conn.connection_status !== "pending"
-        ) {
-          continue;
-        }
-        const { data: accounts } = await supabase
-          .from("broker_accounts")
-          .select("account_id_external")
-          .eq("broker_connection_id", conn.id);
-        for (const account of accounts || []) {
-          if (account.account_id_external) brokerIds.add(String(account.account_id_external));
-        }
-      }
+      const { manualIds, brokerExternalIds } = await fetchActiveAccountIdSets(user.id);
 
       if (!cancelled) {
         setActiveManualIds(manualIds);
-        setActiveBrokerIds(brokerIds);
+        setActiveBrokerIds(brokerExternalIds);
         setAccountsLoaded(true);
       }
     })();
@@ -689,9 +782,7 @@ export function PlaybookDetailView({
     return dedupeTradesForPnL(
       trades.filter((t) => {
         if (t.checklist_id !== checklist.id) return false;
-        if (t.brokerAccountId) return activeBrokerIds.has(t.brokerAccountId);
-        if (t.accountId) return activeManualIds.has(t.accountId);
-        return false;
+        return tradeBelongsToActiveAccount(t, activeManualIds, activeBrokerIds);
       }),
     );
   }, [trades, checklist.id, accountsLoaded, activeManualIds, activeBrokerIds]);
@@ -703,12 +794,27 @@ export function PlaybookDetailView({
     [checklistTrades],
   );
 
+  const gradeFilteredLiveTrades = useMemo(() => {
+    if (gradeFilter === "all") return liveTrades;
+    if (gradeFilter === "ungraded") return liveTrades.filter((t) => !t.grade);
+    return liveTrades.filter((t) => t.grade === gradeFilter);
+  }, [liveTrades, gradeFilter]);
+
+  const activeUnlinkedTrades = useMemo(() => {
+    if (!accountsLoaded) return [];
+    return dedupeTradesForPnL(
+      unlinkedTrades.filter((t) =>
+        tradeBelongsToActiveAccount(t, activeManualIds, activeBrokerIds),
+      ),
+    );
+  }, [unlinkedTrades, accountsLoaded, activeManualIds, activeBrokerIds]);
+
   // Calculate extended metrics
   const extendedMetrics = useMemo(() => {
-    if (!metrics || liveTrades.length === 0) return null;
+    if (!metrics || gradeFilteredLiveTrades.length === 0) return null;
 
-    const stats = journalTradeStats(liveTrades);
-    const nets = liveTrades.map((t) => getTradeNetResult(t));
+    const stats = journalTradeStats(gradeFilteredLiveTrades);
+    const nets = gradeFilteredLiveTrades.map((t) => getTradeNetResult(t));
     const winningNets = nets.filter((n) => n > 0);
     const losingNets = nets.filter((n) => n < 0);
     const largestProfit = winningNets.length > 0 ? Math.max(...winningNets) : 0;
@@ -732,13 +838,13 @@ export function PlaybookDetailView({
       rulesFollowed: 100, // Placeholder - could be calculated from checklist completion
       missedTrades: 0, // Placeholder
     };
-  }, [metrics, liveTrades]);
+  }, [metrics, gradeFilteredLiveTrades]);
 
   // Generate cumulative P&L data for chart
   const cumulativePnLData = useMemo(() => {
-    if (liveTrades.length === 0) return [];
+    if (gradeFilteredLiveTrades.length === 0) return [];
     
-    const sortedTrades = [...liveTrades].sort((a, b) => 
+    const sortedTrades = [...gradeFilteredLiveTrades].sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
     
@@ -750,8 +856,16 @@ export function PlaybookDetailView({
         value: cumulative,
         trade: index + 1,
       };
-    });
-  }, [liveTrades]);
+      });
+  }, [gradeFilteredLiveTrades]);
+
+  const handleTradePatch = useCallback(async (
+    id: string,
+    patch: { grade?: string | null; marketType?: string | null },
+  ) => {
+    await updateTrade(id, patch);
+    onTradesChanged?.();
+  }, [onTradesChanged, updateTrade]);
 
   const handleTabClick = (tab: TabType) => {
     setActiveTab(tab);
@@ -1174,6 +1288,13 @@ export function PlaybookDetailView({
                 </div>
               )}
             </motion.div>
+
+            <PlaybookConfluenceScore checklist={checklist} trades={gradeFilteredLiveTrades} />
+            <PlaybookIdealSetupCard
+              checklist={checklist}
+              onSaveIdealImage={(idealImage) => onUpdateChecklist(checklist.id, { idealImage })}
+            />
+            <PlaybookSessionMatrix trades={gradeFilteredLiveTrades} />
           </motion.div>
         )}
 
@@ -1198,7 +1319,14 @@ export function PlaybookDetailView({
         )}
 
         {activeTab === "executed" && (
-          <ExecutedTradesTab trades={liveTrades} />
+          <ExecutedTradesTab
+            trades={liveTrades}
+            checklist={checklist}
+            unlinkedTrades={activeUnlinkedTrades}
+            gradeFilter={gradeFilter}
+            onGradeFilterChange={setGradeFilter}
+            onTradePatch={handleTradePatch}
+          />
         )}
 
         {activeTab === "backtesting" && (
@@ -1220,7 +1348,7 @@ export function PlaybookDetailView({
             <PlaybookNotesGallery
               checklistId={checklist.id}
               checklistName={checklist.name}
-              trades={liveTrades}
+              trades={liveTrades as import("@/types/trade").Trade[]}
               onNewNote={() => {
                 /* focus stays on live notes editor */
               }}

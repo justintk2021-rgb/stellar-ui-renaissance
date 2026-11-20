@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queries/keys';
 import { readTradeLockerConnectionId, writeTradeLockerConnectionId } from '@/lib/brokerStorage';
+import { clearBrokerSelectionStorage } from '@/lib/brokerAccountSwitch';
 import { getClientDayBoundsISO } from '@/lib/tradeFormat';
 import { refreshTradeLockerConnection, repairTradeLockerSessions } from '@/lib/repairBrokerSession';
 import type { BrokerPosition } from '@/types/broker';
@@ -440,6 +441,7 @@ export function useTradeLocker() {
     try {
       await invokeTradeLocker('disconnect', { connectionId: connection.id });
       toast.success('Disconnected');
+      clearBrokerSelectionStorage();
       const remaining = connections.filter((c) => c.id !== connection.id);
       selectConnection(remaining[0]?.id ?? null);
       setAccounts([]);

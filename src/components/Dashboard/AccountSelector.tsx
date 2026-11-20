@@ -112,6 +112,10 @@ export const AccountSelector = ({
 
     if (!visibleConnections.length) {
       setBrokerAccounts([]);
+      setSelectedBrokerAccount(null);
+      localStorage.removeItem(BROKER_STORAGE_KEYS.selectedBroker);
+      localStorage.removeItem("selectedBrokerAccountId");
+      onSelectBrokerAccount?.(null);
       return;
     }
 
@@ -183,9 +187,12 @@ export const AccountSelector = ({
         writeTradeLockerConnectionId(targetBroker.connectionId);
       }
       onSelectBrokerAccount?.(targetBroker.accountId);
-    } else if (persistedBrokerId && !selectLatest) {
+    } else {
+      // Stale broker selection after delete/disconnect — drop it so orphan trades vanish.
       localStorage.removeItem(BROKER_STORAGE_KEYS.selectedBroker);
+      localStorage.removeItem("selectedBrokerAccountId");
       setSelectedBrokerAccount(null);
+      onSelectBrokerAccount?.(null);
     }
   }, [onSelectBrokerAccount]);
 
@@ -592,7 +599,6 @@ export const AccountSelector = ({
               <Input
                 id="balance"
                 type="number"
-                min="0"
                 step="any"
                 value={newAccountBalance}
                 onChange={(e) => setNewAccountBalance(e.target.value)}
@@ -691,6 +697,7 @@ export const AccountSelector = ({
               <Input
                 id="edit-balance"
                 type="number"
+                step="any"
                 value={newAccountBalance}
                 onChange={(e) => setNewAccountBalance(e.target.value)}
               />

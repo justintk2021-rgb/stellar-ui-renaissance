@@ -132,14 +132,26 @@ export function useTradingAccounts(userId: string | undefined) {
   const deleteAccount = useCallback(async (id: string) => {
     if (!userId) return false;
     try {
+      // Explicitly remove journal trades for this account so they stop showing
+      // on every page immediately (do not rely on FK CASCADE + stale cache).
+      const { error: tradesError } = await supabase
+        .from('trades')
+        .delete()
+        .eq('user_id', userId)
+        .eq('account_id', id);
+      if (tradesError) throw tradesError;
+
       const { error } = await supabase.from('trading_accounts').delete().eq('id', id).eq('user_id', userId);
       if (error) throw error;
+
       if (selectedAccountId === id) {
         const remaining = accounts.filter(a => a.id !== id);
         const defaultAcc = remaining.find(a => a.is_default) || remaining[0];
         setSelectedAccountId(defaultAcc?.id || null);
       }
+
       invalidate();
+      queryClient.invalidateQueries({ queryKey: queryKeys.trades.all });
       toast.success('Account deleted');
       return true;
     } catch (error) {
@@ -147,7 +159,7 @@ export function useTradingAccounts(userId: string | undefined) {
       toast.error('Failed to delete account');
       return false;
     }
-  }, [userId, accounts, selectedAccountId, setSelectedAccountId, invalidate]);
+  }, [userId, accounts, selectedAccountId, setSelectedAccountId, invalidate, queryClient]);
 
   const setDefaultAccount = useCallback(async (id: string) => {
     if (!userId) return false;

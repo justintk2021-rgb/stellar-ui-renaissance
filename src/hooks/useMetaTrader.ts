@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { clearBrokerSelectionStorage } from '@/lib/brokerAccountSwitch';
 import { toast } from 'sonner';
 import type {
   AccountSummary,
@@ -228,6 +229,7 @@ export function useMetaTrader() {
     try {
       await invokeMt5Bridge('disconnect', { connectionId: connection.id });
       toast.success('MT5 connection removed');
+      clearBrokerSelectionStorage();
       setLatestBridgeKey(null);
       const remaining = connections.filter((c) => c.id !== connection.id);
       selectConnection(remaining[0]?.id ?? null);

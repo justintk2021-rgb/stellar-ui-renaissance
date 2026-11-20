@@ -9,6 +9,7 @@ import {
   type PnlTrade,
 } from "@/lib/tradePnl";
 import {
+  computeDayWinLossStats,
   computeWinLossStats,
   getTradeNetResult,
   journalTradeStats,
@@ -329,5 +330,47 @@ describe("cache-aware journal helpers stay on the same module", () => {
     expect(extremes.best?.id).toBe("new");
     expect(extremes.worst?.id).toBe("loss");
     expect(getTradeNetResult(extremes.best!)).toBe(25);
+  });
+
+  it("computes day win rate from net P&L per close date, not per trade", () => {
+    // Day 1: two wins → one winning day. Day 2: one loss → one losing day.
+    // Trade WR = 2/3 ≈ 66.7%. Day WR = 1/2 = 50%.
+    const trades = [
+      asTrade({
+        id: "w1",
+        result: 50,
+        openTime: "2026-06-01T10:00:00.000Z",
+        closeTime: "2026-06-01T14:00:00.000Z",
+        date: "2026-06-01",
+      }),
+      asTrade({
+        id: "w2",
+        result: 20,
+        openTime: "2026-06-01T11:00:00.000Z",
+        closeTime: "2026-06-01T15:00:00.000Z",
+        date: "2026-06-01",
+      }),
+      asTrade({
+        id: "l1",
+        result: -30,
+        openTime: "2026-06-02T10:00:00.000Z",
+        closeTime: "2026-06-02T14:00:00.000Z",
+        date: "2026-06-02",
+      }),
+    ];
+
+    const tradeStats = computeWinLossStats(trades);
+    const dayStats = computeDayWinLossStats(trades);
+
+    expect(tradeStats).toMatchObject({ wins: 2, losses: 1, total: 3 });
+    expect(tradeStats.winRate).toBeCloseTo((2 / 3) * 100);
+
+    expect(dayStats).toMatchObject({
+      winningDays: 1,
+      losingDays: 1,
+      breakevenDays: 0,
+      tradingDays: 2,
+      dayWinRate: 50,
+    });
   });
 });

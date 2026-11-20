@@ -24,10 +24,16 @@ import {
 import { useChecklists, ChecklistType } from "@/hooks/useChecklists";
 import { supabase } from "@/integrations/supabase/client";
 import { journalTradeStats } from "@/lib/tradeFormat";
+import {
+  fetchActiveAccountIdSets,
+  tradeBelongsToActiveAccount,
+} from "@/lib/activeAccounts";
+import type { ChecklistItemState } from "@/types/trade";
 import { filterLivePlaybookTrades } from "./PlaybookBacktesting";
+import { PlaybookScorecard } from "./PlaybookScorecard";
 
 const PLAYBOOK_TRADE_SELECT =
-  "id, date, pair, direction, result, checklist_id, account_id, broker_account_id, session, swap, commission, imported_from_broker, broker_position_id, last_broker_sync_at";
+  "id, date, pair, direction, result, checklist_id, account_id, broker_account_id, session, swap, commission, imported_from_broker, broker_position_id, last_broker_sync_at, checklist_state, grade, market_type";
 
 function mapPlaybookTrade(row: Record<string, unknown>) {
   return {
@@ -45,55 +51,14 @@ function mapPlaybookTrade(row: Record<string, unknown>) {
     importedFromBroker: Boolean(row.imported_from_broker),
     brokerPositionId: (row.broker_position_id as string | null) ?? null,
     lastBrokerSyncAt: (row.last_broker_sync_at as string | null) ?? null,
+    checklistState: Array.isArray(row.checklist_state)
+      ? (row.checklist_state as ChecklistItemState[])
+      : undefined,
+    grade: (row.grade as string | null) ?? null,
+    marketType: (row.market_type as string | null) ?? null,
   };
 }
 
-/** Only keep trades linked to accounts that still exist on the site. */
-function tradeBelongsToActiveAccount(
-  trade: ReturnType<typeof mapPlaybookTrade>,
-  manualIds: Set<string>,
-  brokerExternalIds: Set<string>,
-) {
-  if (trade.brokerAccountId) return brokerExternalIds.has(trade.brokerAccountId);
-  if (trade.accountId) return manualIds.has(trade.accountId);
-  return false;
-}
-
-async function fetchActiveAccountIdSets(userId: string) {
-  const [{ data: manuals }, { data: connections }] = await Promise.all([
-    supabase.from("trading_accounts").select("id").eq("user_id", userId),
-    supabase
-      .from("broker_connections")
-      .select("id, connection_status")
-      .eq("user_id", userId)
-      .neq("connection_status", "disconnected"),
-  ]);
-
-  const manualIds = new Set((manuals || []).map((row) => String(row.id)));
-  const brokerExternalIds = new Set<string>();
-
-  const visibleConnections = (connections || []).filter(
-    (conn) =>
-      conn.connection_status === "connected" ||
-      conn.connection_status === "expired" ||
-      conn.connection_status === "connecting" ||
-      conn.connection_status === "pending",
-  );
-
-  for (const conn of visibleConnections) {
-    const { data: accounts } = await supabase
-      .from("broker_accounts")
-      .select("account_id_external")
-      .eq("broker_connection_id", conn.id);
-    for (const account of accounts || []) {
-      if (account.account_id_external) {
-        brokerExternalIds.add(String(account.account_id_external));
-      }
-    }
-  }
-
-  return { manualIds, brokerExternalIds };
-}
 export function PlaybookView() {
   const { checklists, loading, isAuthenticated, createChecklist, updateChecklist, deleteChecklist } = useChecklists();
   const [newChecklistName, setNewChecklistName] = useState("");
@@ -109,7 +74,8 @@ export function PlaybookView() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   // Detail view state
   const [showDetailView, setShowDetailView] = useState(false);
-  const [allTrades, setAllTrades] = useState<any[]>([]);
+  const [allTrades, setAllTrades] = useState<ReturnType<typeof mapPlaybookTrade>[]>([]);
+  const [unlinkedTrades, setUnlinkedTrades] = useState<ReturnType<typeof mapPlaybookTrade>[]>([]);
 
   const selectedChecklist = checklists.find(c => c.id === selectedChecklistId) || null;
   const selectedMetrics = checklistMetrics.find(m => m.checklistId === selectedChecklistId);
@@ -122,23 +88,33 @@ export function PlaybookView() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setAllTrades([]);
+        setUnlinkedTrades([]);
         setChecklistMetrics([]);
         return;
       }
 
-      const [{ data, error }, accountSets] = await Promise.all([
+      const [{ data, error }, { data: unlinkedData, error: unlinkedError }, accountSets] = await Promise.all([
         supabase.from("trades").select(PLAYBOOK_TRADE_SELECT).not("checklist_id", "is", null),
+        supabase.from("trades").select(PLAYBOOK_TRADE_SELECT).is("checklist_id", null),
         fetchActiveAccountIdSets(user.id),
       ]);
       if (error) throw error;
+      if (unlinkedError) throw unlinkedError;
 
       const activeTrades = (data || [])
-        .map((row) => mapPlaybookTrade(row as Record<string, unknown>))
+        .map((row) => mapPlaybookTrade(row as unknown as Record<string, unknown>))
+        .filter((trade) =>
+          tradeBelongsToActiveAccount(trade, accountSets.manualIds, accountSets.brokerExternalIds),
+        );
+
+      const activeUnlinked = (unlinkedData || [])
+        .map((row) => mapPlaybookTrade(row as unknown as Record<string, unknown>))
         .filter((trade) =>
           tradeBelongsToActiveAccount(trade, accountSets.manualIds, accountSets.brokerExternalIds),
         );
 
       setAllTrades(activeTrades);
+      setUnlinkedTrades(activeUnlinked);
 
       const byChecklist = new Map<string, ReturnType<typeof mapPlaybookTrade>[]>();
       for (const trade of filterLivePlaybookTrades(activeTrades)) {
@@ -151,6 +127,7 @@ export function PlaybookView() {
       setChecklistMetrics(
         checklists.map((checklist) => {
           const stats = journalTradeStats(byChecklist.get(checklist.id) || []);
+          const avgR = stats.avgLoss > 0 ? stats.avgWin / stats.avgLoss : null;
           return {
             checklistId: checklist.id,
             checklistName: checklist.name,
@@ -159,6 +136,10 @@ export function PlaybookView() {
             losingTrades: stats.losses,
             totalPnL: stats.netPnL,
             winRate: stats.winRate,
+            profitFactor: stats.profitFactor,
+            avgR,
+            avgWin: stats.avgWin,
+            avgLoss: stats.avgLoss,
           };
         }),
       );
@@ -313,6 +294,8 @@ export function PlaybookView() {
             </div>
           </div>
         </div>
+
+        {!metricsLoading ? <PlaybookScorecard metrics={checklistMetrics} /> : null}
 
         {/* Type Selection Dialog */}
         <Dialog open={isTypeSelectOpen} onOpenChange={setIsTypeSelectOpen}>
@@ -515,6 +498,7 @@ export function PlaybookView() {
         checklist={selectedChecklist}
         metrics={selectedMetrics}
         trades={allTrades}
+        unlinkedTrades={unlinkedTrades}
         onBack={() => { setSelectedChecklistId(null); setShowDetailView(false); }}
         onUpdateNotes={(notes) => {
           updateChecklist(selectedChecklist.id, { notes });

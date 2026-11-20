@@ -103,10 +103,10 @@ export function computeProjectionMetrics(input: ProjectionMetricsInput): Project
   };
 }
 
-/** Parse a starting-balance field. Empty or invalid input is not replaced with a default. */
+/** Parse a starting-balance field. Empty or invalid input is not replaced with a default. Negatives are allowed. */
 export function parseStartingBalance(raw: string): number | null {
   const n = Number.parseFloat(raw.trim());
-  if (!Number.isFinite(n) || n < 0) return null;
+  if (!Number.isFinite(n)) return null;
   return n;
 }
 
@@ -183,7 +183,9 @@ export function deriveStartBalance(
   liveBalance: number | null,
   netPnL: number,
 ): number {
-  if (storedStart != null && Number.isFinite(storedStart) && storedStart >= 0) {
+  // Negatives are allowed: a starting balance of -500 subtracts from current balance
+  // (current = start + net PnL).
+  if (storedStart != null && Number.isFinite(storedStart)) {
     return storedStart;
   }
   if (liveBalance != null && Number.isFinite(liveBalance)) {
